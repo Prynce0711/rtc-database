@@ -1,24 +1,38 @@
-import { useState } from 'react'
-import './App.css'
-import { RTCData, sampleData } from './assets/components/SampleData'
+import "./App.css";
+import { useState } from "react";
+import Login from "./assets/components/login";
+import AdminDashboard from "./assets/components/Dashboard/AdminDashboard";
+import StaffDashboard from "./assets/components/Dashboard/StaffDashboard";
+
+type View = "login" | "admin" | "staff";
 
 function App() {
-  const [data, setData] = useState<RTCData[] | null>(sampleData)
+  const [currentView, setCurrentView] = useState<View>("login");
+
+  const handleAdminLogin = () => {
+    setCurrentView("admin");
+  };
+
+  const handleStaffLogin = () => {
+    setCurrentView("staff");
+  };
+
+  const handleLogout = () => {
+    setCurrentView("login");
+  };
 
   return (
     <>
-      <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">RTC Sample Data</h1>
-        <ul>
-          {data?.map((item) => (
-            <li key={item.id} className="mb-2">
-              <span className="font-semibold">{item.name}:</span> {item.value}
-            </li>
-          ))}
-        </ul>
-      </div>  
+      {currentView === "login" && (
+        <Login
+          onAdminLogin={handleAdminLogin}
+          onStaffLogin={handleStaffLogin}
+        />
+      )}
+      {currentView === "admin" && <AdminDashboard onLogout={handleLogout} />}
+      {currentView === "staff" && <StaffDashboard onLogout={handleLogout} />}
     </>
-  )
+  );
 }
 
-export default App
+export default App;
