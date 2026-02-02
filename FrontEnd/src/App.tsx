@@ -1,9 +1,11 @@
 import "./App.css";
 import { useState } from "react";
-import Login from "./assets/components/login";
+import Footer from "./assets/components/Footer";
+import Login from "./assets/components/Login";
 import AdminDashboard from "./assets/components/Dashboard/AdminDashboard";
 import StaffDashboard from "./assets/components/Dashboard/StaffDashboard";
-
+import SidebarStaff from "./assets/components/Sidebar/SidebarStaff";
+import SidebarAdmin from "./assets/components/Sidebar/SidebarAdmin";
 type View = "login" | "admin" | "staff";
 
 function App() {
@@ -24,13 +26,26 @@ function App() {
   return (
     <>
       {currentView === "login" && (
-        <Login
-          onAdminLogin={handleAdminLogin}
-          onStaffLogin={handleStaffLogin}
-        />
+        <>
+          <Login
+            onAdminLogin={handleAdminLogin}
+            onStaffLogin={handleStaffLogin}
+          />
+          <Footer />
+        </>
       )}
-      {currentView === "admin" && <AdminDashboard onLogout={handleLogout} />}
-      {currentView === "staff" && <StaffDashboard onLogout={handleLogout} />}
+      {currentView === "admin" && (
+        <SidebarAdmin>
+          <AdminDashboard onLogout={handleLogout} />
+          <Footer />
+        </SidebarAdmin>
+      )}
+      {currentView === "staff" && (
+        <SidebarStaff>
+          <StaffDashboard onLogout={handleLogout} />
+          <Footer />
+        </SidebarStaff>
+      )}
     </>
   );
 }

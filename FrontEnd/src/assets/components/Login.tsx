@@ -18,7 +18,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
@@ -109,14 +109,6 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
           >
             Continue as Staff
           </button>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-xs text-gray-600">
-          <p>For authorized personnel only</p>
-          <p className="mt-1">
-            © 2026 Regional Trial Court - Republic of the Philippines
-          </p>
         </div>
       </div>
     </div>
