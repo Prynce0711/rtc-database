@@ -7,5 +7,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["prisma.config.ts", "prisma/seed.ts", "node_modules"]
 }
