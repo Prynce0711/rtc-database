@@ -1,0 +1,35 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+generator client2 {
+  provider = "prisma-client"
+  output   = "../../FrontEnd/src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Case{
+  id          Int      @id @default(autoincrement())
+  branch      String
+  assistantBranch String
+  caseNumber  String   @unique
+  dateFiled  DateTime
+  name        String
+  charge    String
+  infoSheet   String
+  court      String
+  detained    Boolean
+  consolidation   String
+  eqcNumber   Int?
+  bond Float
+  raffleDate DateTime?
+  committe1 Int?
+  committe2 Int?
+}
