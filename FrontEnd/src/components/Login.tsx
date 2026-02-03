@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { signIn } from "../lib/auth-client";
+import { getAuthClient } from "../lib/auth-client";
 
 interface LoginProps {
   onAdminLogin: () => void;
@@ -23,7 +23,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     // Add validation here
-    const { data, error } = await signIn.email({
+    const { data, error } = await getAuthClient().signIn.email({
       email,
       password,
     });

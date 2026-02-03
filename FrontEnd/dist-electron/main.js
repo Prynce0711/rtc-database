@@ -3130,10 +3130,6 @@ function startUdpListener(mainWindow) {
         port: payload.port,
         lastSeen: Date.now()
       };
-      console.log(
-        `📨 Received UDP from ${rinfo.address}:${rinfo.port} ->`,
-        backend
-      );
       mainWindow.webContents.send("udp:backend", backend);
     } catch (err) {
       console.warn("Invalid UDP packet:", err);

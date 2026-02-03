@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@rtc-database/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@5.4.21(@types/node@25.2.0)(lightningcss@1.30.2))
