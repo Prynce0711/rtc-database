@@ -1,6 +1,35 @@
+import { createAuthClient } from "better-auth/client";
 import { prisma } from "../src/lib/prisma";
 
+const baseURL = process.env.BETTER_AUTH_BASE_URL ?? "http://localhost:3000";
+const { signUp } = createAuthClient({
+  baseURL,
+  fetchOptions: {
+    headers: {
+      origin: baseURL,
+    },
+  },
+});
+
 async function main() {
+  await signUp.email(
+    {
+      email: "admin@admin.com", // user email address
+      password: "admin123", // user password -> min 8 characters by default
+      name: "Admin", // user display name
+    },
+    {
+      onError: (ctx) => {
+        console.error(`Failed to create admin user: ${ctx.error.message}`);
+      },
+    },
+  );
+
+  await prisma.user.update({
+    where: { email: "admin@admin.com" },
+    data: { role: "admin" },
+  });
+
   const cases = [
     {
       branch: "North Branch",
@@ -173,11 +202,9 @@ async function main() {
     },
   ];
 
-  for (const caseData of cases) {
-    await prisma.case.create({
-      data: caseData,
-    });
-  }
+  await prisma.case.createMany({
+    data: cases,
+  });
 
   console.log("Seeded 10 cases successfully!");
 }
