@@ -18,7 +18,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
@@ -29,18 +29,18 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
               className="w-32 h-32 object-contain"
             />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-base-content mb-2">
             Regional Trial Court
           </h1>
-          <p className="text-lg text-gray-700 font-semibold">
+          <p className="text-lg text-base-content font-semibold">
             Republic of the Philippines
           </p>
-          <p className="text-sm text-gray-600 italic mt-1">"Batas at Bayan"</p>
+          <p className="text-sm opacity-70 italic mt-1">"Batas at Bayan"</p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-lg shadow-xl p-8 border-t-4 border-blue-900">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+        <div className="bg-base-100 rounded-lg shadow-xl p-8 border-t-4 border-primary">
+          <h2 className="text-2xl font-bold text-base-content mb-6 text-center">
             Admin Login
           </h2>
 
@@ -48,7 +48,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-semibold text-gray-700 mb-2"
+                className="block text-sm font-semibold text-base-content mb-2"
               >
                 Email Address
               </label>
@@ -57,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none transition-all"
+                className="input input-bordered w-full"
                 placeholder="admin@rtc.gov.ph"
                 required
               />
@@ -66,7 +66,7 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-semibold text-gray-700 mb-2"
+                className="block text-sm font-semibold text-base-content mb-2"
               >
                 Password
               </label>
@@ -75,37 +75,25 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-900 focus:border-transparent outline-none transition-all"
+                className="input input-bordered w-full"
                 placeholder="Enter your password"
                 required
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full bg-blue-900 text-white py-3 rounded-md font-semibold hover:bg-blue-800 transition-colors shadow-lg text-lg"
-            >
+            <button type="submit" className="btn btn-primary w-full text-lg">
               Login as Admin
             </button>
           </form>
 
           {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500 font-medium">
-                OR
-              </span>
-            </div>
-          </div>
+          <div className="divider">OR</div>
 
           {/* Staff Login Button */}
           <button
             type="button"
             onClick={onStaffLogin}
-            className="w-full bg-white text-blue-900 border-2 border-blue-900 py-3 rounded-md font-semibold hover:bg-blue-50 transition-colors shadow-lg text-lg"
+            className="btn btn-outline btn-primary w-full text-lg"
           >
             Continue as Staff
           </button>

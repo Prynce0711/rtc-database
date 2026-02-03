@@ -35,14 +35,14 @@ function App() {
         </>
       )}
       {currentView === "admin" && (
-        <SidebarAdmin>
-          <AdminDashboard onLogout={handleLogout} />
+        <SidebarAdmin onLogout={handleLogout}>
+          <AdminDashboard />
           <Footer />
         </SidebarAdmin>
       )}
       {currentView === "staff" && (
-        <SidebarStaff>
-          <StaffDashboard onLogout={handleLogout} />
+        <SidebarStaff onLogout={handleLogout}>
+          <StaffDashboard />
           <Footer />
         </SidebarStaff>
       )}

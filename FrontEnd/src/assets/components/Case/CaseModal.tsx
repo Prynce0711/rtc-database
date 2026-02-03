@@ -1,25 +1,7 @@
 import React from "react";
-
-interface CaseData {
-  id: number;
-  branch: string;
-  asstBr: string;
-  caseNo: string;
-  dateFilled: string;
-  name: string;
-  charge: string;
-  infoSheet: string;
-  courtDetained: string;
-  consolidation: string;
-  ecqNo: string;
-  bond: string;
-  raffleDate: string;
-  committee1: string;
-  committee2: string;
-}
-
+import type { Case } from "../../../generated/prisma/client";
 interface CaseModalProps {
-  caseData: CaseData;
+  caseData: Case;
   onClose: () => void;
 }
 
@@ -32,7 +14,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
         {/* Case Number Header */}
         <div className="bg-primary text-primary-content p-4 rounded-lg mb-6">
           <div className="text-sm opacity-80">Case Number</div>
-          <div className="text-2xl font-bold">{caseData.caseNo}</div>
+          <div className="text-2xl font-bold">{caseData.caseNumber}</div>
         </div>
 
         {/* Case Information Grid */}
@@ -53,16 +35,16 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
                 <span className="label-text font-semibold">ASST. BR.</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
-                {caseData.asstBr}
+                {caseData.assistantBranch}
               </div>
             </div>
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-semibold">Date Filled</span>
+                <span className="label-text font-semibold">Date Filed</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
-                {caseData.dateFilled}
+                {new Date(caseData.dateFiled).toLocaleDateString()}
               </div>
             </div>
 
@@ -93,17 +75,22 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-semibold">Court Detained</span>
+                <span className="label-text font-semibold">Court</span>
+              </label>
+              <div className="p-3 bg-base-200 rounded-lg">{caseData.court}</div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Detained</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
                 <span
                   className={`badge ${
-                    caseData.courtDetained === "Yes"
-                      ? "badge-error"
-                      : "badge-success"
+                    caseData.detained ? "badge-error" : "badge-success"
                   }`}
                 >
-                  {caseData.courtDetained}
+                  {caseData.detained ? "Yes" : "No"}
                 </span>
               </div>
             </div>
@@ -132,7 +119,9 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
               <label className="label">
                 <span className="label-text font-semibold">ECQ NO.</span>
               </label>
-              <div className="p-3 bg-base-200 rounded-lg">{caseData.ecqNo}</div>
+              <div className="p-3 bg-base-200 rounded-lg">
+                {caseData.eqcNumber ?? "N/A"}
+              </div>
             </div>
 
             <div className="form-control">
@@ -141,7 +130,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
                 <span className="text-lg font-semibold text-success">
-                  {caseData.bond}
+                  ${caseData.bond.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -151,7 +140,9 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
                 <span className="label-text font-semibold">Raffle Date</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
-                {caseData.raffleDate}
+                {caseData.raffleDate
+                  ? new Date(caseData.raffleDate).toLocaleDateString()
+                  : "N/A"}
               </div>
             </div>
 
@@ -160,7 +151,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
                 <span className="label-text font-semibold">Committee 1</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
-                {caseData.committee1}
+                {caseData.committe1 ?? "N/A"}
               </div>
             </div>
 
@@ -169,7 +160,7 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
                 <span className="label-text font-semibold">Committee 2</span>
               </label>
               <div className="p-3 bg-base-200 rounded-lg">
-                {caseData.committee2}
+                {caseData.committe2 ?? "N/A"}
               </div>
             </div>
           </div>
