@@ -5,7 +5,7 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"tsx watch src/server.ts\" \"prisma studio\"",
+    "dev": "concurrently \"tsx watch src/server.ts\" \"prisma studio --browser none\"",
     "build": "tsc",
     "start": "node dist/server.js"
   },
@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "better-auth": "^1.4.18",
     "dotenv": "^17.2.3",
     "express": "^5.2.1"
   },
