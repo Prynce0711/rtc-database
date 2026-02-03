@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { signIn } from "../../../lib/auth-client";
+import { getAuthClient } from "../../../lib/auth-client";
 
 interface Props {
   onSuccess: () => void;
@@ -21,7 +21,10 @@ const AdminLoginForm: React.FC<Props> = ({ onSuccess, onBack }) => {
     setPasswordError(password.length > 0 ? null : "Password is required");
     if (!emailValid || password.length === 0) return;
 
-    const { data, error } = await signIn.email({ email, password });
+    const { data, error } = await getAuthClient().signIn.email({
+      email,
+      password,
+    });
     if (data) {
       onSuccess();
     } else if (error) {
