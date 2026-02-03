@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import type { Case } from "../../../generated/prisma/client";
-import { ENDPOINTS } from "../../../lib/api";
+import type { Case } from "../../generated/prisma/client";
+import { ENDPOINTS } from "../../lib/api";
 
 const StaffDashboard: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
