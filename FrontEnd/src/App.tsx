@@ -1,11 +1,11 @@
 import "./App.css";
 import { useState } from "react";
-import Footer from "./assets/components/Footer";
-import Login from "./assets/components/Login";
-import AdminDashboard from "./assets/components/Dashboard/AdminDashboard";
-import StaffDashboard from "./assets/components/Dashboard/StaffDashboard";
-import SidebarStaff from "./assets/components/Sidebar/SidebarStaff";
-import SidebarAdmin from "./assets/components/Sidebar/SidebarAdmin";
+import Footer from "./components/Footer";
+import Login from "./components/Login";
+import AdminDashboard from "./components/Dashboard/AdminDashboard";
+import StaffDashboard from "./components/Dashboard/StaffDashboard";
+import SidebarStaff from "./components/Sidebar/SidebarStaff";
+import SidebarAdmin from "./components/Sidebar/SidebarAdmin";
 type View = "login" | "admin" | "staff";
 
 function App() {

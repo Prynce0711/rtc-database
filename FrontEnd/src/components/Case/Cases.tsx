@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import CaseModal from "./CaseModal";
-import type { Case } from "../../../generated/prisma/client";
-import { ENDPOINTS } from "../../../lib/api";
+import type { Case } from "../../generated/prisma/client";
+import { ENDPOINTS } from "../../lib/api";
 
 const Cases: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);

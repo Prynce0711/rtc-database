@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { signIn } from "../../lib/auth-client";
+import { signIn } from "../lib/auth-client";
 
 interface LoginProps {
   onAdminLogin: () => void;
