@@ -1,5 +1,5 @@
-import { UdpData } from "@rtc-database/shared/src";
-import { BackendInfo } from "@rtc-database/shared/src/UdpData.js";
+import { UdpData } from "@rtc-database/shared";
+import { BackendInfo } from "@rtc-database/shared";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
 

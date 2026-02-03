@@ -7,7 +7,7 @@ import Login from "./components/Login";
 import SidebarAdmin from "./components/Sidebar/SidebarAdmin";
 import SidebarStaff from "./components/Sidebar/SidebarStaff";
 import { setApiUrl } from "./lib/api";
-import { BackendInfo } from "@rtc-database/shared/src/UdpData.js";
+import { BackendInfo } from "@rtc-database/shared";
 type View = "login" | "admin" | "staff";
 
 function App() {
