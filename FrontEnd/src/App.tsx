@@ -1,15 +1,26 @@
+import { useEffect, useState } from "react";
 import "./App.css";
-import { useState } from "react";
-import Footer from "./components/Footer";
-import Login from "./components/Login";
 import AdminDashboard from "./components/Dashboard/AdminDashboard";
 import StaffDashboard from "./components/Dashboard/StaffDashboard";
-import SidebarStaff from "./components/Sidebar/SidebarStaff";
+import Footer from "./components/Footer";
+import Login from "./components/Login";
 import SidebarAdmin from "./components/Sidebar/SidebarAdmin";
+import SidebarStaff from "./components/Sidebar/SidebarStaff";
+import { setApiUrl } from "./lib/api";
+import { BackendInfo } from "@rtc-database/shared/src/UdpData.js";
 type View = "login" | "admin" | "staff";
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("login");
+
+  useEffect(() => {
+    // Listen for backend URL updates from UDP
+    if (window.ipcRenderer?.onBackend) {
+      window.ipcRenderer.onBackend((backend: BackendInfo) => {
+        setApiUrl(backend.url);
+      });
+    }
+  }, []);
 
   const handleAdminLogin = () => {
     setCurrentView("admin");

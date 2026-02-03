@@ -1,0 +1,16 @@
+{
+  "name": "rtc-database",
+  "version": "1.0.0",
+  "description": "RTC Database monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "dev:backend": "pnpm --filter rtc-backend dev",
+    "dev:frontend": "pnpm --filter rtc dev",
+    "dev": "concurrently \"pnpm --filter @rtc-database/shared build:watch\" \"pnpm --filter rtc-backend dev\" \"pnpm --filter rtc dev\"",
+    "build": "pnpm --filter '@rtc-database/shared' build && pnpm --filter rtc-backend build && pnpm --filter rtc build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
