@@ -1,13 +1,21 @@
 import { toNodeHandler } from "better-auth/node";
+import cors from "cors";
 import express from "express";
 import { auth } from "./lib/auth";
 import { prisma } from "./lib/prisma";
 
 const app = express();
 
-app.all("/api/auth/{*any}", toNodeHandler(auth));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://localhost:3000"],
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
+
+app.all("/api/auth/{*any}", toNodeHandler(auth));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
