@@ -1,11 +1,18 @@
 import { createAuthClient } from "better-auth/client";
 import { adminClient } from "better-auth/client/plugins";
+import { getApiUrl } from "./api";
 
-const API_URL = import.meta.env.API_URL || "http://localhost:3000";
-
-console.log("Auth Client initialized with API_URL:", API_URL);
-
-export const { signIn, signUp, useSession } = createAuthClient({
-  baseURL: API_URL,
+let authClient = createAuthClient({
+  baseURL: getApiUrl(),
   plugins: [adminClient()],
 });
+
+export const reinitializeAuthClient = () => {
+  authClient = createAuthClient({
+    baseURL: getApiUrl(),
+    plugins: [adminClient()],
+  });
+  console.log("🔐 Auth client reinitialized with URL:", getApiUrl());
+};
+
+export const getAuthClient = () => authClient;
