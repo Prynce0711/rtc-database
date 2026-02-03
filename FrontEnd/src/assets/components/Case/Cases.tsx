@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import CaseModal from "../Case/CaseModal";
+import CaseModal from "./CaseModal";
 import type { Case } from "../../../generated/prisma/client";
 
 const Cases: React.FC = () => {
