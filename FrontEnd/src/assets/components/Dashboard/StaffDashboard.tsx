@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import type { Case } from "../../../generated/prisma/client";
+import { ENDPOINTS } from "../../../lib/api";
 
 const StaffDashboard: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -10,7 +11,7 @@ const StaffDashboard: React.FC = () => {
     const fetchCases = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/cases");
+        const response = await fetch(ENDPOINTS.CASES);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

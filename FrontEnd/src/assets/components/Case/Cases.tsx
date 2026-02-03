@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import CaseModal from "./CaseModal";
 import type { Case } from "../../../generated/prisma/client";
+import { ENDPOINTS } from "../../../lib/api";
 
 const Cases: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -21,7 +22,7 @@ const Cases: React.FC = () => {
     const fetchCases = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/cases");
+        const response = await fetch(ENDPOINTS.CASES);
 
         console.log("Fetch response:", response);
         if (!response.ok) {
