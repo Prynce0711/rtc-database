@@ -1,7 +1,7 @@
 import "./App.css";
 import { useState } from "react";
 import Footer from "./components/Footer";
-import Login from "./components/Login";
+import Login from "./components/login/Login";
 import AdminDashboard from "./components/Dashboard/AdminDashboard";
 import StaffDashboard from "./components/Dashboard/StaffDashboard";
 import SidebarStaff from "./components/Sidebar/SidebarStaff";

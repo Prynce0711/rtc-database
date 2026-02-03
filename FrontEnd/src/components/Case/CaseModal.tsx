@@ -163,6 +163,15 @@ const CaseModal: React.FC<CaseModalProps> = ({ caseData, onClose }) => {
                 {caseData.committe2 ?? "N/A"}
               </div>
             </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Complainant</span>
+              </label>
+              <div className="p-3 bg-base-200 rounded-lg">
+                {caseData.complainant}
+              </div>
+            </div>
           </div>
         </div>
 
