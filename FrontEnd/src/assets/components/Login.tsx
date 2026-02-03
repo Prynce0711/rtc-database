@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { signIn } from "../../lib/auth-client";
 
 interface LoginProps {
   onAdminLogin: () => void;
@@ -8,12 +9,30 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hasError, setHasError] = useState<boolean>(false);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (hasError) {
+      const timer = setTimeout(() => {
+        setHasError(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasError]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     // Add validation here
-    if (email && password) {
+    const { data, error } = await signIn.email({
+      email,
+      password,
+    });
+
+    if (data) {
+      console.log("Admin logged in:", data);
       onAdminLogin();
+    } else if (error) {
+      setHasError(true);
     }
   };
 
@@ -81,8 +100,12 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary w-full text-lg">
-              Login as Admin
+            <button
+              type="submit"
+              disabled={hasError}
+              className={`btn w-full text-lg ${hasError ? "btn-error" : "btn-primary"}`}
+            >
+              {hasError ? "Login Failed" : "Login as Admin"}
             </button>
           </form>
 
