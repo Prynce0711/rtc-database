@@ -6,7 +6,7 @@ import {
   initialCaseFormData,
   validateCaseForm,
 } from "./CaseForms";
-import { calculateCaseStats, sortCases } from "./Record";
+import { sortCases } from "./Record";
 
 const AdminCases: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -47,8 +47,6 @@ const AdminCases: React.FC = () => {
       setLoading(false);
     }
   };
-
-  const stats = useMemo(() => calculateCaseStats(cases), [cases]);
 
   const filteredAndSortedCases = useMemo(() => {
     let filtered = cases;
@@ -187,26 +185,6 @@ const AdminCases: React.FC = () => {
             Case Management
           </h2>
           <p className="opacity-70">Manage all court cases</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Total Cases</div>
-            <div className="stat-value text-primary">{stats.totalCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Detained</div>
-            <div className="stat-value text-warning">{stats.detainedCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Pending Raffle</div>
-            <div className="stat-value text-info">{stats.pendingCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Recently Filed</div>
-            <div className="stat-value text-success">{stats.recentlyFiled}</div>
-          </div>
         </div>
 
         {/* Search and Add */}
