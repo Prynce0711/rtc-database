@@ -1,5 +1,5 @@
 import React from "react";
-import type { Case } from "../../generated/prisma/client";
+import type { Case } from "../../../generated/prisma/client";
 interface CaseModalProps {
   caseData: Case;
   onClose: () => void;

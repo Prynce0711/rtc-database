@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useEffect } from "react";
-import Cases from "../Case/Cases";
+import Cases from "../Case/StaffCase/Cases";
 
 interface SidebarProps {
   children: ReactNode;
