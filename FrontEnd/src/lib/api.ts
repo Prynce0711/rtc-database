@@ -17,4 +17,7 @@ export const ENDPOINTS = {
   get CASES() {
     return `${API_URL}/cases`;
   },
+  get USERS() {
+    return `${API_URL}/users`;
+  },
 };

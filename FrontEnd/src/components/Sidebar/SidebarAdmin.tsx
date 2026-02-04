@@ -1,4 +1,5 @@
 import React, { ReactNode, useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 interface SidebarProps {
   children: ReactNode;
@@ -99,7 +100,16 @@ const SidebarAdmin: React.FC<SidebarProps> = ({
             </div>
           </header>
 
-          {children}
+          <motion.div
+            key={activeView}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.18 }}
+            className="min-h-screen w-full"
+          >
+            {children}
+          </motion.div>
         </div>
 
         <div className="drawer-side is-drawer-close:overflow-visible">
@@ -164,6 +174,33 @@ const SidebarAdmin: React.FC<SidebarProps> = ({
                     <circle cx="7" cy="7" r="3"></circle>
                   </svg>
                   <span className="is-drawer-close:hidden">Cases</span>
+                </button>
+              </li>
+
+              {/* Accounts */}
+              <li>
+                <button
+                  className={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${
+                    activeView === "accounts" ? "active" : ""
+                  }`}
+                  data-tip="Accounts"
+                  onClick={() => onNavigate?.("accounts")}
+                >
+                  {/* Accounts icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    strokeWidth="2"
+                    fill="none"
+                    stroke="currentColor"
+                    className="my-1.5 inline-block size-4"
+                  >
+                    <path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z"></path>
+                    <path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"></path>
+                  </svg>
+                  <span className="is-drawer-close:hidden">Accounts</span>
                 </button>
               </li>
             </ul>
