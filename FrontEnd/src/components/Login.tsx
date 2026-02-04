@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAuthClient } from "../lib/auth-client";
+import { getAuthClient } from "../lib/authClient";
 
 interface LoginProps {
   onAdminLogin: () => void;
@@ -20,19 +20,24 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
     }
   }, [hasError]);
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     // Add validation here
     const { data, error } = await getAuthClient().signIn.email({
       email,
       password,
     });
-
-    if (data) {
-      console.log("Admin logged in:", data);
-      onAdminLogin();
-    } else if (error) {
+    
+    if(error){
       setHasError(true);
+      return;
+    }
+
+    if(data?.user?.role === "admin") {
+      onAdminLogin();
+    }
+    else {
+      onStaffLogin();
     }
   };
 
@@ -60,10 +65,10 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
         {/* Login Form */}
         <div className="bg-base-100 rounded-lg shadow-xl p-8 border-t-4 border-primary">
           <h2 className="text-2xl font-bold text-base-content mb-6 text-center">
-            Admin Login
+            Login
           </h2>
 
-          <form onSubmit={handleAdminLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label
                 htmlFor="email"
@@ -105,21 +110,9 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
               disabled={hasError}
               className={`btn w-full text-lg ${hasError ? "btn-error" : "btn-primary"}`}
             >
-              {hasError ? "Login Failed" : "Login as Admin"}
+              {hasError ? "Login Failed" : "Login"}
             </button>
           </form>
-
-          {/* Divider */}
-          <div className="divider">OR</div>
-
-          {/* Staff Login Button */}
-          <button
-            type="button"
-            onClick={onStaffLogin}
-            className="btn btn-outline btn-primary w-full text-lg"
-          >
-            Continue as Staff
-          </button>
         </div>
       </div>
     </div>

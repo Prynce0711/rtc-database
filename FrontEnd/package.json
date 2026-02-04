@@ -18,6 +18,24 @@
     "tailwindcss": "^4.1.18",
     "zod": "^4.3.6"
   },
+  "build": {
+    "appId": "com.prynce0711.rtc-app",
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "directories": {
+      "buildResources": "dist",
+      "output": "release-builds"
+    }
+  },
   "devDependencies": {
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",

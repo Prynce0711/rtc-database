@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { getAuthClient } from "../../../lib/auth-client";
+import { getAuthClient } from "../../../lib/authClient";
 
 interface Props {
   onSuccess: () => void;

@@ -8,7 +8,7 @@ export const setApiUrl = (url: string) => {
   console.log("📡 API URL updated to:", url);
 
   // Dynamically import to avoid circular dependency
-  import("./auth-client").then(({ reinitializeAuthClient }) => {
+  import("./authClient").then(({ reinitializeAuthClient }) => {
     reinitializeAuthClient();
   });
 };

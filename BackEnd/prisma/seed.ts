@@ -25,6 +25,19 @@ async function main() {
     },
   );
 
+  await signUp.email(
+    {
+      email: "staff@staff.com", // user email address
+      password: "staff123", // user password -> min 8 characters by default
+      name: "Staff", // user display name
+    },
+    {
+      onError: (ctx) => {
+        console.error(`Failed to create admin user: ${ctx.error.message}`);
+      },
+    },
+  );
+
   await prisma.user.update({
     where: { email: "admin@admin.com" },
     data: { role: "admin" },
