@@ -33,7 +33,10 @@ const Login: React.FC<LoginProps> = ({ onAdminLogin, onStaffLogin }) => {
       return;
     }
 
-    if(data?.user?.role === "admin") {
+    // Type assertion for the role field
+    const user = data?.user as typeof data.user & { role?: string };
+    
+    if(user?.role === "admin") {
       onAdminLogin();
     }
     else {
