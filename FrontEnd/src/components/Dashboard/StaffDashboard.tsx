@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
 import { ENDPOINTS } from "../../lib/api";
+import { StatsCard, RecentCasesCard } from "./StaffCard";
 
 const StaffDashboard: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -55,69 +56,25 @@ const StaffDashboard: React.FC = () => {
             <>
               {/* Dashboard Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="card bg-base-100 shadow-xl border-l-4 border-primary">
-                  <div className="card-body">
-                    <h3 className="opacity-70 text-sm font-semibold">
-                      Total Cases
-                    </h3>
-                    <p className="text-3xl font-bold">{totalCases}</p>
-                  </div>
-                </div>
-                <div className="card bg-base-100 shadow-xl border-l-4 border-warning">
-                  <div className="card-body">
-                    <h3 className="opacity-70 text-sm font-semibold">
-                      Detained Cases
-                    </h3>
-                    <p className="text-3xl font-bold">{detainedCases}</p>
-                  </div>
-                </div>
-                <div className="card bg-base-100 shadow-xl border-l-4 border-success">
-                  <div className="card-body">
-                    <h3 className="opacity-70 text-sm font-semibold">
-                      Not Detained
-                    </h3>
-                    <p className="text-3xl font-bold">
-                      {totalCases - detainedCases}
-                    </p>
-                  </div>
-                </div>
+                <StatsCard
+                  title="Total Cases"
+                  value={totalCases}
+                  borderColor="primary"
+                />
+                <StatsCard
+                  title="Detained Cases"
+                  value={detainedCases}
+                  borderColor="warning"
+                />
+                <StatsCard
+                  title="Not Detained"
+                  value={totalCases - detainedCases}
+                  borderColor="success"
+                />
               </div>
 
               {/* Recent Cases */}
-              <div className="card bg-base-100 shadow-xl">
-                <div className="card-body">
-                  <h3 className="card-title">Recent Cases</h3>
-                  <div className="space-y-4">
-                    {recentCases.length > 0 ? (
-                      recentCases.map((caseItem) => (
-                        <div
-                          key={caseItem.id}
-                          className={`border-l-4 ${
-                            caseItem.detained
-                              ? "border-error"
-                              : "border-success"
-                          } pl-4 py-2`}
-                        >
-                          <p className="font-semibold">
-                            {caseItem.caseNumber} - {caseItem.charge}
-                          </p>
-                          <p className="text-sm opacity-70">
-                            {caseItem.name} | Branch: {caseItem.branch}
-                          </p>
-                          <p className="text-sm opacity-70">
-                            Filed:{" "}
-                            {new Date(caseItem.dateFiled).toLocaleDateString()}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 opacity-70">
-                        No cases found
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <RecentCasesCard cases={recentCases} />
             </>
           )}
         </main>

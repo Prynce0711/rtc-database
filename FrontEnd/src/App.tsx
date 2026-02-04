@@ -8,10 +8,13 @@ import SidebarAdmin from "./components/Sidebar/SidebarAdmin";
 import SidebarStaff from "./components/Sidebar/SidebarStaff";
 import { setApiUrl } from "./lib/api";
 import { BackendInfo } from "@rtc-database/shared";
+import { AdminCases } from "./components/Case/AdminCase";
 type View = "login" | "admin" | "staff";
+type AdminView = "dashboard" | "cases";
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("login");
+  const [adminView, setAdminView] = useState<AdminView>("dashboard");
 
   useEffect(() => {
     // Listen for backend URL updates from UDP
@@ -46,8 +49,17 @@ function App() {
         </>
       )}
       {currentView === "admin" && (
-        <SidebarAdmin onLogout={handleLogout}>
-          <AdminDashboard />
+        <SidebarAdmin
+          onLogout={handleLogout}
+          activeView={adminView}
+          onNavigate={(view) => setAdminView(view as AdminView)}
+        >
+          {adminView === "dashboard" && (
+            <AdminDashboard
+              onNavigate={(view) => setAdminView(view as AdminView)}
+            />
+          )}
+          {adminView === "cases" && <AdminCases />}
           <Footer />
         </SidebarAdmin>
       )}
