@@ -3,13 +3,14 @@
 import { signIn, useSession } from "@/app/lib/authClient";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-
+import { FiEye, FiEyeOff } from "react-icons/fi";
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
 
   const { data: session } = useSession();
 
@@ -81,10 +82,10 @@ const Login: React.FC = () => {
         {/* Login Form */}
         <div className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm transform transition-all duration-300 hover:shadow-3xl">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-base-content text-center">
+            <h2 className="text-4xl font-bold text-base-content text-center">
               Sign In
             </h2>
-            <p className="text-sm text-base-content/60 text-center mt-2">
+            <p className="text-md text-base-content/60 text-center mt-4">
               Enter your credentials to access your account
             </p>
           </div>
@@ -134,16 +135,28 @@ const Login: React.FC = () => {
                   Password
                 </span>
               </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200"
-                placeholder="••••••••"
-                required
-                disabled={isLoading}
-              />
+
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 pr-12"
+                  placeholder="••••••••"
+                  required
+                  disabled={isLoading}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content transition"
+                  disabled={isLoading}
+                >
+                  {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -177,6 +190,11 @@ const Login: React.FC = () => {
         <div className="text-center mt-8 text-sm text-base-content/50">
           <p>© 2026 Regional Trial Court. All rights reserved.</p>
         </div>
+        <p className="mt-2 text-xs opacity-60 text-center">
+          This system contains confidential information for authorized use only.
+          Unauthorized access is strictly prohibited and may lead to legal
+          action.
+        </p>
       </div>
 
       <style jsx>{`
