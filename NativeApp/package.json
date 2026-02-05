@@ -1,0 +1,56 @@
+{
+  "name": "rtc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@rtc-database/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.1.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.3.6"
+  },
+  "build": {
+    "appId": "com.prynce0711.rtc-app",
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "directories": {
+      "buildResources": "dist",
+      "output": "release-builds"
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "daisyui": "^5.5.16",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "main": "dist-electron/main.js"
+}

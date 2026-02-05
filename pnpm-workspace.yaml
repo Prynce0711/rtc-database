@@ -1,7 +1,7 @@
 packages:
   - packages/*
-  - FrontEnd
-  - BackEnd
+  - WebServer
+  - NativeApp
 
 onlyBuiltDependencies:
   - "@prisma/engines"
@@ -9,3 +9,5 @@ onlyBuiltDependencies:
   - electron
   - esbuild
   - prisma
+  - sharp
+  - unrs-resolver
