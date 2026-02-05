@@ -144,12 +144,15 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
       console.log(
         `⚠ ${validationResults.errors.length} rows have validation errors:`,
       );
+
+      let errorText = "";
       validationResults.errors.forEach(({ row, errors }) => {
+        errorText += `  Row ${row}: ${prettifyError(errors)}\n`;
         console.log(`  Row ${row}:`, prettifyError(errors));
       });
       return {
         success: false,
-        error: `Validation failed: ${validationResults.errors.length} rows have errors`,
+        error: `Validation failed: ${validationResults.errors.length} rows have errors\n${errorText}`,
       };
     }
 
