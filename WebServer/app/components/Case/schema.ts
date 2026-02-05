@@ -21,7 +21,9 @@ export const CaseSchema = z.object({
       z.string().transform((val) => (val ? parseInt(val) : undefined)),
     ])
     .optional(),
-  bond: z.union([z.number(), z.string().transform((val) => parseFloat(val))]),
+  bond: z
+    .union([z.number(), z.string().transform((val) => parseFloat(val))])
+    .optional(),
   raffleDate: z
     .union([
       z.date(),
@@ -41,4 +43,22 @@ export const CaseSchema = z.object({
     ])
     .optional(),
 });
-export type CaseType = z.infer<typeof CaseSchema>;
+export type CaseSchema = z.infer<typeof CaseSchema>;
+
+export const initialCaseFormData: CaseSchema = {
+  branch: "",
+  assistantBranch: "",
+  caseNumber: "",
+  dateFiled: new Date(),
+  name: "",
+  charge: "",
+  infoSheet: "",
+  court: "",
+  detained: false,
+  consolidation: "",
+  eqcNumber: undefined,
+  bond: 0,
+  raffleDate: undefined,
+  committe1: undefined,
+  committe2: undefined,
+};

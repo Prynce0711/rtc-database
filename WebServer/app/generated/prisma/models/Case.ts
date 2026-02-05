@@ -274,7 +274,7 @@ export type CaseGroupByOutputType = {
   detained: boolean
   consolidation: string
   eqcNumber: number | null
-  bond: number
+  bond: number | null
   raffleDate: Date | null
   committe1: number | null
   committe2: number | null
@@ -316,7 +316,7 @@ export type CaseWhereInput = {
   detained?: Prisma.BoolFilter<"Case"> | boolean
   consolidation?: Prisma.StringFilter<"Case"> | string
   eqcNumber?: Prisma.IntNullableFilter<"Case"> | number | null
-  bond?: Prisma.FloatFilter<"Case"> | number
+  bond?: Prisma.FloatNullableFilter<"Case"> | number | null
   raffleDate?: Prisma.DateTimeNullableFilter<"Case"> | Date | string | null
   committe1?: Prisma.IntNullableFilter<"Case"> | number | null
   committe2?: Prisma.IntNullableFilter<"Case"> | number | null
@@ -335,7 +335,7 @@ export type CaseOrderByWithRelationInput = {
   detained?: Prisma.SortOrder
   consolidation?: Prisma.SortOrder
   eqcNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  bond?: Prisma.SortOrder
+  bond?: Prisma.SortOrderInput | Prisma.SortOrder
   raffleDate?: Prisma.SortOrderInput | Prisma.SortOrder
   committe1?: Prisma.SortOrderInput | Prisma.SortOrder
   committe2?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -357,7 +357,7 @@ export type CaseWhereUniqueInput = Prisma.AtLeast<{
   detained?: Prisma.BoolFilter<"Case"> | boolean
   consolidation?: Prisma.StringFilter<"Case"> | string
   eqcNumber?: Prisma.IntNullableFilter<"Case"> | number | null
-  bond?: Prisma.FloatFilter<"Case"> | number
+  bond?: Prisma.FloatNullableFilter<"Case"> | number | null
   raffleDate?: Prisma.DateTimeNullableFilter<"Case"> | Date | string | null
   committe1?: Prisma.IntNullableFilter<"Case"> | number | null
   committe2?: Prisma.IntNullableFilter<"Case"> | number | null
@@ -376,7 +376,7 @@ export type CaseOrderByWithAggregationInput = {
   detained?: Prisma.SortOrder
   consolidation?: Prisma.SortOrder
   eqcNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  bond?: Prisma.SortOrder
+  bond?: Prisma.SortOrderInput | Prisma.SortOrder
   raffleDate?: Prisma.SortOrderInput | Prisma.SortOrder
   committe1?: Prisma.SortOrderInput | Prisma.SortOrder
   committe2?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -403,7 +403,7 @@ export type CaseScalarWhereWithAggregatesInput = {
   detained?: Prisma.BoolWithAggregatesFilter<"Case"> | boolean
   consolidation?: Prisma.StringWithAggregatesFilter<"Case"> | string
   eqcNumber?: Prisma.IntNullableWithAggregatesFilter<"Case"> | number | null
-  bond?: Prisma.FloatWithAggregatesFilter<"Case"> | number
+  bond?: Prisma.FloatNullableWithAggregatesFilter<"Case"> | number | null
   raffleDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Case"> | Date | string | null
   committe1?: Prisma.IntNullableWithAggregatesFilter<"Case"> | number | null
   committe2?: Prisma.IntNullableWithAggregatesFilter<"Case"> | number | null
@@ -421,7 +421,7 @@ export type CaseCreateInput = {
   detained: boolean
   consolidation: string
   eqcNumber?: number | null
-  bond: number
+  bond?: number | null
   raffleDate?: Date | string | null
   committe1?: number | null
   committe2?: number | null
@@ -440,7 +440,7 @@ export type CaseUncheckedCreateInput = {
   detained: boolean
   consolidation: string
   eqcNumber?: number | null
-  bond: number
+  bond?: number | null
   raffleDate?: Date | string | null
   committe1?: number | null
   committe2?: number | null
@@ -458,7 +458,7 @@ export type CaseUpdateInput = {
   detained?: Prisma.BoolFieldUpdateOperationsInput | boolean
   consolidation?: Prisma.StringFieldUpdateOperationsInput | string
   eqcNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  bond?: Prisma.FloatFieldUpdateOperationsInput | number
+  bond?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   raffleDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   committe1?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   committe2?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -477,7 +477,7 @@ export type CaseUncheckedUpdateInput = {
   detained?: Prisma.BoolFieldUpdateOperationsInput | boolean
   consolidation?: Prisma.StringFieldUpdateOperationsInput | string
   eqcNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  bond?: Prisma.FloatFieldUpdateOperationsInput | number
+  bond?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   raffleDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   committe1?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   committe2?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -496,7 +496,7 @@ export type CaseCreateManyInput = {
   detained: boolean
   consolidation: string
   eqcNumber?: number | null
-  bond: number
+  bond?: number | null
   raffleDate?: Date | string | null
   committe1?: number | null
   committe2?: number | null
@@ -514,7 +514,7 @@ export type CaseUpdateManyMutationInput = {
   detained?: Prisma.BoolFieldUpdateOperationsInput | boolean
   consolidation?: Prisma.StringFieldUpdateOperationsInput | string
   eqcNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  bond?: Prisma.FloatFieldUpdateOperationsInput | number
+  bond?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   raffleDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   committe1?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   committe2?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -533,7 +533,7 @@ export type CaseUncheckedUpdateManyInput = {
   detained?: Prisma.BoolFieldUpdateOperationsInput | boolean
   consolidation?: Prisma.StringFieldUpdateOperationsInput | string
   eqcNumber?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  bond?: Prisma.FloatFieldUpdateOperationsInput | number
+  bond?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   raffleDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   committe1?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   committe2?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -632,8 +632,8 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
-export type FloatFieldUpdateOperationsInput = {
-  set?: number
+export type NullableFloatFieldUpdateOperationsInput = {
+  set?: number | null
   increment?: number
   decrement?: number
   multiply?: number
@@ -748,7 +748,7 @@ export type $CasePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     detained: boolean
     consolidation: string
     eqcNumber: number | null
-    bond: number
+    bond: number | null
     raffleDate: Date | null
     committe1: number | null
     committe2: number | null

@@ -1,11 +1,13 @@
 "use client";
 
 import { useSession } from "@/app/lib/authClient";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
+import { usePopup } from "../Popup/PopupProvider";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
+import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
 
 const CasePage: React.FC = () => {
@@ -16,6 +18,10 @@ const CasePage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const session = useSession();
   const isAdmin = session?.data?.user?.role === "admin";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const statusPopup = usePopup();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -34,7 +40,8 @@ const CasePage: React.FC = () => {
       const response = await getCases();
 
       if (!response.success) {
-        throw new Error(response.error || "Failed to fetch cases");
+        statusPopup.showError(response.error || "Failed to fetch cases");
+        return;
       }
 
       setCases(response.result);
@@ -71,15 +78,91 @@ const CasePage: React.FC = () => {
   };
 
   const handleDeleteCase = async (caseId: string) => {
-    if (!confirm("Are you sure you want to delete this case?")) return;
+    if (
+      !(await statusPopup.showYesNo(
+        "Are you sure you want to delete this case?",
+      ))
+    )
+      return;
     try {
+      statusPopup.showLoading("Deleting case...");
       const response = await deleteCase(caseId);
       if (!response.success) {
-        throw new Error("Failed to delete case");
+        statusPopup.showError("Failed to delete case");
+        return;
       }
       await fetchCases();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete case");
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to delete case",
+      );
+    }
+  };
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      statusPopup.showLoading("Importing Excel...");
+      const response = await uploadExcel(file);
+      if (!response.success) {
+        statusPopup.showError(response.error || "Failed to import Excel");
+        return;
+      }
+      await fetchCases();
+      statusPopup.showSuccess("Excel imported successfully");
+    } catch (err) {
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to import Excel",
+      );
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      setUploading(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const result = await exportCasesExcel();
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to export Excel");
+        return;
+      }
+      if (!result.result) {
+        statusPopup.showError("No data to export");
+        return;
+      }
+
+      const { base64, fileName } = result.result;
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      const blob = new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to export Excel",
+      );
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -143,6 +226,31 @@ const CasePage: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportExcel}
+          />
+          {isAdmin && (
+            <button
+              className={`btn btn-outline ${uploading ? "loading" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? "Importing..." : "Import Excel"}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className={`btn btn-outline ${exporting ? "loading" : ""}`}
+              onClick={handleExportExcel}
+              disabled={exporting}
+            >
+              {exporting ? "Exporting..." : "Export Excel"}
+            </button>
+          )}
           {isAdmin && (
             <button
               className="btn btn-primary"

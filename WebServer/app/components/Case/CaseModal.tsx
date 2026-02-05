@@ -1,12 +1,10 @@
 "use client";
 import { Case } from "@/app/generated/prisma/browser";
 import React, { useEffect, useState } from "react";
-import {
-  CaseFormData,
-  initialCaseFormData,
-  validateCaseForm,
-} from "./CaseForms";
+import { z } from "zod";
+import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
+import { CaseSchema, initialCaseFormData } from "./schema";
 
 export enum CaseModalType {
   ADD = "ADD",
@@ -26,8 +24,10 @@ const NewCaseModal = ({
   onCreate?: (caseData: Case) => void;
   onUpdate?: (caseData: Case) => void;
 }) => {
-  const [formData, setFormData] = useState<CaseFormData>(initialCaseFormData);
+  const [formData, setFormData] = useState<CaseSchema>(initialCaseFormData);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const statusPopup = usePopup();
 
   useEffect(() => {
     if (type === CaseModalType.EDIT && selectedCase) {
@@ -43,7 +43,7 @@ const NewCaseModal = ({
         detained: selectedCase.detained,
         consolidation: selectedCase.consolidation,
         eqcNumber: selectedCase.eqcNumber ?? undefined,
-        bond: selectedCase.bond,
+        bond: selectedCase.bond ?? undefined,
         raffleDate: selectedCase.raffleDate
           ? new Date(selectedCase.raffleDate)
           : undefined,
@@ -55,14 +55,42 @@ const NewCaseModal = ({
     }
   }, [type, selectedCase]);
 
+  const getFieldErrors = (
+    issues: z.core.$ZodIssue[],
+  ): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    issues.forEach((issue) => {
+      const key = issue.path[0];
+      if (typeof key === "string" && !errors[key]) {
+        errors[key] = issue.message;
+      }
+    });
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const errors = validateCaseForm(formData);
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
+    if (
+      !(await statusPopup.showYesNo(
+        type === CaseModalType.EDIT
+          ? "Are you sure you want to update this case?"
+          : "Are you sure you want to create this case?",
+      ))
+    )
+      return;
+
+    const validation = CaseSchema.safeParse(formData);
+    if (!validation.success) {
+      setFormErrors(getFieldErrors(validation.error.issues));
       return;
     }
+    setFormErrors({});
+
+    setIsSubmitting(true);
+    statusPopup.showLoading(
+      type === CaseModalType.EDIT ? "Updating case..." : "Creating case...",
+    );
 
     try {
       const caseDataToSend = {
@@ -79,6 +107,7 @@ const NewCaseModal = ({
         if (onUpdate) {
           onUpdate(response.result);
         }
+        statusPopup.showSuccess("Case updated successfully");
       } else {
         const response = await createCase(caseDataToSend);
         if (!response.success) {
@@ -87,11 +116,17 @@ const NewCaseModal = ({
         if (onCreate) {
           onCreate(response.result);
         }
+        statusPopup.showSuccess("Case created successfully");
       }
 
       onClose();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save case");
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to save case",
+      );
+    } finally {
+      setIsSubmitting(false);
+      statusPopup.hidePopup();
     }
   };
 
@@ -432,13 +467,18 @@ const NewCaseModal = ({
             <button
               type="button"
               className="btn"
+              disabled={isSubmitting}
               onClick={() => {
                 onClose();
               }}
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button
+              type="submit"
+              className={`btn btn-primary ${isSubmitting ? "loading" : ""}`}
+              disabled={isSubmitting}
+            >
               {type === CaseModalType.EDIT ? "Update" : "Create"}
             </button>
           </div>

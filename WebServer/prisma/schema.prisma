@@ -23,7 +23,7 @@ model Case {
   detained        Boolean
   consolidation   String
   eqcNumber       Int?
-  bond            Float
+  bond            Float?
   raffleDate      DateTime?
   committe1       Int?
   committe2       Int?

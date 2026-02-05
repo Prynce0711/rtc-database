@@ -1,19 +1,16 @@
 "use server";
 
 import { Case } from "@/app/generated/prisma/client";
-import { auth } from "@/app/lib/auth";
+import { Role, validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import { headers } from "next/headers";
 import ActionResult from "../ActionResult";
 import { CaseSchema } from "./schema";
 
 export async function getCases(): Promise<ActionResult<Case[]>> {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user) {
-      return { success: false, error: "Unauthorized" };
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
     }
 
     const cases = await prisma.case.findMany();
@@ -28,11 +25,9 @@ export async function createCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user || session.user.role !== "admin") {
-      return { success: false, error: "Unauthorized" };
+    const sessionResult = await validateSession(Role.ADMIN);
+    if (!sessionResult.success) {
+      return sessionResult;
     }
 
     const caseData = CaseSchema.safeParse(data);
@@ -55,11 +50,9 @@ export async function updateCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user || session.user.role !== "admin") {
-      return { success: false, error: "Unauthorized" };
+    const sessionResult = await validateSession(Role.ADMIN);
+    if (!sessionResult.success) {
+      return sessionResult;
     }
 
     const caseData = CaseSchema.safeParse(data);
@@ -82,11 +75,9 @@ export async function deleteCase(
   caseNumber: string,
 ): Promise<ActionResult<void>> {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session?.user || session.user.role !== "admin") {
-      return { success: false, error: "Unauthorized" };
+    const sessionResult = await validateSession(Role.ADMIN);
+    if (!sessionResult.success) {
+      return sessionResult;
     }
 
     await prisma.case.delete({
