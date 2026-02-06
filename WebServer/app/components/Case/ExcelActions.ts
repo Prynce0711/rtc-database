@@ -203,7 +203,14 @@ export async function exportCasesExcel(): Promise<
     XLSX.utils.book_append_sheet(workbook, worksheet, "Cases");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-    const fileName = `cases-export-${Date.now()}.xlsx`;
+    const today = new Date();
+
+    const formattedDate =
+      today.toISOString().split("T")[0] +
+      " - " +
+      today.toTimeString().slice(0, 5).replace(":", "-");
+
+    const fileName = `RTC - CASES - ${formattedDate}.xlsx`;
 
     return { success: true, result: { fileName, base64 } };
   } catch (error) {
