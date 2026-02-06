@@ -218,6 +218,44 @@ const EmployeeDashboard: React.FC = () => {
     setCurrentPage(1);
   }, [search]);
 
+  const visiblePages = (() => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+      return pages;
+    }
+
+    pages.push(1);
+    pages.push(2);
+
+    let left = currentPage - 1;
+    let right = currentPage + 1;
+
+    if (left <= 2) left = 3;
+    if (right >= totalPages - 1) right = totalPages - 2;
+
+    if (left > 3) pages.push("...");
+
+    for (let p = left; p <= right; p++) {
+      pages.push(p);
+    }
+
+    if (right < totalPages - 2) pages.push("...");
+
+    pages.push(totalPages - 1);
+    pages.push(totalPages);
+
+    return pages;
+  })();
+
+  const getNextPage = () => {
+    for (let p = currentPage + 1; p <= totalPages; p++) {
+      const start = (p - 1) * rowsPerPage;
+      if (filtered.slice(start, start + rowsPerPage).length > 0) return p;
+    }
+    return currentPage;
+  };
+
   /* ================= FUNCTIONS ================= */
 
   function openAdd() {
@@ -568,37 +606,52 @@ const EmployeeDashboard: React.FC = () => {
             employees
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-md btn-circle shadow hover:shadow-md transition-shadow"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-            >
-              <FiChevronLeft size={20} />
-            </button>
+          <div className="flex items-center gap-2 text-sm">
+            <nav className="flex items-center gap-2">
+              {visiblePages.map((p, idx) => {
+                if (p === "...") {
+                  return (
+                    <span
+                      key={`dots-${idx}`}
+                      className="text-base-content/60 px-2"
+                    >
+                      …
+                    </span>
+                  );
+                }
 
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                className={`btn btn-md min-w-[45px] font-semibold transition-all rounded-lg
-                  ${
-                    currentPage === i + 1
-                      ? "btn-primary scale-105 shadow-md"
-                      : "btn-ghost hover:bg-base-200"
-                  }
-                `}
-                onClick={() => setCurrentPage(i + 1)}
-              >
-                {i + 1}
-              </button>
-            ))}
+                const page = Number(p);
+                const start = (page - 1) * rowsPerPage;
+                const hasData =
+                  filtered.slice(start, start + rowsPerPage).length > 0;
+                if (!hasData) return null;
+
+                return (
+                  <button
+                    key={`page-${page}`}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-1 ${
+                      currentPage === page
+                        ? "text-primary font-medium"
+                        : "text-primary/80 hover:underline"
+                    }`}
+                    aria-current={currentPage === page ? "page" : undefined}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="flex-1" />
 
             <button
-              className="btn btn-md btn-circle shadow hover:shadow-md transition-shadow"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
+              type="button"
+              onClick={() => setCurrentPage(getNextPage())}
+              className="text-sm text-primary/90 hover:underline disabled:text-base-content/40"
+              disabled={getNextPage() === currentPage}
             >
-              <FiChevronRight size={20} />
+              Next
             </button>
           </div>
         </div>
