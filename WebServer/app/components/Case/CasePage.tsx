@@ -3,16 +3,17 @@
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
+import { FilterValues, type FilterOption } from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "../Filter/FilterModal";
+import CaseDetailModal from "./CaseDetailModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
+import CaseDetailModal from "./CaseDetailModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+import { main, div } from "framer-motion/client";
+import CaseFilterModal from "./CaseFilterModal";
 
 type CaseFilterValues = {
   branch?: string;
@@ -36,8 +37,13 @@ const CasePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
+  const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
   const session = useSession();
-  const isAdmin = session?.data?.user?.role === "admin";
+  const isAdminOrAtty = session?.data?.user?.role === "admin" || session?.data?.user?.role === "atty";
+  const isAdminOrAtty =
+    session?.data?.user?.role === "admin" ||
+    session?.data?.user?.role === "atty";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -49,6 +55,7 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
 
@@ -97,8 +104,7 @@ const CasePage: React.FC = () => {
 
   const filteredAndSortedCases = useMemo(() => {
     // Start with advanced filtered cases if filters are applied, otherwise use all cases
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
+    const baseList = cases;
 
     let filtered = baseList;
 
@@ -111,15 +117,17 @@ const CasePage: React.FC = () => {
     }
 
     return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+  }, [cases, searchTerm, sortConfig, filteredByAdvanced]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
-  };
+  };  
 
+  const handleApplyFilters = (filtered: Case[]) => {
+   
   const getCaseSuggestions = (key: string, inputValue: string): string[] => {
     const textFields = [
       "branch",
@@ -284,9 +292,9 @@ const CasePage: React.FC = () => {
   };
 
   const handleApplyFilters = (filters: FilterValues) => {
-    const typedFilters = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typedFilters, cases);
-    setAppliedFilters(typedFilters);
+    const typed = filters as CaseFilterValues;
+    const filtered = applyCaseFilters(typed, cases);
+    setAppliedFilters(typed);
     setFilteredByAdvanced(filtered);
   };
 
@@ -383,6 +391,10 @@ const CasePage: React.FC = () => {
     setModalType(type);
   };
 
+  const handleRowClick = (caseItem: Case) => {
+    setCaseForDetailView(caseItem);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -447,7 +459,7 @@ const CasePage: React.FC = () => {
             onChange={handleImportExcel}
           />
           <button
-            className={`btn btn-outline ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+            className={`btn btn-outline`}
             onClick={() => setFilterModalOpen(true)}
           >
             <svg
@@ -464,7 +476,7 @@ const CasePage: React.FC = () => {
             </svg>
             Filter
           </button>
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className={`btn btn-outline ${uploading ? "loading" : ""}`}
               onClick={() => fileInputRef.current?.click()}
@@ -473,7 +485,7 @@ const CasePage: React.FC = () => {
               {uploading ? "Importing..." : "Import Excel"}
             </button>
           )}
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className={`btn btn-outline ${exporting ? "loading" : ""}`}
               onClick={handleExportExcel}
@@ -482,7 +494,7 @@ const CasePage: React.FC = () => {
               {exporting ? "Exporting..." : "Export Excel"}
             </button>
           )}
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className="btn btn-primary"
               onClick={() => showModal(CaseModalType.ADD)}
@@ -557,7 +569,7 @@ const CasePage: React.FC = () => {
                   {sortConfig.key === "dateFiled" &&
                     (sortConfig.order === "asc" ? "↑" : "↓")}
                 </th>
-                {isAdmin && <th>Actions</th>}
+                {isAdminOrAtty && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -568,6 +580,7 @@ const CasePage: React.FC = () => {
                   setSelectedCase={setSelectedCase}
                   showModal={showModal}
                   handleDeleteCase={handleDeleteCase}
+                  onRowClick={handleRowClick}
                 />
               ))}
             </tbody>
@@ -594,15 +607,24 @@ const CasePage: React.FC = () => {
           />
         )}
 
+        {/* Case Detail Modal */}
+        {caseForDetailView && (
+          <CaseDetailModal
+            caseData={caseForDetailView}
+            onClose={() => setCaseForDetailView(null)}
+          />
+        )}
+<<<<<<< HEAD
+
         {/* Filter Modal */}
-        <FilterModal
+        <CaseFilterModal
           isOpen={filterModalOpen}
           onClose={() => setFilterModalOpen(false)}
-          options={caseFilterOptions}
-          onApply={handleApplyFilters}
-          initialValues={appliedFilters}
-          getSuggestions={getCaseSuggestions}
+          onApplyFilters={handleApplyFilters}
+          cases={cases}
         />
+=======
+>>>>>>> eba2d61ca1fa7c888cbf35d0ad7460b77812c898
       </main>
     </div>
   );

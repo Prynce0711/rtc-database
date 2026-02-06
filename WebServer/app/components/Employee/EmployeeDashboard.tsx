@@ -17,8 +17,8 @@ import {
   FiBriefcase,
   FiDownload,
   FiEdit,
-  FiHeart,
   FiFilter,
+  FiHeart,
   FiMail,
   FiMapPin,
   FiPlus,
@@ -29,11 +29,11 @@ import {
   FiX,
 } from "react-icons/fi";
 
-import type { Employee } from "@/app/generated/prisma/browser";
 import FilterModal, {
   type FilterOption,
   type FilterValues,
 } from "@/app/components/Filter/FilterModal";
+import type { Employee } from "@/app/generated/prisma/browser";
 
 interface KpiCardProps {
   icon: React.ReactNode;

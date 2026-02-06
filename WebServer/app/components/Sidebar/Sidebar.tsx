@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
 import { AiOutlineTeam } from "react-icons/ai";
 import { FiHome } from "react-icons/fi";
-import { IoPersonCircleOutline } from "react-icons/io5";
+
 import { PiSlidersHorizontal } from "react-icons/pi";
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
@@ -18,6 +18,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
+  const isAtty = session?.user?.role === "atty";
 
   const pathname = usePathname();
   const rawTitle = pathname.split("/")[2] || "Dashboard";
@@ -55,6 +56,8 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             <ul className="menu w-full grow">
               {isAdmin
                 ? AdminSidebarContents(activeView)
+                : isAtty
+                ? AttorneySidebarContents(activeView)
                 : StaffSidebarContents(activeView)}
             </ul>
           </div>
@@ -82,14 +85,32 @@ function AdminSidebarContents(activeView: string) {
         activeView={activeView}
         href="employees"
       />
-      <SidebarButton
-        icon={<IoPersonCircleOutline size={20} />}
-        activeView={activeView}
-        href="accounts"
-      />
+
     </>
   );
 }
+
+
+function AttorneySidebarContents(activeView: string) {
+  return (
+    <>
+      <SidebarButton
+        icon={<FiHome size={20} />}
+        activeView={activeView}
+        href="dashboard"
+      />
+      <SidebarButton
+        icon={<PiSlidersHorizontal size={20} />}
+        activeView={activeView}
+        href="cases"
+      />
+
+
+    </>
+  );
+}
+
+
 
 function StaffSidebarContents(activeView: string) {
   return (
