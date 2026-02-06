@@ -6,14 +6,12 @@ import type { Case } from "../../generated/prisma/client";
 import { FilterValues, type FilterOption } from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
 import CaseDetailModal from "./CaseDetailModal";
+import CaseFilterModal from "./CaseFilterModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
-import CaseDetailModal from "./CaseDetailModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
-import { main, div } from "framer-motion/client";
-import CaseFilterModal from "./CaseFilterModal";
 
 type CaseFilterValues = {
   branch?: string;
@@ -38,9 +36,7 @@ const CasePage: React.FC = () => {
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
-  const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
   const session = useSession();
-  const isAdminOrAtty = session?.data?.user?.role === "admin" || session?.data?.user?.role === "atty";
   const isAdminOrAtty =
     session?.data?.user?.role === "admin" ||
     session?.data?.user?.role === "atty";
@@ -55,7 +51,6 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
 
@@ -124,510 +119,509 @@ const CasePage: React.FC = () => {
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
-  };  
+  };
 
   const handleApplyFilters = (filtered: Case[]) => {
-   
-  const getCaseSuggestions = (key: string, inputValue: string): string[] => {
-    const textFields = [
-      "branch",
-      "assistantBranch",
-      "caseNumber",
-      "name",
-      "charge",
-      "infoSheet",
-      "court",
-      "consolidation",
-    ];
+    const getCaseSuggestions = (key: string, inputValue: string): string[] => {
+      const textFields = [
+        "branch",
+        "assistantBranch",
+        "caseNumber",
+        "name",
+        "charge",
+        "infoSheet",
+        "court",
+        "consolidation",
+      ];
 
-    if (!textFields.includes(key)) return [];
+      if (!textFields.includes(key)) return [];
 
-    const values = cases
-      .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
-      .filter((v) => v.length > 0);
+      const values = cases
+        .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
+        .filter((v) => v.length > 0);
 
-    const unique = Array.from(new Set(values)).sort();
+      const unique = Array.from(new Set(values)).sort();
 
-    if (!inputValue) return unique;
+      if (!inputValue) return unique;
 
-    const lower = inputValue.toLowerCase();
-    return unique.filter((v) => v.toLowerCase().includes(lower));
-  };
+      const lower = inputValue.toLowerCase();
+      return unique.filter((v) => v.toLowerCase().includes(lower));
+    };
 
-  const applyCaseFilters = (
-    filters: CaseFilterValues,
-    items: Case[],
-  ): Case[] => {
-    return items.filter((caseItem) => {
-      if (
-        filters.branch &&
-        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.assistantBranch &&
-        !caseItem.assistantBranch
-          .toLowerCase()
-          .includes(filters.assistantBranch.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.caseNumber &&
-        !caseItem.caseNumber
-          .toLowerCase()
-          .includes(filters.caseNumber.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.name &&
-        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.charge &&
-        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.infoSheet &&
-        !caseItem.infoSheet
-          .toLowerCase()
-          .includes(filters.infoSheet.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.court &&
-        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.consolidation &&
-        !caseItem.consolidation
-          .toLowerCase()
-          .includes(filters.consolidation.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.eqcNumber !== undefined &&
-        caseItem.eqcNumber !== filters.eqcNumber
-      ) {
-        return false;
-      }
-
-      if (
-        filters.detained !== undefined &&
-        caseItem.detained !== filters.detained
-      ) {
-        return false;
-      }
-
-      if (filters.bond) {
+    const applyCaseFilters = (
+      filters: CaseFilterValues,
+      items: Case[],
+    ): Case[] => {
+      return items.filter((caseItem) => {
         if (
-          filters.bond.min !== undefined &&
-          (caseItem.bond === null || caseItem.bond < filters.bond.min)
+          filters.branch &&
+          !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
         ) {
           return false;
         }
+
         if (
-          filters.bond.max !== undefined &&
-          (caseItem.bond === null || caseItem.bond > filters.bond.max)
+          filters.assistantBranch &&
+          !caseItem.assistantBranch
+            .toLowerCase()
+            .includes(filters.assistantBranch.toLowerCase())
         ) {
           return false;
         }
-      }
 
-      if (filters.dateFiled) {
-        const caseDate = new Date(caseItem.dateFiled);
         if (
-          filters.dateFiled.start &&
-          caseDate < new Date(filters.dateFiled.start)
+          filters.caseNumber &&
+          !caseItem.caseNumber
+            .toLowerCase()
+            .includes(filters.caseNumber.toLowerCase())
         ) {
           return false;
         }
+
         if (
-          filters.dateFiled.end &&
-          caseDate > new Date(filters.dateFiled.end)
+          filters.name &&
+          !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
         ) {
           return false;
         }
-      }
 
-      if (filters.raffleDate) {
-        if (caseItem.raffleDate === null) {
-          return false;
-        }
-        const caseDate = new Date(caseItem.raffleDate);
         if (
-          filters.raffleDate.start &&
-          caseDate < new Date(filters.raffleDate.start)
+          filters.charge &&
+          !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
         ) {
           return false;
         }
+
         if (
-          filters.raffleDate.end &&
-          caseDate > new Date(filters.raffleDate.end)
+          filters.infoSheet &&
+          !caseItem.infoSheet
+            .toLowerCase()
+            .includes(filters.infoSheet.toLowerCase())
         ) {
           return false;
         }
-      }
 
-      return true;
-    });
-  };
+        if (
+          filters.court &&
+          !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
+        ) {
+          return false;
+        }
 
-  const handleApplyFilters = (filters: FilterValues) => {
-    const typed = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typed, cases);
-    setAppliedFilters(typed);
-    setFilteredByAdvanced(filtered);
-  };
+        if (
+          filters.consolidation &&
+          !caseItem.consolidation
+            .toLowerCase()
+            .includes(filters.consolidation.toLowerCase())
+        ) {
+          return false;
+        }
 
-  const handleDeleteCase = async (caseId: string) => {
-    if (
-      !(await statusPopup.showYesNo(
-        "Are you sure you want to delete this case?",
-      ))
-    )
-      return;
-    try {
-      statusPopup.showLoading("Deleting case...");
-      const response = await deleteCase(caseId);
-      if (!response.success) {
-        statusPopup.showError("Failed to delete case");
-        return;
-      }
-      await fetchCases();
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to delete case",
-      );
-    }
-  };
+        if (
+          filters.eqcNumber !== undefined &&
+          caseItem.eqcNumber !== filters.eqcNumber
+        ) {
+          return false;
+        }
 
-  const handleImportExcel = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      statusPopup.showLoading("Importing Excel...");
-      const response = await uploadExcel(file);
-      if (!response.success) {
-        statusPopup.showError(response.error || "Failed to import Excel");
-        return;
-      }
-      await fetchCases();
-      statusPopup.showSuccess("Excel imported successfully");
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to import Excel",
-      );
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      setUploading(false);
-    }
-  };
+        if (
+          filters.detained !== undefined &&
+          caseItem.detained !== filters.detained
+        ) {
+          return false;
+        }
 
-  const handleExportExcel = async () => {
-    setExporting(true);
-    try {
-      const result = await exportCasesExcel();
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to export Excel");
-        return;
-      }
-      if (!result.result) {
-        statusPopup.showError("No data to export");
-        return;
-      }
+        if (filters.bond) {
+          if (
+            filters.bond.min !== undefined &&
+            (caseItem.bond === null || caseItem.bond < filters.bond.min)
+          ) {
+            return false;
+          }
+          if (
+            filters.bond.max !== undefined &&
+            (caseItem.bond === null || caseItem.bond > filters.bond.max)
+          ) {
+            return false;
+          }
+        }
 
-      const { base64, fileName } = result.result;
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
+        if (filters.dateFiled) {
+          const caseDate = new Date(caseItem.dateFiled);
+          if (
+            filters.dateFiled.start &&
+            caseDate < new Date(filters.dateFiled.start)
+          ) {
+            return false;
+          }
+          if (
+            filters.dateFiled.end &&
+            caseDate > new Date(filters.dateFiled.end)
+          ) {
+            return false;
+          }
+        }
 
-      const blob = new Blob([bytes], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        if (filters.raffleDate) {
+          if (caseItem.raffleDate === null) {
+            return false;
+          }
+          const caseDate = new Date(caseItem.raffleDate);
+          if (
+            filters.raffleDate.start &&
+            caseDate < new Date(filters.raffleDate.start)
+          ) {
+            return false;
+          }
+          if (
+            filters.raffleDate.end &&
+            caseDate > new Date(filters.raffleDate.end)
+          ) {
+            return false;
+          }
+        }
+
+        return true;
       });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to export Excel",
+    };
+
+    const handleApplyFilters = (filters: FilterValues) => {
+      const typed = filters as CaseFilterValues;
+      const filtered = applyCaseFilters(typed, cases);
+      setAppliedFilters(typed);
+      setFilteredByAdvanced(filtered);
+    };
+
+    const handleDeleteCase = async (caseId: string) => {
+      if (
+        !(await statusPopup.showYesNo(
+          "Are you sure you want to delete this case?",
+        ))
+      )
+        return;
+      try {
+        statusPopup.showLoading("Deleting case...");
+        const response = await deleteCase(caseId);
+        if (!response.success) {
+          statusPopup.showError("Failed to delete case");
+          return;
+        }
+        await fetchCases();
+      } catch (err) {
+        statusPopup.showError(
+          err instanceof Error ? err.message : "Failed to delete case",
+        );
+      }
+    };
+
+    const handleImportExcel = async (
+      event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        statusPopup.showLoading("Importing Excel...");
+        const response = await uploadExcel(file);
+        if (!response.success) {
+          statusPopup.showError(response.error || "Failed to import Excel");
+          return;
+        }
+        await fetchCases();
+        statusPopup.showSuccess("Excel imported successfully");
+      } catch (err) {
+        statusPopup.showError(
+          err instanceof Error ? err.message : "Failed to import Excel",
+        );
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        setUploading(false);
+      }
+    };
+
+    const handleExportExcel = async () => {
+      setExporting(true);
+      try {
+        const result = await exportCasesExcel();
+        if (!result.success) {
+          statusPopup.showError(result.error || "Failed to export Excel");
+          return;
+        }
+        if (!result.result) {
+          statusPopup.showError("No data to export");
+          return;
+        }
+
+        const { base64, fileName } = result.result;
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        statusPopup.showError(
+          err instanceof Error ? err.message : "Failed to export Excel",
+        );
+      } finally {
+        setExporting(false);
+      }
+    };
+
+    const showModal = (type: CaseModalType | null) => {
+      setModalType(type);
+    };
+
+    const handleRowClick = (caseItem: Case) => {
+      setCaseForDetailView(caseItem);
+    };
+
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center min-h-screen">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
       );
-    } finally {
-      setExporting(false);
     }
-  };
 
-  const showModal = (type: CaseModalType | null) => {
-    setModalType(type);
-  };
-
-  const handleRowClick = (caseItem: Case) => {
-    setCaseForDetailView(caseItem);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="alert alert-error">
-        <span>Error: {error}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-base-200">
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-base-content mb-2">
-            Case Management
-          </h2>
-          <p className="opacity-70">Manage all court cases</p>
+    if (error) {
+      return (
+        <div className="alert alert-error">
+          <span>Error: {error}</span>
         </div>
+      );
+    }
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Total Cases</div>
-            <div className="stat-value text-primary">{stats.totalCases}</div>
+    return (
+      <div className="min-h-screen bg-base-200">
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-base-content mb-2">
+              Case Management
+            </h2>
+            <p className="opacity-70">Manage all court cases</p>
           </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Detained</div>
-            <div className="stat-value text-warning">{stats.detainedCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Pending Raffle</div>
-            <div className="stat-value text-info">{stats.pendingCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Recently Filed</div>
-            <div className="stat-value text-success">{stats.recentlyFiled}</div>
-          </div>
-        </div>
 
-        {/* Search and Add */}
-        <div className="flex gap-4 mb-6">
-          <input
-            type="text"
-            placeholder="Search cases..."
-            className="input input-bordered flex-1"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleImportExcel}
-          />
-          <button
-            className={`btn btn-outline`}
-            onClick={() => setFilterModalOpen(true)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Filter
-          </button>
-          {isAdminOrAtty && (
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="stat bg-base-100 rounded-lg shadow">
+              <div className="stat-title">Total Cases</div>
+              <div className="stat-value text-primary">{stats.totalCases}</div>
+            </div>
+            <div className="stat bg-base-100 rounded-lg shadow">
+              <div className="stat-title">Detained</div>
+              <div className="stat-value text-warning">
+                {stats.detainedCases}
+              </div>
+            </div>
+            <div className="stat bg-base-100 rounded-lg shadow">
+              <div className="stat-title">Pending Raffle</div>
+              <div className="stat-value text-info">{stats.pendingCases}</div>
+            </div>
+            <div className="stat bg-base-100 rounded-lg shadow">
+              <div className="stat-title">Recently Filed</div>
+              <div className="stat-value text-success">
+                {stats.recentlyFiled}
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Add */}
+          <div className="flex gap-4 mb-6">
+            <input
+              type="text"
+              placeholder="Search cases..."
+              className="input input-bordered flex-1"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportExcel}
+            />
             <button
-              className={`btn btn-outline ${uploading ? "loading" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? "Importing..." : "Import Excel"}
-            </button>
-          )}
-          {isAdminOrAtty && (
-            <button
-              className={`btn btn-outline ${exporting ? "loading" : ""}`}
-              onClick={handleExportExcel}
-              disabled={exporting}
-            >
-              {exporting ? "Exporting..." : "Export Excel"}
-            </button>
-          )}
-          {isAdminOrAtty && (
-            <button
-              className="btn btn-primary"
-              onClick={() => showModal(CaseModalType.ADD)}
+              className={`btn btn-outline`}
+              onClick={() => setFilterModalOpen(true)}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
+                className="h-5 w-5"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
                 <path
                   fillRule="evenodd"
-                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
                   clipRule="evenodd"
                 />
               </svg>
-              Add Case
+              Filter
             </button>
+            {isAdminOrAtty && (
+              <button
+                className={`btn btn-outline ${uploading ? "loading" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Importing..." : "Import Excel"}
+              </button>
+            )}
+            {isAdminOrAtty && (
+              <button
+                className={`btn btn-outline ${exporting ? "loading" : ""}`}
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                {exporting ? "Exporting..." : "Export Excel"}
+              </button>
+            )}
+            {isAdminOrAtty && (
+              <button
+                className="btn btn-primary"
+                onClick={() => showModal(CaseModalType.ADD)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Add Case
+              </button>
+            )}
+          </div>
+
+          {/* Cases Table */}
+          <div className="overflow-x-auto bg-base-100 rounded-lg shadow">
+            <table className="table table-zebra">
+              <thead>
+                <tr>
+                  <th
+                    onClick={() => handleSort("caseNumber")}
+                    className="cursor-pointer"
+                  >
+                    Case Number{" "}
+                    {sortConfig.key === "caseNumber" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("name")}
+                    className="cursor-pointer"
+                  >
+                    Name{" "}
+                    {sortConfig.key === "name" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("charge")}
+                    className="cursor-pointer"
+                  >
+                    Charge{" "}
+                    {sortConfig.key === "charge" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("branch")}
+                    className="cursor-pointer"
+                  >
+                    Branch{" "}
+                    {sortConfig.key === "branch" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("detained")}
+                    className="cursor-pointer"
+                  >
+                    Detained{" "}
+                    {sortConfig.key === "detained" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    onClick={() => handleSort("dateFiled")}
+                    className="cursor-pointer"
+                  >
+                    Date Filed{" "}
+                    {sortConfig.key === "dateFiled" &&
+                      (sortConfig.order === "asc" ? "↑" : "↓")}
+                  </th>
+                  {isAdminOrAtty && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAndSortedCases.map((caseItem) => (
+                  <CaseRow
+                    key={caseItem.id}
+                    caseItem={caseItem}
+                    setSelectedCase={setSelectedCase}
+                    showModal={showModal}
+                    handleDeleteCase={handleDeleteCase}
+                    onRowClick={handleRowClick}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add/Edit Modal */}
+          {modalType && (
+            <NewCaseModal
+              type={modalType}
+              onClose={() => setModalType(null)}
+              selectedCase={selectedCase}
+              onCreate={(newCase) => {
+                setCases((prev) => [...prev, newCase]);
+                sortCases(cases, sortConfig.key, sortConfig.order);
+              }}
+              onUpdate={(updatedCase) => {
+                setCases((prev) =>
+                  prev.map((c) =>
+                    c.caseNumber === updatedCase.caseNumber ? updatedCase : c,
+                  ),
+                );
+              }}
+            />
           )}
-        </div>
 
-        {/* Cases Table */}
-        <div className="overflow-x-auto bg-base-100 rounded-lg shadow">
-          <table className="table table-zebra">
-            <thead>
-              <tr>
-                <th
-                  onClick={() => handleSort("caseNumber")}
-                  className="cursor-pointer"
-                >
-                  Case Number{" "}
-                  {sortConfig.key === "caseNumber" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("name")}
-                  className="cursor-pointer"
-                >
-                  Name{" "}
-                  {sortConfig.key === "name" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("charge")}
-                  className="cursor-pointer"
-                >
-                  Charge{" "}
-                  {sortConfig.key === "charge" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("branch")}
-                  className="cursor-pointer"
-                >
-                  Branch{" "}
-                  {sortConfig.key === "branch" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("detained")}
-                  className="cursor-pointer"
-                >
-                  Detained{" "}
-                  {sortConfig.key === "detained" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("dateFiled")}
-                  className="cursor-pointer"
-                >
-                  Date Filed{" "}
-                  {sortConfig.key === "dateFiled" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                {isAdminOrAtty && <th>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedCases.map((caseItem) => (
-                <CaseRow
-                  key={caseItem.id}
-                  caseItem={caseItem}
-                  setSelectedCase={setSelectedCase}
-                  showModal={showModal}
-                  handleDeleteCase={handleDeleteCase}
-                  onRowClick={handleRowClick}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Add/Edit Modal */}
-        {modalType && (
-          <NewCaseModal
-            type={modalType}
-            onClose={() => setModalType(null)}
-            selectedCase={selectedCase}
-            onCreate={(newCase) => {
-              setCases((prev) => [...prev, newCase]);
-              sortCases(cases, sortConfig.key, sortConfig.order);
-            }}
-            onUpdate={(updatedCase) => {
-              setCases((prev) =>
-                prev.map((c) =>
-                  c.caseNumber === updatedCase.caseNumber ? updatedCase : c,
-                ),
-              );
-            }}
+          {/* Case Detail Modal */}
+          {caseForDetailView && (
+            <CaseDetailModal
+              caseData={caseForDetailView}
+              onClose={() => setCaseForDetailView(null)}
+            />
+          )}
+          {/* Filter Modal */}
+          <CaseFilterModal
+            isOpen={filterModalOpen}
+            onClose={() => setFilterModalOpen(false)}
+            onApplyFilters={handleApplyFilters}
+            cases={cases}
           />
-        )}
-
-        {/* Case Detail Modal */}
-        {caseForDetailView && (
-          <CaseDetailModal
-            caseData={caseForDetailView}
-            onClose={() => setCaseForDetailView(null)}
-          />
-        )}
-<<<<<<< HEAD
-
-        {/* Filter Modal */}
-        <CaseFilterModal
-          isOpen={filterModalOpen}
-          onClose={() => setFilterModalOpen(false)}
-          onApplyFilters={handleApplyFilters}
-          cases={cases}
-        />
-=======
->>>>>>> eba2d61ca1fa7c888cbf35d0ad7460b77812c898
-      </main>
-    </div>
-  );
+        </main>
+      </div>
+    );
+  };
 };
-
 export default CasePage;
