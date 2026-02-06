@@ -24,6 +24,8 @@ import {
   FiSearch,
   FiX,
 } from "react-icons/fi";
+import EmployeeTable from "./EmployeeTable";
+import EmployeeModal from "./EmployeeModal";
 
 import type { Employee } from "@/app/generated/prisma/browser";
 
