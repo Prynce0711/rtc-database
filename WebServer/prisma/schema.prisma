@@ -127,3 +127,26 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
+
+model ActivityLog {
+  id            String   @id @default(cuid())
+  userId        String
+  userName      String
+  userRole      String
+  action        String   // add, edit, delete, login, logout
+  entityType    String   // Employee, Case, User, etc.
+  entityId      String?
+  entityName    String?
+  description   String?
+  oldValues     String?  // JSON string of previous values
+  newValues     String?  // JSON string of new values
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_log")
+}
