@@ -456,10 +456,6 @@ export type UserScalarRelationFilter = {
   isNot?: Prisma.UserWhereInput
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type NullableBoolFieldUpdateOperationsInput = {
   set?: boolean | null
 }

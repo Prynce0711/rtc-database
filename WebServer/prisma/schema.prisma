@@ -10,6 +10,17 @@ datasource db {
   provider = "sqlite"
 }
 
+enum BloodType {
+  A_Positive
+  A_Negative
+  B_Positive
+  B_Negative
+  AB_Positive
+  AB_Negative
+  O_Positive
+  O_Negative
+}
+
 model Case {
   id              Int       @id @default(autoincrement())
   branch          String
@@ -27,6 +38,26 @@ model Case {
   raffleDate      DateTime?
   committe1       Int?
   committe2       Int?
+}
+
+model Employee{
+  id          Int     @id @default(autoincrement())
+  employeeName String
+  employeeNumber String  @unique
+  position    String
+  branch     String
+  tinNumber   String?
+  gsisNumber String?
+  philHealthNumber String?
+  pagIbigNumber String?
+  birthDate   DateTime
+  bloodType   BloodType?
+  allergies    String?
+  height      Float?
+  weight      Float?
+  contactPerson String
+  contactNumber String?
+  email       String?
 }
 
 model User {
