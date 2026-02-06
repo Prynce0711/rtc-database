@@ -208,9 +208,11 @@ export type StringNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedStringNullableFilter<$PrismaModel> | string | null
 }
 
-export type BoolNullableFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
+export type EnumBloodTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.BloodType | Prisma.EnumBloodTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.BloodType[] | null
+  notIn?: $Enums.BloodType[] | null
+  not?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel> | $Enums.BloodType | null
 }
 
 export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -228,6 +230,21 @@ export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedStringNullableFilter<$PrismaModel>
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
+}
+
+export type EnumBloodTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BloodType | Prisma.EnumBloodTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.BloodType[] | null
+  notIn?: $Enums.BloodType[] | null
+  not?: Prisma.NestedEnumBloodTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.BloodType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel>
+}
+
+export type BoolNullableFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
 }
 
 export type BoolNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -438,9 +455,11 @@ export type NestedStringNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedStringNullableFilter<$PrismaModel> | string | null
 }
 
-export type NestedBoolNullableFilter<$PrismaModel = never> = {
-  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
+export type NestedEnumBloodTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.BloodType | Prisma.EnumBloodTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.BloodType[] | null
+  notIn?: $Enums.BloodType[] | null
+  not?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel> | $Enums.BloodType | null
 }
 
 export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -458,6 +477,21 @@ export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedStringNullableFilter<$PrismaModel>
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumBloodTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BloodType | Prisma.EnumBloodTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.BloodType[] | null
+  notIn?: $Enums.BloodType[] | null
+  not?: Prisma.NestedEnumBloodTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.BloodType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBloodTypeNullableFilter<$PrismaModel>
+}
+
+export type NestedBoolNullableFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
 }
 
 export type NestedBoolNullableWithAggregatesFilter<$PrismaModel = never> = {
