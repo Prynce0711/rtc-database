@@ -680,6 +680,9 @@ const EmployeeDashboard: React.FC = () => {
           <table className="table w-full text-sm">
             <thead className="bg-base-200">
               <tr>
+                <th className="font-semibold text-base-content text-center">
+                  Actions
+                </th>
                 <th className="font-semibold text-base-content">
                   Employee Name
                 </th>
@@ -704,9 +707,6 @@ const EmployeeDashboard: React.FC = () => {
                   Contact Number
                 </th>
                 <th className="font-semibold text-base-content">Email</th>
-                <th className="font-semibold text-base-content text-center">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -715,6 +715,22 @@ const EmployeeDashboard: React.FC = () => {
                   key={emp.id}
                   className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
                 >
+                  <td className="text-center">
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        className="btn btn-ghost btn-sm text-primary hover:bg-primary/10 rounded-lg"
+                        onClick={() => handleEdit(emp)}
+                      >
+                        <FiEdit size={16} />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm text-error hover:bg-error/10 rounded-lg"
+                        onClick={() => handleDelete(emp.employeeNumber)}
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
                   <td className="font-medium text-base-content">
                     {emp.employeeName || "—"}
                   </td>
