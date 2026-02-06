@@ -36,6 +36,7 @@ const emptyEmployee = (): Partial<Employee> => ({
 
 const EmployeeDashboard: React.FC = () => {
   const [isEdit, setIsEdit] = useState(false);
+
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
