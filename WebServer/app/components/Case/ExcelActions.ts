@@ -3,8 +3,9 @@
 import ActionResult from "@/app/components/ActionResult";
 import { CaseSchema } from "@/app/components/Case/schema";
 import { Prisma } from "@/app/generated/prisma/client";
-import { Role, validateSession } from "@/app/lib/authActions";
+import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 
@@ -15,7 +16,7 @@ type ExportExcelResult = {
 
 export async function uploadExcel(file: File): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -172,7 +173,7 @@ export async function exportCasesExcel(): Promise<
   ActionResult<ExportExcelResult>
 > {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
