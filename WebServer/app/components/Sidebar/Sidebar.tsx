@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
 import { AiOutlineTeam } from "react-icons/ai";
-import { FiHome } from "react-icons/fi";
+import { FiHome, FiActivity } from "react-icons/fi";
 import { IoPersonCircleOutline } from "react-icons/io5";
 import { PiSlidersHorizontal } from "react-icons/pi";
 import Header from "./Header";
@@ -86,6 +86,11 @@ function AdminSidebarContents(activeView: string) {
         icon={<IoPersonCircleOutline size={20} />}
         activeView={activeView}
         href="accounts"
+      />
+      <SidebarButton
+        icon={<FiActivity size={20} />}
+        activeView={activeView}
+        href="activity-reports"
       />
     </>
   );
