@@ -1,13 +1,13 @@
 "use client";
 
-import { FiEdit, FiTrash2 } from "react-icons/fi";
 import type { Employee } from "@/app/generated/prisma/browser";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 
 interface Props {
   employees: Employee[];
   bloodTypeMap: Record<string, string>;
   onEdit: (emp: Employee) => void;
-  onDelete: (employeeNumber: string) => void;
+  onDelete: (id: number) => void;
 }
 
 const EmployeeTable: React.FC<Props> = ({
@@ -113,7 +113,7 @@ const EmployeeTable: React.FC<Props> = ({
 
                 <button
                   className="btn btn-ghost btn-sm text-error"
-                  onClick={() => onDelete(emp.employeeNumber)}
+                  onClick={() => onDelete(emp.id)}
                 >
                   <FiTrash2 />
                 </button>

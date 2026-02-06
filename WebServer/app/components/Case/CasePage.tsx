@@ -4,12 +4,31 @@ import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
 import { usePopup } from "../Popup/PopupProvider";
-import CaseFilterModal, { type CaseFilterFilters } from "./CaseFilterModal";
+import FilterModal, {
+  type FilterOption,
+  type FilterValues,
+} from "../Filter/FilterModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+
+type CaseFilterValues = {
+  branch?: string;
+  assistantBranch?: string;
+  caseNumber?: string;
+  name?: string;
+  charge?: string;
+  infoSheet?: string;
+  court?: string;
+  detained?: boolean;
+  consolidation?: string;
+  eqcNumber?: number;
+  bond?: { min?: number; max?: number };
+  raffleDate?: { start?: string; end?: string };
+  dateFiled?: { start?: string; end?: string };
+};
 
 const CasePage: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -30,8 +49,24 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<CaseFilterFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
+
+  const caseFilterOptions: FilterOption[] = [
+    { key: "branch", label: "Branch", type: "text" },
+    { key: "assistantBranch", label: "Assistant Branch", type: "text" },
+    { key: "caseNumber", label: "Case Number", type: "text" },
+    { key: "name", label: "Name", type: "text" },
+    { key: "charge", label: "Charge", type: "text" },
+    { key: "infoSheet", label: "Info Sheet", type: "text" },
+    { key: "court", label: "Court", type: "text" },
+    { key: "consolidation", label: "Consolidation", type: "text" },
+    { key: "eqcNumber", label: "EQC Number", type: "number" },
+    { key: "detained", label: "Detained", type: "checkbox" },
+    { key: "bond", label: "Bond Amount", type: "range" },
+    { key: "dateFiled", label: "Date Filed", type: "daterange" },
+    { key: "raffleDate", label: "Raffle Date", type: "daterange" },
+  ];
 
   // Fetch cases from API
   useEffect(() => {
@@ -85,8 +120,173 @@ const CasePage: React.FC = () => {
     }));
   };
 
-  const handleApplyFilters = (filters: CaseFilterFilters, filtered: Case[]) => {
-    setAppliedFilters(filters);
+  const getCaseSuggestions = (key: string, inputValue: string): string[] => {
+    const textFields = [
+      "branch",
+      "assistantBranch",
+      "caseNumber",
+      "name",
+      "charge",
+      "infoSheet",
+      "court",
+      "consolidation",
+    ];
+
+    if (!textFields.includes(key)) return [];
+
+    const values = cases
+      .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
+      .filter((v) => v.length > 0);
+
+    const unique = Array.from(new Set(values)).sort();
+
+    if (!inputValue) return unique;
+
+    const lower = inputValue.toLowerCase();
+    return unique.filter((v) => v.toLowerCase().includes(lower));
+  };
+
+  const applyCaseFilters = (
+    filters: CaseFilterValues,
+    items: Case[],
+  ): Case[] => {
+    return items.filter((caseItem) => {
+      if (
+        filters.branch &&
+        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.assistantBranch &&
+        !caseItem.assistantBranch
+          .toLowerCase()
+          .includes(filters.assistantBranch.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.caseNumber &&
+        !caseItem.caseNumber
+          .toLowerCase()
+          .includes(filters.caseNumber.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.name &&
+        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.charge &&
+        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.infoSheet &&
+        !caseItem.infoSheet
+          .toLowerCase()
+          .includes(filters.infoSheet.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.court &&
+        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.consolidation &&
+        !caseItem.consolidation
+          .toLowerCase()
+          .includes(filters.consolidation.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.eqcNumber !== undefined &&
+        caseItem.eqcNumber !== filters.eqcNumber
+      ) {
+        return false;
+      }
+
+      if (
+        filters.detained !== undefined &&
+        caseItem.detained !== filters.detained
+      ) {
+        return false;
+      }
+
+      if (filters.bond) {
+        if (
+          filters.bond.min !== undefined &&
+          (caseItem.bond === null || caseItem.bond < filters.bond.min)
+        ) {
+          return false;
+        }
+        if (
+          filters.bond.max !== undefined &&
+          (caseItem.bond === null || caseItem.bond > filters.bond.max)
+        ) {
+          return false;
+        }
+      }
+
+      if (filters.dateFiled) {
+        const caseDate = new Date(caseItem.dateFiled);
+        if (
+          filters.dateFiled.start &&
+          caseDate < new Date(filters.dateFiled.start)
+        ) {
+          return false;
+        }
+        if (
+          filters.dateFiled.end &&
+          caseDate > new Date(filters.dateFiled.end)
+        ) {
+          return false;
+        }
+      }
+
+      if (filters.raffleDate) {
+        if (caseItem.raffleDate === null) {
+          return false;
+        }
+        const caseDate = new Date(caseItem.raffleDate);
+        if (
+          filters.raffleDate.start &&
+          caseDate < new Date(filters.raffleDate.start)
+        ) {
+          return false;
+        }
+        if (
+          filters.raffleDate.end &&
+          caseDate > new Date(filters.raffleDate.end)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const handleApplyFilters = (filters: FilterValues) => {
+    const typedFilters = filters as CaseFilterValues;
+    const filtered = applyCaseFilters(typedFilters, cases);
+    setAppliedFilters(typedFilters);
     setFilteredByAdvanced(filtered);
   };
 
@@ -395,11 +595,13 @@ const CasePage: React.FC = () => {
         )}
 
         {/* Filter Modal */}
-        <CaseFilterModal
+        <FilterModal
           isOpen={filterModalOpen}
           onClose={() => setFilterModalOpen(false)}
-          onApplyFilters={handleApplyFilters}
-          cases={cases}
+          options={caseFilterOptions}
+          onApply={handleApplyFilters}
+          initialValues={appliedFilters}
+          getSuggestions={getCaseSuggestions}
         />
       </main>
     </div>

@@ -26,7 +26,7 @@ export async function createCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -51,7 +51,7 @@ export async function updateCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -76,7 +76,7 @@ export async function deleteCase(
   caseNumber: string,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }

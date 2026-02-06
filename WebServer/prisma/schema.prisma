@@ -21,6 +21,22 @@ enum BloodType {
   O_Negative
 }
 
+enum LogAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  CREATE_CASE
+  UPDATE_CASE
+  DELETE_CASE
+  IMPORT_CASES
+  EXPORT_CASES
+  CREATE_EMPLOYEE
+  UPDATE_EMPLOYEE
+  DELETE_EMPLOYEE
+  IMPORT_EMPLOYEES
+  EXPORT_EMPLOYEES
+}
+
 model Case {
   id              Int       @id @default(autoincrement())
   branch          String
@@ -43,7 +59,7 @@ model Case {
 model Employee{
   id          Int     @id @default(autoincrement())
   employeeName String
-  employeeNumber String  @unique
+  employeeNumber String? @unique
   position    String
   branch     String
   tinNumber   String?
@@ -60,6 +76,19 @@ model Employee{
   email       String?
 }
 
+model Log {
+  id          Int       @id @default(autoincrement())
+  action      LogAction
+
+  details     String?
+
+  timestamp   DateTime  @default(now())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+}
+
 model User {
   id            String    @id
   name          String
@@ -74,6 +103,8 @@ model User {
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
+
+  Logs         Log[]
 
   @@unique([email])
   @@map("user")
