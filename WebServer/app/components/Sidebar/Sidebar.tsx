@@ -5,8 +5,8 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
 import { AiOutlineTeam } from "react-icons/ai";
-import { FiHome } from "react-icons/fi";
 
+import { FiHome, FiActivity } from "react-icons/fi";
 import { PiSlidersHorizontal } from "react-icons/pi";
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
@@ -106,6 +106,11 @@ function AttorneySidebarContents(activeView: string) {
         icon={<PiSlidersHorizontal size={20} />}
         activeView={activeView}
         href="cases"
+      />
+      <SidebarButton
+        icon={<FiActivity size={20} />}
+        activeView={activeView}
+        href="activity-reports"
       />
     </>
   );
