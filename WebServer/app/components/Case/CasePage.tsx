@@ -3,11 +3,10 @@
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "../Filter/FilterModal";
+import { type FilterOption } from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
+import CaseDetailModal from "./CaseDetailModal";
+import CaseFilterModal, { type CaseFilterFilters } from "./CaseFilterModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
@@ -36,6 +35,7 @@ const CasePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
   const session = useSession();
   const isAdmin = session?.data?.user?.role === "admin";
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,7 +49,7 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterFilters>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
 
   const caseFilterOptions: FilterOption[] = [
@@ -97,8 +97,7 @@ const CasePage: React.FC = () => {
 
   const filteredAndSortedCases = useMemo(() => {
     // Start with advanced filtered cases if filters are applied, otherwise use all cases
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
+    const baseList = cases;
 
     let filtered = baseList;
 
@@ -111,7 +110,7 @@ const CasePage: React.FC = () => {
     }
 
     return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+  }, [cases, searchTerm, sortConfig, filteredByAdvanced]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
@@ -120,173 +119,8 @@ const CasePage: React.FC = () => {
     }));
   };
 
-  const getCaseSuggestions = (key: string, inputValue: string): string[] => {
-    const textFields = [
-      "branch",
-      "assistantBranch",
-      "caseNumber",
-      "name",
-      "charge",
-      "infoSheet",
-      "court",
-      "consolidation",
-    ];
-
-    if (!textFields.includes(key)) return [];
-
-    const values = cases
-      .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
-      .filter((v) => v.length > 0);
-
-    const unique = Array.from(new Set(values)).sort();
-
-    if (!inputValue) return unique;
-
-    const lower = inputValue.toLowerCase();
-    return unique.filter((v) => v.toLowerCase().includes(lower));
-  };
-
-  const applyCaseFilters = (
-    filters: CaseFilterValues,
-    items: Case[],
-  ): Case[] => {
-    return items.filter((caseItem) => {
-      if (
-        filters.branch &&
-        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.assistantBranch &&
-        !caseItem.assistantBranch
-          .toLowerCase()
-          .includes(filters.assistantBranch.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.caseNumber &&
-        !caseItem.caseNumber
-          .toLowerCase()
-          .includes(filters.caseNumber.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.name &&
-        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.charge &&
-        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.infoSheet &&
-        !caseItem.infoSheet
-          .toLowerCase()
-          .includes(filters.infoSheet.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.court &&
-        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.consolidation &&
-        !caseItem.consolidation
-          .toLowerCase()
-          .includes(filters.consolidation.toLowerCase())
-      ) {
-        return false;
-      }
-
-      if (
-        filters.eqcNumber !== undefined &&
-        caseItem.eqcNumber !== filters.eqcNumber
-      ) {
-        return false;
-      }
-
-      if (
-        filters.detained !== undefined &&
-        caseItem.detained !== filters.detained
-      ) {
-        return false;
-      }
-
-      if (filters.bond) {
-        if (
-          filters.bond.min !== undefined &&
-          (caseItem.bond === null || caseItem.bond < filters.bond.min)
-        ) {
-          return false;
-        }
-        if (
-          filters.bond.max !== undefined &&
-          (caseItem.bond === null || caseItem.bond > filters.bond.max)
-        ) {
-          return false;
-        }
-      }
-
-      if (filters.dateFiled) {
-        const caseDate = new Date(caseItem.dateFiled);
-        if (
-          filters.dateFiled.start &&
-          caseDate < new Date(filters.dateFiled.start)
-        ) {
-          return false;
-        }
-        if (
-          filters.dateFiled.end &&
-          caseDate > new Date(filters.dateFiled.end)
-        ) {
-          return false;
-        }
-      }
-
-      if (filters.raffleDate) {
-        if (caseItem.raffleDate === null) {
-          return false;
-        }
-        const caseDate = new Date(caseItem.raffleDate);
-        if (
-          filters.raffleDate.start &&
-          caseDate < new Date(filters.raffleDate.start)
-        ) {
-          return false;
-        }
-        if (
-          filters.raffleDate.end &&
-          caseDate > new Date(filters.raffleDate.end)
-        ) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  };
-
-  const handleApplyFilters = (filters: FilterValues) => {
-    const typedFilters = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typedFilters, cases);
-    setAppliedFilters(typedFilters);
+  const handleApplyFilters = (filters: CaseFilterFilters, filtered: Case[]) => {
+    setAppliedFilters(filters);
     setFilteredByAdvanced(filtered);
   };
 
@@ -383,6 +217,10 @@ const CasePage: React.FC = () => {
     setModalType(type);
   };
 
+  const handleRowClick = (caseItem: Case) => {
+    setCaseForDetailView(caseItem);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -447,7 +285,7 @@ const CasePage: React.FC = () => {
             onChange={handleImportExcel}
           />
           <button
-            className={`btn btn-outline ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+            className={`btn btn-outline`}
             onClick={() => setFilterModalOpen(true)}
           >
             <svg
@@ -464,7 +302,7 @@ const CasePage: React.FC = () => {
             </svg>
             Filter
           </button>
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className={`btn btn-outline ${uploading ? "loading" : ""}`}
               onClick={() => fileInputRef.current?.click()}
@@ -473,7 +311,7 @@ const CasePage: React.FC = () => {
               {uploading ? "Importing..." : "Import Excel"}
             </button>
           )}
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className={`btn btn-outline ${exporting ? "loading" : ""}`}
               onClick={handleExportExcel}
@@ -482,7 +320,7 @@ const CasePage: React.FC = () => {
               {exporting ? "Exporting..." : "Export Excel"}
             </button>
           )}
-          {isAdmin && (
+          {isAdminOrAtty && (
             <button
               className="btn btn-primary"
               onClick={() => showModal(CaseModalType.ADD)}
@@ -557,7 +395,7 @@ const CasePage: React.FC = () => {
                   {sortConfig.key === "dateFiled" &&
                     (sortConfig.order === "asc" ? "↑" : "↓")}
                 </th>
-                {isAdmin && <th>Actions</th>}
+                {isAdminOrAtty && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -568,6 +406,7 @@ const CasePage: React.FC = () => {
                   setSelectedCase={setSelectedCase}
                   showModal={showModal}
                   handleDeleteCase={handleDeleteCase}
+                  onRowClick={handleRowClick}
                 />
               ))}
             </tbody>
@@ -594,14 +433,20 @@ const CasePage: React.FC = () => {
           />
         )}
 
+        {/* Case Detail Modal */}
+        {caseForDetailView && (
+          <CaseDetailModal
+            caseData={caseForDetailView}
+            onClose={() => setCaseForDetailView(null)}
+          />
+        )}
+
         {/* Filter Modal */}
-        <FilterModal
+        <CaseFilterModal
           isOpen={filterModalOpen}
           onClose={() => setFilterModalOpen(false)}
-          options={caseFilterOptions}
-          onApply={handleApplyFilters}
-          initialValues={appliedFilters}
-          getSuggestions={getCaseSuggestions}
+          onApplyFilters={handleApplyFilters}
+          cases={cases}
         />
       </main>
     </div>
