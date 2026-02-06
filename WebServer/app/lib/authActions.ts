@@ -3,14 +3,10 @@
 import { headers } from "next/headers";
 import ActionResult from "../components/ActionResult";
 import { auth } from "./auth";
-
-export enum Role {
-  ADMIN = "admin",
-  USER = "user",
-}
+import Roles from "./Roles";
 
 export async function validateSession(
-  role?: Role,
+  role?: Roles,
 ): Promise<ActionResult<void>> {
   try {
     const session = await auth.api.getSession({

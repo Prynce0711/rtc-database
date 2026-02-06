@@ -28,7 +28,7 @@ export const EmployeeSchema = z.object({
     .optional(),
   contactPerson: z.string().min(1, "Contact person is required"),
   contactNumber: z.string().optional(),
-  email: z.string().email("Invalid email format").optional().or(z.literal("")),
+  email: z.email("Invalid email format").optional().or(z.literal("")),
 });
 
 export type EmployeeSchema = z.infer<typeof EmployeeSchema>;

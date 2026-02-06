@@ -4,10 +4,10 @@ import { useSession } from "@/app/lib/authClient";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
+import { AiOutlineTeam } from "react-icons/ai";
 import { FiHome } from "react-icons/fi";
 import { IoPersonCircleOutline } from "react-icons/io5";
 import { PiSlidersHorizontal } from "react-icons/pi";
-import { AiOutlineTeam } from "react-icons/ai";
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
 

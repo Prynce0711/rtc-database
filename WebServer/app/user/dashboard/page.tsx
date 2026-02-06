@@ -1,6 +1,7 @@
 import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
 import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
 import { auth } from "@/app/lib/auth";
+import Roles from "@/app/lib/Roles";
 import { headers } from "next/headers";
 
 const page = async () => {
@@ -12,7 +13,7 @@ const page = async () => {
     return <div>Unauthorized</div>;
   }
 
-  if (session.user.role === "admin") return <AdminDashboard />;
+  if (session.user.role === Roles.ADMIN) return <AdminDashboard />;
   else return <StaffDashboard />;
 };
 

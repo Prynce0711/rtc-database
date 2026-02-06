@@ -1,8 +1,9 @@
 "use server";
 
 import { Case } from "@/app/generated/prisma/client";
-import { Role, validateSession } from "@/app/lib/authActions";
+import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import ActionResult from "../ActionResult";
 import { CaseSchema } from "./schema";
 
@@ -25,7 +26,7 @@ export async function createCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -50,7 +51,7 @@ export async function updateCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -75,7 +76,7 @@ export async function deleteCase(
   caseNumber: string,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
