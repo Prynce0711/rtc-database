@@ -1,5 +1,14 @@
+import EmployeeDashboard from "../components/Employee/EmployeeDashboard";
+import React from "react";
+
 const page = () => {
-  return <div>page</div>;
+  const [showModal, setShowModal] = React.useState(true);
+
+  return (
+    <>
+      <EmployeeDashboard />
+    </>
+  );
 };
 
 export default page;
