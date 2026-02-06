@@ -3,11 +3,11 @@
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import { usePopup } from "../Popup/PopupProvider";
 import FilterModal, {
   type FilterOption,
   type FilterValues,
 } from "../Filter/FilterModal";
+import { usePopup } from "../Popup/PopupProvider";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";

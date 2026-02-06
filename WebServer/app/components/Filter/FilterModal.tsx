@@ -213,9 +213,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                         className="input input-bordered input-sm flex-1"
                         step="0.01"
                         value={
-                          ((filters[option.key] || {}) as {
-                            min?: number;
-                          }).min || ""
+                          (
+                            (filters[option.key] || {}) as {
+                              min?: number;
+                            }
+                          ).min || ""
                         }
                         onChange={(e) => {
                           const current = (filters[option.key] || {}) as {
@@ -236,9 +238,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                         className="input input-bordered input-sm flex-1"
                         step="0.01"
                         value={
-                          ((filters[option.key] || {}) as {
-                            max?: number;
-                          }).max || ""
+                          (
+                            (filters[option.key] || {}) as {
+                              max?: number;
+                            }
+                          ).max || ""
                         }
                         onChange={(e) => {
                           const current = (filters[option.key] || {}) as {
@@ -262,9 +266,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                         type="date"
                         className="input input-bordered input-sm flex-1"
                         value={
-                          ((filters[option.key] || {}) as {
-                            start?: string;
-                          }).start || ""
+                          (
+                            (filters[option.key] || {}) as {
+                              start?: string;
+                            }
+                          ).start || ""
                         }
                         onChange={(e) => {
                           const current = (filters[option.key] || {}) as {
@@ -281,9 +287,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                         type="date"
                         className="input input-bordered input-sm flex-1"
                         value={
-                          ((filters[option.key] || {}) as {
-                            end?: string;
-                          }).end || ""
+                          (
+                            (filters[option.key] || {}) as {
+                              end?: string;
+                            }
+                          ).end || ""
                         }
                         onChange={(e) => {
                           const current = (filters[option.key] || {}) as {
