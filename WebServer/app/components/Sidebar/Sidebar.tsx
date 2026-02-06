@@ -7,6 +7,7 @@ import React, { ReactNode } from "react";
 import { FiHome } from "react-icons/fi";
 import { IoPersonCircleOutline } from "react-icons/io5";
 import { PiSlidersHorizontal } from "react-icons/pi";
+import { AiOutlineTeam } from "react-icons/ai";
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
 
@@ -67,17 +68,22 @@ function AdminSidebarContents(activeView: string) {
   return (
     <>
       <SidebarButton
-        icon={<FiHome className="w-5 h-5" />}
+        icon={<FiHome size={20} />}
         activeView={activeView}
         href="dashboard"
       />
       <SidebarButton
-        icon={<PiSlidersHorizontal className="w-5 h-5" />}
+        icon={<PiSlidersHorizontal size={20} />}
         activeView={activeView}
         href="cases"
       />
       <SidebarButton
-        icon={<IoPersonCircleOutline className="w-5 h-5" />}
+        icon={<AiOutlineTeam size={20} />}
+        activeView={activeView}
+        href="employees"
+      />
+      <SidebarButton
+        icon={<IoPersonCircleOutline size={20} />}
         activeView={activeView}
         href="accounts"
       />
@@ -89,12 +95,12 @@ function StaffSidebarContents(activeView: string) {
   return (
     <>
       <SidebarButton
-        icon={<FiHome className="w-5 h-5" />}
+        icon={<FiHome size={20} />}
         activeView={activeView}
         href="dashboard"
       />
       <SidebarButton
-        icon={<PiSlidersHorizontal className="w-5 h-5" />}
+        icon={<PiSlidersHorizontal size={20} />}
         activeView={activeView}
         href="cases"
       />
