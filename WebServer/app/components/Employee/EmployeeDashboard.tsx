@@ -1,6 +1,13 @@
 "use client";
+import {
+  getEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+} from "@/app/components/Employee/EmployeeActions";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+
 import {
   FiPlus,
   FiTrash2,
@@ -14,36 +21,17 @@ import {
   FiUpload,
   FiDownload,
   FiEdit,
+  FiSearch,
 } from "react-icons/fi";
 
-type Employee = {
-  id: string;
-  name: string;
-  employeeNumber: string;
-  position: string;
-  branch: string;
-  vatGstId?: string;
-  tin?: string;
-  gsis?: string;
-  philhealth?: string;
-  pagibig?: string;
-  birthday?: string;
-  bloodType?: string;
-  allergies?: string;
-  height?: string;
-  weight?: string;
-  contactPerson?: string;
-  contactNumber?: string;
-  email?: string;
-};
+import type { Employee } from "@/app/generated/prisma/browser";
 
-const emptyEmployee = (): Employee => ({
-  id: String(Date.now()),
-  name: "",
+const emptyEmployee = (): Partial<Employee> => ({
+  employeeName: "",
   employeeNumber: "",
   position: "",
   branch: "",
-  vatGstId: "",
+  contactPerson: "",
 });
 
 const EmployeeDashboard: React.FC = () => {
@@ -63,7 +51,14 @@ const EmployeeDashboard: React.FC = () => {
           return;
         }
 
-        setEmployees(importedData);
+        setEmployees(
+          importedData.map((e: any) => ({
+            ...e,
+            birthDate: e.birthDate ? new Date(e.birthDate) : undefined,
+            height: Number.isNaN(e.height) ? undefined : e.height,
+            weight: Number.isNaN(e.weight) ? undefined : e.weight,
+          })),
+        );
       } catch {
         alert("Error reading file");
       }
@@ -85,35 +80,42 @@ const EmployeeDashboard: React.FC = () => {
   }
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [employees, setEmployees] = useState<Employee[]>([
-    ...Array.from({ length: 15 }, (_, i) => ({
-      id: String(i + 1),
-      name: `Employee ${i + 1}`,
-      employeeNumber: `EMP-${String(i + 1).padStart(3, "0")}`,
-      position: i % 2 === 0 ? "Clerk" : "Staff",
-      branch: ["Manila", "Cebu", "Davao"][i % 3],
-      tin: `000-000-${i + 1}`,
-      gsis: `GSIS-${i + 1}`,
-      philhealth: `PH-${i + 1}`,
-      pagibig: `PB-${i + 1}`,
-      birthday: "1995-05-10",
-      bloodType: "O+",
-      allergies: "None",
-      height: "165 cm",
-      weight: "60 kg",
-      contactPerson: "Emergency Contact",
-      contactNumber: "09171234567",
-      email: `employee${i + 1}@example.com`,
-    })),
-  ]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  useEffect(() => {
+    async function loadEmployees() {
+      const res = await getEmployees();
+
+      if (!res.success) {
+        alert(res.error ?? "Failed to load employees");
+        return;
+      }
+
+      setEmployees(res.result);
+    }
+
+    loadEmployees();
+  }, []);
+  const bloodTypeMap: Record<string, string> = {
+    A_Positive: "A+",
+    A_Negative: "A-",
+    B_Positive: "B+",
+    B_Negative: "B-",
+    AB_Positive: "AB+",
+    AB_Negative: "AB-",
+    O_Positive: "O+",
+    O_Negative: "O-",
+  };
+
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<Employee>(emptyEmployee());
+  const [form, setForm] = useState<Partial<Employee>>(emptyEmployee());
+
   function handleEdit(emp: Employee) {
-    setForm(emp);
+    setForm({ ...emp });
+
     setIsEdit(true);
     setShowModal(true);
   }
@@ -137,15 +139,19 @@ const EmployeeDashboard: React.FC = () => {
 
     /* WITH MEDICAL INFO */
     const withMedical = employees.filter(
-      (e) => e.bloodType || e.allergies,
+      (e) =>
+        e.bloodType ||
+        (e.allergies &&
+          e.allergies.trim() !== "" &&
+          e.allergies.toLowerCase() !== "n/a"),
     ).length;
 
     /* UPCOMING BIRTHDAYS THIS MONTH */
     const currentMonth = new Date().getMonth();
 
     const birthdayThisMonth = employees.filter((emp) => {
-      if (!emp.birthday) return false;
-      return new Date(emp.birthday).getMonth() === currentMonth;
+      if (!emp.birthDate) return false;
+      return new Date(emp.birthDate).getMonth() === currentMonth;
     }).length;
 
     /* MISSING EMAIL */
@@ -165,21 +171,32 @@ const EmployeeDashboard: React.FC = () => {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return employees;
+
     const q = search.toLowerCase();
 
     return employees.filter((e) =>
-      Object.values(e)
+      [
+        e.employeeName,
+        e.employeeNumber,
+        e.position,
+        e.branch,
+        e.tinNumber,
+        e.gsisNumber,
+        e.philHealthNumber,
+        e.pagIbigNumber,
+      ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
+        .some((field) => String(field).toLowerCase().includes(q)),
     );
   }, [employees, search]);
+
   const totalPages = Math.ceil(filtered.length / rowsPerPage);
 
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, currentPage]);
-  React.useEffect(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [search]);
 
@@ -191,37 +208,128 @@ const EmployeeDashboard: React.FC = () => {
     setShowModal(true);
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
     const newErrors: Record<string, string> = {};
 
-    if (!form.name) newErrors.name = "Employee name is required";
-    if (!form.employeeNumber)
+    if (!form.employeeName?.trim())
+      newErrors.employeeName = "Employee name is required";
+
+    if (!form.employeeNumber?.trim())
       newErrors.employeeNumber = "Employee number is required";
-    if (!form.position) newErrors.position = "Position is required";
-    if (!form.branch) newErrors.branch = "Branch is required";
+    if (!form.position?.trim()) newErrors.position = "Position is required";
+    if (!form.branch?.trim()) newErrors.branch = "Branch is required";
+    if (!form.birthDate) newErrors.birthDate = "Birth date is required";
+
+    if (!form.contactPerson?.trim())
+      newErrors.contactPerson = "Contact person is required";
+    if (
+      form.contactNumber &&
+      form.contactNumber.replace(/\D/g, "").length !== 11
+    )
+      newErrors.contactNumber = "Contact number must be 11 digits";
+
+    if (form.email && !/^[^@]+@[^@]+$/.test(form.email)) {
+      newErrors.email = "Invalid email format";
+    }
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
-    if (isEdit) {
-      setEmployees((prev) =>
-        prev.map((emp) => (emp.id === form.id ? form : emp)),
-      );
-    } else {
-      setEmployees((s) => [form, ...s]);
-    }
+    try {
+      if (isEdit && form.id) {
+        const sanitizedForm = {
+          ...form,
+          allergies:
+            form.allergies?.trim() === "" ||
+            form.allergies?.toLowerCase() === "n/a"
+              ? undefined
+              : form.allergies,
 
-    setShowModal(false);
-    setIsEdit(false);
-    setForm(emptyEmployee());
-    setErrors({});
+          height:
+            typeof form.height === "number" && !Number.isNaN(form.height)
+              ? form.height
+              : undefined,
+
+          weight:
+            typeof form.weight === "number" && !Number.isNaN(form.weight)
+              ? form.weight
+              : undefined,
+
+          email: form.email?.trim() === "" ? undefined : form.email?.trim(),
+        };
+
+        const res = await updateEmployee(
+          Number(form.id),
+          sanitizedForm as Record<string, unknown>,
+        );
+
+        if (!res.success) {
+          throw new Error(res.error);
+        }
+
+        if (!res.result) {
+          throw new Error("No result returned");
+        }
+
+        setEmployees((prev) =>
+          prev.map((emp) => (emp.id === form.id ? res.result! : emp)),
+        );
+      } else {
+        const sanitizedForm = {
+          ...form,
+          height:
+            typeof form.height === "number" && !Number.isNaN(form.height)
+              ? form.height
+              : undefined,
+
+          weight:
+            typeof form.weight === "number" && !Number.isNaN(form.weight)
+              ? form.weight
+              : undefined,
+
+          email: form.email?.trim() === "" ? undefined : form.email?.trim(),
+        };
+
+        const res = await createEmployee(
+          sanitizedForm as Record<string, unknown>,
+        );
+
+        if (!res.success) {
+          throw new Error(res.error);
+        }
+
+        if (!res.result) {
+          throw new Error("No result returned");
+        }
+
+        setEmployees((prev) => [res.result!, ...prev]);
+      }
+
+      setShowModal(false);
+      setIsEdit(false);
+      setForm(emptyEmployee());
+      setErrors({});
+    } catch (error: any) {
+      alert(error.message || "Error saving employee");
+    }
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(employeeNumber: string) {
     if (!confirm("Delete employee?")) return;
-    setEmployees((s) => s.filter((x) => x.id !== id));
+
+    try {
+      const res = await deleteEmployee(employeeNumber);
+
+      if (!res.success) throw new Error(res.error);
+
+      setEmployees((prev) =>
+        prev.filter((emp) => emp.employeeNumber !== employeeNumber),
+      );
+    } catch (error: any) {
+      alert(error.message);
+    }
   }
 
   /* ================= UI ================= */
@@ -236,8 +344,21 @@ const EmployeeDashboard: React.FC = () => {
             <h2 className="text-3xl font-bold">Employee Management</h2>
             <p className="opacity-70">Employee analytics and records</p>
           </div>
+
           <div className="flex gap-3 items-center">
-            {/* Import Button */}
+            <div className="relative w-[320px] md:w-[420px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-black/80 pointer-events-none">
+                <FiSearch size={18} />
+              </span>
+
+              <input
+                className="input input-bordered w-full pl-10"
+                placeholder="Search Name, Employee #, Position, Branch, TIN, GSIS..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
             <label className="btn btn-outline">
               <span className="mr-2">
                 <FiUpload size={18} />
@@ -336,19 +457,33 @@ const EmployeeDashboard: React.FC = () => {
             <tbody>
               {paginatedEmployees.map((emp) => (
                 <tr key={emp.id}>
-                  <td className="font-semibold">{emp.name || "—"}</td>
+                  <td className="font-semibold">{emp.employeeName || "—"}</td>
                   <td>{emp.employeeNumber || "—"}</td>
                   <td>{emp.position || "—"}</td>
                   <td>{emp.branch || "—"}</td>
-                  <td>{emp.tin || "—"}</td>
-                  <td>{emp.gsis || "—"}</td>
-                  <td>{emp.philhealth || "—"}</td>
-                  <td>{emp.pagibig || "—"}</td>
-                  <td>{emp.birthday || "—"}</td>
-                  <td>{emp.bloodType || "—"}</td>
-                  <td>{emp.allergies || "—"}</td>
-                  <td>{emp.height || "—"}</td>
-                  <td>{emp.weight || "—"}</td>
+                  <td>{emp.tinNumber || "—"}</td>
+
+                  <td>{emp.gsisNumber || "—"}</td>
+                  <td>{emp.philHealthNumber || "—"}</td>
+                  <td>{emp.pagIbigNumber || "—"}</td>
+                  <td>
+                    {emp.birthDate
+                      ? new Date(emp.birthDate).toLocaleDateString()
+                      : "—"}
+                  </td>
+
+                  <td>{emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}</td>
+                  <td>
+                    {emp.allergies &&
+                    emp.allergies.trim() !== "" &&
+                    emp.allergies.toLowerCase() !== "n/a"
+                      ? emp.allergies
+                      : "N/A"}
+                  </td>
+
+                  <td>{emp.height ?? "—"}</td>
+                  <td>{emp.weight ?? "—"}</td>
+
                   <td>{emp.contactPerson || "—"}</td>
                   <td>{emp.contactNumber || "—"}</td>
                   <td>{emp.email || "—"}</td>
@@ -363,7 +498,7 @@ const EmployeeDashboard: React.FC = () => {
 
                     <button
                       className="btn btn-ghost btn-sm text-error"
-                      onClick={() => handleDelete(emp.id)}
+                      onClick={() => handleDelete(emp.employeeNumber)}
                     >
                       <FiTrash2 />
                     </button>
@@ -433,7 +568,9 @@ const EmployeeDashboard: React.FC = () => {
               onSubmit={handleSave}
               className="bg-base-100 w-full max-w-5xl rounded-2xl p-8 shadow-xl"
             >
-              <h2 className="text-2xl font-semibold mb-6">Add Employee</h2>
+              <h2 className="text-2xl font-semibold mb-6">
+                {isEdit ? "Edit Employee" : "Add Employee"}
+              </h2>
 
               <div className="grid md:grid-cols-2 gap-5">
                 {/* Employee Name */}
@@ -442,12 +579,16 @@ const EmployeeDashboard: React.FC = () => {
                     Employee Name *
                   </label>
                   <input
-                    className={`input input-bordered w-full ${errors.name && "input-error"}`}
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className={`input input-bordered w-full ${errors.employeeName && "input-error"}`}
+                    value={form.employeeName || ""}
+                    onChange={(e) =>
+                      setForm({ ...form, employeeName: e.target.value })
+                    }
                   />
-                  {errors.name && (
-                    <p className="text-error text-sm mt-1">{errors.name}</p>
+                  {errors.employeeName && (
+                    <p className="text-error text-sm mt-1">
+                      {errors.employeeName}
+                    </p>
                   )}
                 </div>
 
@@ -457,12 +598,16 @@ const EmployeeDashboard: React.FC = () => {
                     Employee Number *
                   </label>
                   <input
-                    className={`input input-bordered w-full ${errors.employeeNumber && "input-error"}`}
-                    value={form.employeeNumber}
+                    className="input input-bordered w-full"
+                    value={form.employeeNumber || ""}
                     onChange={(e) =>
-                      setForm({ ...form, employeeNumber: e.target.value })
+                      setForm({
+                        ...form,
+                        employeeNumber: e.target.value.replace(/\D/g, ""),
+                      })
                     }
                   />
+
                   {errors.employeeNumber && (
                     <p className="text-error text-sm mt-1">
                       {errors.employeeNumber}
@@ -507,8 +652,13 @@ const EmployeeDashboard: React.FC = () => {
                   <label className="label-text font-medium">TIN</label>
                   <input
                     className="input input-bordered w-full"
-                    value={form.tin || ""}
-                    onChange={(e) => setForm({ ...form, tin: e.target.value })}
+                    value={form.tinNumber || ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        tinNumber: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
                   />
                 </div>
 
@@ -517,8 +667,13 @@ const EmployeeDashboard: React.FC = () => {
                   <label className="label-text font-medium">GSIS</label>
                   <input
                     className="input input-bordered w-full"
-                    value={form.gsis || ""}
-                    onChange={(e) => setForm({ ...form, gsis: e.target.value })}
+                    value={form.gsisNumber || ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        gsisNumber: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
                   />
                 </div>
 
@@ -527,9 +682,12 @@ const EmployeeDashboard: React.FC = () => {
                   <label className="label-text font-medium">PhilHealth</label>
                   <input
                     className="input input-bordered w-full"
-                    value={form.philhealth || ""}
+                    value={form.philHealthNumber || ""}
                     onChange={(e) =>
-                      setForm({ ...form, philhealth: e.target.value })
+                      setForm({
+                        ...form,
+                        philHealthNumber: e.target.value.replace(/\D/g, ""),
+                      })
                     }
                   />
                 </div>
@@ -539,9 +697,12 @@ const EmployeeDashboard: React.FC = () => {
                   <label className="label-text font-medium">Pag-IBIG</label>
                   <input
                     className="input input-bordered w-full"
-                    value={form.pagibig || ""}
+                    value={form.pagIbigNumber || ""}
                     onChange={(e) =>
-                      setForm({ ...form, pagibig: e.target.value })
+                      setForm({
+                        ...form,
+                        pagIbigNumber: e.target.value.replace(/\D/g, ""),
+                      })
                     }
                   />
                 </div>
@@ -551,24 +712,45 @@ const EmployeeDashboard: React.FC = () => {
                   <label className="label-text font-medium">Birthday</label>
                   <input
                     type="date"
-                    className="input input-bordered w-full"
-                    value={form.birthday || ""}
+                    className={`input input-bordered w-full ${errors.birthDate && "input-error"}`}
+                    value={
+                      form.birthDate
+                        ? new Date(form.birthDate).toISOString().split("T")[0]
+                        : ""
+                    }
                     onChange={(e) =>
-                      setForm({ ...form, birthday: e.target.value })
+                      setForm({
+                        ...form,
+                        birthDate: new Date(e.target.value + "T00:00:00"),
+                      })
                     }
                   />
+
+                  {errors.birthDate && (
+                    <p className="text-error text-sm mt-1">
+                      {errors.birthDate}
+                    </p>
+                  )}
                 </div>
 
                 {/* Blood Type */}
                 <div>
                   <label className="label-text font-medium">Blood Type</label>
-                  <input
-                    className="input input-bordered w-full"
+                  <select
+                    className="select select-bordered w-full"
                     value={form.bloodType || ""}
                     onChange={(e) =>
-                      setForm({ ...form, bloodType: e.target.value })
+                      setForm({ ...form, bloodType: e.target.value as any })
                     }
-                  />
+                  >
+                    <option value="">Select Blood Type</option>
+
+                    {Object.entries(bloodTypeMap).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Allergies */}
@@ -586,25 +768,54 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Height */}
                 <div>
                   <label className="label-text font-medium">Height</label>
-                  <input
-                    className="input input-bordered w-full"
-                    value={form.height || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, height: e.target.value })
-                    }
-                  />
+
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-full"
+                      value={form.height ?? ""}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          height: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                        })
+                      }
+                    />
+
+                    <select className="select select-bordered">
+                      <option>cm</option>
+                      <option>ft</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Weight */}
                 <div>
                   <label className="label-text font-medium">Weight</label>
-                  <input
-                    className="input input-bordered w-full"
-                    value={form.weight || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, weight: e.target.value })
-                    }
-                  />
+
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input input-bordered w-full"
+                      value={form.weight ?? ""}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          weight: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                        })
+                      }
+                    />
+
+                    <select className="select select-bordered">
+                      <option>kg</option>
+                      <option>lbs</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Contact Person */}
@@ -629,22 +840,44 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     className="input input-bordered w-full"
                     value={form.contactNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, contactNumber: e.target.value })
-                    }
+                    onChange={(e) => {
+                      let numbers = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 11);
+
+                      if (numbers.length > 4 && numbers.length <= 8)
+                        numbers = numbers.replace(/(\d{4})(\d+)/, "$1-$2");
+
+                      if (numbers.length > 8)
+                        numbers = numbers.replace(
+                          /(\d{4})(\d{4})(\d+)/,
+                          "$1-$2-$3",
+                        );
+
+                      setForm({ ...form, contactNumber: numbers });
+                    }}
                   />
+                  {errors.contactNumber && (
+                    <p className="text-error text-sm mt-1">
+                      {errors.contactNumber}
+                    </p>
+                  )}
                 </div>
 
                 {/* Email */}
                 <div className="md:col-span-2">
                   <label className="label-text font-medium">Email</label>
                   <input
-                    className="input input-bordered w-full"
+                    className={`input input-bordered w-full ${errors.email && "input-error"}`}
                     value={form.email || ""}
                     onChange={(e) =>
                       setForm({ ...form, email: e.target.value })
                     }
                   />
+
+                  {errors.email && (
+                    <p className="text-error text-sm mt-1">{errors.email}</p>
+                  )}
                 </div>
               </div>
 
@@ -659,7 +892,7 @@ const EmployeeDashboard: React.FC = () => {
                 </button>
 
                 <button type="submit" className="btn btn-primary px-8">
-                  Create
+                  {isEdit ? "Update" : "Create"}
                 </button>
               </div>
             </form>

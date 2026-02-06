@@ -1,6 +1,8 @@
 import { auth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 
+// #TODO: disable signup route after seeding
+
 async function main() {
   // Create admin user
   try {
@@ -19,6 +21,33 @@ async function main() {
     console.error(`Failed to create admin user: ${error.message}`);
   }
 
+  await prisma.user.update({
+    where: { email: "admin@admin.com" },
+    data: { role: "admin" },
+  });
+
+  // Create atty user
+  try {
+    const attyResult = await auth.api.signUpEmail({
+      body: {
+        email: "atty@atty.com",
+        password: "atty123",
+        name: "Attorney",
+      },
+    });
+
+    if (attyResult) {
+      console.log("Created attorney user successfully");
+    }
+  } catch (error: any) {
+    console.error(`Failed to create attorney user: ${error.message}`);
+  }
+
+  await prisma.user.update({
+    where: { email: "atty@atty.com" },
+    data: { role: "atty" },
+  });
+
   // Create staff user
   try {
     const staffResult = await auth.api.signUpEmail({
@@ -35,11 +64,6 @@ async function main() {
   } catch (error: any) {
     console.error(`Failed to create staff user: ${error.message}`);
   }
-
-  await prisma.user.update({
-    where: { email: "admin@admin.com" },
-    data: { role: "admin" },
-  });
 
   const cases = [
     {

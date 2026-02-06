@@ -1,5 +1,5 @@
 {
-  "name": "rtc-database-backend",
+  "name": "rtc-database-webserver",
   "version": "0.1.0",
   "private": true,
   "scripts": {

@@ -1,14 +1,15 @@
 "use server";
 
 import { Employee } from "@/app/generated/prisma/browser";
-import { Role, validateSession } from "@/app/lib/authActions";
+import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import ActionResult from "../ActionResult";
 import { EmployeeSchema } from "./schema";
 
 export async function getEmployees(): Promise<ActionResult<Employee[]>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -25,7 +26,7 @@ export async function createEmployee(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Employee>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -50,7 +51,7 @@ export async function updateEmployee(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Employee>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -75,7 +76,7 @@ export async function deleteEmployee(
   employeeNumber: string,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Role.ADMIN);
+    const sessionResult = await validateSession(Roles.ADMIN);
     if (!sessionResult.success) {
       return sessionResult;
     }
