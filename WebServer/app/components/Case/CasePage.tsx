@@ -4,6 +4,7 @@ import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
 import { usePopup } from "../Popup/PopupProvider";
+import CaseFilterModal, { type CaseFilterFilters } from "./CaseFilterModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
@@ -28,6 +29,9 @@ const CasePage: React.FC = () => {
     key: keyof Case;
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterFilters>({});
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
 
   // Fetch cases from API
   useEffect(() => {
@@ -57,10 +61,14 @@ const CasePage: React.FC = () => {
   const stats = useMemo(() => calculateCaseStats(cases), [cases]);
 
   const filteredAndSortedCases = useMemo(() => {
-    let filtered = cases;
+    // Start with advanced filtered cases if filters are applied, otherwise use all cases
+    const baseList =
+      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
+
+    let filtered = baseList;
 
     if (searchTerm) {
-      filtered = cases.filter((caseItem) =>
+      filtered = baseList.filter((caseItem) =>
         Object.values(caseItem).some((value) =>
           value?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
         ),
@@ -68,13 +76,18 @@ const CasePage: React.FC = () => {
     }
 
     return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig]);
+  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
+  };
+
+  const handleApplyFilters = (filters: CaseFilterFilters, filtered: Case[]) => {
+    setAppliedFilters(filters);
+    setFilteredByAdvanced(filtered);
   };
 
   const handleDeleteCase = async (caseId: string) => {
@@ -233,6 +246,24 @@ const CasePage: React.FC = () => {
             className="hidden"
             onChange={handleImportExcel}
           />
+          <button
+            className={`btn btn-outline ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+            onClick={() => setFilterModalOpen(true)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Filter
+          </button>
           {isAdmin && (
             <button
               className={`btn btn-outline ${uploading ? "loading" : ""}`}
@@ -362,6 +393,14 @@ const CasePage: React.FC = () => {
             }}
           />
         )}
+
+        {/* Filter Modal */}
+        <CaseFilterModal
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          onApplyFilters={handleApplyFilters}
+          cases={cases}
+        />
       </main>
     </div>
   );
