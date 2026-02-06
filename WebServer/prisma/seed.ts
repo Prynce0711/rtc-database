@@ -9,7 +9,7 @@ async function main() {
     const adminResult = await auth.api.signUpEmail({
       body: {
         email: "admin@admin.com",
-        password: "admin123",
+        password: "admin12345",
         name: "Admin",
       },
     });
@@ -31,7 +31,7 @@ async function main() {
     const attyResult = await auth.api.signUpEmail({
       body: {
         email: "atty@atty.com",
-        password: "atty123",
+        password: "atty12345",
         name: "Attorney",
       },
     });
@@ -53,7 +53,7 @@ async function main() {
     const staffResult = await auth.api.signUpEmail({
       body: {
         email: "staff@staff.com",
-        password: "staff123",
+        password: "staff12345",
         name: "Staff",
       },
     });
