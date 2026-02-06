@@ -362,8 +362,12 @@ const EmployeeDashboard: React.FC = () => {
         {/* ===== HEADER ===== */}
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
-            <h1 className="text-4xl font-bold text-base-content">Employee Management</h1>
-            <p className="text-base text-base-content/70 mt-1">Employee analytics and records</p>
+            <h1 className="text-4xl font-bold text-base-content">
+              Employee Management
+            </h1>
+            <p className="text-base text-base-content/70 mt-1">
+              Employee analytics and records
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
@@ -390,12 +394,18 @@ const EmployeeDashboard: React.FC = () => {
               />
             </label>
 
-            <button className="btn btn-outline btn-md gap-2 rounded-lg" onClick={handleExport}>
+            <button
+              className="btn btn-outline btn-md gap-2 rounded-lg"
+              onClick={handleExport}
+            >
               <FiDownload size={18} />
               Export
             </button>
 
-            <button className="btn btn-primary btn-md gap-2 rounded-lg" onClick={openAdd}>
+            <button
+              className="btn btn-primary btn-md gap-2 rounded-lg"
+              onClick={openAdd}
+            >
               <FiPlus size={18} />
               Add Employee
             </button>
@@ -441,10 +451,14 @@ const EmployeeDashboard: React.FC = () => {
           <table className="table w-full text-sm">
             <thead className="bg-base-200">
               <tr>
-                <th className="font-semibold text-base-content">Employee Name</th>
+                <th className="font-semibold text-base-content">
+                  Employee Name
+                </th>
                 <th className="font-semibold text-base-content">Employee #</th>
                 <th className="font-semibold text-base-content">Position</th>
-                <th className="font-semibold text-base-content">Branch / Station</th>
+                <th className="font-semibold text-base-content">
+                  Branch / Station
+                </th>
                 <th className="font-semibold text-base-content">TIN</th>
                 <th className="font-semibold text-base-content">GSIS</th>
                 <th className="font-semibold text-base-content">PhilHealth</th>
@@ -454,29 +468,48 @@ const EmployeeDashboard: React.FC = () => {
                 <th className="font-semibold text-base-content">Allergies</th>
                 <th className="font-semibold text-base-content">Height</th>
                 <th className="font-semibold text-base-content">Weight</th>
-                <th className="font-semibold text-base-content">Contact Person</th>
-                <th className="font-semibold text-base-content">Contact Number</th>
+                <th className="font-semibold text-base-content">
+                  Contact Person
+                </th>
+                <th className="font-semibold text-base-content">
+                  Contact Number
+                </th>
                 <th className="font-semibold text-base-content">Email</th>
-                <th className="font-semibold text-base-content text-center">Actions</th>
+                <th className="font-semibold text-base-content text-center">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {paginatedEmployees.map((emp, index) => (
-                <tr key={emp.id} className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}>
-                  <td className="font-medium text-base-content">{emp.employeeName || "—"}</td>
-                  <td className="text-base-content">{emp.employeeNumber || "—"}</td>
+                <tr
+                  key={emp.id}
+                  className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
+                >
+                  <td className="font-medium text-base-content">
+                    {emp.employeeName || "—"}
+                  </td>
+                  <td className="text-base-content">
+                    {emp.employeeNumber || "—"}
+                  </td>
                   <td className="text-base-content">{emp.position || "—"}</td>
                   <td className="text-base-content">{emp.branch || "—"}</td>
                   <td className="text-base-content">{emp.tinNumber || "—"}</td>
                   <td className="text-base-content">{emp.gsisNumber || "—"}</td>
-                  <td className="text-base-content">{emp.philHealthNumber || "—"}</td>
-                  <td className="text-base-content">{emp.pagIbigNumber || "—"}</td>
+                  <td className="text-base-content">
+                    {emp.philHealthNumber || "—"}
+                  </td>
+                  <td className="text-base-content">
+                    {emp.pagIbigNumber || "—"}
+                  </td>
                   <td className="text-base-content">
                     {emp.birthDate
                       ? new Date(emp.birthDate).toLocaleDateString()
                       : "—"}
                   </td>
-                  <td className="text-base-content">{emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}</td>
+                  <td className="text-base-content">
+                    {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
+                  </td>
                   <td className="text-base-content">
                     {emp.allergies &&
                     emp.allergies.trim() !== "" &&
@@ -486,8 +519,12 @@ const EmployeeDashboard: React.FC = () => {
                   </td>
                   <td className="text-base-content">{emp.height ?? "—"}</td>
                   <td className="text-base-content">{emp.weight ?? "—"}</td>
-                  <td className="text-base-content">{emp.contactPerson || "—"}</td>
-                  <td className="text-base-content">{emp.contactNumber || "—"}</td>
+                  <td className="text-base-content">
+                    {emp.contactPerson || "—"}
+                  </td>
+                  <td className="text-base-content">
+                    {emp.contactNumber || "—"}
+                  </td>
                   <td className="text-base-content">{emp.email || "—"}</td>
                   <td className="text-center">
                     <div className="flex gap-2 justify-center">
@@ -522,7 +559,11 @@ const EmployeeDashboard: React.FC = () => {
             <span className="font-bold text-base-content">
               {Math.min(currentPage * rowsPerPage, filtered.length)}
             </span>{" "}
-            of <span className="font-bold text-base-content">{filtered.length}</span> employees
+            of{" "}
+            <span className="font-bold text-base-content">
+              {filtered.length}
+            </span>{" "}
+            employees
           </div>
 
           <div className="flex items-center gap-2">
@@ -585,18 +626,24 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Employee Name */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Employee Name *</span>
+                    <span className="label-text font-semibold">
+                      Employee Name *
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.employeeName || ""}
-                    onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, employeeName: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="John Doe"
                   />
                   {errors.employeeName && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.employeeName}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.employeeName}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -604,19 +651,25 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Employee Number */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Employee Number *</span>
+                    <span className="label-text font-semibold">
+                      Employee Number *
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.employeeNumber || ""}
-                    onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, employeeNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="EMP001"
                     disabled={isEdit}
                   />
                   {errors.employeeNumber && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.employeeNumber}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.employeeNumber}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -629,13 +682,17 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="text"
                     value={form.position || ""}
-                    onChange={(e) => setForm({ ...form, position: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, position: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="Judge"
                   />
                   {errors.position && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.position}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.position}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -643,18 +700,24 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Branch */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Branch / Station *</span>
+                    <span className="label-text font-semibold">
+                      Branch / Station *
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.branch || ""}
-                    onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, branch: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="Manila"
                   />
                   {errors.branch && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.branch}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.branch}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -662,17 +725,32 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Birth Date */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Birth Date *</span>
+                    <span className="label-text font-semibold">
+                      Birth Date *
+                    </span>
                   </label>
                   <input
                     type="date"
-                    value={form.birthDate ? new Date(form.birthDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) => setForm({ ...form, birthDate: e.target.value ? new Date(e.target.value) : undefined })}
+                    value={
+                      form.birthDate
+                        ? new Date(form.birthDate).toISOString().split("T")[0]
+                        : ""
+                    }
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        birthDate: e.target.value
+                          ? new Date(e.target.value)
+                          : undefined,
+                      })
+                    }
                     className="input input-bordered w-full"
                   />
                   {errors.birthDate && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.birthDate}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.birthDate}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -680,18 +758,24 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Contact Person */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Contact Person *</span>
+                    <span className="label-text font-semibold">
+                      Contact Person *
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.contactPerson || ""}
-                    onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, contactPerson: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="Contact name"
                   />
                   {errors.contactPerson && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.contactPerson}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.contactPerson}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -699,18 +783,24 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Contact Number */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Contact Number</span>
+                    <span className="label-text font-semibold">
+                      Contact Number
+                    </span>
                   </label>
                   <input
                     type="tel"
                     value={form.contactNumber || ""}
-                    onChange={(e) => setForm({ ...form, contactNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, contactNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="09123456789"
                   />
                   {errors.contactNumber && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.contactNumber}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.contactNumber}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -723,13 +813,17 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="email"
                     value={form.email || ""}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="employee@rtc.gov.ph"
                   />
                   {errors.email && (
                     <label className="label">
-                      <span className="label-text-alt text-error">{errors.email}</span>
+                      <span className="label-text-alt text-error">
+                        {errors.email}
+                      </span>
                     </label>
                   )}
                 </div>
@@ -745,7 +839,9 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="text"
                     value={form.tinNumber || ""}
-                    onChange={(e) => setForm({ ...form, tinNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, tinNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="TIN number"
                   />
@@ -759,7 +855,9 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="text"
                     value={form.gsisNumber || ""}
-                    onChange={(e) => setForm({ ...form, gsisNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, gsisNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="GSIS number"
                   />
@@ -773,7 +871,9 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="text"
                     value={form.philHealthNumber || ""}
-                    onChange={(e) => setForm({ ...form, philHealthNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, philHealthNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="PhilHealth number"
                   />
@@ -787,7 +887,9 @@ const EmployeeDashboard: React.FC = () => {
                   <input
                     type="text"
                     value={form.pagIbigNumber || ""}
-                    onChange={(e) => setForm({ ...form, pagIbigNumber: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, pagIbigNumber: e.target.value })
+                    }
                     className="input input-bordered w-full"
                     placeholder="Pag-IBIG number"
                   />
@@ -803,7 +905,12 @@ const EmployeeDashboard: React.FC = () => {
                   </label>
                   <select
                     value={form.bloodType || ""}
-                    onChange={(e) => setForm({ ...form, bloodType: (e.target.value as any) || undefined })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        bloodType: (e.target.value as any) || undefined,
+                      })
+                    }
                     className="select select-bordered w-full"
                   >
                     <option value="">Select blood type</option>
@@ -825,7 +932,9 @@ const EmployeeDashboard: React.FC = () => {
                   </label>
                   <textarea
                     value={form.allergies || ""}
-                    onChange={(e) => setForm({ ...form, allergies: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, allergies: e.target.value })
+                    }
                     className="textarea textarea-bordered w-full"
                     placeholder="List any allergies (N/A if none)"
                     rows={3}
@@ -835,12 +944,21 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Height */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Height (cm)</span>
+                    <span className="label-text font-semibold">
+                      Height (cm)
+                    </span>
                   </label>
                   <input
                     type="number"
                     value={form.height ?? ""}
-                    onChange={(e) => setForm({ ...form, height: e.target.value ? Number(e.target.value) : undefined })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        height: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
                     className="input input-bordered w-full"
                     placeholder="170"
                   />
@@ -849,12 +967,21 @@ const EmployeeDashboard: React.FC = () => {
                 {/* Weight */}
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text font-semibold">Weight (kg)</span>
+                    <span className="label-text font-semibold">
+                      Weight (kg)
+                    </span>
                   </label>
                   <input
                     type="number"
                     value={form.weight ?? ""}
-                    onChange={(e) => setForm({ ...form, weight: e.target.value ? Number(e.target.value) : undefined })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        weight: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
                     className="input input-bordered w-full"
                     placeholder="70"
                   />
@@ -873,10 +1000,7 @@ const EmployeeDashboard: React.FC = () => {
                   >
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary flex-1"
-                  >
+                  <button type="submit" className="btn btn-primary flex-1">
                     {isEdit ? "Update" : "Create"}
                   </button>
                 </div>
