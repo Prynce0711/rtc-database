@@ -34,7 +34,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ actions }) => {
               whileHover={{ rotate: 5 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
-              {action.icon}
+              <>{action.icon}</>
             </motion.div>
             <div className="text-left">
               <div className="font-semibold text-base">{action.title}</div>
