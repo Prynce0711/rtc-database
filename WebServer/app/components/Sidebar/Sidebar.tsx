@@ -41,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             transition={{ duration: 0.18 }}
             className="min-h-screen w-full"
           >
-            {children}
+            <>{children}</>
           </motion.div>
         </div>
 
@@ -57,8 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               {isAdmin
                 ? AdminSidebarContents(activeView)
                 : isAtty
-                ? AttorneySidebarContents(activeView)
-                : StaffSidebarContents(activeView)}
+                  ? AttorneySidebarContents(activeView)
+                  : StaffSidebarContents(activeView)}
             </ul>
           </div>
         </div>
@@ -85,11 +85,14 @@ function AdminSidebarContents(activeView: string) {
         activeView={activeView}
         href="employees"
       />
-
+      <SidebarButton
+        icon={<AiOutlineTeam size={20} />}
+        activeView={activeView}
+        href="activity-logs"
+      />
     </>
   );
 }
-
 
 function AttorneySidebarContents(activeView: string) {
   return (
@@ -104,13 +107,9 @@ function AttorneySidebarContents(activeView: string) {
         activeView={activeView}
         href="cases"
       />
-
-
     </>
   );
 }
-
-
 
 function StaffSidebarContents(activeView: string) {
   return (
