@@ -70,3 +70,19 @@
   --depth: 0;
   --noise: 0;
 }
+
+/* Ensure the Tailwind `font-sans` utility uses the Montserrat variable when available. */
+.font-sans {
+  font-family:
+    var(--font-montserrat, "Montserrat"),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans",
+    "Liberation Sans",
+    sans-serif;
+}
