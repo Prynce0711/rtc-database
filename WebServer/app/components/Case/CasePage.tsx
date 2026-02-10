@@ -404,7 +404,7 @@ const CasePage: React.FC = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medi">
           <div className="stat bg-base-100 rounded-lg shadow">
             <div className="stat-title">Total Cases</div>
             <div className="stat-value text-primary">{stats.totalCases}</div>

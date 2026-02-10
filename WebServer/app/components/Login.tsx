@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn, useSession } from "@/app/lib/authClient";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
@@ -13,6 +13,25 @@ const Login: React.FC = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
 
+  const cardControls = useAnimation();
+  const overlayControls = useAnimation();
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 30, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+    transitioning: {
+      scale: 1.06,
+      y: -40,
+      opacity: 0.98,
+      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+  } as const;
+
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -20,6 +39,11 @@ const Login: React.FC = () => {
       router.push("/user/dashboard");
     }
   }, [session, router]);
+
+  useEffect(() => {
+    // reveal card on mount
+    void cardControls.start("visible");
+  }, [cardControls]);
 
   useEffect(() => {
     if (error) {
@@ -47,6 +71,19 @@ const Login: React.FC = () => {
         return;
       }
 
+      // smooth transition: animate card then fade overlay into view before navigating
+      try {
+        // fade in subtle overlay
+        void overlayControls.start({
+          opacity: 1,
+          transition: { duration: 0.45 },
+        });
+        // animate card lift/scale
+        await cardControls.start("transitioning");
+        // small delay to let overlay settle
+        await new Promise((r) => setTimeout(r, 120));
+      } catch {}
+
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -57,6 +94,13 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
+        {/* full-screen overlay used during transition */}
+        <motion.div
+          className="fixed inset-0 z-20 bg-base-100"
+          initial={{ opacity: 0 }}
+          animate={overlayControls}
+          style={{ pointerEvents: "none" }}
+        />
         {/* Logo and Header */}
         <motion.div
           className="text-center mb-10"
@@ -90,14 +134,10 @@ const Login: React.FC = () => {
 
         {/* Login Form */}
         <motion.div
-          className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm"
-          initial={{ opacity: 0, y: 30, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            duration: 0.7,
-            delay: 0.2,
-            ease: [0.25, 0.46, 0.45, 0.94],
-          }}
+          className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm relative z-10"
+          variants={cardVariants}
+          initial="hidden"
+          animate={cardControls}
           whileHover={{
             y: -4,
             boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
