@@ -1,5 +1,7 @@
-import ActivityLogs from "@/app/components/Logs/ActivityLogs";
+import ActivityLogs from "@/app/components/Case/CasePage";
 
-export default function ActivityReportsPage() {
+const page = () => {
   return <ActivityLogs />;
-}
+};
+
+export default page;
