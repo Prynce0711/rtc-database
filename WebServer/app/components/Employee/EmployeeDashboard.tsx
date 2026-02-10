@@ -17,14 +17,12 @@ import Table from "../Table/Table";
 import {
   FiBriefcase,
   FiDownload,
-  FiEdit,
   FiFilter,
   FiHeart,
   FiMail,
   FiMapPin,
   FiPlus,
   FiSearch,
-  FiTrash2,
   FiUpload,
   FiUsers,
   FiX,
@@ -40,13 +38,21 @@ interface KpiCardProps {
   icon: React.ReactNode;
   title: string;
   value: string | number;
+  valueClassName?: string;
 }
 
-const KpiCard: React.FC<KpiCardProps> = ({ icon, title, value }) => (
+const KpiCard: React.FC<KpiCardProps> = ({
+  icon,
+  title,
+  value,
+  valueClassName,
+}) => (
   <div className="stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow">
     <div className="stat-figure text-black">{icon}</div>
     <div className="stat-title text-black font-medium">{title}</div>
-    <div className="stat-value text-black font-medium">{value}</div>
+    <div className={`stat-value font-medium ${valueClassName ?? "text-black"}`}>
+      {value}
+    </div>
   </div>
 );
 
@@ -597,31 +603,37 @@ const EmployeeDashboard: React.FC = () => {
             icon={<FiUsers />}
             title="Total Employees"
             value={analytics.totalEmployees}
+            valueClassName="text-primary"
           />
           <KpiCard
             icon={<FiMapPin />}
             title="Branches"
             value={analytics.totalBranches}
+            valueClassName="text-warning"
           />
           <KpiCard
             icon={<FiBriefcase />}
             title="Most Common Position"
             value={analytics.mostCommonPosition}
+            valueClassName="text-info"
           />
           <KpiCard
             icon={<FiHeart />}
             title="Medical Records"
             value={analytics.withMedical}
+            valueClassName="text-success"
           />
           <KpiCard
             icon={<FiUsers />}
             title="Birthdays This Month"
             value={analytics.birthdayThisMonth}
+            valueClassName="text-accent"
           />
           <KpiCard
             icon={<FiMail />}
             title="Missing Email"
             value={analytics.missingEmail}
+            valueClassName="text-error"
           />
         </div>
 
@@ -655,6 +667,26 @@ const EmployeeDashboard: React.FC = () => {
                 key={emp.id}
                 className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
               >
+                <td className="text-center">
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm text-primary hover:bg-primary hover:text-white rounded-lg transition-colors"
+                      onClick={() => handleEdit(emp)}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm text-error hover:bg-error hover:text-white rounded-lg transition-colors"
+                      onClick={() => handleDelete(emp.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+
                 <td className="font-medium text-base-content">
                   {emp.employeeName || "—"}
                 </td>
@@ -695,22 +727,6 @@ const EmployeeDashboard: React.FC = () => {
                   {emp.contactNumber || "—"}
                 </td>
                 <td className="text-base-content">{emp.email || "—"}</td>
-                <td className="text-center">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      className="btn btn-ghost btn-sm text-primary hover:bg-primary/10 rounded-lg"
-                      onClick={() => handleEdit(emp)}
-                    >
-                      <FiEdit size={16} />
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-error hover:bg-error/10 rounded-lg"
-                      onClick={() => handleDelete(emp.id)}
-                    >
-                      <FiTrash2 size={16} />
-                    </button>
-                  </div>
-                </td>
               </tr>
             )}
           />
@@ -719,11 +735,20 @@ const EmployeeDashboard: React.FC = () => {
         {/* ===== MODAL ===== */}
         {showModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
-            <div className="bg-base-100 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 z-10 bg-base-100 border-b border-base-300 px-8 py-6 flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-base-content">
-                  {isEdit ? "Edit Employee" : "Add New Employee"}
-                </h2>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header (gradient) */}
+              <div className="flex items-start justify-between px-8 py-6 bg-gradient-to-r from-primary to-primary/30 text-white rounded-t-2xl">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    {isEdit ? "Edit Employee" : "Add New Employee"}
+                  </h2>
+                  <p className="text-sm opacity-90 mt-1">
+                    {isEdit && form.employeeNumber
+                      ? form.employeeNumber
+                      : "New Employee"}
+                  </p>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -731,395 +756,299 @@ const EmployeeDashboard: React.FC = () => {
                     setForm(emptyEmployee());
                     setErrors({});
                   }}
-                  className="btn btn-ghost btn-sm btn-circle"
+                  className="btn btn-ghost btn-sm btn-circle text-white"
+                  aria-label="Close"
                 >
                   <FiX size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleSave} className="p-8 space-y-6">
-                {/* Employee Name */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Employee Name *
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.employeeName || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, employeeName: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="John Doe"
-                  />
-                  {errors.employeeName && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.employeeName}
-                      </span>
-                    </label>
-                  )}
-                </div>
+              {/* Content */}
+              <div className="overflow-y-auto p-6 flex-1">
+                <form onSubmit={handleSave} className="space-y-6">
+                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold mb-4">
+                      Case Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Employee Name *
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.employeeName || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, employeeName: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="John Doe"
+                        />
+                        {errors.employeeName && (
+                          <label className="label">
+                            <span className="label-text-alt text-error">
+                              {errors.employeeName}
+                            </span>
+                          </label>
+                        )}
+                      </div>
 
-                {/* Employee Number */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Employee Number
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.employeeNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, employeeNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="EMP001"
-                    disabled={isEdit}
-                  />
-                  {errors.employeeNumber && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.employeeNumber}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Employee Number
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.employeeNumber || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, employeeNumber: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="EMP001"
+                          disabled={isEdit}
+                        />
+                      </div>
 
-                {/* Position */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Position *</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.position || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, position: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="Judge"
-                  />
-                  {errors.position && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.position}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Position *
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.position || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, position: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="Judge"
+                        />
+                      </div>
 
-                {/* Branch */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Branch / Station *
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.branch || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, branch: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="Manila"
-                  />
-                  {errors.branch && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.branch}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Branch / Station *
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.branch || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, branch: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="Manila"
+                        />
+                      </div>
 
-                {/* Birth Date */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Birth Date *
-                    </span>
-                  </label>
-                  <input
-                    type="date"
-                    value={
-                      form.birthDate
-                        ? new Date(form.birthDate).toISOString().split("T")[0]
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        birthDate: e.target.value
-                          ? new Date(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="input input-bordered w-full"
-                  />
-                  {errors.birthDate && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.birthDate}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Birth Date *
+                          </span>
+                        </label>
+                        <input
+                          type="date"
+                          value={
+                            form.birthDate
+                              ? new Date(form.birthDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              birthDate: e.target.value
+                                ? new Date(e.target.value)
+                                : undefined,
+                            })
+                          }
+                          className="input input-bordered w-full"
+                        />
+                      </div>
 
-                {/* Contact Person */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Contact Person *
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.contactPerson || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, contactPerson: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="Contact name"
-                  />
-                  {errors.contactPerson && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.contactPerson}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Contact Person *
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.contactPerson || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, contactPerson: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="Contact name"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Contact Number */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Contact Number
-                    </span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={form.contactNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, contactNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="09123456789"
-                  />
-                  {errors.contactNumber && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.contactNumber}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold mb-4">
+                      Contact & Additional
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Contact Number
+                          </span>
+                        </label>
+                        <input
+                          type="tel"
+                          value={form.contactNumber || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, contactNumber: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="09123456789"
+                        />
+                      </div>
 
-                {/* Email */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Email</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={form.email || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="employee@rtc.gov.ph"
-                  />
-                  {errors.email && (
-                    <label className="label">
-                      <span className="label-text-alt text-error">
-                        {errors.email}
-                      </span>
-                    </label>
-                  )}
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Email
+                          </span>
+                        </label>
+                        <input
+                          type="email"
+                          value={form.email || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, email: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="employee@rtc.gov.ph"
+                        />
+                      </div>
 
-                {/* Additional Info */}
-                <div className="divider">Additional Information</div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">TIN</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.tinNumber || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, tinNumber: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="TIN number"
+                        />
+                      </div>
 
-                {/* TIN */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">TIN</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.tinNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, tinNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="TIN number"
-                  />
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">GSIS</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.gsisNumber || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, gsisNumber: e.target.value })
+                          }
+                          className="input input-bordered w-full"
+                          placeholder="GSIS number"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                {/* GSIS */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">GSIS</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.gsisNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, gsisNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="GSIS number"
-                  />
-                </div>
+                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold mb-4">
+                      Medical Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Blood Type
+                          </span>
+                        </label>
+                        <select
+                          value={form.bloodType || ""}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              bloodType: (e.target.value as any) || undefined,
+                            })
+                          }
+                          className="select select-bordered w-full"
+                        >
+                          <option value="">Select blood type</option>
+                          <option value="A_Positive">A+</option>
+                          <option value="A_Negative">A-</option>
+                          <option value="B_Positive">B+</option>
+                          <option value="B_Negative">B-</option>
+                          <option value="AB_Positive">AB+</option>
+                          <option value="AB_Negative">AB-</option>
+                          <option value="O_Positive">O+</option>
+                          <option value="O_Negative">O-</option>
+                        </select>
+                      </div>
 
-                {/* PhilHealth */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">PhilHealth</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.philHealthNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, philHealthNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="PhilHealth number"
-                  />
-                </div>
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-semibold">
+                            Allergies
+                          </span>
+                        </label>
+                        <textarea
+                          value={form.allergies || ""}
+                          onChange={(e) =>
+                            setForm({ ...form, allergies: e.target.value })
+                          }
+                          className="textarea textarea-bordered w-full"
+                          placeholder="List any allergies (N/A if none)"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Pag-IBIG */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Pag-IBIG</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={form.pagIbigNumber || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, pagIbigNumber: e.target.value })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="Pag-IBIG number"
-                  />
-                </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModal(false);
+                        setForm(emptyEmployee());
+                        setErrors({});
+                      }}
+                      className="btn btn-ghost"
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      {isEdit ? "Update" : "Create"}
+                    </button>
+                  </div>
+                </form>
+              </div>
 
-                {/* Medical Info */}
-                <div className="divider">Medical Information</div>
-
-                {/* Blood Type */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Blood Type</span>
-                  </label>
-                  <select
-                    value={form.bloodType || ""}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        bloodType: (e.target.value as any) || undefined,
-                      })
-                    }
-                    className="select select-bordered w-full"
-                  >
-                    <option value="">Select blood type</option>
-                    <option value="A_Positive">A+</option>
-                    <option value="A_Negative">A-</option>
-                    <option value="B_Positive">B+</option>
-                    <option value="B_Negative">B-</option>
-                    <option value="AB_Positive">AB+</option>
-                    <option value="AB_Negative">AB-</option>
-                    <option value="O_Positive">O+</option>
-                    <option value="O_Negative">O-</option>
-                  </select>
-                </div>
-
-                {/* Allergies */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">Allergies</span>
-                  </label>
-                  <textarea
-                    value={form.allergies || ""}
-                    onChange={(e) =>
-                      setForm({ ...form, allergies: e.target.value })
-                    }
-                    className="textarea textarea-bordered w-full"
-                    placeholder="List any allergies (N/A if none)"
-                    rows={3}
-                  />
-                </div>
-
-                {/* Height */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Height (cm)
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    value={form.height ?? ""}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        height: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="170"
-                  />
-                </div>
-
-                {/* Weight */}
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-semibold">
-                      Weight (kg)
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    value={form.weight ?? ""}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        weight: e.target.value
-                          ? Number(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="input input-bordered w-full"
-                    placeholder="70"
-                  />
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex gap-3 pt-8">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setForm(emptyEmployee());
-                      setErrors({});
-                    }}
-                    className="btn btn-ghost flex-1"
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary flex-1">
-                    {isEdit ? "Update" : "Create"}
-                  </button>
-                </div>
-              </form>
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-base-300 flex justify-end bg-base-100 rounded-b-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setForm(emptyEmployee());
+                    setErrors({});
+                  }}
+                  className="btn btn-primary"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
