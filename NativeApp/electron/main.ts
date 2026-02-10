@@ -46,14 +46,12 @@ function createWindow() {
     win?.webContents.send("main-process-message", new Date().toLocaleString());
   });
 
-  win.loadURL("http://localhost:3000");
-
-  // if (VITE_DEV_SERVER_URL) {
-  //   win.loadURL(VITE_DEV_SERVER_URL);
-  // } else {
-  //   // win.loadFile('dist/index.html')
-  //   win.loadFile(path.join(RENDERER_DIST, "index.html"));
-  // }
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    // win.loadFile('dist/index.html')
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
 
   startUdpListener(win);
 }
