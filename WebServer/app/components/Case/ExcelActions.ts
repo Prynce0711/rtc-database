@@ -16,7 +16,7 @@ type ExportExcelResult = {
 
 export async function uploadExcel(file: File): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -173,7 +173,7 @@ export async function exportCasesExcel(): Promise<
   ActionResult<ExportExcelResult>
 > {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }

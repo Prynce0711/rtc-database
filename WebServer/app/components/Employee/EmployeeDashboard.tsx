@@ -1,32 +1,38 @@
 "use client";
 import {
-  getEmployees,
   createEmployee,
-  updateEmployee,
   deleteEmployee,
+  getEmployees,
+  updateEmployee,
 } from "@/app/components/Employee/EmployeeActions";
 
-import React, { useMemo, useState, useEffect } from "react";
+import {
+  exportEmployeesExcel,
+  uploadEmployeeExcel,
+} from "@/app/components/Employee/ExcelActions";
+
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
-  FiPlus,
-  FiTrash2,
-  FiUsers,
-  FiMapPin,
   FiBriefcase,
-  FiMail,
-  FiHeart,
-  FiChevronRight,
-  FiChevronLeft,
-  FiUpload,
   FiDownload,
   FiEdit,
+  FiFilter,
+  FiHeart,
+  FiMail,
+  FiMapPin,
+  FiPlus,
   FiSearch,
+  FiTrash2,
+  FiUpload,
+  FiUsers,
   FiX,
 } from "react-icons/fi";
-import EmployeeTable from "./EmployeeTable";
-import EmployeeModal from "./EmployeeModal";
 
+import FilterModal, {
+  type FilterOption,
+  type FilterValues,
+} from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
 
 interface KpiCardProps {
@@ -53,48 +59,72 @@ const emptyEmployee = (): Partial<Employee> => ({
 
 const EmployeeDashboard: React.FC = () => {
   const [isEdit, setIsEdit] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Employee[]>([]);
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
+    (async () => {
       try {
-        const importedData = JSON.parse(event.target?.result as string);
-
-        if (!Array.isArray(importedData)) {
-          alert("Invalid file format");
+        const res = await uploadEmployeeExcel(file);
+        if (!res.success) {
+          alert(res.error ?? "Failed to import employees");
           return;
         }
 
-        setEmployees(
-          importedData.map((e: any) => ({
-            ...e,
-            birthDate: e.birthDate ? new Date(e.birthDate) : undefined,
-            height: Number.isNaN(e.height) ? undefined : e.height,
-            weight: Number.isNaN(e.weight) ? undefined : e.weight,
-          })),
-        );
-      } catch {
-        alert("Error reading file");
-      }
-    };
+        const refreshed = await getEmployees();
+        if (!refreshed.success) {
+          alert(refreshed.error ?? "Failed to reload employees");
+          return;
+        }
 
-    reader.readAsText(file);
+        setEmployees(refreshed.result);
+        alert("Employees imported successfully");
+      } catch (err: any) {
+        alert(err?.message ?? "Error importing employees");
+      } finally {
+        // reset input so same file can be selected again if needed
+        e.target.value = "";
+      }
+    })();
   }
   function handleExport() {
-    const dataStr = JSON.stringify(employees, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
+    (async () => {
+      try {
+        const result = await exportEmployeesExcel();
+        if (!result.success) {
+          alert(result.error ?? "Failed to export employees");
+          return;
+        }
+        if (!result.result) {
+          alert("No data to export");
+          return;
+        }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "employees.json";
-    a.click();
+        const { base64, fileName } = result.result;
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
 
-    URL.revokeObjectURL(url);
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+
+        URL.revokeObjectURL(url);
+      } catch (err: any) {
+        alert(err?.message ?? "Error exporting employees");
+      }
+    })();
   }
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -130,6 +160,19 @@ const EmployeeDashboard: React.FC = () => {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Employee>>(emptyEmployee());
+
+  const employeeFilterOptions: FilterOption[] = [
+    { key: "employeeName", label: "Employee Name", type: "text" },
+    { key: "employeeNumber", label: "Employee Number", type: "text" },
+    { key: "position", label: "Position", type: "text" },
+    { key: "branch", label: "Branch/Station", type: "text" },
+    { key: "tinNumber", label: "TIN", type: "text" },
+    { key: "gsisNumber", label: "GSIS", type: "text" },
+    { key: "philHealthNumber", label: "PHILHEALTH", type: "text" },
+    { key: "pagIbigNumber", label: "PAG-IBIG", type: "text" },
+    { key: "hasMedicalInfo", label: "Has Medical Info", type: "checkbox" },
+    { key: "hasEmail", label: "Has Email", type: "checkbox" },
+  ];
 
   function handleEdit(emp: Employee) {
     setForm({ ...emp });
@@ -188,11 +231,14 @@ const EmployeeDashboard: React.FC = () => {
   /* ================= SEARCH ================= */
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return employees;
+    const baseList =
+      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : employees;
+
+    if (!search.trim()) return baseList;
 
     const q = search.toLowerCase();
 
-    return employees.filter((e) =>
+    return baseList.filter((e) =>
       [
         e.employeeName,
         e.employeeNumber,
@@ -206,7 +252,145 @@ const EmployeeDashboard: React.FC = () => {
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q)),
     );
-  }, [employees, search]);
+  }, [employees, search, appliedFilters, filteredByAdvanced]);
+
+  const getEmployeeSuggestions = (
+    key: string,
+    inputValue: string,
+  ): string[] => {
+    const textFields = [
+      "employeeName",
+      "employeeNumber",
+      "position",
+      "branch",
+      "tinNumber",
+      "gsisNumber",
+      "philHealthNumber",
+      "pagIbigNumber",
+    ];
+
+    if (!textFields.includes(key)) return [];
+
+    const values = employees
+      .map((e) => (e as any)[key] as string | null | undefined)
+      .filter((v): v is string => !!v && v.length > 0);
+
+    const unique = Array.from(new Set(values)).sort();
+
+    if (!inputValue) return unique;
+
+    const lower = inputValue.toLowerCase();
+    return unique.filter((v) => v.toLowerCase().includes(lower));
+  };
+
+  const applyEmployeeFilters = (
+    filters: FilterValues,
+    list: Employee[],
+  ): Employee[] => {
+    return list.filter((e) => {
+      if (
+        typeof filters.employeeName === "string" &&
+        filters.employeeName.trim() !== "" &&
+        !e.employeeName
+          .toLowerCase()
+          .includes(filters.employeeName.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.employeeNumber === "string" &&
+        filters.employeeNumber.trim() !== "" &&
+        (e.employeeNumber || "")
+          .toLowerCase()
+          .includes(filters.employeeNumber.toLowerCase()) === false
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.position === "string" &&
+        filters.position.trim() !== "" &&
+        !e.position.toLowerCase().includes(filters.position.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.branch === "string" &&
+        filters.branch.trim() !== "" &&
+        !e.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.tinNumber === "string" &&
+        filters.tinNumber.trim() !== "" &&
+        (e.tinNumber || "")
+          .toLowerCase()
+          .includes(filters.tinNumber.toLowerCase()) === false
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.gsisNumber === "string" &&
+        filters.gsisNumber.trim() !== "" &&
+        (e.gsisNumber || "")
+          .toLowerCase()
+          .includes(filters.gsisNumber.toLowerCase()) === false
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.philHealthNumber === "string" &&
+        filters.philHealthNumber.trim() !== "" &&
+        (e.philHealthNumber || "")
+          .toLowerCase()
+          .includes(filters.philHealthNumber.toLowerCase()) === false
+      ) {
+        return false;
+      }
+
+      if (
+        typeof filters.pagIbigNumber === "string" &&
+        filters.pagIbigNumber.trim() !== "" &&
+        (e.pagIbigNumber || "")
+          .toLowerCase()
+          .includes(filters.pagIbigNumber.toLowerCase()) === false
+      ) {
+        return false;
+      }
+
+      if (typeof filters.hasMedicalInfo === "boolean") {
+        const hasMedical =
+          !!e.bloodType ||
+          (!!e.allergies &&
+            e.allergies.trim() !== "" &&
+            e.allergies.toLowerCase() !== "n/a");
+        if (filters.hasMedicalInfo !== hasMedical) {
+          return false;
+        }
+      }
+
+      if (typeof filters.hasEmail === "boolean") {
+        const hasEmail = !!e.email && e.email.trim() !== "";
+        if (filters.hasEmail !== hasEmail) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const handleApplyEmployeeFilters = (filters: FilterValues) => {
+    const filtered = applyEmployeeFilters(filters, employees);
+    setAppliedFilters(filters);
+    setFilteredByAdvanced(filtered);
+  };
 
   const totalPages = Math.ceil(filtered.length / rowsPerPage);
 
@@ -272,8 +456,6 @@ const EmployeeDashboard: React.FC = () => {
     if (!form.employeeName?.trim())
       newErrors.employeeName = "Employee name is required";
 
-    if (!form.employeeNumber?.trim())
-      newErrors.employeeNumber = "Employee number is required";
     if (!form.position?.trim()) newErrors.position = "Position is required";
     if (!form.branch?.trim()) newErrors.branch = "Branch is required";
     if (!form.birthDate) newErrors.birthDate = "Birth date is required";
@@ -378,17 +560,15 @@ const EmployeeDashboard: React.FC = () => {
     }
   }
 
-  async function handleDelete(employeeNumber: string) {
+  async function handleDelete(id: number) {
     if (!confirm("Delete employee?")) return;
 
     try {
-      const res = await deleteEmployee(employeeNumber);
+      const res = await deleteEmployee(id);
 
       if (!res.success) throw new Error(res.error);
 
-      setEmployees((prev) =>
-        prev.filter((emp) => emp.employeeNumber !== employeeNumber),
-      );
+      setEmployees((prev) => prev.filter((emp) => emp.id !== id));
     } catch (error: any) {
       alert(error.message);
     }
@@ -423,12 +603,21 @@ const EmployeeDashboard: React.FC = () => {
               />
             </div>
 
+            <button
+              className={`btn btn-outline btn-md gap-2 rounded-lg ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+              type="button"
+              onClick={() => setFilterModalOpen(true)}
+            >
+              <FiFilter size={18} />
+              Filter
+            </button>
+
             <label className="btn btn-outline btn-md gap-2 rounded-lg">
               <FiUpload size={18} />
-              Import
+              Import Excel
               <input
                 type="file"
-                accept=".json"
+                accept=".xlsx,.xls"
                 hidden
                 onChange={handleImport}
               />
@@ -439,7 +628,7 @@ const EmployeeDashboard: React.FC = () => {
               onClick={handleExport}
             >
               <FiDownload size={18} />
-              Export
+              Export Excel
             </button>
 
             <button
@@ -576,7 +765,7 @@ const EmployeeDashboard: React.FC = () => {
                       </button>
                       <button
                         className="btn btn-ghost btn-sm text-error hover:bg-error/10 rounded-lg"
-                        onClick={() => handleDelete(emp.employeeNumber)}
+                        onClick={() => handleDelete(emp.id)}
                       >
                         <FiTrash2 size={16} />
                       </button>
@@ -707,7 +896,7 @@ const EmployeeDashboard: React.FC = () => {
                 <div className="form-control">
                   <label className="label">
                     <span className="label-text font-semibold">
-                      Employee Number *
+                      Employee Number
                     </span>
                   </label>
                   <input
@@ -1063,6 +1252,15 @@ const EmployeeDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+        <FilterModal
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          options={employeeFilterOptions}
+          onApply={handleApplyEmployeeFilters}
+          initialValues={appliedFilters}
+          getSuggestions={getEmployeeSuggestions}
+        />
       </main>
     </div>
   );

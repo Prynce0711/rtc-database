@@ -6,13 +6,16 @@ import { auth } from "./auth";
 import Roles from "./Roles";
 
 export async function validateSession(
-  role?: Roles,
+  role?: Roles[],
 ): Promise<ActionResult<void>> {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
     });
-    if (!session?.user || (role && session.user.role !== role)) {
+    if (
+      !session?.user ||
+      (role && !role.includes(session.user.role as Roles))
+    ) {
       return { success: false, error: "Unauthorized" };
     }
     return { success: true, result: undefined };

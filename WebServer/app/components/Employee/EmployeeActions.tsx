@@ -9,7 +9,7 @@ import { EmployeeSchema } from "./schema";
 
 export async function getEmployees(): Promise<ActionResult<Employee[]>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -26,7 +26,7 @@ export async function createEmployee(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Employee>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -51,7 +51,7 @@ export async function updateEmployee(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Employee>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -73,16 +73,16 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(
-  employeeNumber: string,
+  employeeId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession(Roles.ADMIN);
+    const sessionResult = await validateSession([Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
     await prisma.employee.delete({
-      where: { employeeNumber },
+      where: { id: employeeId },
     });
     return { success: true, result: undefined };
   } catch (error) {

@@ -1,30 +1,31 @@
 "use client";
 import {
-  getEmployees,
   createEmployee,
-  updateEmployee,
   deleteEmployee,
+  getEmployees,
+  updateEmployee,
 } from "@/app/components/Employee/EmployeeActions";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
-  FiPlus,
-  FiTrash2,
-  FiUsers,
-  FiMapPin,
   FiBriefcase,
-  FiMail,
-  FiHeart,
-  FiChevronRight,
   FiChevronLeft,
-  FiUpload,
+  FiChevronRight,
   FiDownload,
   FiEdit,
+  FiHeart,
+  FiMail,
+  FiMapPin,
+  FiPlus,
   FiSearch,
+  FiTrash2,
+  FiUpload,
+  FiUsers,
 } from "react-icons/fi";
 
 import type { Employee } from "@/app/generated/prisma/browser";
+import { id } from "zod/locales";
 
 const emptyEmployee = (): Partial<Employee> => ({
   employeeName: "",
@@ -321,7 +322,7 @@ const EmployeeDashboard: React.FC = () => {
     if (!confirm("Delete employee?")) return;
 
     try {
-      const res = await deleteEmployee(employeeNumber);
+      const res = await deleteEmployee(id);
 
       if (!res.success) throw new Error(res.error);
 

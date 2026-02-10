@@ -3,14 +3,38 @@
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
+import FilterModal, {
+  type FilterOption,
+  type FilterValues,
+} from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
+<<<<<<< HEAD
 
+=======
+import CaseDetailModal from "./CaseDetailModal";
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseDetailModal from "./CaseDetailModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+
+type CaseFilterValues = {
+  branch?: string;
+  assistantBranch?: string;
+  caseNumber?: string;
+  name?: string;
+  charge?: string;
+  infoSheet?: string;
+  court?: string;
+  detained?: boolean;
+  consolidation?: string;
+  eqcNumber?: number;
+  bond?: { min?: number; max?: number };
+  raffleDate?: { start?: string; end?: string };
+  dateFiled?: { start?: string; end?: string };
+};
 
 const CasePage: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -20,7 +44,13 @@ const CasePage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
   const session = useSession();
+<<<<<<< HEAD
   const isAdminOrAtty = session?.data?.user?.role === "admin" || session?.data?.user?.role === "atty";
+=======
+  const isAdminOrAtty =
+    session?.data?.user?.role === "admin" ||
+    session?.data?.user?.role === "atty";
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -32,8 +62,28 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+<<<<<<< HEAD
 
+=======
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
+
+  const caseFilterOptions: FilterOption[] = [
+    { key: "branch", label: "Branch", type: "text" },
+    { key: "assistantBranch", label: "Assistant Branch", type: "text" },
+    { key: "caseNumber", label: "Case Number", type: "text" },
+    { key: "name", label: "Name", type: "text" },
+    { key: "charge", label: "Charge", type: "text" },
+    { key: "infoSheet", label: "Info Sheet", type: "text" },
+    { key: "court", label: "Court", type: "text" },
+    { key: "consolidation", label: "Consolidation", type: "text" },
+    { key: "eqcNumber", label: "EQC Number", type: "number" },
+    { key: "detained", label: "Detained", type: "checkbox" },
+    { key: "bond", label: "Bond Amount", type: "range" },
+    { key: "dateFiled", label: "Date Filed", type: "daterange" },
+    { key: "raffleDate", label: "Raffle Date", type: "daterange" },
+  ];
 
   // Fetch cases from API
   useEffect(() => {
@@ -75,7 +125,6 @@ const CasePage: React.FC = () => {
         ),
       );
     }
-
     return sortCases(filtered, sortConfig.key, sortConfig.order);
   }, [cases, searchTerm, sortConfig, filteredByAdvanced]);
 
@@ -84,59 +133,219 @@ const CasePage: React.FC = () => {
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
+<<<<<<< HEAD
   };  
 
   const handleApplyFilters = (filtered: Case[]) => {
    
+=======
+  };
+  const getCaseSuggestions = (key: string, inputValue: string): string[] => {
+    const textFields = [
+      "branch",
+      "assistantBranch",
+      "caseNumber",
+      "name",
+      "charge",
+      "infoSheet",
+      "court",
+      "consolidation",
+    ];
+
+    if (!textFields.includes(key)) return [];
+
+    const values = cases
+      .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
+      .filter((v) => v.length > 0);
+
+    const unique = Array.from(new Set(values)).sort();
+
+    if (!inputValue) return unique;
+
+    const lower = inputValue.toLowerCase();
+    return unique.filter((v) => v.toLowerCase().includes(lower));
+  };
+
+  const applyCaseFilters = (
+    filters: CaseFilterValues,
+    items: Case[],
+  ): Case[] => {
+    return items.filter((caseItem) => {
+      if (
+        filters.branch &&
+        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.assistantBranch &&
+        !caseItem.assistantBranch
+          .toLowerCase()
+          .includes(filters.assistantBranch.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.caseNumber &&
+        !caseItem.caseNumber
+          .toLowerCase()
+          .includes(filters.caseNumber.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.name &&
+        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.charge &&
+        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.infoSheet &&
+        !caseItem.infoSheet
+          .toLowerCase()
+          .includes(filters.infoSheet.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.court &&
+        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.consolidation &&
+        !caseItem.consolidation
+          .toLowerCase()
+          .includes(filters.consolidation.toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (
+        filters.eqcNumber !== undefined &&
+        caseItem.eqcNumber !== filters.eqcNumber
+      ) {
+        return false;
+      }
+
+      if (
+        filters.detained !== undefined &&
+        caseItem.detained !== filters.detained
+      ) {
+        return false;
+      }
+
+      if (filters.bond) {
+        if (
+          filters.bond.min !== undefined &&
+          (caseItem.bond === null || caseItem.bond < filters.bond.min)
+        ) {
+          return false;
+        }
+        if (
+          filters.bond.max !== undefined &&
+          (caseItem.bond === null || caseItem.bond > filters.bond.max)
+        ) {
+          return false;
+        }
+      }
+
+      if (filters.dateFiled) {
+        const caseDate = new Date(caseItem.dateFiled);
+        if (
+          filters.dateFiled.start &&
+          caseDate < new Date(filters.dateFiled.start)
+        ) {
+          return false;
+        }
+        if (
+          filters.dateFiled.end &&
+          caseDate > new Date(filters.dateFiled.end)
+        ) {
+          return false;
+        }
+      }
+
+      if (filters.raffleDate) {
+        if (caseItem.raffleDate === null) {
+          return false;
+        }
+        const caseDate = new Date(caseItem.raffleDate);
+        if (
+          filters.raffleDate.start &&
+          caseDate < new Date(filters.raffleDate.start)
+        ) {
+          return false;
+        }
+        if (
+          filters.raffleDate.end &&
+          caseDate > new Date(filters.raffleDate.end)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const handleApplyFilters = (filters: FilterValues) => {
+    const typed = filters as CaseFilterValues;
+    const filtered = applyCaseFilters(typed, cases);
+    setAppliedFilters(typed);
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
     setFilteredByAdvanced(filtered);
   };
 
-  const handleDeleteCase = async (caseId: string) => {
+  const handleDeleteCase = async (caseNumber: string) => {
     if (
       !(await statusPopup.showYesNo(
         "Are you sure you want to delete this case?",
       ))
-    )
+    ) {
       return;
-    try {
-      statusPopup.showLoading("Deleting case...");
-      const response = await deleteCase(caseId);
-      if (!response.success) {
-        statusPopup.showError("Failed to delete case");
-        return;
-      }
-      await fetchCases();
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to delete case",
-      );
     }
+
+    const result = await deleteCase(caseNumber);
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to delete case");
+      return;
+    }
+
+    statusPopup.showSuccess("Case deleted successfully");
+    await fetchCases();
   };
 
-  const handleImportExcel = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
+
     setUploading(true);
     try {
-      statusPopup.showLoading("Importing Excel...");
-      const response = await uploadExcel(file);
-      if (!response.success) {
-        statusPopup.showError(response.error || "Failed to import Excel");
-        return;
+      const result = await uploadExcel(file);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+      } else {
+        statusPopup.showSuccess("Cases imported successfully");
+        await fetchCases();
       }
-      await fetchCases();
-      statusPopup.showSuccess("Excel imported successfully");
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to import Excel",
-      );
     } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
       setUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -145,42 +354,40 @@ const CasePage: React.FC = () => {
     try {
       const result = await exportCasesExcel();
       if (!result.success) {
-        statusPopup.showError(result.error || "Failed to export Excel");
+        statusPopup.showError(result.error || "Failed to export cases");
         return;
       }
+
       if (!result.result) {
         statusPopup.showError("No data to export");
         return;
       }
 
-      const { base64, fileName } = result.result;
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
+      const { fileName, base64 } = result.result;
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
-
-      const blob = new Blob([bytes], {
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to export Excel",
-      );
     } finally {
       setExporting(false);
     }
   };
 
-  const showModal = (type: CaseModalType | null) => {
+  const showModal = (type: CaseModalType) => {
     setModalType(type);
   };
 
@@ -252,7 +459,11 @@ const CasePage: React.FC = () => {
             onChange={handleImportExcel}
           />
           <button
+<<<<<<< HEAD
             className={`btn btn-outline`}
+=======
+            className="btn btn-outline"
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
             onClick={() => setFilterModalOpen(true)}
           >
             <svg
@@ -407,6 +618,19 @@ const CasePage: React.FC = () => {
             onClose={() => setCaseForDetailView(null)}
           />
         )}
+<<<<<<< HEAD
+=======
+
+        {/* Filter Modal */}
+        <FilterModal
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          options={caseFilterOptions}
+          onApply={handleApplyFilters}
+          initialValues={appliedFilters}
+          getSuggestions={getCaseSuggestions}
+        />
+>>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
       </main>
     </div>
   );
