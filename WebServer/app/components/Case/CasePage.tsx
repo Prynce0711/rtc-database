@@ -8,6 +8,7 @@ import FilterModal, {
   type FilterValues,
 } from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
+import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
@@ -498,74 +499,48 @@ const CasePage: React.FC = () => {
         </div>
 
         {/* Cases Table */}
-        <div className="overflow-x-auto bg-base-100 rounded-lg shadow">
-          <table className="table table-zebra">
-            <thead>
-              <tr>
-                <th
-                  onClick={() => handleSort("caseNumber")}
-                  className="cursor-pointer"
-                >
-                  Case Number{" "}
-                  {sortConfig.key === "caseNumber" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("name")}
-                  className="cursor-pointer"
-                >
-                  Name{" "}
-                  {sortConfig.key === "name" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("charge")}
-                  className="cursor-pointer"
-                >
-                  Charge{" "}
-                  {sortConfig.key === "charge" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("branch")}
-                  className="cursor-pointer"
-                >
-                  Branch{" "}
-                  {sortConfig.key === "branch" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("detained")}
-                  className="cursor-pointer"
-                >
-                  Detained{" "}
-                  {sortConfig.key === "detained" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                <th
-                  onClick={() => handleSort("dateFiled")}
-                  className="cursor-pointer"
-                >
-                  Date Filed{" "}
-                  {sortConfig.key === "dateFiled" &&
-                    (sortConfig.order === "asc" ? "↑" : "↓")}
-                </th>
-                {isAdminOrAtty && <th>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedCases.map((caseItem) => (
-                <CaseRow
-                  key={caseItem.id}
-                  caseItem={caseItem}
-                  setSelectedCase={setSelectedCase}
-                  showModal={showModal}
-                  handleDeleteCase={handleDeleteCase}
-                  onRowClick={handleRowClick}
-                />
-              ))}
-            </tbody>
-          </table>
+        <div className="bg-base-100 rounded-lg shadow">
+          <Table
+            headers={[
+              { key: "caseNumber", label: "Case Number", sortable: true },
+              { key: "name", label: "Name", sortable: true },
+              { key: "charge", label: "Charge", sortable: true },
+              { key: "branch", label: "Branch", sortable: true },
+              {
+                key: "detained",
+                label: "Detained",
+                sortable: true,
+                align: "center",
+              },
+              { key: "dateFiled", label: "Date Filed", sortable: true },
+              ...(isAdminOrAtty
+                ? [
+                    {
+                      key: "actions",
+                      label: "Actions",
+                      align: "center" as const,
+                    },
+                  ]
+                : []),
+            ]}
+            data={filteredAndSortedCases}
+            rowsPerPage={10}
+            sortConfig={{
+              key: sortConfig.key as string,
+              order: sortConfig.order,
+            }}
+            onSort={(k) => handleSort(k as keyof Case)}
+            renderRow={(caseItem) => (
+              <CaseRow
+                key={caseItem.id}
+                caseItem={caseItem}
+                setSelectedCase={setSelectedCase}
+                showModal={showModal}
+                handleDeleteCase={handleDeleteCase}
+                onRowClick={handleRowClick}
+              />
+            )}
+          />
         </div>
 
         {/* Add/Edit Modal */}

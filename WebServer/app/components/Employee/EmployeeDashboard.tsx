@@ -12,6 +12,7 @@ import {
 } from "@/app/components/Employee/ExcelActions";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Table from "../Table/Table";
 
 import {
   FiBriefcase,
@@ -153,9 +154,6 @@ const EmployeeDashboard: React.FC = () => {
     O_Positive: "O+",
     O_Negative: "O-",
   };
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
 
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -390,54 +388,6 @@ const EmployeeDashboard: React.FC = () => {
     const filtered = applyEmployeeFilters(filters, employees);
     setAppliedFilters(filters);
     setFilteredByAdvanced(filtered);
-  };
-
-  const totalPages = Math.ceil(filtered.length / rowsPerPage);
-
-  const paginatedEmployees = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, currentPage]);
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
-
-  const visiblePages = (() => {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-
-    pages.push(1);
-    pages.push(2);
-
-    let left = currentPage - 1;
-    let right = currentPage + 1;
-
-    if (left <= 2) left = 3;
-    if (right >= totalPages - 1) right = totalPages - 2;
-
-    if (left > 3) pages.push("...");
-
-    for (let p = left; p <= right; p++) {
-      pages.push(p);
-    }
-
-    if (right < totalPages - 2) pages.push("...");
-
-    pages.push(totalPages - 1);
-    pages.push(totalPages);
-
-    return pages;
-  })();
-
-  const getNextPage = () => {
-    for (let p = currentPage + 1; p <= totalPages; p++) {
-      const start = (p - 1) * rowsPerPage;
-      if (filtered.slice(start, start + rowsPerPage).length > 0) return p;
-    }
-    return currentPage;
   };
 
   /* ================= FUNCTIONS ================= */
@@ -676,173 +626,94 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* ===== FULL TABLE ===== */}
-        <div className="flex-1 overflow-x-auto bg-base-100 rounded-xl shadow-lg border border-base-300">
-          <table className="table w-full text-sm">
-            <thead className="bg-base-200">
-              <tr>
-                <th className="font-semibold text-base-content">
-                  Employee Name
-                </th>
-                <th className="font-semibold text-base-content">Employee #</th>
-                <th className="font-semibold text-base-content">Position</th>
-                <th className="font-semibold text-base-content">
-                  Branch / Station
-                </th>
-                <th className="font-semibold text-base-content">TIN</th>
-                <th className="font-semibold text-base-content">GSIS</th>
-                <th className="font-semibold text-base-content">PhilHealth</th>
-                <th className="font-semibold text-base-content">Pag-IBIG</th>
-                <th className="font-semibold text-base-content">Birthday</th>
-                <th className="font-semibold text-base-content">Blood Type</th>
-                <th className="font-semibold text-base-content">Allergies</th>
-                <th className="font-semibold text-base-content">Height</th>
-                <th className="font-semibold text-base-content">Weight</th>
-                <th className="font-semibold text-base-content">
-                  Contact Person
-                </th>
-                <th className="font-semibold text-base-content">
-                  Contact Number
-                </th>
-                <th className="font-semibold text-base-content">Email</th>
-                <th className="font-semibold text-base-content text-center">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedEmployees.map((emp, index) => (
-                <tr
-                  key={emp.id}
-                  className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
-                >
-                  <td className="font-medium text-base-content">
-                    {emp.employeeName || "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.employeeNumber || "—"}
-                  </td>
-                  <td className="text-base-content">{emp.position || "—"}</td>
-                  <td className="text-base-content">{emp.branch || "—"}</td>
-                  <td className="text-base-content">{emp.tinNumber || "—"}</td>
-                  <td className="text-base-content">{emp.gsisNumber || "—"}</td>
-                  <td className="text-base-content">
-                    {emp.philHealthNumber || "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.pagIbigNumber || "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.birthDate
-                      ? new Date(emp.birthDate).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.allergies &&
-                    emp.allergies.trim() !== "" &&
-                    emp.allergies.toLowerCase() !== "n/a"
-                      ? emp.allergies
-                      : "N/A"}
-                  </td>
-                  <td className="text-base-content">{emp.height ?? "—"}</td>
-                  <td className="text-base-content">{emp.weight ?? "—"}</td>
-                  <td className="text-base-content">
-                    {emp.contactPerson || "—"}
-                  </td>
-                  <td className="text-base-content">
-                    {emp.contactNumber || "—"}
-                  </td>
-                  <td className="text-base-content">{emp.email || "—"}</td>
-                  <td className="text-center">
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        className="btn btn-ghost btn-sm text-primary hover:bg-primary/10 rounded-lg"
-                        onClick={() => handleEdit(emp)}
-                      >
-                        <FiEdit size={16} />
-                      </button>
-                      <button
-                        className="btn btn-ghost btn-sm text-error hover:bg-error/10 rounded-lg"
-                        onClick={() => handleDelete(emp.id)}
-                      >
-                        <FiTrash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ===== PAGINATION ===== */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-8 p-4 bg-base-100 rounded-xl shadow border border-base-300">
-          <div className="text-sm md:text-base font-medium text-base-content/70">
-            Showing{" "}
-            <span className="font-bold text-base-content">
-              {(currentPage - 1) * rowsPerPage + 1}
-            </span>{" "}
-            -
-            <span className="font-bold text-base-content">
-              {Math.min(currentPage * rowsPerPage, filtered.length)}
-            </span>{" "}
-            of{" "}
-            <span className="font-bold text-base-content">
-              {filtered.length}
-            </span>{" "}
-            employees
-          </div>
-
-          <div className="flex items-center gap-2 text-sm">
-            <nav className="flex items-center gap-2">
-              {visiblePages.map((p, idx) => {
-                if (p === "...") {
-                  return (
-                    <span
-                      key={`dots-${idx}`}
-                      className="text-base-content/60 px-2"
+        <div className="flex-1">
+          <Table
+            className="overflow-x-auto bg-base-100 rounded-xl shadow-lg border border-base-300 p-4"
+            headers={[
+              { key: "employeeName", label: "Employee Name" },
+              { key: "employeeNumber", label: "Employee #" },
+              { key: "position", label: "Position" },
+              { key: "branch", label: "Branch / Station" },
+              { key: "tinNumber", label: "TIN" },
+              { key: "gsisNumber", label: "GSIS" },
+              { key: "philHealthNumber", label: "PhilHealth" },
+              { key: "pagIbigNumber", label: "Pag-IBIG" },
+              { key: "birthDate", label: "Birthday" },
+              { key: "bloodType", label: "Blood Type" },
+              { key: "allergies", label: "Allergies" },
+              { key: "height", label: "Height" },
+              { key: "weight", label: "Weight" },
+              { key: "contactPerson", label: "Contact Person" },
+              { key: "contactNumber", label: "Contact Number" },
+              { key: "email", label: "Email" },
+              { key: "actions", label: "Actions", align: "center" },
+            ]}
+            data={filtered}
+            rowsPerPage={10}
+            renderRow={(emp, index) => (
+              <tr
+                key={emp.id}
+                className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
+              >
+                <td className="font-medium text-base-content">
+                  {emp.employeeName || "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.employeeNumber || "—"}
+                </td>
+                <td className="text-base-content">{emp.position || "—"}</td>
+                <td className="text-base-content">{emp.branch || "—"}</td>
+                <td className="text-base-content">{emp.tinNumber || "—"}</td>
+                <td className="text-base-content">{emp.gsisNumber || "—"}</td>
+                <td className="text-base-content">
+                  {emp.philHealthNumber || "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.pagIbigNumber || "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.birthDate
+                    ? new Date(emp.birthDate).toLocaleDateString()
+                    : "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.allergies &&
+                  emp.allergies.trim() !== "" &&
+                  emp.allergies.toLowerCase() !== "n/a"
+                    ? emp.allergies
+                    : "N/A"}
+                </td>
+                <td className="text-base-content">{emp.height ?? "—"}</td>
+                <td className="text-base-content">{emp.weight ?? "—"}</td>
+                <td className="text-base-content">
+                  {emp.contactPerson || "—"}
+                </td>
+                <td className="text-base-content">
+                  {emp.contactNumber || "—"}
+                </td>
+                <td className="text-base-content">{emp.email || "—"}</td>
+                <td className="text-center">
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      className="btn btn-ghost btn-sm text-primary hover:bg-primary/10 rounded-lg"
+                      onClick={() => handleEdit(emp)}
                     >
-                      …
-                    </span>
-                  );
-                }
-
-                const page = Number(p);
-                const start = (page - 1) * rowsPerPage;
-                const hasData =
-                  filtered.slice(start, start + rowsPerPage).length > 0;
-                if (!hasData) return null;
-
-                return (
-                  <button
-                    key={`page-${page}`}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-1 ${
-                      currentPage === page
-                        ? "text-primary font-medium"
-                        : "text-primary/80 hover:underline"
-                    }`}
-                    aria-current={currentPage === page ? "page" : undefined}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div className="flex-1" />
-
-            <button
-              type="button"
-              onClick={() => setCurrentPage(getNextPage())}
-              className="text-sm text-primary/90 hover:underline disabled:text-base-content/40"
-              disabled={getNextPage() === currentPage}
-            >
-              Next
-            </button>
-          </div>
+                      <FiEdit size={16} />
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-error hover:bg-error/10 rounded-lg"
+                      onClick={() => handleDelete(emp.id)}
+                    >
+                      <FiTrash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+          />
         </div>
 
         {/* ===== MODAL ===== */}
