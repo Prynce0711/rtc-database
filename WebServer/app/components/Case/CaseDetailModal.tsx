@@ -17,11 +17,14 @@ interface CaseDetailModalProps {
   caseData: Case;
   /** Callback when modal is closed */
   onClose: () => void;
+  /** Optional requestClose injected by ModalBase to run animated close */
+  requestClose?: () => void;
 }
 
 const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   caseData,
   onClose,
+  requestClose,
 }) => {
   /**
    * Formats a date for display, handling null/undefined values
@@ -56,7 +59,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             <p className="text-lg opacity-90 mt-1">{caseData.caseNumber}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => (requestClose ? requestClose() : onClose())}
             className="btn btn-circle btn-ghost hover:bg-primary-focus"
           >
             <svg
@@ -235,7 +238,10 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
         {/* Footer Section */}
         <div className="bg-base-200 px-8 py-4 flex justify-end border-t border-base-300">
-          <button onClick={onClose} className="btn btn-primary btn-wide">
+          <button
+            onClick={() => (requestClose ? requestClose() : onClose())}
+            className="btn btn-primary btn-wide"
+          >
             Close
           </button>
         </div>

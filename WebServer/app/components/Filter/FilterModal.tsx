@@ -1,30 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
-export type FilterTypeName =
-  | "text"
-  | "number"
-  | "checkbox"
-  | "range"
-  | "daterange";
-
-export interface FilterOption {
-  key: string;
-  label: string;
-  type: FilterTypeName;
-}
-
-export type FilterValues = Record<string, any>;
-
-interface FilterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  options: FilterOption[];
-  onApply: (filters: FilterValues) => void;
-  initialValues?: FilterValues;
-  getSuggestions?: (key: string, inputValue: string) => string[];
-}
+import ModalBase from "../Popup/ModalBase";
+import FilterRow from "./FilterRow";
+import { FilterModalProps, FilterValues } from "./FilterTypes";
 
 const FilterModal: React.FC<FilterModalProps> = ({
   isOpen,
@@ -33,6 +12,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onApply,
   initialValues,
   getSuggestions,
+  requestClose,
 }) => {
   const [enabledFilters, setEnabledFilters] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterValues>({});
@@ -73,13 +53,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
       return;
     }
 
-    if (value.length > 0) {
-      const sugs = getSuggestions(key, value) || [];
-      setSuggestions(sugs.slice(0, 8));
-    } else {
-      const sugs = getSuggestions(key, "") || [];
-      setSuggestions(sugs.slice(0, 8));
-    }
+    const sugs = getSuggestions(key, value || "") || [];
+    setSuggestions(sugs.slice(0, 8));
   };
 
   const handleSuggestionClick = (key: string, suggestion: string) => {
@@ -114,220 +89,81 @@ const FilterModal: React.FC<FilterModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h3 className="font-bold text-lg mb-4">Advanced Search</h3>
-
-        <div className="space-y-4">
-          {options.map((option) => (
-            <div key={option.key} className="border-b pb-4">
-              <div className="flex items-center gap-3 mb-2">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={enabledFilters.has(option.key)}
-                  onChange={() => toggleFilter(option.key)}
-                />
-                <label className="label-text font-medium">{option.label}</label>
-              </div>
-
-              {enabledFilters.has(option.key) && (
-                <div className="ml-6">
-                  {option.type === "text" && (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder={`Enter ${option.label.toLowerCase()}...`}
-                        className="input input-bordered input-sm w-full"
-                        value={(filters[option.key] as string) || ""}
-                        onChange={(e) =>
-                          handleTextInputChange(option.key, e.target.value)
-                        }
-                        onFocus={() => {
-                          setFocusedFilter(option.key);
-                          if (getSuggestions) {
-                            const currentValue =
-                              (filters[option.key] as string) || "";
-                            const sugs =
-                              getSuggestions(option.key, currentValue) || [];
-                            setSuggestions(sugs.slice(0, 8));
-                          }
-                        }}
-                        onBlur={() =>
-                          setTimeout(() => setFocusedFilter(null), 200)
-                        }
-                      />
-                      {focusedFilter === option.key &&
-                        suggestions.length > 0 && (
-                          <div className="absolute z-10 w-full bg-base-100 border border-base-300 rounded mt-1 shadow-lg">
-                            {suggestions.map((suggestion, idx) => (
-                              <div
-                                key={idx}
-                                className="px-3 py-2 hover:bg-base-200 cursor-pointer text-sm"
-                                onClick={() =>
-                                  handleSuggestionClick(option.key, suggestion)
-                                }
-                              >
-                                {suggestion}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                    </div>
-                  )}
-
-                  {option.type === "number" && (
-                    <input
-                      type="number"
-                      placeholder={`Enter ${option.label.toLowerCase()}...`}
-                      className="input input-bordered input-sm w-full"
-                      value={(filters[option.key] as number) || ""}
-                      onChange={(e) =>
-                        handleFilterChange(
-                          option.key,
-                          e.target.value ? Number(e.target.value) : undefined,
-                        )
-                      }
-                    />
-                  )}
-
-                  {option.type === "checkbox" && (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={Boolean(filters[option.key])}
-                        onChange={(e) =>
-                          handleFilterChange(option.key, e.target.checked)
-                        }
-                      />
-                      <span className="text-sm">{option.label}</span>
-                    </div>
-                  )}
-
-                  {option.type === "range" && (
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        placeholder="Min amount"
-                        className="input input-bordered input-sm flex-1"
-                        step="0.01"
-                        value={
-                          (
-                            (filters[option.key] || {}) as {
-                              min?: number;
-                            }
-                          ).min || ""
-                        }
-                        onChange={(e) => {
-                          const current = (filters[option.key] || {}) as {
-                            min?: number;
-                            max?: number;
-                          };
-                          handleFilterChange(option.key, {
-                            ...current,
-                            min: e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          });
-                        }}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Max amount"
-                        className="input input-bordered input-sm flex-1"
-                        step="0.01"
-                        value={
-                          (
-                            (filters[option.key] || {}) as {
-                              max?: number;
-                            }
-                          ).max || ""
-                        }
-                        onChange={(e) => {
-                          const current = (filters[option.key] || {}) as {
-                            min?: number;
-                            max?: number;
-                          };
-                          handleFilterChange(option.key, {
-                            ...current,
-                            max: e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
-                          });
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {option.type === "daterange" && (
-                    <div className="flex gap-2">
-                      <input
-                        type="date"
-                        className="input input-bordered input-sm flex-1"
-                        value={
-                          (
-                            (filters[option.key] || {}) as {
-                              start?: string;
-                            }
-                          ).start || ""
-                        }
-                        onChange={(e) => {
-                          const current = (filters[option.key] || {}) as {
-                            start?: string;
-                            end?: string;
-                          };
-                          handleFilterChange(option.key, {
-                            ...current,
-                            start: e.target.value || undefined,
-                          });
-                        }}
-                      />
-                      <input
-                        type="date"
-                        className="input input-bordered input-sm flex-1"
-                        value={
-                          (
-                            (filters[option.key] || {}) as {
-                              end?: string;
-                            }
-                          ).end || ""
-                        }
-                        onChange={(e) => {
-                          const current = (filters[option.key] || {}) as {
-                            start?: string;
-                            end?: string;
-                          };
-                          handleFilterChange(option.key, {
-                            ...current,
-                            end: e.target.value || undefined,
-                          });
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+    <ModalBase onClose={onClose}>
+      <div className="bg-base-100 rounded-2xl shadow-2xl w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-primary to-primary-focus text-primary-content px-8 py-6 flex justify-between items-center">
+          <h3 className="text-3xl font-extrabold tracking-tight">
+            Advanced Search
+          </h3>
+          <button
+            onClick={() => (requestClose ? requestClose() : onClose())}
+            className="btn btn-circle btn-ghost hover:bg-primary-focus"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
 
-        <div className="modal-action gap-2 mt-6">
-          <button className="btn btn-sm" onClick={resetFilters}>
+        {/* Content Section - Scrollable */}
+        <div className="overflow-y-auto flex-1 px-8 py-6">
+          <div className="space-y-3">
+            {options.map((option) => (
+              <FilterRow
+                key={option.key}
+                option={option}
+                enabled={enabledFilters.has(option.key)}
+                value={filters[option.key]}
+                onToggle={(k) => toggleFilter(k)}
+                onChange={handleFilterChange}
+                focused={focusedFilter === option.key}
+                onFocus={(k) => {
+                  setFocusedFilter(k);
+                  if (getSuggestions) {
+                    const currentValue = (filters[k] as string) || "";
+                    const sugs = getSuggestions(k, currentValue) || [];
+                    setSuggestions(sugs.slice(0, 8));
+                  }
+                }}
+                onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
+                suggestions={focusedFilter === option.key ? suggestions : []}
+                onSuggestionClick={handleSuggestionClick}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer Section */}
+        <div className="bg-base-200 px-8 py-4 flex justify-between items-center border-t border-base-300">
+          <button className="btn btn-ghost btn-sm" onClick={resetFilters}>
             Reset
           </button>
-          <button className="btn btn-sm" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-sm btn-primary" onClick={applyFilters}>
-            Apply Filters
-          </button>
+          <div className="flex gap-3">
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => (requestClose ? requestClose() : onClose())}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-sm btn-primary" onClick={applyFilters}>
+              Apply Filters
+            </button>
+          </div>
         </div>
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+    </ModalBase>
   );
 };
 

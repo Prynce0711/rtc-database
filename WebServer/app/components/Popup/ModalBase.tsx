@@ -1,4 +1,5 @@
 "use client";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   cloneElement,
   isValidElement,
@@ -24,6 +25,7 @@ const ModalBase = ({
   bgColor?: string;
 }) => {
   const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -35,30 +37,60 @@ const ModalBase = ({
   let childWithStop: ReactNode = children;
 
   if (isValidElement<ClickableChild>(children)) {
-    const child = children as ReactElement<ClickableChild>;
+    const child = children as ReactElement<
+      ClickableChild & { requestClose?: () => void }
+    >;
     childWithStop = cloneElement(child, {
       onClick: (event: ReactMouseEvent) => {
         event.stopPropagation();
         child.props.onClick?.(event);
       },
+      // provide a `requestClose` function to children so they can ask ModalBase
+      // to perform the animated close sequence before calling the parent's onClose
+      requestClose: () => setVisible(false),
     });
   }
 
   return createPortal(
-    <div
-      className={`fixed inset-0 min-w-0 flex items-center justify-center backdrop-brightness-50 z-9999 ${
-        notTransparent
-          ? `bg-opacity-100 ${bgColor}`
-          : "bg-opacity-50 bg-transparent"
-      } ${className}`}
-      onClick={onClose}
+    <AnimatePresence
+      onExitComplete={() => {
+        if (onClose) onClose();
+      }}
     >
-      <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
-        <div className="flex-1 flex p-5 items-center justify-center">
-          <div className="w-auto">{childWithStop}</div>
-        </div>
-      </div>
-    </div>,
+      {visible && (
+        <motion.div
+          key="modal-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
+          <div
+            className={`fixed inset-0 min-w-0 flex items-center justify-center backdrop-brightness-50 z-9999 ${
+              notTransparent
+                ? `bg-opacity-100 ${bgColor}`
+                : "bg-opacity-50 bg-transparent"
+            } ${className}`}
+            onClick={() => setVisible(false)}
+          >
+            <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
+              <div className="flex-1 flex p-5 items-center justify-center">
+                <motion.div
+                  key="modal-content"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.38, ease: "easeOut" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="w-auto">{childWithStop}</div>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 };

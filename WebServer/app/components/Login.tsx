@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn, useSession } from "@/app/lib/authClient";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
@@ -12,6 +13,25 @@ const Login: React.FC = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
 
+  const cardControls = useAnimation();
+  const overlayControls = useAnimation();
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 30, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+    transitioning: {
+      scale: 1.06,
+      y: -40,
+      opacity: 0.98,
+      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+  } as const;
+
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -19,6 +39,11 @@ const Login: React.FC = () => {
       router.push("/user/dashboard");
     }
   }, [session, router]);
+
+  useEffect(() => {
+    // reveal card on mount
+    void cardControls.start("visible");
+  }, [cardControls]);
 
   useEffect(() => {
     if (error) {
@@ -46,6 +71,19 @@ const Login: React.FC = () => {
         return;
       }
 
+      // smooth transition: animate card then fade overlay into view before navigating
+      try {
+        // fade in subtle overlay
+        void overlayControls.start({
+          opacity: 1,
+          transition: { duration: 0.45 },
+        });
+        // animate card lift/scale
+        await cardControls.start("transitioning");
+        // small delay to let overlay settle
+        await new Promise((r) => setTimeout(r, 120));
+      } catch {}
+
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -56,8 +94,23 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
+        {/* full-screen overlay used during transition */}
+        <motion.div
+          className="fixed inset-0 z-20 bg-base-100"
+          initial={{ opacity: 0 }}
+          animate={overlayControls}
+          style={{ pointerEvents: "none" }}
+        />
         {/* Logo and Header */}
-        <div className="text-center mb-10 animate-fade-in">
+        <motion.div
+          className="text-center mb-10"
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.8,
+            ease: [0.25, 0.46, 0.45, 0.94],
+          }}
+        >
           <div className="flex justify-center mb-6">
             <div className="relative group">
               <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"></div>
@@ -77,10 +130,21 @@ const Login: React.FC = () => {
           <p className="text-sm text-base-content/60 italic mt-2 font-medium">
             "Batas at Bayan"
           </p>
-        </div>
+        </motion.div>
 
         {/* Login Form */}
-        <div className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm transform transition-all duration-300 hover:shadow-3xl">
+        <motion.div
+          className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm relative z-10"
+          variants={cardVariants}
+          initial="hidden"
+          animate={cardControls}
+          whileHover={{
+            y: -4,
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
+            transition: { duration: 0.3 },
+          }}
+          style={{ WebkitTapHighlightColor: "transparent" }}
+        >
           <div className="mb-8">
             <h2 className="text-4xl font-bold text-base-content text-center">
               Sign In
@@ -91,24 +155,40 @@ const Login: React.FC = () => {
           </div>
 
           {/* Error Alert */}
-          {error && (
-            <div className="alert alert-error mb-6 animate-shake shadow-lg">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="stroke-current shrink-0 h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                key={error}
+                className="alert alert-error mb-6 shadow-lg"
+                initial={{ x: -30, opacity: 0, scale: 0.9 }}
+                animate={{
+                  x: [-30, 10, -8, 6, -4, 2, 0],
+                  opacity: 1,
+                  scale: 1,
+                }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{
+                  duration: 0.7,
+                  ease: "easeInOut",
+                }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="stroke-current shrink-0 h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-sm">{error}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="form-control">
@@ -184,7 +264,7 @@ const Login: React.FC = () => {
               Protected by enterprise-grade security
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-base-content/50">
@@ -196,47 +276,6 @@ const Login: React.FC = () => {
           action.
         </p>
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes shake {
-          0%,
-          100% {
-            transform: translateX(0);
-          }
-          10%,
-          30%,
-          50%,
-          70%,
-          90% {
-            transform: translateX(-5px);
-          }
-          20%,
-          40%,
-          60%,
-          80% {
-            transform: translateX(5px);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 };

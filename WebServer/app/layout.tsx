@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Footer from "./components/Footer";
+
 import PopupProvider from "./components/Popup/PopupProvider";
 import "./globals.css";
 
@@ -29,10 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <PopupProvider>
-          {children}
-          <Footer />
-        </PopupProvider>
+        <PopupProvider>{children}</PopupProvider>
       </body>
     </html>
   );
