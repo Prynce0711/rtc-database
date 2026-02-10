@@ -21,6 +21,7 @@ const EmployeeTable: React.FC<Props> = ({
       <table className="table w-full text-sm h-full">
         <thead>
           <tr>
+            <th className="text-center">Actions</th>
             <th>Employee Name</th>
             <th>Employee #</th>
             <th>Position</th>
@@ -37,13 +38,28 @@ const EmployeeTable: React.FC<Props> = ({
             <th>Contact Person</th>
             <th>Contact Number</th>
             <th>Email</th>
-            <th className="text-center">Actions</th>
           </tr>
         </thead>
 
         <tbody>
           {employees.map((emp) => (
             <tr key={emp.id}>
+              {/* Actions */}
+              <td className="text-center flex gap-2 justify-center">
+                <button
+                  className="btn btn-ghost btn-sm text-primary"
+                  onClick={() => onEdit(emp)}
+                >
+                  <FiEdit />
+                </button>
+
+                <button
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={() => onDelete(emp.id)}
+                >
+                  <FiTrash2 />
+                </button>
+              </td>
               {/* Employee Name */}
               <td className="font-semibold">{emp.employeeName || "—"}</td>
 
@@ -101,23 +117,6 @@ const EmployeeTable: React.FC<Props> = ({
 
               {/* Email */}
               <td>{emp.email || "—"}</td>
-
-              {/* Actions */}
-              <td className="text-center flex gap-2 justify-center">
-                <button
-                  className="btn btn-ghost btn-sm text-primary"
-                  onClick={() => onEdit(emp)}
-                >
-                  <FiEdit />
-                </button>
-
-                <button
-                  className="btn btn-ghost btn-sm text-error"
-                  onClick={() => onDelete(emp.id)}
-                >
-                  <FiTrash2 />
-                </button>
-              </td>
             </tr>
           ))}
         </tbody>

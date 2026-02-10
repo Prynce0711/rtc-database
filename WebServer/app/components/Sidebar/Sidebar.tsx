@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
 import { AiOutlineTeam } from "react-icons/ai";
 import { FaHistory, FaUserCog } from "react-icons/fa";
-import { FiHome } from "react-icons/fi";
+import { FiActivity, FiHome } from "react-icons/fi";
 import { PiSlidersHorizontal } from "react-icons/pi";
 
 import Header from "./Header";
