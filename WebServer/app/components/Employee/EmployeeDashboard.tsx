@@ -39,6 +39,7 @@ interface KpiCardProps {
   title: string;
   value: string | number;
   valueClassName?: string;
+  className?: string;
 }
 
 const KpiCard: React.FC<KpiCardProps> = ({
@@ -46,11 +47,24 @@ const KpiCard: React.FC<KpiCardProps> = ({
   title,
   value,
   valueClassName,
+  className,
 }) => (
-  <div className="stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow">
-    <div className="stat-figure text-black">{icon}</div>
-    <div className="stat-title text-black font-medium">{title}</div>
-    <div className={`stat-value font-medium ${valueClassName ?? "text-black"}`}>
+  <div
+    className={`stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow ${
+      className ?? ""
+    }`}
+  >
+    <div className="stat-figure text-black text-xl md:text-2xl lg:text-xl">
+      {icon}
+    </div>
+    <div className="stat-title text-black font-medium text-base md:text-lg">
+      {title}
+    </div>
+    <div
+      className={`stat-value font-medium text-xl md:text-2xl lg:text-2xl ${
+        valueClassName ?? "text-black"
+      }`}
+    >
       {value}
     </div>
   </div>
@@ -612,10 +626,13 @@ const EmployeeDashboard: React.FC = () => {
             valueClassName="text-warning"
           />
           <KpiCard
-            icon={<FiBriefcase />}
+            icon={
+              <FiBriefcase className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-0 sm:-ml-1 md:-ml-2" />
+            }
             title="Most Common Position"
             value={analytics.mostCommonPosition}
-            valueClassName="text-info"
+            valueClassName="text-info text-base md:text-lg lg:text-lg"
+            className="py-2 sm:py-3 md:py-4 lg:py-3"
           />
           <KpiCard
             icon={<FiHeart />}
