@@ -8,6 +8,7 @@ import { AiOutlineTeam } from "react-icons/ai";
 import { FaHistory, FaUserCog } from "react-icons/fa";
 import { FiHome } from "react-icons/fi";
 import { PiSlidersHorizontal } from "react-icons/pi";
+
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
 interface SidebarProps {
@@ -92,7 +93,7 @@ function AdminSidebarContents(activeView: string) {
       <SidebarButton
         icon={<FaHistory size={20} />}
         activeView={activeView}
-        href="activity-logs"
+        href="activity-reports"
       />
     </>
   );
@@ -110,11 +111,6 @@ function AttorneySidebarContents(activeView: string) {
         icon={<PiSlidersHorizontal size={20} />}
         activeView={activeView}
         href="cases"
-      />
-      <SidebarButton
-        icon={<FiActivity size={20} />}
-        activeView={activeView}
-        href="activity-reports"
       />
     </>
   );

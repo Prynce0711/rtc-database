@@ -1,6 +1,6 @@
 /**
  * Case Detail Modal Component
- * 
+ *
  * Displays comprehensive case information in a modern, wide modal.
  * Shows all fields from the case schema organized into logical sections.
  * Uses ModalBase for consistent modal behavior across the application.
@@ -192,9 +192,7 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   />
                   <DetailItem
                     label="EQC Number"
-                    value={
-                      caseData.eqcNumber?.toString() || "Not set"
-                    }
+                    value={caseData.eqcNumber?.toString() || "Not set"}
                   />
                 </div>
               </div>
