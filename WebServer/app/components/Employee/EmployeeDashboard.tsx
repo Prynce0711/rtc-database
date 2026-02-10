@@ -630,6 +630,7 @@ const EmployeeDashboard: React.FC = () => {
           <Table
             className="overflow-x-auto bg-base-100 rounded-xl shadow-lg border border-base-300 p-4"
             headers={[
+              { key: "actions", label: "Actions", align: "center" },
               { key: "employeeName", label: "Employee Name" },
               { key: "employeeNumber", label: "Employee #" },
               { key: "position", label: "Position" },
@@ -646,7 +647,6 @@ const EmployeeDashboard: React.FC = () => {
               { key: "contactPerson", label: "Contact Person" },
               { key: "contactNumber", label: "Contact Number" },
               { key: "email", label: "Email" },
-              { key: "actions", label: "Actions", align: "center" },
             ]}
             data={filtered}
             rowsPerPage={10}
