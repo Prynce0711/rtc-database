@@ -13,24 +13,87 @@ function App() {
     "locating",
   );
   const [backendUrl, setBackendUrl] = useState<string | null>(null);
+  const [isDevMode] = useState(() => import.meta.env.DEV);
 
   useEffect(() => {
-    // Listen for backend discovery from main process
-    if (window.ipcRenderer?.onBackend) {
-      window.ipcRenderer.onBackend((backend: BackendInfo) => {
-        console.log("✅ Backend discovered:", backend);
-        setBackendUrl(backend.url);
-        setStatus("located");
+    let isSubscribed = true;
 
-        // After showing the backend info for 2 seconds, load it
-        setTimeout(() => {
-          setStatus("loading");
-          // Navigate to the backend URL
-          window.location.href = backend.url;
-        }, 2000);
-      });
-    }
-  }, []);
+    // Try localhost:3000 first in dev mode
+    const tryLocalhost = async () => {
+      if (!isDevMode) return false;
+
+      console.log("🔍 Dev mode detected, checking localhost:3000...");
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch("http://localhost:3000/api/health", {
+          signal: controller.signal,
+          method: "GET",
+        });
+
+        console.log("Received response from localhost:3000:", response.status);
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const text = await response.text();
+          if (text === "OK" && isSubscribed) {
+            console.log("✅ Localhost:3000 is available!");
+            setBackendUrl("http://localhost:3000");
+            setStatus("located");
+
+            setTimeout(() => {
+              if (isSubscribed) {
+                setStatus("loading");
+                window.location.href = "http://localhost:3000";
+              }
+            }, 2000);
+
+            return true;
+          }
+        }
+      } catch (err) {
+        console.log(
+          "❌ Localhost:3000 not available, falling back to UDP discovery",
+        );
+      }
+
+      return false;
+    };
+
+    // Start with localhost check in dev mode, then fall back to UDP
+    (async () => {
+      const localhostWorked = await tryLocalhost();
+
+      if (!localhostWorked && isSubscribed) {
+        // Listen for backend discovery from main process
+        if (window.ipcRenderer?.onBackend) {
+          window.ipcRenderer.onBackend((backend: BackendInfo) => {
+            if (!isSubscribed) return;
+
+            console.log("✅ Backend discovered:", backend);
+            setBackendUrl(backend.url);
+            setStatus("located");
+
+            // After showing the backend info for 2 seconds, load it
+            setTimeout(() => {
+              if (isSubscribed) {
+                setStatus("loading");
+                // Navigate to the backend URL
+                window.location.href = backend.url;
+              }
+            }, 2000);
+          });
+        }
+      }
+    })();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isDevMode]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-primary via-secondary to-accent flex items-center justify-center p-8">
@@ -68,7 +131,9 @@ function App() {
                   ></path>
                 </svg>
                 <span className="text-sm">
-                  Multicast discovery active on port 41234
+                  {isDevMode
+                    ? "Checked localhost:3000, now listening for broadcasts"
+                    : "Broadcast discovery active on port 41234"}
                 </span>
               </div>
             </>
