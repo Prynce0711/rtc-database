@@ -17,7 +17,11 @@ export function startUdpListener(mainWindow: BrowserWindow) {
 
   socket.on("listening", () => {
     try {
+      // Enable loopback for same-machine testing
+      socket!.setMulticastLoopback(true);
+      // Join multicast group on all interfaces
       socket!.addMembership(MULTICAST_ADDR);
+      console.log(`✅ Joined multicast group ${MULTICAST_ADDR}`);
     } catch (err) {
       console.error("Failed to join multicast group:", err);
     }
@@ -55,9 +59,10 @@ export function startUdpListener(mainWindow: BrowserWindow) {
     socket = null;
   });
 
-  socket.bind(UDP_PORT, () => {
+  // Bind to 0.0.0.0 to receive multicast on all interfaces
+  socket.bind(UDP_PORT, "0.0.0.0", () => {
     console.log(
-      `📥 Bound UDP socket on port ${UDP_PORT}, joining multicast group ${MULTICAST_ADDR}`,
+      `📥 Bound UDP socket to 0.0.0.0:${UDP_PORT}, will join multicast group ${MULTICAST_ADDR}`,
     );
   });
 }
