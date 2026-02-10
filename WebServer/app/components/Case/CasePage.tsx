@@ -394,7 +394,7 @@ const CasePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-base-200">
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="w-full px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-base-content mb-2">
