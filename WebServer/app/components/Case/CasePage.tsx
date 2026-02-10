@@ -8,13 +8,8 @@ import FilterModal, {
   type FilterValues,
 } from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
-<<<<<<< HEAD
-
-=======
 import CaseDetailModal from "./CaseDetailModal";
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
 import NewCaseModal, { CaseModalType } from "./CaseModal";
-import CaseDetailModal from "./CaseDetailModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
@@ -44,13 +39,9 @@ const CasePage: React.FC = () => {
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
   const session = useSession();
-<<<<<<< HEAD
-  const isAdminOrAtty = session?.data?.user?.role === "admin" || session?.data?.user?.role === "atty";
-=======
   const isAdminOrAtty =
     session?.data?.user?.role === "admin" ||
     session?.data?.user?.role === "atty";
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -62,11 +53,7 @@ const CasePage: React.FC = () => {
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-<<<<<<< HEAD
-
-=======
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
 
   const caseFilterOptions: FilterOption[] = [
@@ -133,12 +120,6 @@ const CasePage: React.FC = () => {
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
-<<<<<<< HEAD
-  };  
-
-  const handleApplyFilters = (filtered: Case[]) => {
-   
-=======
   };
   const getCaseSuggestions = (key: string, inputValue: string): string[] => {
     const textFields = [
@@ -307,7 +288,6 @@ const CasePage: React.FC = () => {
     const typed = filters as CaseFilterValues;
     const filtered = applyCaseFilters(typed, cases);
     setAppliedFilters(typed);
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
     setFilteredByAdvanced(filtered);
   };
 
@@ -459,11 +439,7 @@ const CasePage: React.FC = () => {
             onChange={handleImportExcel}
           />
           <button
-<<<<<<< HEAD
-            className={`btn btn-outline`}
-=======
             className="btn btn-outline"
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
             onClick={() => setFilterModalOpen(true)}
           >
             <svg
@@ -618,8 +594,6 @@ const CasePage: React.FC = () => {
             onClose={() => setCaseForDetailView(null)}
           />
         )}
-<<<<<<< HEAD
-=======
 
         {/* Filter Modal */}
         <FilterModal
@@ -630,7 +604,6 @@ const CasePage: React.FC = () => {
           initialValues={appliedFilters}
           getSuggestions={getCaseSuggestions}
         />
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
       </main>
     </div>
   );

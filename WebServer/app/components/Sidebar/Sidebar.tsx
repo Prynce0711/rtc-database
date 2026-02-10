@@ -57,13 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               {isAdmin
                 ? AdminSidebarContents(activeView)
                 : isAtty
-<<<<<<< HEAD
-                ? AttorneySidebarContents(activeView)
-                : StaffSidebarContents(activeView)}
-=======
                   ? AttorneySidebarContents(activeView)
                   : StaffSidebarContents(activeView)}
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
             </ul>
           </div>
         </div>
@@ -90,9 +85,6 @@ function AdminSidebarContents(activeView: string) {
         activeView={activeView}
         href="employees"
       />
-<<<<<<< HEAD
-
-=======
       <SidebarButton
         icon={<AiOutlineTeam size={20} />}
         activeView={activeView}
@@ -115,32 +107,9 @@ function AttorneySidebarContents(activeView: string) {
         activeView={activeView}
         href="cases"
       />
->>>>>>> 8fab0e0ae9f38e6e9e5ccf3e6812095de6eaf29d
     </>
   );
 }
-
-
-function AttorneySidebarContents(activeView: string) {
-  return (
-    <>
-      <SidebarButton
-        icon={<FiHome size={20} />}
-        activeView={activeView}
-        href="dashboard"
-      />
-      <SidebarButton
-        icon={<PiSlidersHorizontal size={20} />}
-        activeView={activeView}
-        href="cases"
-      />
-
-
-    </>
-  );
-}
-
-
 
 function StaffSidebarContents(activeView: string) {
   return (
