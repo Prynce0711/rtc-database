@@ -1,7 +1,7 @@
 import dgram from "dgram";
 
 const UDP_PORT = Number(process.env.UDP_PORT) || 41234;
-const MULTICAST_ADDR = "239.255.255.250"; // must match listener
+const BROADCAST_ADDR = "255.255.255.255";
 const INTERVAL_MS = 5000;
 
 let socket: dgram.Socket | null = null;
@@ -13,16 +13,7 @@ export function startUdpBroadcast() {
   socket = dgram.createSocket("udp4");
 
   socket.bind(() => {
-    socket!.setBroadcast(false);
-    socket!.setMulticastTTL(128);
-    socket!.setMulticastLoopback(true); // Allow same-machine testing
-
-    // Add multicast interface (optional but helps with routing)
-    try {
-      socket!.setMulticastInterface("0.0.0.0");
-    } catch (err) {
-      console.warn("Could not set multicast interface:", err);
-    }
+    socket!.setBroadcast(true);
 
     interval = setInterval(() => {
       const payload = {
@@ -33,12 +24,12 @@ export function startUdpBroadcast() {
 
       const message = Buffer.from(JSON.stringify(payload));
 
-      socket!.send(message, UDP_PORT, MULTICAST_ADDR, (err) => {
-        if (err) console.error("UDP multicast error:", err);
+      socket!.send(message, UDP_PORT, BROADCAST_ADDR, (err) => {
+        if (err) console.error("UDP broadcast error:", err);
       });
     }, INTERVAL_MS);
 
-    console.log("✅ UDP multicast started (every 5 seconds)");
+    console.log("✅ UDP broadcast started (every 5 seconds)");
   });
 }
 
@@ -49,5 +40,5 @@ export function stopUdpBroadcast() {
   if (socket) socket.close();
   socket = null;
 
-  console.log("🛑 UDP multicast stopped");
+  console.log("🛑 UDP broadcast stopped");
 }
