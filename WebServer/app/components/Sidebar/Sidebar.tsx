@@ -111,6 +111,11 @@ function AttorneySidebarContents(activeView: string) {
         activeView={activeView}
         href="cases"
       />
+      <SidebarButton
+        icon={<FiActivity size={20} />}
+        activeView={activeView}
+        href="activity-reports"
+      />
     </>
   );
 }
