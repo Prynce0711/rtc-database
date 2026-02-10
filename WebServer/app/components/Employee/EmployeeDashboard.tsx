@@ -528,7 +528,7 @@ const EmployeeDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col">
-      <main className="flex-1 flex flex-col w-full max-w-[1700px] mx-auto px-6 py-8">
+      <main className="flex-1 flex flex-col w-full max-w-425 mx-auto px-6 py-8">
         {/* ===== HEADER ===== */}
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
@@ -541,7 +541,7 @@ const EmployeeDashboard: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative w-full sm:w-[320px] md:w-[420px]">
+            <div className="relative w-full sm:w-[320px] md:w-105">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/60 pointer-events-none">
                 <FiSearch size={20} />
               </span>

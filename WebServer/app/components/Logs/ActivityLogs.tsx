@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiDownload,
-  FiCopy,
   FiChevronLeft,
   FiChevronRight,
+  FiDownload,
+  FiFilter,
+  FiSearch,
 } from "react-icons/fi";
 
 interface ActivityLog {
@@ -116,13 +114,15 @@ const ActivityLogs: React.FC = () => {
 
   // debounce search input
   useEffect(() => {
-    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    if (searchDebounceRef.current)
+      window.clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
     }, 300);
 
     return () => {
-      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+      if (searchDebounceRef.current)
+        window.clearTimeout(searchDebounceRef.current);
     };
   }, [search]);
 
@@ -181,7 +181,7 @@ const ActivityLogs: React.FC = () => {
     // Export CSV by default for professionals; keep JSON as fallback
     if (filteredLogs.length === 0) return;
 
-    const headers = [
+    const headers: (keyof ActivityLog)[] = [
       "id",
       "userName",
       "userRole",
@@ -198,7 +198,7 @@ const ActivityLogs: React.FC = () => {
       filteredLogs.map((r) =>
         headers
           .map((h) => {
-            const v = (r as any)[h] ?? "";
+            const v = r[h] ?? "";
             const s = String(v).replace(/"/g, '""');
             return `"${s}"`;
           })
@@ -206,7 +206,9 @@ const ActivityLogs: React.FC = () => {
       ),
     );
 
-    const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -275,7 +277,10 @@ const ActivityLogs: React.FC = () => {
               className="input input-bordered input-sm w-full pl-10"
             />
           </div>
-          <button onClick={handleExport} className="btn btn-primary btn-sm gap-2">
+          <button
+            onClick={handleExport}
+            className="btn btn-primary btn-sm gap-2"
+          >
             <FiDownload /> Export
           </button>
         </div>
@@ -322,7 +327,10 @@ const ActivityLogs: React.FC = () => {
             placeholder="To Date"
           />
 
-          <button onClick={handleClearFilters} className="btn btn-ghost btn-sm gap-2">
+          <button
+            onClick={handleClearFilters}
+            className="btn btn-ghost btn-sm gap-2"
+          >
             <FiFilter /> Clear
           </button>
         </div>
@@ -330,9 +338,14 @@ const ActivityLogs: React.FC = () => {
         {/* Results count */}
         <div className="text-sm text-base-content/60 flex items-center gap-3">
           <span>
-            Showing {paginatedLogs.length > 0 ? (currentPage - 1) * rowsPerPage + 1 : 0} to {Math.min(currentPage * rowsPerPage, filteredLogs.length)} of {filteredLogs.length} logs
+            Showing{" "}
+            {paginatedLogs.length > 0 ? (currentPage - 1) * rowsPerPage + 1 : 0}{" "}
+            to {Math.min(currentPage * rowsPerPage, filteredLogs.length)} of{" "}
+            {filteredLogs.length} logs
           </span>
-          <span className="badge badge-outline badge-sm">{filteredLogs.length} total</span>
+          <span className="badge badge-outline badge-sm">
+            {filteredLogs.length} total
+          </span>
         </div>
       </div>
 
@@ -414,7 +427,7 @@ const ActivityLogs: React.FC = () => {
             {Array.from({ length: totalPages }, (_, i) => (
               <button
                 key={i}
-                className={`btn btn-sm min-w-[38px] font-semibold transition-all rounded-lg ${
+                className={`btn btn-sm min-w-9.5 font-semibold transition-all rounded-lg ${
                   currentPage === i + 1 ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={() => setCurrentPage(i + 1)}

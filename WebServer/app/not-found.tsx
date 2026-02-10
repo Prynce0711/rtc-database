@@ -1,11 +1,13 @@
-"use client";
-
-import React from "react";
+import { headers } from "next/headers";
 import Link from "next/link";
+import { auth } from "./lib/auth";
 
-const NotFound = () => {
+const NotFound = async () => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const hasSession = session?.user ? true : false;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
       <div className="max-w-2xl w-full text-center">
         <div className="mb-8">
           <h1 className="text-9xl font-bold text-slate-800 tracking-tight">
@@ -22,13 +24,12 @@ const NotFound = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button
-            type="button"
-            onClick={() => window.history.back()}
+          <Link
+            href={hasSession ? "/user/dashboard" : "/"}
             className="px-8 py-3 bg-white text-slate-700 font-medium rounded-lg border-2 border-slate-300 hover:border-slate-400 transition-colors duration-200 pointer-events-auto"
           >
-            Go Back
-          </button>
+            {hasSession ? "Go to Dashboard" : "Go to Home"}
+          </Link>
         </div>
 
         <div className="mt-12 text-slate-400">
