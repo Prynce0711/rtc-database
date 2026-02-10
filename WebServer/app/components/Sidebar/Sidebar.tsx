@@ -5,11 +5,11 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import React, { ReactNode } from "react";
 import { AiOutlineTeam } from "react-icons/ai";
-import { FiActivity, FiHome } from "react-icons/fi";
+import { FaHistory, FaUserCog } from "react-icons/fa";
+import { FiHome } from "react-icons/fi";
 import { PiSlidersHorizontal } from "react-icons/pi";
 import Header from "./Header";
 import SidebarButton from "./SidebarButton";
-
 interface SidebarProps {
   children: ReactNode;
 }
@@ -83,6 +83,16 @@ function AdminSidebarContents(activeView: string) {
         icon={<AiOutlineTeam size={20} />}
         activeView={activeView}
         href="employees"
+      />
+      <SidebarButton
+        icon={<FaUserCog size={20} />}
+        activeView={activeView}
+        href="account"
+      />
+      <SidebarButton
+        icon={<FaHistory size={20} />}
+        activeView={activeView}
+        href="activity-logs"
       />
     </>
   );
