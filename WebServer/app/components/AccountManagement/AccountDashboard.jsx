@@ -218,7 +218,9 @@ const AccountDashboard = () => {
           )}
         </div>
 
-        <p className="text-lg md:text-xl opacity-70 mb-6">Manage system users</p>
+        <p className="text-lg md:text-xl opacity-70 mb-6">
+          Manage system users
+        </p>
         {/* STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           {[
@@ -305,7 +307,10 @@ const AccountDashboard = () => {
                 <tbody>
                   {archivedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center text-base-content/60">
+                      <td
+                        colSpan={4}
+                        className="text-center text-base-content/60"
+                      >
                         No archived accounts
                       </td>
                     </tr>
@@ -315,7 +320,9 @@ const AccountDashboard = () => {
                         <td className="text-base md:text-lg">{user.name}</td>
                         <td className="text-base md:text-lg">{user.email}</td>
                         <td className="text-base md:text-lg">{user.role}</td>
-                        <td className="text-base md:text-lg">{formatDate(user.updatedAt)}</td>
+                        <td className="text-base md:text-lg">
+                          {formatDate(user.updatedAt)}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -363,9 +370,15 @@ const AccountDashboard = () => {
                     </th>
                     <th className="text-base md:text-lg font-medium">Role</th>
                     <th className="text-base md:text-lg font-medium">Status</th>
-                    <th className="text-base md:text-lg font-medium">Created</th>
-                    <th className="text-base md:text-lg font-medium">Last Login</th>
-                    <th className="text-base md:text-lg font-medium">Updated</th>
+                    <th className="text-base md:text-lg font-medium">
+                      Created
+                    </th>
+                    <th className="text-base md:text-lg font-medium">
+                      Last Login
+                    </th>
+                    <th className="text-base md:text-lg font-medium">
+                      Updated
+                    </th>
                     {canManage && (
                       <th className="text-base md:text-lg font-medium">
                         Actions
@@ -505,7 +518,10 @@ const AccountDashboard = () => {
                         placeholder="Email"
                         value={newAccount.email}
                         onChange={(e) =>
-                          setNewAccount({ ...newAccount, email: e.target.value })
+                          setNewAccount({
+                            ...newAccount,
+                            email: e.target.value,
+                          })
                         }
                       />
                     </div>
