@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Montserrat } from "next/font/google";
-import Footer from "./components/Footer";
->>>>>>> 3934de0 (font)
+import { Montserrat } from "next/font/google";
+
 import PopupProvider from "./components/Popup/PopupProvider";
 import "./globals.css";
 
@@ -23,14 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <PopupProvider>
-          {children}
-          <Footer />
-        </PopupProvider>
->>>>>>> 3934de0 (font)
+      <body className={`${montserrat.variable} font-sans antialiased`}>
+        <PopupProvider>{children}</PopupProvider>
       </body>
     </html>
   );
