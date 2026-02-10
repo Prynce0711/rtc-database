@@ -2,8 +2,8 @@
 
 import { Case } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
-import { CaseModalType } from "./CaseModal";
 import Roles from "@/app/lib/Roles";
+import { CaseModalType } from "./CaseModal";
 
 const CaseRow = ({
   caseItem,
@@ -19,11 +19,13 @@ const CaseRow = ({
   onRowClick: (caseItem: Case) => void;
 }) => {
   const session = useSession();
-  const isAdminOrAtty = session?.data?.user?.role === Roles.ADMIN || session?.data?.user?.role === Roles.ATTY;
+  const isAdminOrAtty =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.ATTY;
 
   return (
-    <tr 
-      key={caseItem.id} 
+    <tr
+      key={caseItem.id}
       className="hover:bg-base-200 cursor-pointer transition-colors"
       onClick={() => onRowClick(caseItem)}
     >
