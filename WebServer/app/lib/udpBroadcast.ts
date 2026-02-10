@@ -15,6 +15,14 @@ export function startUdpBroadcast() {
   socket.bind(() => {
     socket!.setBroadcast(false);
     socket!.setMulticastTTL(128);
+    socket!.setMulticastLoopback(true); // Allow same-machine testing
+
+    // Add multicast interface (optional but helps with routing)
+    try {
+      socket!.setMulticastInterface("0.0.0.0");
+    } catch (err) {
+      console.warn("Could not set multicast interface:", err);
+    }
 
     interval = setInterval(() => {
       const payload = {
