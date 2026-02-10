@@ -102,8 +102,7 @@ const CasePage: React.FC = () => {
 
   const filteredAndSortedCases = useMemo(() => {
     // Start with advanced filtered cases if filters are applied, otherwise use all cases
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
+    const baseList = cases;
 
     let filtered = baseList;
 
@@ -115,7 +114,7 @@ const CasePage: React.FC = () => {
       );
     }
     return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+  }, [cases, searchTerm, sortConfig, filteredByAdvanced]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
