@@ -1,4 +1,4 @@
-import { UdpData } from "@rtc-database/shared";
+import { BackendInfo } from "@rtc-database/shared";
 import { contextBridge, ipcRenderer } from "electron";
 
 // --------- Expose some API to the Renderer process ---------
@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
   // You can expose other APTs you need here.
   // ...
 
-  onBackend: (callback: (backend: UdpData) => void) => {
+  onBackend: (callback: (backend: BackendInfo) => void) => {
     ipcRenderer.on("udp:backend", (_, data) => callback(data));
   },
 });

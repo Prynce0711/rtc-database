@@ -1,22 +1,31 @@
-import { UdpData } from "@rtc-database/shared";
-import { BackendInfo } from "@rtc-database/shared";
+import { BackendInfo, UdpData } from "@rtc-database/shared";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
 
 const UDP_PORT = 41234;
+const MULTICAST_ADDR = "239.255.255.250"; // must match broadcaster
 
 let socket: dgram.Socket | null = null;
 
 export function startUdpListener(mainWindow: BrowserWindow) {
   if (socket) return;
 
-  console.log("🚀 Starting UDP listener...");
+  console.log("🚀 Starting UDP listener (multicast)...");
 
-  socket = dgram.createSocket("udp4");
+  // reuseAddr helps if multiple listeners exist on the same host
+  socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("listening", () => {
+    try {
+      socket!.addMembership(MULTICAST_ADDR);
+    } catch (err) {
+      console.error("Failed to join multicast group:", err);
+    }
+
     const addr = socket!.address();
-    console.log(`📡 UDP listening on ${addr.address}:${addr.port}`);
+    console.log(
+      `📡 UDP multicast listening on ${addr.address}:${addr.port} (group ${MULTICAST_ADDR})`,
+    );
   });
 
   socket.on("message", (msg, rinfo) => {
@@ -31,6 +40,9 @@ export function startUdpListener(mainWindow: BrowserWindow) {
       };
 
       // 🔁 Forward to renderer
+      console.log(
+        `📨 Received UDP from ${rinfo.address}:${payload.port} - forwarding to renderer`,
+      );
       mainWindow.webContents.send("udp:backend", backend);
     } catch (err) {
       console.warn("Invalid UDP packet:", err);
@@ -44,7 +56,9 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   });
 
   socket.bind(UDP_PORT, () => {
-    socket!.setBroadcast(true);
+    console.log(
+      `📥 Bound UDP socket on port ${UDP_PORT}, joining multicast group ${MULTICAST_ADDR}`,
+    );
   });
 }
 
