@@ -28,11 +28,9 @@ import {
   FiX,
 } from "react-icons/fi";
 
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "@/app/components/Filter/FilterModal";
+import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 
 interface KpiCardProps {
   icon: React.ReactNode;

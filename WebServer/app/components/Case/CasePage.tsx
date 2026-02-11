@@ -3,10 +3,7 @@
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "../Filter/FilterModal";
+import FilterModal from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
@@ -15,6 +12,7 @@ import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 
 type CaseFilterValues = {
   branch?: string;
