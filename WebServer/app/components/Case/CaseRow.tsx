@@ -29,20 +29,12 @@ const CaseRow = ({
       className="hover:bg-base-200 cursor-pointer transition-colors"
       onClick={() => onRowClick(caseItem)}
     >
-      <td>{caseItem.caseNumber}</td>
+      {/* <td>{caseItem.caseNumber}</td>
       <td>{caseItem.name}</td>
       <td>{caseItem.charge}</td>
       <td>{caseItem.branch}</td>
-      <td>
-        <span
-          className={`badge ${
-            caseItem.detained ? "badge-warning" : "badge-success"
-          }`}
-        >
-          {caseItem.detained ? "Yes" : "No"}
-        </span>
-      </td>
-      <td>{new Date(caseItem.dateFiled).toLocaleDateString()}</td>
+      <td>{caseItem.assistantBranch}</td>
+      <td>{caseItem.court}</td> */}
       {isAdminOrAtty && (
         <td onClick={(e) => e.stopPropagation()}>
           <div className="flex gap-2">
@@ -68,6 +60,34 @@ const CaseRow = ({
           </div>
         </td>
       )}
+
+      <td>{caseItem.branch}</td>
+      <td>{caseItem.assistantBranch}</td>
+      <td>{caseItem.caseNumber}</td>
+      <td>{new Date(caseItem.dateFiled).toLocaleDateString()}</td>
+      <td>{caseItem.name}</td>
+      <td>{caseItem.charge}</td>
+      <td>{caseItem.infoSheet}</td>
+      <td>{caseItem.court}</td>
+      <td>
+        <span
+          className={`badge ${
+            caseItem.detained ? "badge-warning" : "badge-success"
+          }`}
+        >
+          {caseItem.detained ? "Yes" : "No"}
+        </span>
+      </td>
+      <td>{caseItem.consolidation}</td>
+      <td>{caseItem.eqcNumber ?? "N/A"}</td>
+      <td>{caseItem.bond}</td>
+      <td>
+        {caseItem.raffleDate
+          ? new Date(caseItem.raffleDate).toLocaleDateString()
+          : ""}
+      </td>
+      <td>{caseItem.committe1}</td>
+      <td>{caseItem.committe2}</td>
     </tr>
   );
 };
