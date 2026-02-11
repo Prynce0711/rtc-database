@@ -170,83 +170,119 @@ const LogsDashboard: React.FC = () => {
         </div>
 
         <div className="bg-base-100 rounded-xl border border-base-200">
-          <Table
-            className="p-0 text-base md:text-lg font-medium"
-            headers={[
+          {(() => {
+            const headers = [
               {
                 key: "userName",
                 label: "User",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "userRole",
                 label: "Role",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "action",
                 label: "Action",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "entityType",
                 label: "Entity",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "entityName",
                 label: "Entity Name",
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "description",
                 label: "Description",
                 className: "text-base md:text-lg font-semibold",
+                align: "center" as const,
               },
               {
                 key: "createdAt",
                 label: "Timestamp",
                 sortable: true,
-                className: "text-base md:text-lg font-semibold",
+                className: "text-base md:text-lg font-semibold text-right pr-4",
+                align: "right" as const,
               },
-            ]}
-            data={sortedLogs}
-            rowsPerPage={10}
-            sortConfig={sortConfig ?? undefined}
-            onSort={(k) => handleSort(k)}
-            renderRow={(log) => (
-              <tr
-                key={log.id}
-                className="hover:bg-base-200 align-middle cursor-pointer"
-                onClick={() => setSelectedLog(log)}
-              >
-                <td className="font-medium py-4 align-middle">
-                  {log.userName}
-                </td>
-                <td className="py-4 align-middle text-base-content/80 font-medium">
-                  {log.userRole}
-                </td>
-                <td className="py-4 align-middle text-base-content/80">
-                  {log.action}
-                </td>
-                <td className="py-4 align-middle">{log.entityType || "-"}</td>
-                <td className="py-4 align-middle">{log.entityName || "-"}</td>
-                <td
-                  className="py-4 align-middle max-w-4xl break-words text-base-content/80"
-                  title={log.description}
-                >
-                  {log.description}
-                </td>
-                <td className="py-4 align-middle whitespace-nowrap text-base-content/60">
-                  {new Date(log.createdAt).toLocaleString()}
-                </td>
-              </tr>
-            )}
-          />
+            ];
+
+            const getAlignClass = (key: string) => {
+              const a = headers.find((h) => h.key === key)?.align ?? "left";
+              if (a === "center") return "text-center";
+              if (a === "right") return "text-right";
+              return "text-left";
+            };
+
+            return (
+              <Table
+                className="p-0 text-base md:text-lg font-medium"
+                headers={headers}
+                data={sortedLogs}
+                rowsPerPage={10}
+                sortConfig={sortConfig ?? undefined}
+                onSort={(k) => handleSort(k as string)}
+                renderRow={(log) => (
+                  <tr
+                    key={log.id}
+                    className="hover:bg-base-200 align-middle cursor-pointer"
+                    onClick={() => setSelectedLog(log)}
+                  >
+                    <td
+                      className={`font-medium py-4 align-middle ${getAlignClass("userName")}`}
+                    >
+                      {log.userName}
+                    </td>
+                    <td
+                      className={`py-4 align-middle text-base-content/80 font-medium ${getAlignClass("userRole")}`}
+                    >
+                      {log.userRole}
+                    </td>
+                    <td
+                      className={`py-4 align-middle text-base-content/80 ${getAlignClass("action")}`}
+                    >
+                      {log.action}
+                    </td>
+                    <td
+                      className={`py-4 align-middle ${getAlignClass("entityType")}`}
+                    >
+                      {log.entityType || "-"}
+                    </td>
+                    <td
+                      className={`py-4 align-middle ${getAlignClass("entityName")}`}
+                    >
+                      {log.entityName || "-"}
+                    </td>
+                    <td
+                      className={`py-4 align-middle max-w-4xl break-words text-base-content/80 ${getAlignClass("description")}`}
+                      title={log.description}
+                    >
+                      {log.description}
+                    </td>
+                    <td
+                      className={`py-4 align-middle whitespace-nowrap text-base-content/60 pr-4 ${getAlignClass("createdAt")}`}
+                    >
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+              />
+            );
+          })()}
         </div>
 
         <div className="flex items-center justify-between">

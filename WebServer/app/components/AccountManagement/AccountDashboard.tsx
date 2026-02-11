@@ -29,7 +29,7 @@ const AccountDashboard = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [users, setUsers] = useState<User[]>([]);
-  const [activeView, setActiveView] = useState<"accounts" | "archive">(
+  const [activeView, setActiveView] = useState<"all" | "accounts" | "archive">(
     "accounts",
   );
 
@@ -73,6 +73,13 @@ const AccountDashboard = () => {
 
     if (roleFilter !== "all") {
       data = data.filter((u) => u.role === roleFilter);
+    }
+
+    // status filter based on activeView: accounts = ACTIVE, archive = INACTIVE, all = both
+    if (activeView === "accounts") {
+      data = data.filter((u) => u.status === Status.ACTIVE);
+    } else if (activeView === "archive") {
+      data = data.filter((u) => u.status === Status.INACTIVE);
     }
 
     data.sort((a, b) => {
@@ -262,6 +269,15 @@ const AccountDashboard = () => {
           </select>
 
           <div className="join">
+            <button
+              className={`btn btn-md join-item ${
+                activeView === "all" ? "btn-primary" : "btn-outline"
+              }`}
+              type="button"
+              onClick={() => setActiveView("all")}
+            >
+              All
+            </button>
             <button
               className={`btn btn-md join-item ${
                 activeView === "accounts" ? "btn-primary" : "btn-outline"
