@@ -484,7 +484,7 @@ const EmployeeDashboard: React.FC = () => {
           <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Employee Management
           </h1>
-          <p className="text-lg text-base-content/70">
+          <p className="text-xl text-base-content/70">
             Manage and track your organization's workforce
           </p>
         </div>

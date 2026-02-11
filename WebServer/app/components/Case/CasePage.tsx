@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
@@ -13,7 +14,6 @@ import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 
 type CaseFilterValues = {
   branch?: string;
@@ -399,7 +399,7 @@ const CasePage: React.FC = () => {
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Case Management
           </h2>
-          <p className="text-lg text-base-content/70">Manage all court cases</p>
+          <p className="text-xl text-base-content/70">Manage all court cases</p>
         </div>
         {/* Search and Add */}
         <div className="flex gap-4 mb-6">

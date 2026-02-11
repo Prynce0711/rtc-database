@@ -16,11 +16,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   className = "",
 }) => {
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen bg-base-100">
       <main className={`w-full px-8 py-8 ${className}`}>
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-base-content mb-2">{title}</h2>
-          {subtitle && <p className="opacity-70">{subtitle}</p>}
+          <h2 className="text-3xl font-bold text-base-content mb-2 text-4xl lg:text-5xl font-bold text-base-content mb-2">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xl text-base-content/70 ">{subtitle}</p>
+          )}
         </div>
 
         {children}
