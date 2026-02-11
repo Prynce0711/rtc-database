@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
           transition={{ duration: 0.2 }}
           className="min-h-screen p-6 lg:p-8"
         >
-          {children}
+          <>{children}</>
         </motion.main>
       </div>
 

@@ -26,42 +26,7 @@ import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 import EmployeeTable from "./EmployeeTable";
-
-interface KpiCardProps {
-  icon: React.ReactNode;
-  title: string;
-  value: string | number;
-  valueClassName?: string;
-  className?: string;
-}
-
-const KpiCard: React.FC<KpiCardProps> = ({
-  icon,
-  title,
-  value,
-  valueClassName,
-  className,
-}) => (
-  <div
-    className={`stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow ${
-      className ?? ""
-    }`}
-  >
-    <div className="stat-figure text-black text-xl md:text-2xl lg:text-xl">
-      {icon}
-    </div>
-    <div className="stat-title text-black font-medium text-base md:text-lg">
-      {title}
-    </div>
-    <div
-      className={`stat-value font-medium text-xl md:text-2xl lg:text-2xl ${
-        valueClassName ?? "text-black"
-      }`}
-    >
-      {value}
-    </div>
-  </div>
-);
+import KpiCard from "./KpiCard";
 
 const emptyEmployee = (): Partial<Employee> => ({
   employeeName: "",
@@ -208,83 +173,11 @@ const EmployeeDashboard: React.FC = () => {
 
     const missingEmail = employees.filter((e) => !e.email).length;
 
-    /* TIME-BASED */
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const addedToday = employees.filter((emp) => {
-      if (!emp.createdAt) return false;
-      const created = new Date(emp.createdAt);
-      return created >= today;
-    }).length;
-
-    const addedThisWeek = employees.filter((emp) => {
-      if (!emp.createdAt) return false;
-      const created = new Date(emp.createdAt);
-      return created >= weekAgo;
-    }).length;
-
-    const addedThisMonth = employees.filter((emp) => {
-      if (!emp.createdAt) return false;
-      const created = new Date(emp.createdAt);
-      return created >= monthAgo;
-    }).length;
-
-    /* BRANCH BREAKDOWN */
-    const branchCount: Record<string, number> = {};
-    employees.forEach((emp) => {
-      if (!emp.branch) return;
-      branchCount[emp.branch] = (branchCount[emp.branch] || 0) + 1;
-    });
-
-    const branchBreakdown = Object.entries(branchCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
-
-    /* RECENT EMPLOYEES */
-    const recentEmployees = [...employees]
-      .sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      })
-      .slice(0, 8);
-
-    /* UPCOMING BIRTHDAYS */
-    const upcomingBirthdays = employees
-      .filter((emp) => {
-        if (!emp.birthDate) return false;
-        const bday = new Date(emp.birthDate);
-        const thisYear = new Date(
-          now.getFullYear(),
-          bday.getMonth(),
-          bday.getDate(),
-        );
-        const daysDiff = Math.ceil(
-          (thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        return daysDiff >= 0 && daysDiff <= 30;
-      })
-      .sort((a, b) => {
-        const bdayA = new Date(a.birthDate!);
-        const bdayB = new Date(b.birthDate!);
-        return bdayA.getDate() - bdayB.getDate();
-      })
-      .slice(0, 6);
-
     return {
       totalEmployees,
       totalBranches,
       withMedical,
       missingEmail,
-      addedToday,
-      addedThisWeek,
-      addedThisMonth,
-      branchBreakdown,
-      recentEmployees,
-      upcomingBirthdays,
     };
   }, [employees]);
 
@@ -640,33 +533,23 @@ const EmployeeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* ===== MAIN GRID ===== */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 ">
-          {/* LEFT - Main Content */}
-          <div className="xl:col-span-9 space-y-6">
-            {/* KPI CARDS */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 ">
-              <KpiCard
-                title="Total Employees"
-                value={analytics.totalEmployees}
-              />
-              <KpiCard title="Branches" value={analytics.totalBranches} />
-              <KpiCard
-                title="Complete Profiles"
-                value={analytics.withMedical}
-              />
-              <KpiCard title="Pending" value={analytics.missingEmail} />
-            </div>
+        <div className="xl:col-span-9 space-y-6">
+          {/* KPI CARDS */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 ">
+            <KpiCard title="Total Employees" value={analytics.totalEmployees} />
+            <KpiCard title="Branches" value={analytics.totalBranches} />
+            <KpiCard title="Complete Profiles" value={analytics.withMedical} />
+            <KpiCard title="Pending" value={analytics.missingEmail} />
+          </div>
 
-            {/* TABLE */}
-            <div className="rounded-2xl shadow-lg border border-base-100  overflow-hidden">
-              <EmployeeTable
-                employees={filtered}
-                bloodTypeMap={bloodTypeMap}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            </div>
+          {/* TABLE */}
+          <div className="rounded-2xl shadow-lg border border-base-100  overflow-hidden">
+            <EmployeeTable
+              employees={filtered}
+              bloodTypeMap={bloodTypeMap}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
           </div>
         </div>
 
