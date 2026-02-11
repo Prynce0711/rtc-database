@@ -3,6 +3,8 @@
 import { Case } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { CaseModalType } from "./CaseModal";
 
 const CaseRow = ({
@@ -25,63 +27,67 @@ const CaseRow = ({
 
   return (
     <tr
-      key={caseItem.id}
-      className="hover:bg-base-200 cursor-pointer transition-colors"
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
       onClick={() => onRowClick(caseItem)}
     >
-      {/* <td>{caseItem.caseNumber}</td>
-      <td>{caseItem.name}</td>
-      <td>{caseItem.charge}</td>
-      <td>{caseItem.branch}</td>
-      <td>{caseItem.assistantBranch}</td>
-      <td>{caseItem.court}</td> */}
+      {/* ACTIONS */}
       {isAdminOrAtty && (
-        <td onClick={(e) => e.stopPropagation()}>
-          <div className="flex gap-2">
+        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-center gap-1">
             <button
-              className="btn btn-sm btn-ghost"
+              className="btn btn-xs btn-ghost text-info hover:bg-info/10"
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedCase(caseItem);
                 showModal(CaseModalType.EDIT);
               }}
             >
-              Edit
+              <FiEdit size={15} />
             </button>
+
             <button
-              className="btn btn-sm btn-error btn-ghost"
+              className="btn btn-xs btn-ghost text-error hover:bg-error/10"
               onClick={(e) => {
                 e.stopPropagation();
                 handleDeleteCase(caseItem.caseNumber);
               }}
             >
-              Delete
+              <FiTrash2 size={15} />
             </button>
           </div>
         </td>
       )}
 
-      <td>{caseItem.branch}</td>
-      <td>{caseItem.assistantBranch}</td>
-      <td>{caseItem.caseNumber}</td>
-      <td>{new Date(caseItem.dateFiled).toLocaleDateString()}</td>
-      <td>{caseItem.name}</td>
+      {/* DATA CELLS */}
+      <td className="text-center">{caseItem.branch}</td>
+      <td className="text-center">{caseItem.assistantBranch}</td>
+      <td className="font-semibold text-center">{caseItem.caseNumber}</td>
+      <td className="text-center text-base-content/70">
+        {new Date(caseItem.dateFiled).toLocaleDateString()}
+      </td>
+      <td className="font-medium">{caseItem.name}</td>
       <td>{caseItem.charge}</td>
       <td>{caseItem.infoSheet}</td>
       <td>{caseItem.court}</td>
-      <td>
+
+      {/* DETENTION STATUS (GLASS STYLE) */}
+      <td className="text-center">
         <span
-          className={`badge ${
-            caseItem.detained ? "badge-warning" : "badge-success"
-          }`}
+          className={`px-3 py-1 rounded-full backdrop-blur-md border text-xs font-medium
+            ${
+              caseItem.detained
+                ? "bg-red-500/15 text-red-600 border-red-400/30"
+                : "bg-emerald-500/15 text-emerald-600 border-emerald-400/30"
+            }`}
         >
-          {caseItem.detained ? "Yes" : "No"}
+          {caseItem.detained ? "Detained" : "Free"}
         </span>
       </td>
-      <td>{caseItem.consolidation}</td>
-      <td>{caseItem.eqcNumber ?? "N/A"}</td>
-      <td>{caseItem.bond}</td>
-      <td>
+
+      <td className="text-center">{caseItem.consolidation}</td>
+      <td className="text-center">{caseItem.eqcNumber ?? "N/A"}</td>
+      <td className="text-center">{caseItem.bond}</td>
+      <td className="text-center text-base-content/70">
         {caseItem.raffleDate
           ? new Date(caseItem.raffleDate).toLocaleDateString()
           : ""}
