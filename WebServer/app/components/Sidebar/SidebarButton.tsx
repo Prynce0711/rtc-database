@@ -20,7 +20,7 @@ const SidebarButton = ({
       href={`/user/${href}`}
       className={`group flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-200 ${
         isActive
-          ? "bg-primary text-primary-content shadow-lg scale-[1.02]"
+          ? "bg-primary text-primary-content "
           : "text-base-content/70 hover:bg-base-300 hover:text-base-content hover:scale-[1.01]"
       }`}
     >
