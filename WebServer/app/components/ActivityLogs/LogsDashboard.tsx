@@ -42,9 +42,9 @@ const LogsDashboard: React.FC = () => {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [nameFilter, setNameFilter] = useState("");
-  const [selectedLog, setSelectedLog] = useState<null | (typeof SAMPLE_LOGS)[number]>(
-    null,
-  );
+  const [selectedLog, setSelectedLog] = useState<
+    null | (typeof SAMPLE_LOGS)[number]
+  >(null);
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     order: "asc" | "desc";
@@ -126,7 +126,7 @@ const LogsDashboard: React.FC = () => {
           Review user activities and system changes across the platform.
         </p>
       </div>
-      <div className="bg-base-100 rounded-2xl shadow p-6 md:p-8 space-y-6 w-full">
+      <div className="space-y-6 w-full">
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="flex-1 relative">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/50" />
@@ -134,7 +134,7 @@ const LogsDashboard: React.FC = () => {
               placeholder="Search by user, entity or description..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input input-bordered input-md w-full pl-12 bg-base-200 h-12 text-base md:text-lg"
+              className="input input-bordered input-md w-full pl-12 bg-base-100 h-12 text-base md:text-lg"
             />
           </div>
 
@@ -356,7 +356,10 @@ const LogsDashboard: React.FC = () => {
             </div>
 
             <div className="modal-action px-6 pb-6">
-              <button className="btn btn-primary" onClick={() => setSelectedLog(null)}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setSelectedLog(null)}
+              >
                 Close
               </button>
             </div>
