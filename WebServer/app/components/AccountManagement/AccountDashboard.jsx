@@ -40,6 +40,7 @@ const AccountDashboard = () => {
 
   const [auditLogs, setAuditLogs] = useState([]);
   const [activeView, setActiveView] = useState("accounts");
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const [users, setUsers] = useState([
     {
@@ -140,6 +141,23 @@ const AccountDashboard = () => {
       { id: Date.now(), message: msg, time: new Date() },
       ...prev,
     ]);
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = (ids) => {
+    const allSelected = ids.every((id) => selectedIds.includes(id));
+    setSelectedIds(
+      allSelected
+        ? selectedIds.filter((id) => !ids.includes(id))
+        : [...new Set([...selectedIds, ...ids])],
+    );
+  };
+
+  const requestBulkDeactivate = () =>
+    setConfirmAction({ type: "bulkDeactivate" });
 
   /* ===== ACTION REQUESTS ===== */
   const requestRoleChange = (user, newRole) =>
@@ -197,6 +215,16 @@ const AccountDashboard = () => {
         ),
       );
       logAction(`User deactivated: ${confirmAction.user.name}`);
+    }
+    if (confirmAction.type === "bulkDeactivate") {
+      setUsers((prev) =>
+        prev.map((u) =>
+          selectedIds.includes(u.id)
+            ? { ...u, status: "Inactive", updatedAt: new Date() }
+            : u,
+        ),
+      );
+      setSelectedIds([]);
     }
 
     setConfirmAction(null);
@@ -284,6 +312,23 @@ const AccountDashboard = () => {
             </button>
           </div>
         </div>
+        {canManage && selectedIds.length > 0 && activeView === "accounts" && (
+          <div className="flex gap-2 mb-3">
+            <button
+              className="btn btn-error btn-sm"
+              onClick={requestBulkDeactivate}
+            >
+              Deactivate Selected ({selectedIds.length})
+            </button>
+
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => setSelectedIds([])}
+            >
+              Deselect All
+            </button>
+          </div>
+        )}
 
         {activeView === "archive" ? (
           <div className="mb-6">
@@ -298,6 +343,25 @@ const AccountDashboard = () => {
               <table className="table table-zebra text-base md:text-lg">
                 <thead>
                   <tr>
+                    {canManage && (
+                      <th>
+                        <input
+                          type="checkbox"
+                          className="checkbox"
+                          onChange={() =>
+                            toggleSelectAll(
+                              paginatedUsers
+                                .filter((u) => u.status === "Active")
+                                .map((u) => u.id),
+                            )
+                          }
+                          checked={paginatedUsers
+                            .filter((u) => u.status === "Active")
+                            .every((u) => selectedIds.includes(u.id))}
+                        />
+                      </th>
+                    )}
+
                     <th className="font-medium">Name</th>
                     <th className="font-medium">Email</th>
                     <th className="font-medium">Role</th>
@@ -390,6 +454,19 @@ const AccountDashboard = () => {
                 <tbody>
                   {paginatedUsers.map((user) => (
                     <tr key={user.id}>
+                      {canManage && (
+                        <td>
+                          {user.status === "Active" && (
+                            <input
+                              type="checkbox"
+                              className="checkbox"
+                              checked={selectedIds.includes(user.id)}
+                              onChange={() => toggleSelect(user.id)}
+                            />
+                          )}
+                        </td>
+                      )}
+
                       <td className="flex items-center gap-2 text-lg md:text-xl font-normal">
                         {user.name}
                       </td>
@@ -438,7 +515,7 @@ const AccountDashboard = () => {
                               className="btn btn-sm btn-error"
                               onClick={() => requestDeactivate(user)}
                             >
-                              Deactivate
+                              Archive
                             </button>
                           )}
                         </td>
