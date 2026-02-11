@@ -69,9 +69,9 @@ const Table: React.FC<{
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto">
-        <table className="table table-compact w-full">
-          <thead>
+      <div className="overflow-x-auto ">
+        <table className="table  table-compact w-full text-center">
+          <thead className="bg-base-300 text-base ">
             <tr>
               {headers.map((h) => (
                 <th
@@ -81,7 +81,7 @@ const Table: React.FC<{
                   {h.sortable ? (
                     <button
                       type="button"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 mx-auto"
                       onClick={() => onSort && onSort(h.key)}
                     >
                       <span className="text-xl font-semibold">{h.label}</span>

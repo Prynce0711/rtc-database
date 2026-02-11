@@ -86,3 +86,9 @@
     "Liberation Sans",
     sans-serif;
 }
+
+@layer base {
+  html {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui;
+  }
+}

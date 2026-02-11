@@ -551,7 +551,7 @@ const EmployeeDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200">
+    <div className="min-h-screen  bg-base-100 from-base-200 via-base-100 to-base-200 ">
       <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         {/* ===== HEADER ===== */}
         <div className="mb-8">
@@ -568,7 +568,7 @@ const EmployeeDashboard: React.FC = () => {
           <div className="relative flex-1">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
             <input
-              className="input input-bordered input-lg w-full pl-12 bg-base-300 text-base"
+              className="input input-bordered input-lg w-full pl-12  text-base"
               placeholder="Search by name, employee #, position, branch..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -627,16 +627,6 @@ const EmployeeDashboard: React.FC = () => {
 
             {/* TABLE */}
             <div className="rounded-2xl shadow-lg border border-base-100  overflow-hidden">
-              <div className="p-6 border-b border-base-200">
-                <h2 className="text-2xl font-bold text-base-content">
-                  Employee Directory
-                </h2>
-                <p className="text-base text-base-content/70 mt-1">
-                  {filtered.length} employee{filtered.length !== 1 ? "s" : ""}{" "}
-                  found
-                </p>
-              </div>
-
               <EmployeeTable
                 employees={filtered}
                 bloodTypeMap={bloodTypeMap}
@@ -658,9 +648,7 @@ const EmployeeDashboard: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-4 border-b border-base-200">
                     <div>
-                      <p className="text-base font-bold text-base-content">
-                        Today
-                      </p>
+                      <p className=" font-medium text-base-content">Today</p>
                       <p className="text-sm text-base-content/60 mt-1">
                         New additions
                       </p>
@@ -672,7 +660,7 @@ const EmployeeDashboard: React.FC = () => {
 
                   <div className="flex justify-between items-center pb-4 border-b border-base-200">
                     <div>
-                      <p className="text-base font-bold text-base-content">
+                      <p className="text-base font-medium text-base-content">
                         This Week
                       </p>
                       <p className="text-sm text-base-content/60 mt-1">
@@ -686,7 +674,7 @@ const EmployeeDashboard: React.FC = () => {
 
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-base font-bold text-base-content">
+                      <p className="text-base font-medium text-base-content">
                         This Month
                       </p>
                       <p className="text-sm text-base-content/60 mt-1">
@@ -713,7 +701,7 @@ const EmployeeDashboard: React.FC = () => {
                         key={emp.id}
                         className="pb-3 border-b border-base-200 last:border-0 last:pb-0"
                       >
-                        <p className="font-bold text-base text-base-content truncate">
+                        <p className="font-medium text-base text-base-content truncate">
                           {emp.employeeName}
                         </p>
                         <div className="flex justify-between items-center mt-1">
