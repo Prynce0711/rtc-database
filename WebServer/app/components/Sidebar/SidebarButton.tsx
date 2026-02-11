@@ -18,15 +18,27 @@ const SidebarButton = ({
   return (
     <Link
       href={`/user/${href}`}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-        ${
-          isActive
-            ? "bg-primary text-primary-content shadow-md"
-            : "text-base-content/70 hover:bg-base-300"
-        }`}
+      className={`group flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-200 ${
+        isActive
+          ? "bg-primary text-primary-content shadow-lg scale-[1.02]"
+          : "text-base-content/70 hover:bg-base-300 hover:text-base-content hover:scale-[1.01]"
+      }`}
     >
-      <span className="text-xl">{icon}</span>
-      <span className="text-sm font-semibold">{label}</span>
+      <span
+        className={`text-2xl transition-transform duration-200 ${
+          isActive ? "" : "group-hover:scale-110"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="text-base font-bold tracking-wide">{label}</span>
+
+      {/* Active Indicator */}
+      {isActive && (
+        <div className="ml-auto">
+          <div className="h-2 w-2 rounded-full bg-primary-content animate-pulse" />
+        </div>
+      )}
     </Link>
   );
 };

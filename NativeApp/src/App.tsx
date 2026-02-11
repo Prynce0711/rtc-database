@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import "./App.css";
 
@@ -8,12 +10,12 @@ interface BackendInfo {
   lastSeen: number;
 }
 
-function App() {
+export default function App() {
   const [status, setStatus] = useState<"locating" | "located" | "loading">(
     "locating",
   );
   const [backendUrl, setBackendUrl] = useState<string | null>(null);
-  const [isDevMode] = useState(() => import.meta.env.DEV);
+  const [isDevMode] = useState(() => process.env.NODE_ENV === "development");
 
   useEffect(() => {
     let isSubscribed = true;
@@ -69,8 +71,11 @@ function App() {
 
       if (!localhostWorked && isSubscribed) {
         // Listen for backend discovery from main process
-        if (window.ipcRenderer?.onBackend) {
-          window.ipcRenderer.onBackend((backend: BackendInfo) => {
+        if (
+          typeof window !== "undefined" &&
+          (window as any).ipcRenderer?.onBackend
+        ) {
+          (window as any).ipcRenderer.onBackend((backend: BackendInfo) => {
             if (!isSubscribed) return;
 
             console.log("✅ Backend discovered:", backend);
@@ -96,158 +101,51 @@ function App() {
   }, [isDevMode]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-8">
-      <div className="max-w-md w-full">
-        <div className="flex flex-col items-center text-center gap-6">
-          {status === "locating" && (
-            <>
-              <div className="relative h-[200px] w-full">
-                <div className="loader">
-                  <span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <div className="base">
-                    <span></span>
-                    <div className="face"></div>
-                  </div>
-                </div>
-                <div className="longfazers">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Locating Backend
-                </h1>
-                <div className="flex items-center justify-center gap-2 text-gray-600">
-                  <p>Listening for server broadcasts</p>
-                </div>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 w-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="stroke-blue-600 shrink-0 w-6 h-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
-                <span className="text-sm text-blue-800 text-left">
-                  {isDevMode
-                    ? "Checked localhost:3000, now listening for broadcasts"
-                    : "Broadcast discovery active on port 41234"}
-                </span>
-              </div>
-            </>
-          )}
+    <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center gap-6 animate-fade-in">
+      {/* SPEEDER ANIMATION */}
+      <div className="relative flex justify-center items-center h-56">
+        <div className="transform scale-125">
+          <div className="loader">
+            <span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
 
-          {status === "located" && backendUrl && (
-            <>
-              <div className="relative h-[200px] w-full">
-                <div className="loader">
-                  <span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <div className="base">
-                    <span></span>
-                    <div className="face"></div>
-                  </div>
-                </div>
-                <div className="longfazers">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h1 className="text-3xl font-bold text-green-600">
-                  Backend Located!
-                </h1>
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 rounded-full">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    className="inline-block w-4 h-4 stroke-green-700 stroke-2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                  </svg>
-                  <span className="font-semibold text-green-700">
-                    Connected
-                  </span>
-                </div>
-              </div>
-              <div className="w-full bg-gray-900 text-gray-100 rounded-lg p-4">
-                <pre className="text-sm font-mono overflow-x-auto">
-                  <code>{backendUrl}</code>
-                </pre>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
-                <p className="text-sm text-gray-600">Loading in 2 seconds...</p>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div className="bg-green-500 h-full w-full"></div>
-              </div>
-            </>
-          )}
-
-          {status === "loading" && (
-            <>
-              <div className="relative h-[200px] w-full">
-                <div className="loader">
-                  <span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <div className="base">
-                    <span></span>
-                    <div className="face"></div>
-                  </div>
-                </div>
-                <div className="longfazers">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Loading Backend
-                </h1>
-                <p className="text-gray-600">Connecting to server...</p>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                <div className="bg-blue-500 h-full w-full animate-pulse"></div>
-              </div>
-            </>
-          )}
+            <div className="base">
+              <span></span>
+              <div className="face"></div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* LABEL */}
+      <div className="text-center space-y-2">
+        {status === "locating" && (
+          <>
+            <p className="text-xl font-semibold">Locating backend...</p>
+            <p className="text-sm opacity-70">
+              Listening for server broadcasts
+            </p>
+          </>
+        )}
+
+        {status === "located" && (
+          <>
+            <p className="text-xl font-semibold text-success">Backend found!</p>
+            <p className="text-sm opacity-70">Preparing connection...</p>
+          </>
+        )}
+
+        {status === "loading" && (
+          <>
+            <p className="text-xl font-semibold">Connecting to server...</p>
+            <p className="text-sm opacity-70">Establishing secure connection</p>
+          </>
+        )}
       </div>
     </div>
   );
 }
-
-export default App;

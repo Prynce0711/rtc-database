@@ -478,32 +478,28 @@ const CasePage: React.FC = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medium text-center">
           <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base font-bold text-base mb-3 mb-5">
-              Total Cases
-            </div>
+            <div className="text-base-content font-bold mb-5">TOTAL CASES</div>
             <div className="text-5xl font-bold text-primary">
               {stats.totalCases}
             </div>
           </div>
           <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base font-bold text-base mb-3 mb-5">
-              Detained
-            </div>
+            <div className="text-base-content font-bold mb-5">DETAINED</div>
             <div className="text-5xl font-bold text-primary">
               {stats.detainedCases}
             </div>
           </div>
           <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base font-bold text-base mb-3  mb-5">
-              Pending Raffle
+            <div className="text-base-content font-bold mb-5">
+              PENDING RAFFLE
             </div>
             <div className="text-5xl font-bold text-primary">
               {stats.pendingCases}
             </div>
           </div>
           <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base font-bold text-base mb-3 mb-5">
-              Recently Filed
+            <div className="text-base-content font-bold mb-5">
+              RECENTLY FILED
             </div>
             <div className="text-5xl font-bold text-primary">
               {stats.recentlyFiled}
