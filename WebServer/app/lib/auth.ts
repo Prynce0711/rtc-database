@@ -19,6 +19,10 @@ export const auth = betterAuth({
         type: "string",
         input: false,
       },
+      status: {
+        type: "string",
+        input: false,
+      },
     },
   },
   session: {
@@ -30,3 +34,4 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
+export type User = typeof auth.$Infer.Session.user;

@@ -525,10 +525,10 @@ const CasePage: React.FC = () => {
             data={filteredAndSortedCases}
             rowsPerPage={10}
             sortConfig={{
-              key: sortConfig.key as string,
+              key: sortConfig.key,
               order: sortConfig.order,
             }}
-            onSort={(k) => handleSort(k as keyof Case)}
+            onSort={(k) => handleSort(k)}
             renderRow={(caseItem) => (
               <CaseRow
                 key={caseItem.id}

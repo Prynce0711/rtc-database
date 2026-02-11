@@ -2,27 +2,33 @@
 
 import React, { useMemo, useState } from "react";
 
-type Header = {
+type Header<T extends Record<string, unknown>> = {
   key: string;
   label: React.ReactNode;
   sortable?: boolean;
+  sortKey?: keyof T;
   className?: string;
   align?: "left" | "center" | "right";
 };
 
-type SortConfig = { key: string; order: "asc" | "desc" } | null;
+type SortConfig<T extends Record<string, unknown>> = {
+  key: keyof T;
+  order: "asc" | "desc";
+} | null;
 
-const Table: React.FC<{
-  headers: Header[];
-  data: any[];
-  renderRow: (item: any, index: number) => React.ReactNode;
+type TableProps<T extends Record<string, unknown>> = {
+  headers: Header<T>[];
+  data: T[];
+  renderRow: (item: T, index: number) => React.ReactNode;
   rowsPerPage?: number;
   initialPage?: number;
   showPagination?: boolean;
-  sortConfig?: SortConfig;
-  onSort?: (key: string) => void;
+  sortConfig?: SortConfig<T>;
+  onSort?: (key: keyof T) => void;
   className?: string;
-}> = ({
+};
+
+const Table = <T extends Record<string, unknown>>({
   headers,
   data,
   renderRow,
@@ -32,7 +38,7 @@ const Table: React.FC<{
   sortConfig,
   onSort,
   className,
-}) => {
+}: TableProps<T>) => {
   const [page, setPage] = useState(initialPage);
 
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
@@ -82,10 +88,14 @@ const Table: React.FC<{
                     <button
                       type="button"
                       className="flex items-center gap-2"
-                      onClick={() => onSort && onSort(h.key)}
+                      onClick={() => {
+                        if (!onSort) return;
+                        const key = h.sortKey ?? (h.key as keyof T);
+                        onSort(key);
+                      }}
                     >
                       <span className="text-xl font-semibold">{h.label}</span>
-                      {sortConfig?.key === h.key ? (
+                      {sortConfig?.key === (h.sortKey ?? h.key) ? (
                         <span>{sortConfig.order === "asc" ? "↑" : "↓"}</span>
                       ) : null}
                     </button>
