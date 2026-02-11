@@ -1,11 +1,5 @@
-import EmployeeDashboard from "../components/Employee/EmployeeDashboard";
-
 const page = () => {
-.  return (
-    <>
-      <EmployeeDashboard />
-    </>
-  );
+  return <></>;
 };
 
 export default page;

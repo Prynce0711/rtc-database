@@ -4,10 +4,7 @@ import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "../Filter/FilterModal";
+import FilterModal from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
@@ -16,6 +13,7 @@ import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 
 type CaseFilterValues = {
   branch?: string;
@@ -541,10 +539,10 @@ const CasePage: React.FC = () => {
             data={filteredAndSortedCases}
             rowsPerPage={10}
             sortConfig={{
-              key: sortConfig.key as string,
+              key: sortConfig.key,
               order: sortConfig.order,
             }}
-            onSort={(k) => handleSort(k as keyof Case)}
+            onSort={(k) => handleSort(k)}
             renderRow={(caseItem) => (
               <CaseRow
                 key={caseItem.id}

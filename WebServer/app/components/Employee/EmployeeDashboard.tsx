@@ -22,13 +22,45 @@ import {
   FiX,
 } from "react-icons/fi";
 
-import EmployeeTable from "@/app/components/Employee/EmployeeTable";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "@/app/components/Filter/FilterModal";
+import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
-import KpiCard from "./KpiCard";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+
+interface KpiCardProps {
+  icon: React.ReactNode;
+  title: string;
+  value: string | number;
+  valueClassName?: string;
+  className?: string;
+}
+
+const KpiCard: React.FC<KpiCardProps> = ({
+  icon,
+  title,
+  value,
+  valueClassName,
+  className,
+}) => (
+  <div
+    className={`stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow ${
+      className ?? ""
+    }`}
+  >
+    <div className="stat-figure text-black text-xl md:text-2xl lg:text-xl">
+      {icon}
+    </div>
+    <div className="stat-title text-black font-medium text-base md:text-lg">
+      {title}
+    </div>
+    <div
+      className={`stat-value font-medium text-xl md:text-2xl lg:text-2xl ${
+        valueClassName ?? "text-black"
+      }`}
+    >
+      {value}
+    </div>
+  </div>
+);
 
 const emptyEmployee = (): Partial<Employee> => ({
   employeeName: "",
