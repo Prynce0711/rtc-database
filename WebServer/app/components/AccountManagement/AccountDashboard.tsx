@@ -29,9 +29,6 @@ const AccountDashboard = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [users, setUsers] = useState<User[]>([]);
-  const [activeView, setActiveView] = useState<"all" | "accounts" | "archive">(
-    "accounts",
-  );
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -267,36 +264,6 @@ const AccountDashboard = () => {
             <option value={Roles.USER}>Staff</option>
             <option value={Roles.ATTY}>Atty</option>
           </select>
-
-          <div className="join">
-            <button
-              className={`btn btn-md join-item ${
-                activeView === "all" ? "btn-primary" : "btn-outline"
-              }`}
-              type="button"
-              onClick={() => setActiveView("all")}
-            >
-              All
-            </button>
-            <button
-              className={`btn btn-md join-item ${
-                activeView === "accounts" ? "btn-primary" : "btn-outline"
-              }`}
-              type="button"
-              onClick={() => setActiveView("accounts")}
-            >
-              Accounts
-            </button>
-            <button
-              className={`btn btn-md join-item ${
-                activeView === "archive" ? "btn-primary" : "btn-outline"
-              }`}
-              type="button"
-              onClick={() => setActiveView("archive")}
-            >
-              Archive
-            </button>
-          </div>
 
           {canManage && selectedIds.length > 0 && (
             <>
