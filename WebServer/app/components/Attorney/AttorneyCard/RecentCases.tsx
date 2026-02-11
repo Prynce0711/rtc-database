@@ -26,10 +26,13 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
     <div className="bg-base-100 rounded-lg shadow p-6">
       {/* Header with title and optional View All button */}
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold">Recent Cases</h3>
+        <h3 className="text-3xl font-bold">Recent Cases</h3>
         {/* Only show View All button if callback is provided */}
         {onViewAll && (
-          <button className="btn btn-sm btn-ghost" onClick={onViewAll}>
+          <button
+            className="btn btn-sm btn-ghost font-black text-md"
+            onClick={onViewAll}
+          >
             View All →
           </button>
         )}
@@ -37,7 +40,7 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
       {/* Scrollable table container for mobile responsiveness */}
       <div className="overflow-x-auto">
         <table className="table table-sm">
-          <thead>
+          <thead className="text-xl bg-base-300">
             <tr>
               <th>Case Number</th>
               <th>Name</th>
@@ -51,15 +54,15 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
             {/* Show empty state message if no cases */}
             {cases.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center opacity-50">
+                <td colSpan={6} className="text-center text-xl opacity-50">
                   No recent cases
                 </td>
               </tr>
             ) : (
               /* Map through cases and display each row */
               cases.map((caseItem) => (
-                <tr key={caseItem.id} className="hover">
-                  <td className="font-medium">{caseItem.caseNumber}</td>
+                <tr key={caseItem.id} className="hover text-lg">
+                  <td className="font-medium text-lg">{caseItem.caseNumber}</td>
                   <td>{caseItem.name}</td>
                   <td>{caseItem.charge}</td>
                   <td>{caseItem.branch}</td>
@@ -67,7 +70,7 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
                   <td>
                     {/* Status badge: warning for detained, success for free */}
                     <span
-                      className={`badge badge-sm ${
+                      className={`badge badge-md  ${
                         caseItem.detained ? "badge-warning" : "badge-success"
                       }`}
                     >
