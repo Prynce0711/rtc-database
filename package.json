@@ -13,9 +13,9 @@
     "seed": "concurrently --kill-others-on-success \"pnpm --filter rtc-database-webserver dev\" \"node -e 'setTimeout(() => {}, 3000)' && pnpm --filter rtc-database-webserver exec prisma db seed\""
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.2.1"
   },
   "dependencies": {
-    "framer-motion": "^12.31.0"
+    "framer-motion": "^12.34.0"
   }
 }
