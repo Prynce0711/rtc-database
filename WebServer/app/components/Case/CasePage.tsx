@@ -6,6 +6,8 @@ import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
 import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+
+import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
@@ -72,9 +74,18 @@ const CasePage: React.FC = () => {
     { key: "raffleDate", label: "Raffle Date", type: "daterange" },
   ];
 
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 25;
+
+  // Reset to page 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, appliedFilters]);
+
   // Fetch cases from API
   useEffect(() => {
     fetchCases();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCases = async () => {
@@ -101,7 +112,8 @@ const CasePage: React.FC = () => {
 
   const filteredAndSortedCases = useMemo(() => {
     // Start with advanced filtered cases if filters are applied, otherwise use all cases
-    const baseList = cases;
+    const baseList =
+      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
 
     let filtered = baseList;
 
@@ -113,7 +125,17 @@ const CasePage: React.FC = () => {
       );
     }
     return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig, filteredByAdvanced]);
+  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+
+  const totalItems = filteredAndSortedCases.length;
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Paginated data for current page
+  const paginatedCases = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredAndSortedCases.slice(startIndex, endIndex);
+  }, [filteredAndSortedCases, currentPage, pageSize]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
@@ -511,17 +533,18 @@ const CasePage: React.FC = () => {
         <div className="bg-base-100  rounded-lg shadow">
           <Table
             headers={[
-              { key: "caseNumber", label: "Case Number", sortable: true },
-              { key: "name", label: "Name", sortable: true, align: "center" },
-              { key: "charge", label: "Charge", sortable: true },
-              { key: "branch", label: "Branch", sortable: true },
-              {
-                key: "detained",
-                label: "Detained",
-                sortable: true,
-                align: "center",
-              },
-              { key: "dateFiled", label: "Date Filed", sortable: true },
+              // { key: "caseNumber", label: "Case Number", sortable: true },
+              // { key: "name", label: "Name", sortable: true, align: "center" },
+              // { key: "charge", label: "Charge", sortable: true },
+              // { key: "branch", label: "Branch", sortable: true },
+              // {
+              //   key: "assistantBranch",
+              //   label: "Assistant Branch",
+              //   sortable: true,
+              // },
+              // { key: "court", label: "Court", sortable: true },
+              //BUTTON FOR ACTIONS
+
               ...(isAdminOrAtty
                 ? [
                     {
@@ -531,8 +554,38 @@ const CasePage: React.FC = () => {
                     },
                   ]
                 : []),
+              { key: "branch", label: "Branch", sortable: true },
+              {
+                key: "assistantBranch",
+                label: "Assistant Branch",
+                sortable: true,
+              },
+              { key: "caseNumber", label: "Case Number", sortable: true },
+              { key: "dateFiled", label: "Date Filed", sortable: true },
+              { key: "name", label: "Name", sortable: true },
+              { key: "charge", label: "Charge", sortable: true },
+              { key: "infoSheet", label: "Info Sheet", sortable: true },
+              { key: "court", label: "Court", sortable: true },
+              {
+                key: "detained",
+                label: "Detained",
+                sortable: true,
+                align: "center",
+              },
+
+              {
+                key: "consolidation",
+                label: "Consolidation",
+                sortable: true,
+              },
+
+              { key: "eqcNumber", label: "EQC Number", sortable: true },
+              { key: "bond", label: "Bond", sortable: true },
+              { key: "raffleDate", label: "Raffle Date", sortable: true },
+              { key: "committe1", label: "Committe 1", sortable: true },
+              { key: "committe2", label: "Committe 2", sortable: true },
             ]}
-            data={filteredAndSortedCases}
+            data={paginatedCases}
             rowsPerPage={10}
             sortConfig={{
               key: sortConfig.key,
@@ -549,6 +602,18 @@ const CasePage: React.FC = () => {
                 onRowClick={handleRowClick}
               />
             )}
+          />
+        </div>
+
+        {/* Pagination */}
+        <div className="mt-4 flex justify-end">
+          <Pagination
+            pageCount={pageCount}
+            currentPage={currentPage}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           />
         </div>
 
