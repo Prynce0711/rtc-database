@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import { DashboardCard, QuickActions, RecentCases } from "./AdminCard";
+import { DashboardCard, RecentCases } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";
 
 interface AdminDashboardProps {
@@ -233,11 +233,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
           }
           color="success"
         />
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <QuickActions actions={quickActions} />
       </div>
 
       {/* Recent Cases */}

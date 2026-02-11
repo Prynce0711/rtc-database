@@ -96,32 +96,45 @@ function App() {
   }, [isDevMode]);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-primary via-secondary to-accent flex items-center justify-center p-8">
-      <div className="card bg-base-100 shadow-2xl max-w-md w-full">
-        <div className="card-body items-center text-center gap-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-8">
+      <div className="max-w-md w-full">
+        <div className="flex flex-col items-center text-center gap-6">
           {status === "locating" && (
             <>
-              <div className="relative">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
-                <div className="absolute inset-0 flex items-center justify-center text-4xl animate-pulse">
-                  🔍
+              <div className="relative h-[200px] w-full">
+                <div className="loader">
+                  <span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  <div className="base">
+                    <span></span>
+                    <div className="face"></div>
+                  </div>
+                </div>
+                <div className="longfazers">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
                 </div>
               </div>
               <div className="space-y-3">
-                <h1 className="card-title text-3xl font-bold">
+                <h1 className="text-3xl font-bold text-gray-900">
                   Locating Backend
                 </h1>
-                <div className="flex items-center gap-2 text-base-content/70">
-                  <span className="loading loading-dots loading-sm"></span>
+                <div className="flex items-center justify-center gap-2 text-gray-600">
                   <p>Listening for server broadcasts</p>
                 </div>
               </div>
-              <div className="alert alert-info">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 w-full">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
-                  className="stroke-current shrink-0 w-6 h-6"
+                  className="stroke-blue-600 shrink-0 w-6 h-6"
                 >
                   <path
                     strokeLinecap="round"
@@ -130,7 +143,7 @@ function App() {
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   ></path>
                 </svg>
-                <span className="text-sm">
+                <span className="text-sm text-blue-800 text-left">
                   {isDevMode
                     ? "Checked localhost:3000, now listening for broadcasts"
                     : "Broadcast discovery active on port 41234"}
@@ -141,55 +154,94 @@ function App() {
 
           {status === "located" && backendUrl && (
             <>
-              <div className="text-6xl animate-bounce">✅</div>
+              <div className="relative h-[200px] w-full">
+                <div className="loader">
+                  <span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  <div className="base">
+                    <span></span>
+                    <div className="face"></div>
+                  </div>
+                </div>
+                <div className="longfazers">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
               <div className="space-y-3">
-                <h1 className="card-title text-3xl font-bold text-success">
+                <h1 className="text-3xl font-bold text-green-600">
                   Backend Located!
                 </h1>
-                <div className="badge badge-success badge-lg gap-2 px-4 py-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 rounded-full">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
-                    className="inline-block w-4 h-4 stroke-current"
+                    className="inline-block w-4 h-4 stroke-green-700 stroke-2"
                   >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth="2"
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     ></path>
                   </svg>
-                  Connected
+                  <span className="font-semibold text-green-700">
+                    Connected
+                  </span>
                 </div>
               </div>
-              <div className="mockup-code w-full bg-neutral text-neutral-content">
-                <pre className="px-6">
-                  <code className="text-sm">{backendUrl}</code>
+              <div className="w-full bg-gray-900 text-gray-100 rounded-lg p-4">
+                <pre className="text-sm font-mono overflow-x-auto">
+                  <code>{backendUrl}</code>
                 </pre>
               </div>
               <div className="flex items-center gap-2">
-                <span className="loading loading-ring loading-md"></span>
-                <p className="text-sm opacity-70">Loading in 2 seconds...</p>
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+                <p className="text-sm text-gray-600">Loading in 2 seconds...</p>
               </div>
-              <progress
-                className="progress progress-success w-full"
-                value="100"
-                max="100"
-              ></progress>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="bg-green-500 h-full w-full"></div>
+              </div>
             </>
           )}
 
           {status === "loading" && (
             <>
-              <span className="loading loading-infinity loading-lg text-primary"></span>
+              <div className="relative h-[200px] w-full">
+                <div className="loader">
+                  <span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  <div className="base">
+                    <span></span>
+                    <div className="face"></div>
+                  </div>
+                </div>
+                <div className="longfazers">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
               <div className="space-y-3">
-                <h1 className="card-title text-3xl font-bold">
+                <h1 className="text-3xl font-bold text-gray-900">
                   Loading Backend
                 </h1>
-                <p className="text-base-content/70">Connecting to server...</p>
+                <p className="text-gray-600">Connecting to server...</p>
               </div>
-              <progress className="progress progress-primary w-full"></progress>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="bg-blue-500 h-full w-full animate-pulse"></div>
+              </div>
             </>
           )}
         </div>
