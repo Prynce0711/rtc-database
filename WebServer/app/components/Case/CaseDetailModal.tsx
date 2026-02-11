@@ -174,16 +174,19 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="form-control">
-                    <label className="label">
+                    <label className="label mb-1">
                       <span className="label-text font-semibold">
                         Detention Status
                       </span>
                     </label>
                     <div>
                       <span
-                        className={`badge badge-lg ${
-                          caseData.detained ? "badge-warning" : "badge-success"
-                        }`}
+                        className={`badge badge-lg backdrop-blur-md border font-medium
+${
+  caseData.detained
+    ? "bg-red-500/15 text-red-600 border-red-400/30"
+    : "bg-emerald-500/15 text-emerald-600 border-emerald-400/30"
+}`}
                       >
                         {caseData.detained ? "Detained" : "Free"}
                       </span>

@@ -30,68 +30,77 @@ const EmployeeTable: React.FC<Props> = ({
     <div className="w-full bg-base-100">
       {/* TABLE SCROLL */}
       <div className="overflow-x-auto">
-        <table className="table w-full text-center">
-          <thead className="bg-base-300 text-base">
-            <tr>
-              <th className="font-bold">Actions</th>
-              <th className="font-bold">Employee Name</th>
-              <th className="font-bold">Employee #</th>
-              <th className="font-bold">Position</th>
-              <th className="font-bold">Branch / Station</th>
-              <th className="font-bold">TIN</th>
-              <th className="font-bold">GSIS</th>
-              <th className="font-bold">PhilHealth</th>
-              <th className="font-bold">Pag-IBIG</th>
-              <th className="font-bold">Birthday</th>
-              <th className="font-bold">Blood Type</th>
-              <th className="font-bold">Allergies</th>
-              <th className="font-bold">Height</th>
-              <th className="font-bold">Weight</th>
-              <th className="font-bold">Contact Person</th>
-              <th className="font-bold">Contact Number</th>
-              <th className="font-bold">Email</th>
+        <table className="table w-full border-separate border-spacing-y-2">
+          {/* HEADER */}
+          <thead className="bg-base-200">
+            <tr className="text-md font-semibold  tracking-wide text-base-content/70">
+              <th className="text-center py-4 uppercase">Actions</th>
+              <th className="py-4">Employee Name</th>
+              <th className="text-center py-4">Employee #</th>
+              <th className="py-4">Position</th>
+              <th className="py-4">Branch / Station</th>
+              <th className="text-center py-4">TIN</th>
+              <th className="text-center py-4">GSIS</th>
+              <th className="text-center py-4">PhilHealth</th>
+              <th className="text-center py-4">Pag-IBIG</th>
+              <th className="text-center py-4">Birthday</th>
+              <th className="text-center py-4">Blood Type</th>
+              <th className="py-4">Allergies</th>
+              <th className="text-center py-4">Height</th>
+              <th className="text-center py-4">Weight</th>
+              <th className="py-4">Contact Person</th>
+              <th className="text-center py-4">Contact Number</th>
+              <th className="py-4">Email</th>
             </tr>
           </thead>
 
-          <tbody>
+          {/* BODY */}
+          <tbody className="text-sm">
             {paginatedEmployees.map((emp) => (
-              <tr key={emp.id} className="hover:bg-base-200 text-base">
+              <tr
+                key={emp.id}
+                className="bg-base-100 hover:bg-base-200 transition shadow-sm"
+              >
+                {/* ACTIONS */}
                 <td>
-                  <div className="flex gap-2 justify-center">
+                  <div className="flex justify-center gap-1">
                     <button
-                      className="btn btn-ghost btn-sm text-primary"
+                      className="btn btn-xs btn-ghost text-info hover:bg-info/10"
                       onClick={() => onEdit(emp)}
                     >
-                      <FiEdit size={18} />
+                      <FiEdit size={16} />
                     </button>
 
                     <button
-                      className="btn btn-ghost btn-sm text-error"
+                      className="btn btn-xs btn-ghost text-error hover:bg-error/10"
                       onClick={() => onDelete(emp.id)}
                     >
-                      <FiTrash2 size={18} />
+                      <FiTrash2 size={16} />
                     </button>
                   </div>
                 </td>
 
                 <td className="font-semibold">{emp.employeeName || "—"}</td>
-                <td>{emp.employeeNumber || "—"}</td>
+                <td className="text-center">{emp.employeeNumber || "—"}</td>
                 <td>{emp.position || "—"}</td>
                 <td>{emp.branch || "—"}</td>
-                <td>{emp.tinNumber || "—"}</td>
-                <td>{emp.gsisNumber || "—"}</td>
-                <td>{emp.philHealthNumber || "—"}</td>
-                <td>{emp.pagIbigNumber || "—"}</td>
 
-                <td>
+                <td className="text-center">{emp.tinNumber || "—"}</td>
+                <td className="text-center">{emp.gsisNumber || "—"}</td>
+                <td className="text-center">{emp.philHealthNumber || "—"}</td>
+                <td className="text-center">{emp.pagIbigNumber || "—"}</td>
+
+                <td className="text-center text-base-content/70">
                   {emp.birthDate
                     ? new Date(emp.birthDate).toLocaleDateString()
                     : "—"}
                 </td>
 
-                <td>{emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}</td>
+                <td className="text-center">
+                  {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
+                </td>
 
-                <td>
+                <td className="text-base-content/80">
                   {emp.allergies &&
                   emp.allergies.trim() !== "" &&
                   emp.allergies.toLowerCase() !== "n/a"
@@ -99,11 +108,11 @@ const EmployeeTable: React.FC<Props> = ({
                     : "N/A"}
                 </td>
 
-                <td>{emp.height ?? "—"}</td>
-                <td>{emp.weight ?? "—"}</td>
+                <td className="text-center">{emp.height ?? "—"}</td>
+                <td className="text-center">{emp.weight ?? "—"}</td>
                 <td>{emp.contactPerson || "—"}</td>
-                <td>{emp.contactNumber || "—"}</td>
-                <td>{emp.email || "—"}</td>
+                <td className="text-center">{emp.contactNumber || "—"}</td>
+                <td className="text-base-content/80">{emp.email || "—"}</td>
               </tr>
             ))}
           </tbody>
