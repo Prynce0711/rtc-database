@@ -42,9 +42,9 @@ const LogsDashboard: React.FC = () => {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [nameFilter, setNameFilter] = useState("");
-  const [selectedLog, setSelectedLog] = useState<null | (typeof SAMPLE_LOGS)[number]>(
-    null,
-  );
+  const [selectedLog, setSelectedLog] = useState<
+    null | (typeof SAMPLE_LOGS)[number]
+  >(null);
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     order: "asc" | "desc";
@@ -126,7 +126,7 @@ const LogsDashboard: React.FC = () => {
           Review user activities and system changes across the platform.
         </p>
       </div>
-      <div className="bg-base-100 rounded-2xl shadow p-6 md:p-8 space-y-6 w-full">
+      <div className="space-y-6 w-full">
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="flex-1 relative">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/50" />
@@ -134,7 +134,7 @@ const LogsDashboard: React.FC = () => {
               placeholder="Search by user, entity or description..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input input-bordered input-md w-full pl-12 bg-base-200 h-12 text-base md:text-lg"
+              className="input input-bordered input-md w-full pl-12 bg-base-100 h-12 text-base md:text-lg"
             />
           </div>
 
@@ -170,83 +170,119 @@ const LogsDashboard: React.FC = () => {
         </div>
 
         <div className="bg-base-100 rounded-xl border border-base-200">
-          <Table
-            className="p-0 text-base md:text-lg font-medium"
-            headers={[
+          {(() => {
+            const headers = [
               {
                 key: "userName",
                 label: "User",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "userRole",
                 label: "Role",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "action",
                 label: "Action",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "entityType",
                 label: "Entity",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "entityName",
                 label: "Entity Name",
                 className: "text-base md:text-lg font-semibold",
+                align: "left" as const,
               },
               {
                 key: "description",
                 label: "Description",
                 className: "text-base md:text-lg font-semibold",
+                align: "center" as const,
               },
               {
                 key: "createdAt",
                 label: "Timestamp",
                 sortable: true,
-                className: "text-base md:text-lg font-semibold",
+                className: "text-base md:text-lg font-semibold text-right pr-4",
+                align: "right" as const,
               },
-            ]}
-            data={sortedLogs}
-            rowsPerPage={10}
-            sortConfig={sortConfig ?? undefined}
-            onSort={(k) => handleSort(k)}
-            renderRow={(log) => (
-              <tr
-                key={log.id}
-                className="hover:bg-base-200 align-middle cursor-pointer"
-                onClick={() => setSelectedLog(log)}
-              >
-                <td className="font-medium py-4 align-middle">
-                  {log.userName}
-                </td>
-                <td className="py-4 align-middle text-base-content/80 font-medium">
-                  {log.userRole}
-                </td>
-                <td className="py-4 align-middle text-base-content/80">
-                  {log.action}
-                </td>
-                <td className="py-4 align-middle">{log.entityType || "-"}</td>
-                <td className="py-4 align-middle">{log.entityName || "-"}</td>
-                <td
-                  className="py-4 align-middle max-w-4xl break-words text-base-content/80"
-                  title={log.description}
-                >
-                  {log.description}
-                </td>
-                <td className="py-4 align-middle whitespace-nowrap text-base-content/60">
-                  {new Date(log.createdAt).toLocaleString()}
-                </td>
-              </tr>
-            )}
-          />
+            ];
+
+            const getAlignClass = (key: string) => {
+              const a = headers.find((h) => h.key === key)?.align ?? "left";
+              if (a === "center") return "text-center";
+              if (a === "right") return "text-right";
+              return "text-left";
+            };
+
+            return (
+              <Table
+                className="p-0 text-base md:text-lg font-medium"
+                headers={headers}
+                data={sortedLogs}
+                rowsPerPage={10}
+                sortConfig={sortConfig ?? undefined}
+                onSort={(k) => handleSort(k as string)}
+                renderRow={(log) => (
+                  <tr
+                    key={log.id}
+                    className="hover:bg-base-200 align-middle cursor-pointer"
+                    onClick={() => setSelectedLog(log)}
+                  >
+                    <td
+                      className={`font-medium py-4 align-middle ${getAlignClass("userName")}`}
+                    >
+                      {log.userName}
+                    </td>
+                    <td
+                      className={`py-4 align-middle text-base-content/80 font-medium ${getAlignClass("userRole")}`}
+                    >
+                      {log.userRole}
+                    </td>
+                    <td
+                      className={`py-4 align-middle text-base-content/80 ${getAlignClass("action")}`}
+                    >
+                      {log.action}
+                    </td>
+                    <td
+                      className={`py-4 align-middle ${getAlignClass("entityType")}`}
+                    >
+                      {log.entityType || "-"}
+                    </td>
+                    <td
+                      className={`py-4 align-middle ${getAlignClass("entityName")}`}
+                    >
+                      {log.entityName || "-"}
+                    </td>
+                    <td
+                      className={`py-4 align-middle max-w-4xl break-words text-base-content/80 ${getAlignClass("description")}`}
+                      title={log.description}
+                    >
+                      {log.description}
+                    </td>
+                    <td
+                      className={`py-4 align-middle whitespace-nowrap text-base-content/60 pr-4 ${getAlignClass("createdAt")}`}
+                    >
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+              />
+            );
+          })()}
         </div>
 
         <div className="flex items-center justify-between">
@@ -356,7 +392,10 @@ const LogsDashboard: React.FC = () => {
             </div>
 
             <div className="modal-action px-6 pb-6">
-              <button className="btn btn-primary" onClick={() => setSelectedLog(null)}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setSelectedLog(null)}
+              >
                 Close
               </button>
             </div>
