@@ -3,35 +3,32 @@
 import Link from "next/link";
 
 const SidebarButton = ({
-  activeView,
-  href,
   icon,
+  href,
+  label,
+  active,
 }: {
-  activeView: string;
-  href: string;
   icon: React.ReactNode;
+  href: string;
+  label: string;
+  active: string;
 }) => {
+  const isActive = active === href;
+
   return (
-    <li className="py-1">
-      <Link
-        href={`/user/${href}`}
-        className={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${
-          activeView === href ? "active" : ""
+    <Link
+      href={`/user/${href}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+        ${
+          isActive
+            ? "bg-primary text-primary-content shadow-md"
+            : "text-base-content/70 hover:bg-base-300"
         }`}
-        data-tip={capitalizeFirstLetter(href)}
-      >
-        {/* Home icon */}
-        {icon}
-        <span className="is-drawer-close:hidden">
-          {capitalizeFirstLetter(href)}
-        </span>
-      </Link>
-    </li>
+    >
+      <span className="text-xl">{icon}</span>
+      <span className="text-sm font-semibold">{label}</span>
+    </Link>
   );
 };
-
-function capitalizeFirstLetter(string: string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
-}
 
 export default SidebarButton;

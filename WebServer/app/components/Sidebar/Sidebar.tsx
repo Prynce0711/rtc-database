@@ -1,144 +1,157 @@
 "use client";
 
-import { useSession } from "@/app/lib/authClient";
+import { authClient, useSession } from "@/app/lib/authClient";
 import { motion } from "framer-motion";
-import { usePathname } from "next/navigation";
-import React, { ReactNode } from "react";
-import { AiOutlineTeam } from "react-icons/ai";
+import { usePathname, useRouter } from "next/navigation";
+import React, { ReactNode, useEffect, useState } from "react";
 import { FaHistory, FaUserCog } from "react-icons/fa";
-import { FiActivity, FiHome } from "react-icons/fi";
-import { PiSlidersHorizontal } from "react-icons/pi";
+import {
+  FiFileText,
+  FiHome,
+  FiLogOut,
+  FiMoon,
+  FiSun,
+  FiUsers,
+} from "react-icons/fi";
 
-import Header from "./Header";
 import SidebarButton from "./SidebarButton";
+
 interface SidebarProps {
   children: ReactNode;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "admin";
-  const isAtty = session?.user?.role === "atty";
-
+  const router = useRouter();
   const pathname = usePathname();
-  const rawTitle = pathname.split("/")[2] || "Dashboard";
-  const rawTitleWords = rawTitle.split("-").map((word) => capitalizeWord(word));
-  const activeView = rawTitleWords.join(" ");
+
+  const activeView = pathname.split("/")[2] || "dashboard";
+
+  /* ================= THEME ================= */
+  const [theme, setTheme] = useState<"winter" | "dim">("winter");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  async function handleLogout() {
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => router.push("/"),
+      },
+    });
+  }
 
   return (
-    <div>
-      <div className="drawer lg:drawer-open">
-        <input id="my-drawer-4" type="checkbox" className="drawer-toggle" />
-        <div className="drawer-content">
-          {/* Header */}
-          <Header />
+    <div className="drawer lg:drawer-open bg-base-100">
+      <input id="app-drawer" type="checkbox" className="drawer-toggle" />
 
-          <motion.div
-            key={activeView}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.18 }}
-            className="min-h-screen w-full"
-          >
-            <>{children}</>
-          </motion.div>
-        </div>
+      {/* ================= CONTENT ================= */}
+      <div className="drawer-content min-h-screen">
+        <motion.main
+          key={activeView}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="min-h-screen p-6 lg:p-8"
+        >
+          <>{children}</>
+        </motion.main>
+      </div>
 
-        <div className="drawer-side is-drawer-close:overflow-visible">
-          <label
-            htmlFor="my-drawer-4"
-            aria-label="close sidebar"
-            className="drawer-overlay"
-          ></label>
-          <div className="flex min-h-full flex-col items-start bg-base-200 is-drawer-close:w-14 is-drawer-open:w-64">
-            {/* Sidebar content here */}
-            <ul className="menu w-full grow">
-              {isAdmin
-                ? AdminSidebarContents(activeView)
-                : isAtty
-                  ? AttorneySidebarContents(activeView)
-                  : StaffSidebarContents(activeView)}
-            </ul>
+      {/* ================= SIDEBAR ================= */}
+      <div className="drawer-side">
+        <label htmlFor="app-drawer" className="drawer-overlay" />
+
+        <aside className="w-72 bg-base-200 min-h-full flex flex-col border-r border-base-300">
+          {/* ===== LOGO / BRAND ===== */}
+          <div className="px-6 py-6 border-b border-base-300 flex items-center gap-3">
+            <img
+              src="/SupremeCourtLogo.webp"
+              alt="Supreme Court"
+              className="w-11 h-11 object-contain"
+            />
+            <div>
+              <h1 className="font-bold text-base-content leading-tight">
+                Regional Trial Court
+              </h1>
+              <p className="text-xs text-base-content/60">
+                Case & Employee System
+              </p>
+            </div>
           </div>
-        </div>
+
+          {/* ===== NAVIGATION ===== */}
+          <nav className="flex-1 px-3 py-4 space-y-1">
+            <SidebarButton
+              icon={<FiHome />}
+              href="dashboard"
+              active={activeView}
+              label="Dashboard"
+            />
+            <SidebarButton
+              icon={<FiFileText />}
+              href="cases"
+              active={activeView}
+              label="Cases"
+            />
+            <SidebarButton
+              icon={<FiUsers />}
+              href="employees"
+              active={activeView}
+              label="Employees"
+            />
+
+            {session?.user?.role === "admin" && (
+              <>
+                <SidebarButton
+                  icon={<FaUserCog />}
+                  href="account"
+                  active={activeView}
+                  label="Account"
+                />
+                <SidebarButton
+                  icon={<FaHistory />}
+                  href="activity-reports"
+                  active={activeView}
+                  label="Activity Logs"
+                />
+              </>
+            )}
+          </nav>
+
+          {/* ===== FOOTER CONTROLS ===== */}
+          <div className="border-t border-base-300 p-4 space-y-3">
+            {/* THEME TOGGLE */}
+            <button
+              onClick={() =>
+                setTheme((t) => (t === "winter" ? "dim" : "winter"))
+              }
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition"
+            >
+              {theme === "winter" ? (
+                <FiMoon className="text-lg" />
+              ) : (
+                <FiSun className="text-lg" />
+              )}
+              <span className="text-sm font-medium">
+                {theme === "winter" ? "Dark Mode" : "Light Mode"}
+              </span>
+            </button>
+
+            {/* LOGOUT */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-error hover:bg-error/10 transition"
+            >
+              <FiLogOut className="text-lg" />
+              <span className="text-sm font-medium">Logout</span>
+            </button>
+          </div>
+        </aside>
       </div>
     </div>
   );
 };
-
-function AdminSidebarContents(activeView: string) {
-  return (
-    <>
-      <SidebarButton
-        icon={<FiHome size={20} />}
-        activeView={activeView}
-        href="dashboard"
-      />
-      <SidebarButton
-        icon={<PiSlidersHorizontal size={20} />}
-        activeView={activeView}
-        href="cases"
-      />
-      <SidebarButton
-        icon={<AiOutlineTeam size={20} />}
-        activeView={activeView}
-        href="employees"
-      />
-      <SidebarButton
-        icon={<FaUserCog size={20} />}
-        activeView={activeView}
-        href="account"
-      />
-      <SidebarButton
-        icon={<FaHistory size={20} />}
-        activeView={activeView}
-        href="activity-reports"
-      />
-    </>
-  );
-}
-
-function AttorneySidebarContents(activeView: string) {
-  return (
-    <>
-      <SidebarButton
-        icon={<FiHome size={20} />}
-        activeView={activeView}
-        href="dashboard"
-      />
-      <SidebarButton
-        icon={<PiSlidersHorizontal size={20} />}
-        activeView={activeView}
-        href="cases"
-      />
-    </>
-  );
-}
-
-function StaffSidebarContents(activeView: string) {
-  return (
-    <>
-      <SidebarButton
-        icon={<FiHome size={20} />}
-        activeView={activeView}
-        href="dashboard"
-      />
-      <SidebarButton
-        icon={<PiSlidersHorizontal size={20} />}
-        activeView={activeView}
-        href="cases"
-      />
-    </>
-  );
-}
-
-function capitalizeWord(word: string) {
-  if (word.length === 2) {
-    return word.toUpperCase();
-  }
-
-  return word.charAt(0).toUpperCase() + word.slice(1);
-}
 
 export default Sidebar;

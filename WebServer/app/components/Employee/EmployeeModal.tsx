@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
 import type { Employee } from "@/app/generated/prisma/browser";
+import React from "react";
 
 interface Props {
   showModal: boolean;

@@ -10,6 +10,13 @@ datasource db {
   provider = "sqlite"
 }
 
+enum Status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
 enum BloodType {
   A_Positive
   A_Negative
@@ -103,6 +110,8 @@ model User {
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
+
+  status       Status @default(INACTIVE)
 
   Logs         Log[]
 

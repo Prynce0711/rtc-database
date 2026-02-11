@@ -2,11 +2,9 @@
 
 import { useSession } from "@/app/lib/authClient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
-import FilterModal, {
-  type FilterOption,
-  type FilterValues,
-} from "../Filter/FilterModal";
+import FilterModal from "../Filter/FilterModal";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import CaseDetailModal from "./CaseDetailModal";
@@ -15,6 +13,7 @@ import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, sortCases } from "./Record";
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 
 type CaseFilterValues = {
   branch?: string;
@@ -393,42 +392,22 @@ const CasePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen bg-base-100">
       <main className="w-full px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-base-content mb-2">
+          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Case Management
           </h2>
-          <p className="opacity-70">Manage all court cases</p>
+          <p className="text-lg text-base-content/70">Manage all court cases</p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Total Cases</div>
-            <div className="stat-value text-primary">{stats.totalCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Detained</div>
-            <div className="stat-value text-warning">{stats.detainedCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Pending Raffle</div>
-            <div className="stat-value text-info">{stats.pendingCases}</div>
-          </div>
-          <div className="stat bg-base-100 rounded-lg shadow">
-            <div className="stat-title">Recently Filed</div>
-            <div className="stat-value text-success">{stats.recentlyFiled}</div>
-          </div>
-        </div>
-
         {/* Search and Add */}
         <div className="flex gap-4 mb-6">
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
           <input
             type="text"
             placeholder="Search cases..."
-            className="input input-bordered flex-1"
+            className="input input-bordered input-lg w-full pl-12  text-base"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -496,13 +475,48 @@ const CasePage: React.FC = () => {
             </button>
           )}
         </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medium text-center">
+          <div className="stat bg-base-300 rounded-lg shadow">
+            <div className="text-base font-bold text-base mb-3 mb-5">
+              Total Cases
+            </div>
+            <div className="text-5xl font-bold text-primary">
+              {stats.totalCases}
+            </div>
+          </div>
+          <div className="stat bg-base-300 rounded-lg shadow">
+            <div className="text-base font-bold text-base mb-3 mb-5">
+              Detained
+            </div>
+            <div className="text-5xl font-bold text-primary">
+              {stats.detainedCases}
+            </div>
+          </div>
+          <div className="stat bg-base-300 rounded-lg shadow">
+            <div className="text-base font-bold text-base mb-3  mb-5">
+              Pending Raffle
+            </div>
+            <div className="text-5xl font-bold text-primary">
+              {stats.pendingCases}
+            </div>
+          </div>
+          <div className="stat bg-base-300 rounded-lg shadow">
+            <div className="text-base font-bold text-base mb-3 mb-5">
+              Recently Filed
+            </div>
+            <div className="text-5xl font-bold text-primary">
+              {stats.recentlyFiled}
+            </div>
+          </div>
+        </div>
 
         {/* Cases Table */}
-        <div className="bg-base-100 rounded-lg shadow">
+        <div className="bg-base-100  rounded-lg shadow">
           <Table
             headers={[
               { key: "caseNumber", label: "Case Number", sortable: true },
-              { key: "name", label: "Name", sortable: true },
+              { key: "name", label: "Name", sortable: true, align: "center" },
               { key: "charge", label: "Charge", sortable: true },
               { key: "branch", label: "Branch", sortable: true },
               {
@@ -525,10 +539,10 @@ const CasePage: React.FC = () => {
             data={filteredAndSortedCases}
             rowsPerPage={10}
             sortConfig={{
-              key: sortConfig.key as string,
+              key: sortConfig.key,
               order: sortConfig.order,
             }}
-            onSort={(k) => handleSort(k as keyof Case)}
+            onSort={(k) => handleSort(k)}
             renderRow={(caseItem) => (
               <CaseRow
                 key={caseItem.id}

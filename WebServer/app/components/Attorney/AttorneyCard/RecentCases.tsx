@@ -1,12 +1,12 @@
 /**
  * Recent Cases Table Component
- * 
+ *
  * Displays a table of recent court cases with:
  * - Case number, name, charge, branch
  * - Date filed
  * - Detention status badge
  * - Optional "View All" button to navigate to full case list
- * 
+ *
  * Shows empty state message when no cases are available.
  */
 

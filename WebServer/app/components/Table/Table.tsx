@@ -2,27 +2,33 @@
 
 import React, { useMemo, useState } from "react";
 
-type Header = {
+type Header<T extends Record<string, unknown>> = {
   key: string;
   label: React.ReactNode;
   sortable?: boolean;
+  sortKey?: keyof T;
   className?: string;
   align?: "left" | "center" | "right";
 };
 
-type SortConfig = { key: string; order: "asc" | "desc" } | null;
+type SortConfig<T extends Record<string, unknown>> = {
+  key: keyof T;
+  order: "asc" | "desc";
+} | null;
 
-const Table: React.FC<{
-  headers: Header[];
-  data: any[];
-  renderRow: (item: any, index: number) => React.ReactNode;
+type TableProps<T extends Record<string, unknown>> = {
+  headers: Header<T>[];
+  data: T[];
+  renderRow: (item: T, index: number) => React.ReactNode;
   rowsPerPage?: number;
   initialPage?: number;
   showPagination?: boolean;
-  sortConfig?: SortConfig;
-  onSort?: (key: string) => void;
+  sortConfig?: SortConfig<T>;
+  onSort?: (key: keyof T) => void;
   className?: string;
-}> = ({
+};
+
+const Table = <T extends Record<string, unknown>>({
   headers,
   data,
   renderRow,
@@ -32,7 +38,7 @@ const Table: React.FC<{
   sortConfig,
   onSort,
   className,
-}) => {
+}: TableProps<T>) => {
   const [page, setPage] = useState(initialPage);
 
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
@@ -69,34 +75,38 @@ const Table: React.FC<{
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto">
-        <table className="table table-compact w-full">
-          <thead>
+      <div className="overflow-x-auto ">
+        <table className="table  table-compact w-full text-center">
+          <thead className="bg-base-300 text-base ">
             <tr>
               {headers.map((h) => (
                 <th
                   key={h.key}
-                  className={`${h.className ?? ""} ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}
+                  className={`${h.className ?? ""} text-xl font-semibold ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}
                 >
                   {h.sortable ? (
                     <button
                       type="button"
-                      className="flex items-center gap-2"
-                      onClick={() => onSort && onSort(h.key)}
+                      className="flex items-center gap-2 mx-auto"
+                      onClick={() => {
+                        if (!onSort) return;
+                        const key = h.sortKey ?? (h.key as keyof T);
+                        onSort(key);
+                      }}
                     >
-                      <span>{h.label}</span>
-                      {sortConfig?.key === h.key ? (
+                      <span className="text-xl font-semibold">{h.label}</span>
+                      {sortConfig?.key === (h.sortKey ?? h.key) ? (
                         <span>{sortConfig.order === "asc" ? "↑" : "↓"}</span>
                       ) : null}
                     </button>
                   ) : (
-                    h.label
+                    <span className="text-xl font-semibold">{h.label}</span>
                   )}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-lx font-medium">
             {paginated.map((d, i) =>
               renderRow(d, (page - 1) * rowsPerPage + i),
             )}
