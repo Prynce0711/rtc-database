@@ -29,14 +29,14 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
 }) => {
   return (
     <div
-      className={`stat bg-base-100 rounded-lg shadow hover:shadow-lg transition-shadow ${
+      className={`bg-base-300  rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow text-center ${
         onClick ? "cursor-pointer" : ""
       }`}
       onClick={onClick}
     >
-      <div className="stat-figure text-${color}">{icon}</div>
-      <div className="stat-title">{title}</div>
-      <div className={`stat-value text-${color}`}>{value}</div>
+      <p className="text-base font-bold text-base mb-3">{title}</p>
+      <p className="text-5xl font-bold text-primary">{value}</p>
+
       {trend && (
         <div
           className={`stat-desc ${trend.isPositive ? "text-success" : "text-error"}`}

@@ -19,12 +19,12 @@ import {
   FiPlus,
   FiSearch,
   FiUpload,
-  FiX,
 } from "react-icons/fi";
 
 import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+import EmployeeModal from "./EmployeeModal";
 import EmployeeTable from "./EmployeeTable";
 import KpiCard from "./KpiCard";
 
@@ -478,7 +478,7 @@ const EmployeeDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen  bg-base-100 from-base-200 via-base-100 to-base-200 ">
-      <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="w-full max-w-[2000px] mx-auto ">
         {/* ===== HEADER ===== */}
         <div className="mb-8">
           <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
@@ -554,288 +554,16 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* MODAL */}
-        {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 p-4">
-            <div className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-8 py-6 border-b border-base-200">
-                <div>
-                  <h2 className="text-3xl font-bold text-base-content">
-                    {isEdit ? "Edit Employee" : "Add New Employee"}
-                  </h2>
-                  <p className="text-base text-base-content/60 mt-1">
-                    {isEdit && form.employeeNumber
-                      ? `Employee #${form.employeeNumber}`
-                      : "Fill in the employee details below"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    setForm(emptyEmployee());
-                    setErrors({});
-                  }}
-                  className="btn btn-ghost btn-circle btn-lg"
-                >
-                  <FiX size={28} />
-                </button>
-              </div>
-
-              <div className="overflow-y-auto p-8 flex-1">
-                <form onSubmit={handleSave} className="space-y-8">
-                  <div>
-                    <h3 className="text-xl font-bold text-base-content mb-5">
-                      Basic Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Employee Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={form.employeeName || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, employeeName: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="John Doe"
-                        />
-                        {errors.employeeName && (
-                          <p className="text-sm text-error mt-1">
-                            {errors.employeeName}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Employee Number
-                        </label>
-                        <input
-                          type="text"
-                          value={form.employeeNumber || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, employeeNumber: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="EMP001"
-                          disabled={isEdit}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Position *
-                        </label>
-                        <input
-                          type="text"
-                          value={form.position || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, position: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="Judge"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Branch / Station *
-                        </label>
-                        <input
-                          type="text"
-                          value={form.branch || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, branch: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="Manila"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Birth Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={
-                            form.birthDate
-                              ? new Date(form.birthDate)
-                                  .toISOString()
-                                  .split("T")[0]
-                              : ""
-                          }
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              birthDate: e.target.value
-                                ? new Date(e.target.value)
-                                : undefined,
-                            })
-                          }
-                          className="input input-bordered input-lg w-full"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Contact Person *
-                        </label>
-                        <input
-                          type="text"
-                          value={form.contactPerson || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, contactPerson: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="Emergency contact"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold text-base-content mb-5">
-                      Contact & Government IDs
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Contact Number
-                        </label>
-                        <input
-                          type="tel"
-                          value={form.contactNumber || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, contactNumber: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="09123456789"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          value={form.email || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, email: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="employee@rtc.gov.ph"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          TIN Number
-                        </label>
-                        <input
-                          type="text"
-                          value={form.tinNumber || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, tinNumber: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="000-000-000"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          GSIS Number
-                        </label>
-                        <input
-                          type="text"
-                          value={form.gsisNumber || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, gsisNumber: e.target.value })
-                          }
-                          className="input input-bordered input-lg w-full"
-                          placeholder="00000000000"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold text-base-content mb-5">
-                      Medical Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Blood Type
-                        </label>
-                        <select
-                          value={form.bloodType || ""}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              bloodType: (e.target.value as any) || undefined,
-                            })
-                          }
-                          className="select select-bordered select-lg w-full"
-                        >
-                          <option value="">Select blood type</option>
-                          <option value="A_Positive">A+</option>
-                          <option value="A_Negative">A-</option>
-                          <option value="B_Positive">B+</option>
-                          <option value="B_Negative">B-</option>
-                          <option value="AB_Positive">AB+</option>
-                          <option value="AB_Negative">AB-</option>
-                          <option value="O_Positive">O+</option>
-                          <option value="O_Negative">O-</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-base font-bold text-base-content mb-2">
-                          Allergies
-                        </label>
-                        <textarea
-                          value={form.allergies || ""}
-                          onChange={(e) =>
-                            setForm({ ...form, allergies: e.target.value })
-                          }
-                          className="textarea textarea-bordered textarea-lg w-full text-base"
-                          placeholder="List any allergies or N/A"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-4 border-t border-base-200">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowModal(false);
-                        setForm(emptyEmployee());
-                        setErrors({});
-                      }}
-                      className="btn btn-ghost btn-lg text-base"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn-primary btn-lg text-base"
-                    >
-                      {isEdit ? "Update Employee" : "Create Employee"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
+        <EmployeeModal
+          showModal={showModal}
+          isEdit={isEdit}
+          form={form}
+          errors={errors}
+          bloodTypeMap={bloodTypeMap}
+          setForm={setForm}
+          setShowModal={setShowModal}
+          handleSave={handleSave}
+        />
 
         <FilterModal
           isOpen={filterModalOpen}
