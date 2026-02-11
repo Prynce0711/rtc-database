@@ -12,19 +12,13 @@ import {
 } from "@/app/components/Employee/ExcelActions";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Table from "../Table/Table";
 
 import {
-  FiBriefcase,
   FiDownload,
   FiFilter,
-  FiHeart,
-  FiMail,
-  FiMapPin,
   FiPlus,
   FiSearch,
   FiUpload,
-  FiUsers,
   FiX,
 } from "react-icons/fi";
 
@@ -105,11 +99,11 @@ const EmployeeDashboard: React.FC = () => {
       } catch (err: any) {
         alert(err?.message ?? "Error importing employees");
       } finally {
-        // reset input so same file can be selected again if needed
         e.target.value = "";
       }
     })();
   }
+
   function handleExport() {
     (async () => {
       try {
@@ -148,6 +142,7 @@ const EmployeeDashboard: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [employees, setEmployees] = useState<Employee[]>([]);
+
   useEffect(() => {
     async function loadEmployees() {
       const res = await getEmployees();
@@ -162,6 +157,7 @@ const EmployeeDashboard: React.FC = () => {
 
     loadEmployees();
   }, []);
+
   const bloodTypeMap: Record<string, string> = {
     A_Positive: "A+",
     A_Negative: "A-",
@@ -192,29 +188,15 @@ const EmployeeDashboard: React.FC = () => {
 
   function handleEdit(emp: Employee) {
     setForm({ ...emp });
-
     setIsEdit(true);
     setShowModal(true);
   }
 
-  /* ================= KPI ANALYTICS ================= */
+  /* ================= ANALYTICS ================= */
   const analytics = useMemo(() => {
     const totalEmployees = employees.length;
-
     const totalBranches = new Set(employees.map((e) => e.branch)).size;
 
-    /* MOST COMMON POSITION */
-    const positionCount: Record<string, number> = {};
-    employees.forEach((emp) => {
-      if (!emp.position) return;
-      positionCount[emp.position] = (positionCount[emp.position] || 0) + 1;
-    });
-
-    const mostCommonPosition =
-      Object.entries(positionCount).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-      "N/A";
-
-    /* WITH MEDICAL INFO */
     const withMedical = employees.filter(
       (e) =>
         e.bloodType ||
@@ -223,29 +205,89 @@ const EmployeeDashboard: React.FC = () => {
           e.allergies.toLowerCase() !== "n/a"),
     ).length;
 
-    /* UPCOMING BIRTHDAYS THIS MONTH */
-    const currentMonth = new Date().getMonth();
+    const missingEmail = employees.filter((e) => !e.email).length;
 
-    const birthdayThisMonth = employees.filter((emp) => {
-      if (!emp.birthDate) return false;
-      return new Date(emp.birthDate).getMonth() === currentMonth;
+    /* TIME-BASED */
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const addedToday = employees.filter((emp) => {
+      if (!emp.createdAt) return false;
+      const created = new Date(emp.createdAt);
+      return created >= today;
     }).length;
 
-    /* MISSING EMAIL */
-    const missingEmail = employees.filter((e) => !e.email).length;
+    const addedThisWeek = employees.filter((emp) => {
+      if (!emp.createdAt) return false;
+      const created = new Date(emp.createdAt);
+      return created >= weekAgo;
+    }).length;
+
+    const addedThisMonth = employees.filter((emp) => {
+      if (!emp.createdAt) return false;
+      const created = new Date(emp.createdAt);
+      return created >= monthAgo;
+    }).length;
+
+    /* BRANCH BREAKDOWN */
+    const branchCount: Record<string, number> = {};
+    employees.forEach((emp) => {
+      if (!emp.branch) return;
+      branchCount[emp.branch] = (branchCount[emp.branch] || 0) + 1;
+    });
+
+    const branchBreakdown = Object.entries(branchCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+
+    /* RECENT EMPLOYEES */
+    const recentEmployees = [...employees]
+      .sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, 8);
+
+    /* UPCOMING BIRTHDAYS */
+    const upcomingBirthdays = employees
+      .filter((emp) => {
+        if (!emp.birthDate) return false;
+        const bday = new Date(emp.birthDate);
+        const thisYear = new Date(
+          now.getFullYear(),
+          bday.getMonth(),
+          bday.getDate(),
+        );
+        const daysDiff = Math.ceil(
+          (thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        return daysDiff >= 0 && daysDiff <= 30;
+      })
+      .sort((a, b) => {
+        const bdayA = new Date(a.birthDate!);
+        const bdayB = new Date(b.birthDate!);
+        return bdayA.getDate() - bdayB.getDate();
+      })
+      .slice(0, 6);
 
     return {
       totalEmployees,
       totalBranches,
-      mostCommonPosition,
       withMedical,
-      birthdayThisMonth,
       missingEmail,
+      addedToday,
+      addedThisWeek,
+      addedThisMonth,
+      branchBreakdown,
+      recentEmployees,
+      upcomingBirthdays,
     };
   }, [employees]);
 
   /* ================= SEARCH ================= */
-
   const filtered = useMemo(() => {
     const baseList =
       Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : employees;
@@ -408,8 +450,6 @@ const EmployeeDashboard: React.FC = () => {
     setFilteredByAdvanced(filtered);
   };
 
-  /* ================= FUNCTIONS ================= */
-
   function openAdd() {
     setForm(emptyEmployee());
     setIsEdit(false);
@@ -542,47 +582,43 @@ const EmployeeDashboard: React.FC = () => {
     }
   }
 
-  /* ================= UI ================= */
-
   return (
-    <div className="min-h-screen bg-base-200 flex flex-col">
-      <main className="flex-1 flex flex-col w-full max-w-425 mx-auto px-6 py-8">
+    <div className="min-h-screen  bg-base-100 from-base-200 via-base-100 to-base-200 ">
+      <div className="w-full max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         {/* ===== HEADER ===== */}
-        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div>
-            <h1 className="text-4xl font-bold text-base-content">
-              Employee Management
-            </h1>
-            <p className="text-base text-base-content/70 mt-1">
-              Employee analytics and records
-            </p>
+        <div className="mb-8">
+          <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
+            Employee Management
+          </h1>
+          <p className="text-lg text-base-content/70">
+            Manage and track your organization's workforce
+          </p>
+        </div>
+
+        {/* ===== ACTION BAR ===== */}
+        <div className="mb-8 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
+            <input
+              className="input input-bordered input-lg w-full pl-12  text-base"
+              placeholder="Search by name, employee #, position, branch..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative w-full sm:w-[320px] md:w-105">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/60 pointer-events-none">
-                <FiSearch size={20} />
-              </span>
-              <input
-                className="input input-bordered w-full pl-12 pr-4 py-3 text-base rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="Search Name, Employee #, Position, Branch, TIN, GSIS..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
+          <div className="flex gap-2">
             <button
-              className={`btn btn-outline btn-md gap-2 rounded-lg ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
-              type="button"
+              className={`btn btn-lg btn-outline ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
               onClick={() => setFilterModalOpen(true)}
             >
-              <FiFilter size={18} />
-              Filter
+              <FiFilter size={20} />
+              <span className="text-base">Filters</span>
             </button>
 
-            <label className="btn btn-outline btn-md gap-2 rounded-lg">
-              <FiUpload size={18} />
-              Import Excel
+            <label className="btn btn-lg btn-outline">
+              <FiUpload size={20} />
+              <span className="text-base">Import</span>
               <input
                 type="file"
                 accept=".xlsx,.xls"
@@ -591,176 +627,179 @@ const EmployeeDashboard: React.FC = () => {
               />
             </label>
 
-            <button
-              className="btn btn-outline btn-md gap-2 rounded-lg"
-              onClick={handleExport}
-            >
-              <FiDownload size={18} />
-              Export Excel
+            <button className="btn btn-lg btn-outline" onClick={handleExport}>
+              <FiDownload size={20} />
+              <span className="text-base">Export</span>
             </button>
 
-            <button
-              className="btn btn-primary btn-md gap-2 rounded-lg"
-              onClick={openAdd}
-            >
-              <FiPlus size={18} />
-              Add Employee
+            <button className="btn btn-lg btn-primary" onClick={openAdd}>
+              <FiPlus size={20} />
+              <span className="text-base">Add Employee</span>
             </button>
           </div>
         </div>
 
-        {/* ===== KPI CARDS ===== */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-          <KpiCard
-            icon={<FiUsers />}
-            title="Total Employees"
-            value={analytics.totalEmployees}
-            valueClassName="text-primary"
-          />
-          <KpiCard
-            icon={<FiMapPin />}
-            title="Branches"
-            value={analytics.totalBranches}
-            valueClassName="text-warning"
-          />
-          <KpiCard
-            icon={
-              <FiBriefcase className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-0 sm:-ml-1 md:-ml-2" />
-            }
-            title="Most Common Position"
-            value={analytics.mostCommonPosition}
-            valueClassName="text-info text-base md:text-lg lg:text-lg"
-            className="py-2 sm:py-3 md:py-4 lg:py-3"
-          />
-          <KpiCard
-            icon={<FiHeart />}
-            title="Medical Records"
-            value={analytics.withMedical}
-            valueClassName="text-success"
-          />
-          <KpiCard
-            icon={<FiUsers />}
-            title="Birthdays This Month"
-            value={analytics.birthdayThisMonth}
-            valueClassName="text-accent"
-          />
-          <KpiCard
-            icon={<FiMail />}
-            title="Missing Email"
-            value={analytics.missingEmail}
-            valueClassName="text-error"
-          />
-        </div>
+        {/* ===== MAIN GRID ===== */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 ">
+          {/* LEFT - Main Content */}
+          <div className="xl:col-span-9 space-y-6">
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 ">
+              <KpiCard
+                title="Total Employees"
+                value={analytics.totalEmployees}
+              />
+              <KpiCard title="Branches" value={analytics.totalBranches} />
+              <KpiCard
+                title="Complete Profiles"
+                value={analytics.withMedical}
+              />
+              <KpiCard title="Pending" value={analytics.missingEmail} />
+            </div>
 
-        {/* ===== FULL TABLE ===== */}
-        <div className="flex-1">
-          <Table
-            className="overflow-x-auto bg-base-100 rounded-xl shadow-lg border border-base-300 p-4"
-            headers={[
-              { key: "actions", label: "Actions", align: "center" },
-              { key: "employeeName", label: "Employee Name" },
-              { key: "employeeNumber", label: "Employee #" },
-              { key: "position", label: "Position" },
-              { key: "branch", label: "Branch / Station" },
-              { key: "tinNumber", label: "TIN" },
-              { key: "gsisNumber", label: "GSIS" },
-              { key: "philHealthNumber", label: "PhilHealth" },
-              { key: "pagIbigNumber", label: "Pag-IBIG" },
-              { key: "birthDate", label: "Birthday" },
-              { key: "bloodType", label: "Blood Type" },
-              { key: "allergies", label: "Allergies" },
-              { key: "height", label: "Height" },
-              { key: "weight", label: "Weight" },
-              { key: "contactPerson", label: "Contact Person" },
-              { key: "contactNumber", label: "Contact Number" },
-              { key: "email", label: "Email" },
-            ]}
-            data={filtered}
-            rowsPerPage={10}
-            renderRow={(emp, index) => (
-              <tr
-                key={emp.id}
-                className={index % 2 === 0 ? "bg-base-100" : "bg-base-50"}
-              >
-                <td className="text-center">
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm text-primary hover:bg-primary hover:text-white rounded-lg transition-colors"
-                      onClick={() => handleEdit(emp)}
-                    >
-                      Edit
-                    </button>
+            {/* TABLE */}
+            <div className="rounded-2xl shadow-lg border border-base-100  overflow-hidden">
+              <EmployeeTable
+                employees={filtered}
+                bloodTypeMap={bloodTypeMap}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            </div>
+          </div>
 
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm text-error hover:bg-error hover:text-white rounded-lg transition-colors"
-                      onClick={() => handleDelete(emp.id)}
-                    >
-                      Delete
-                    </button>
+          {/* RIGHT SIDEBAR */}
+          <div className="xl:col-span-3">
+            <div className="xl:sticky xl:top-6 space-y-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-base-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+              {/* ACTIVITY */}
+              <div className="bg-base-300 rounded-2xl shadow-lg border border-base-200 p-6">
+                <h3 className="text-xl font-bold text-base-content mb-5">
+                  Recent Activity
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center pb-4 border-b border-base-200">
+                    <div>
+                      <p className=" font-medium text-base-content">Today</p>
+                      <p className="text-sm text-base-content/60 mt-1">
+                        New additions
+                      </p>
+                    </div>
+                    <span className="text-4xl font-bold text-primary">
+                      {analytics.addedToday}
+                    </span>
                   </div>
-                </td>
 
-                <td className="font-medium text-base-content">
-                  {emp.employeeName || "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.employeeNumber || "—"}
-                </td>
-                <td className="text-base-content">{emp.position || "—"}</td>
-                <td className="text-base-content">{emp.branch || "—"}</td>
-                <td className="text-base-content">{emp.tinNumber || "—"}</td>
-                <td className="text-base-content">{emp.gsisNumber || "—"}</td>
-                <td className="text-base-content">
-                  {emp.philHealthNumber || "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.pagIbigNumber || "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.birthDate
-                    ? new Date(emp.birthDate).toLocaleDateString()
-                    : "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.allergies &&
-                  emp.allergies.trim() !== "" &&
-                  emp.allergies.toLowerCase() !== "n/a"
-                    ? emp.allergies
-                    : "N/A"}
-                </td>
-                <td className="text-base-content">{emp.height ?? "—"}</td>
-                <td className="text-base-content">{emp.weight ?? "—"}</td>
-                <td className="text-base-content">
-                  {emp.contactPerson || "—"}
-                </td>
-                <td className="text-base-content">
-                  {emp.contactNumber || "—"}
-                </td>
-                <td className="text-base-content">{emp.email || "—"}</td>
-              </tr>
-            )}
-          />
+                  <div className="flex justify-between items-center pb-4 border-b border-base-200">
+                    <div>
+                      <p className="text-base font-medium text-base-content">
+                        This Week
+                      </p>
+                      <p className="text-sm text-base-content/60 mt-1">
+                        Last 7 days
+                      </p>
+                    </div>
+                    <span className="text-4xl font-bold text-primary">
+                      {analytics.addedThisWeek}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-base font-medium text-base-content">
+                        This Month
+                      </p>
+                      <p className="text-sm text-base-content/60 mt-1">
+                        Last 30 days
+                      </p>
+                    </div>
+                    <span className="text-4xl font-bold text-primary">
+                      {analytics.addedThisMonth}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* RECENT EMPLOYEES */}
+              <div className="bg-base-300 rounded-2xl shadow-lg border border-base-200 p-6">
+                <h3 className="text-xl font-bold text-base-content mb-5">
+                  Recently Added
+                </h3>
+
+                <div className="space-y-3">
+                  {analytics.recentEmployees.length > 0 ? (
+                    analytics.recentEmployees.map((emp) => (
+                      <div
+                        key={emp.id}
+                        className="pb-3 border-b border-base-200 last:border-0 last:pb-0"
+                      >
+                        <p className="font-medium text-base text-base-content truncate">
+                          {emp.employeeName}
+                        </p>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-sm text-base-content/60 truncate">
+                            {emp.position}
+                          </span>
+                          <span className="text-sm font-semibold text-primary ml-2">
+                            {emp.branch}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-base text-center text-base-content/50 py-8">
+                      No recent employees
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* BRANCHES */}
+              <div className="bg-base-300 rounded-2xl shadow-lg border border-base-200 p-6">
+                <h3 className="text-xl font-bold text-base-content mb-5">
+                  Branch Distribution
+                </h3>
+
+                <div className="space-y-4">
+                  {analytics.branchBreakdown.map(([branch, count]) => (
+                    <div key={branch}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-base font-semibold text-base-content truncate">
+                          {branch}
+                        </span>
+                        <span className="text-base font-bold text-primary ml-2">
+                          {count}
+                        </span>
+                      </div>
+                      <div className="w-full bg-base-200 rounded-full h-3">
+                        <div
+                          className="bg-primary h-3 rounded-full transition-all"
+                          style={{
+                            width: `${(count / analytics.totalEmployees) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* ===== MODAL ===== */}
+        {/* MODAL */}
         {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
-              {/* Header (gradient) */}
-              <div className="flex items-start justify-between px-8 py-6 bg-gradient-to-r from-primary to-primary/30 text-white rounded-t-2xl">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 p-4">
+            <div className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-8 py-6 border-b border-base-200">
                 <div>
-                  <h2 className="text-2xl font-bold">
+                  <h2 className="text-3xl font-bold text-base-content">
                     {isEdit ? "Edit Employee" : "Add New Employee"}
                   </h2>
-                  <p className="text-sm opacity-90 mt-1">
+                  <p className="text-base text-base-content/60 mt-1">
                     {isEdit && form.employeeNumber
-                      ? form.employeeNumber
-                      : "New Employee"}
+                      ? `Employee #${form.employeeNumber}`
+                      : "Fill in the employee details below"}
                   </p>
                 </div>
 
@@ -771,26 +810,22 @@ const EmployeeDashboard: React.FC = () => {
                     setForm(emptyEmployee());
                     setErrors({});
                   }}
-                  className="btn btn-ghost btn-sm btn-circle text-white"
-                  aria-label="Close"
+                  className="btn btn-ghost btn-circle btn-lg"
                 >
-                  <FiX size={20} />
+                  <FiX size={28} />
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="overflow-y-auto p-6 flex-1">
-                <form onSubmit={handleSave} className="space-y-6">
-                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4">
-                      Case Information
+              <div className="overflow-y-auto p-8 flex-1">
+                <form onSubmit={handleSave} className="space-y-8">
+                  <div>
+                    <h3 className="text-xl font-bold text-base-content mb-5">
+                      Basic Information
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Employee Name *
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Employee Name *
                         </label>
                         <input
                           type="text"
@@ -798,23 +833,19 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, employeeName: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="John Doe"
                         />
                         {errors.employeeName && (
-                          <label className="label">
-                            <span className="label-text-alt text-error">
-                              {errors.employeeName}
-                            </span>
-                          </label>
+                          <p className="text-sm text-error mt-1">
+                            {errors.employeeName}
+                          </p>
                         )}
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Employee Number
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Employee Number
                         </label>
                         <input
                           type="text"
@@ -822,17 +853,15 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, employeeNumber: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="EMP001"
                           disabled={isEdit}
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Position *
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Position *
                         </label>
                         <input
                           type="text"
@@ -840,16 +869,14 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, position: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="Judge"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Branch / Station *
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Branch / Station *
                         </label>
                         <input
                           type="text"
@@ -857,16 +884,14 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, branch: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="Manila"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Birth Date *
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Birth Date *
                         </label>
                         <input
                           type="date"
@@ -885,15 +910,13 @@ const EmployeeDashboard: React.FC = () => {
                                 : undefined,
                             })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Contact Person *
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Contact Person *
                         </label>
                         <input
                           type="text"
@@ -901,23 +924,21 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, contactPerson: e.target.value })
                           }
-                          className="input input-bordered w-full"
-                          placeholder="Contact name"
+                          className="input input-bordered input-lg w-full"
+                          placeholder="Emergency contact"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4">
-                      Contact & Additional
+                  <div>
+                    <h3 className="text-xl font-bold text-base-content mb-5">
+                      Contact & Government IDs
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Contact Number
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Contact Number
                         </label>
                         <input
                           type="tel"
@@ -925,16 +946,14 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, contactNumber: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="09123456789"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Email
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Email Address
                         </label>
                         <input
                           type="email"
@@ -942,14 +961,14 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, email: e.target.value })
                           }
-                          className="input input-bordered w-full"
+                          className="input input-bordered input-lg w-full"
                           placeholder="employee@rtc.gov.ph"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">TIN</span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          TIN Number
                         </label>
                         <input
                           type="text"
@@ -957,14 +976,14 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, tinNumber: e.target.value })
                           }
-                          className="input input-bordered w-full"
-                          placeholder="TIN number"
+                          className="input input-bordered input-lg w-full"
+                          placeholder="000-000-000"
                         />
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">GSIS</span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          GSIS Number
                         </label>
                         <input
                           type="text"
@@ -972,23 +991,21 @@ const EmployeeDashboard: React.FC = () => {
                           onChange={(e) =>
                             setForm({ ...form, gsisNumber: e.target.value })
                           }
-                          className="input input-bordered w-full"
-                          placeholder="GSIS number"
+                          className="input input-bordered input-lg w-full"
+                          placeholder="00000000000"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-base-100 rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-base-content mb-5">
                       Medical Information
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Blood Type
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Blood Type
                         </label>
                         <select
                           value={form.bloodType || ""}
@@ -998,7 +1015,7 @@ const EmployeeDashboard: React.FC = () => {
                               bloodType: (e.target.value as any) || undefined,
                             })
                           }
-                          className="select select-bordered w-full"
+                          className="select select-bordered select-lg w-full"
                         >
                           <option value="">Select blood type</option>
                           <option value="A_Positive">A+</option>
@@ -1013,25 +1030,23 @@ const EmployeeDashboard: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="label">
-                          <span className="label-text font-semibold">
-                            Allergies
-                          </span>
+                        <label className="block text-base font-bold text-base-content mb-2">
+                          Allergies
                         </label>
                         <textarea
                           value={form.allergies || ""}
                           onChange={(e) =>
                             setForm({ ...form, allergies: e.target.value })
                           }
-                          className="textarea textarea-bordered w-full"
-                          placeholder="List any allergies (N/A if none)"
+                          className="textarea textarea-bordered textarea-lg w-full text-base"
+                          placeholder="List any allergies or N/A"
                           rows={3}
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex gap-3 pt-4 border-t border-base-200">
                     <button
                       type="button"
                       onClick={() => {
@@ -1039,30 +1054,18 @@ const EmployeeDashboard: React.FC = () => {
                         setForm(emptyEmployee());
                         setErrors({});
                       }}
-                      className="btn btn-ghost"
+                      className="btn btn-ghost btn-lg text-base"
                     >
                       Cancel
                     </button>
-                    <button type="submit" className="btn btn-primary">
-                      {isEdit ? "Update" : "Create"}
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-lg text-base"
+                    >
+                      {isEdit ? "Update Employee" : "Create Employee"}
                     </button>
                   </div>
                 </form>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-base-300 flex justify-end bg-base-100 rounded-b-2xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    setForm(emptyEmployee());
-                    setErrors({});
-                  }}
-                  className="btn btn-primary"
-                >
-                  Close
-                </button>
               </div>
             </div>
           </div>
@@ -1076,7 +1079,7 @@ const EmployeeDashboard: React.FC = () => {
           initialValues={appliedFilters}
           getSuggestions={getEmployeeSuggestions}
         />
-      </main>
+      </div>
     </div>
   );
 };

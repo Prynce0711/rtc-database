@@ -75,9 +75,9 @@ const Table = <T extends Record<string, unknown>>({
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto">
-        <table className="table table-compact w-full">
-          <thead>
+      <div className="overflow-x-auto ">
+        <table className="table  table-compact w-full text-center">
+          <thead className="bg-base-300 text-base ">
             <tr>
               {headers.map((h) => (
                 <th
@@ -87,7 +87,7 @@ const Table = <T extends Record<string, unknown>>({
                   {h.sortable ? (
                     <button
                       type="button"
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 mx-auto"
                       onClick={() => {
                         if (!onSort) return;
                         const key = h.sortKey ?? (h.key as keyof T);
