@@ -885,6 +885,7 @@ const EnhancedAdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                 <div className="rounded-2xl border-2 border-base-300 bg-base-300 shadow-xl">
                   <RecentCases
                     cases={cases}
+                    view="table"
                     onViewAll={() => onNavigate?.("cases")}
                   />
                 </div>

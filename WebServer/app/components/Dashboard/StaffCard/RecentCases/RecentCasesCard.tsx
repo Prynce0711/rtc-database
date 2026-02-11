@@ -76,7 +76,7 @@ const RecentCasesCard: React.FC<RecentCasesCardProps> = ({
 
       <div className="overflow-x-auto">
         <table className="table table-sm">
-          <thead className="bg-base-300">
+          <thead className="bg-base-300 text-xl">
             <tr>
               <th>Case Number</th>
               <th>Name</th>
@@ -96,8 +96,8 @@ const RecentCasesCard: React.FC<RecentCasesCardProps> = ({
               </tr>
             ) : (
               cases.map((caseItem) => (
-                <tr key={caseItem.id}>
-                  <td className="font-medium">{caseItem.caseNumber}</td>
+                <tr key={caseItem.id} className="hover text-lg">
+                  <td className="font-medium text-lg">{caseItem.caseNumber}</td>
                   <td>{caseItem.name}</td>
                   <td>{caseItem.charge}</td>
                   <td>{caseItem.branch}</td>
