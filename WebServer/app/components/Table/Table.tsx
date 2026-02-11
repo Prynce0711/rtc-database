@@ -82,7 +82,7 @@ const Table = <T extends Record<string, unknown>>({
               {headers.map((h) => (
                 <th
                   key={h.key}
-                  className={`${h.className ?? ""} ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}
+                  className={`${h.className ?? ""} text-xl font-semibold ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}
                 >
                   {h.sortable ? (
                     <button
@@ -96,17 +96,19 @@ const Table = <T extends Record<string, unknown>>({
                     >
                       <span>{h.label}</span>
                       {sortConfig?.key === (h.sortKey ?? h.key) ? (
+                      <span className="text-xl font-semibold">{h.label}</span>
+                      {sortConfig?.key === h.key ? (
                         <span>{sortConfig.order === "asc" ? "↑" : "↓"}</span>
                       ) : null}
                     </button>
                   ) : (
-                    h.label
+                    <span className="text-xl font-semibold">{h.label}</span>
                   )}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-lx font-medium">
             {paginated.map((d, i) =>
               renderRow(d, (page - 1) * rowsPerPage + i),
             )}

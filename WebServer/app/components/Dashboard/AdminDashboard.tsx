@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
 import { DashboardCard, QuickActions, RecentCases } from "./AdminCard";
+import DashboardLayout from "./DashboardLayout";
 
 interface AdminDashboardProps {
   onNavigate?: (view: string) => void;
@@ -141,120 +142,112 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-base-content mb-2">
-            Welcome, Administrator
-          </h2>
-          <p className="opacity-70">Manage court operations and personnel</p>
-        </div>
+    <DashboardLayout
+      title="Welcome, Administrator"
+      subtitle="Manage court operations and personnel"
+    >
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 ">
+        <DashboardCard
+          title="Total Cases"
+          value={stats.totalCases}
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          }
+          color="primary"
+          onClick={() => onNavigate?.("cases")}
+        />
+        <DashboardCard
+          title="Detained Cases"
+          value={stats.detainedCases}
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          }
+          color="warning"
+        />
+        <DashboardCard
+          title="Pending Raffle"
+          value={stats.pendingRaffle}
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          }
+          color="info"
+        />
+        <DashboardCard
+          title="Recent (30 Days)"
+          value={stats.recentCases}
+          icon={
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
+            </svg>
+          }
+          color="success"
+        />
+      </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <DashboardCard
-            title="Total Cases"
-            value={stats.totalCases}
-            icon={
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            }
-            color="primary"
-            onClick={() => onNavigate?.("cases")}
-          />
-          <DashboardCard
-            title="Detained Cases"
-            value={stats.detainedCases}
-            icon={
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-            }
-            color="warning"
-          />
-          <DashboardCard
-            title="Pending Raffle"
-            value={stats.pendingRaffle}
-            icon={
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            }
-            color="info"
-          />
-          <DashboardCard
-            title="Recent (30 Days)"
-            value={stats.recentCases}
-            icon={
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
-              </svg>
-            }
-            color="success"
-          />
-        </div>
+      {/* Quick Actions */}
+      <div className="mb-8">
+        <QuickActions actions={quickActions} />
+      </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <QuickActions actions={quickActions} />
-        </div>
-
-        {/* Recent Cases */}
-        <div>
-          <RecentCases
-            cases={recentCases}
-            onViewAll={() => onNavigate?.("cases")}
-          />
-        </div>
-      </main>
-    </div>
+      {/* Recent Cases */}
+      <div>
+        <RecentCases
+          cases={recentCases}
+          onViewAll={() => onNavigate?.("cases")}
+        />
+      </div>
+    </DashboardLayout>
   );
 };
 

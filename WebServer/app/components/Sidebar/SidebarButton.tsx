@@ -12,7 +12,7 @@ const SidebarButton = ({
   icon: React.ReactNode;
 }) => {
   return (
-    <li className="py-1">
+    <li className="py-3">
       <Link
         href={`/user/${href}`}
         className={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${
@@ -20,11 +20,15 @@ const SidebarButton = ({
         }`}
         data-tip={capitalizeFirstLetter(href)}
       >
-        {/* Home icon */}
-        {icon}
-        <span className="is-drawer-close:hidden">
-          {capitalizeFirstLetter(href)}
-        </span>
+        {/* Horizontal layout with gap and larger icon */}
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center justify-center w-10 h-10 text-2xl">
+            {icon}
+          </span>
+          <span className="is-drawer-close:hidden text-sm font-medium">
+            {capitalizeFirstLetter(href)}
+          </span>
+        </div>
       </Link>
     </li>
   );

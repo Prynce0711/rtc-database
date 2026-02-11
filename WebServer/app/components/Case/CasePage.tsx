@@ -394,7 +394,7 @@ const CasePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-base-200">
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="w-full px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-base-content mb-2">
@@ -404,7 +404,7 @@ const CasePage: React.FC = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medi">
           <div className="stat bg-base-100 rounded-lg shadow">
             <div className="stat-title">Total Cases</div>
             <div className="stat-value text-primary">{stats.totalCases}</div>
