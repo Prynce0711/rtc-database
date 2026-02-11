@@ -94,10 +94,8 @@ const Table = <T extends Record<string, unknown>>({
                         onSort(key);
                       }}
                     >
-                      <span>{h.label}</span>
-                      {sortConfig?.key === (h.sortKey ?? h.key) ? (
                       <span className="text-xl font-semibold">{h.label}</span>
-                      {sortConfig?.key === h.key ? (
+                      {sortConfig?.key === (h.sortKey ?? h.key) ? (
                         <span>{sortConfig.order === "asc" ? "↑" : "↓"}</span>
                       ) : null}
                     </button>
