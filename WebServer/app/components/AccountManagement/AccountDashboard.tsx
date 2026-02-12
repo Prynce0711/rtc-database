@@ -13,7 +13,6 @@ import {
   unbanAccount,
 } from "./AccountActions";
 import AddAccountModal from "./AddAccountModal";
-import ArchivedAccountsTable from "./ArchivedAccountsTable";
 
 const AccountDashboard = () => {
   const statusPopup = usePopup();
@@ -134,7 +133,7 @@ const AccountDashboard = () => {
     });
 
     return data;
-  }, [users, searchTerm, roleFilter, sortKey, sortOrder]);
+  }, [users, searchTerm, roleFilter, sortKey, sortOrder, activeView]);
 
   /* ===== PAGINATION ===== */
   const totalPages = Math.ceil(filteredUsers.length / pageSize);
@@ -197,6 +196,31 @@ const AccountDashboard = () => {
   }
 
   async function requestUnlock(user: User) {
+    const confirmation = await statusPopup.showYesNo(
+      `Unlock ${user.name}'s account?`,
+    );
+    if (!confirmation) return;
+
+    const result = await unbanAccount([user.id]);
+    if (!result.success) {
+      statusPopup.showError(
+        "Error unlocking account: " + result.error,
+        "error",
+      );
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
+          : u,
+      ),
+    );
+    statusPopup.showSuccess("Account unlocked successfully");
+  }
+
+  async function requestRestore(user: User) {
     const confirmation = await statusPopup.showYesNo(
       `Restore ${user.name} to active accounts?`,
     );
@@ -281,8 +305,53 @@ const AccountDashboard = () => {
           : u,
       ),
     );
+    setSelectedIds([]);
     statusPopup.showSuccess("Selected accounts deactivated successfully");
   }
+
+  /* ===== RENDER ACTION BUTTONS ===== */
+  const renderActionButtons = (user: User) => {
+    if (!canManage) return null;
+
+    switch (user.status) {
+      case Status.LOCKED:
+        return (
+          <button
+            className="btn btn-sm btn-success text-white"
+            onClick={() => requestUnlock(user)}
+          >
+            Unlock
+          </button>
+        );
+      case Status.INACTIVE:
+        return (
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => requestRestore(user)}
+          >
+            Restore
+          </button>
+        );
+      case Status.ACTIVE:
+      default:
+        return (
+          <div className="flex gap-2">
+            <button
+              className="btn btn-xs btn-error"
+              onClick={() => requestDeactivate(user)}
+            >
+              Deactivate
+            </button>
+            <button
+              className="btn btn-xs btn-warning"
+              onClick={() => requestLock(user)}
+            >
+              Lock
+            </button>
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -428,140 +497,99 @@ const AccountDashboard = () => {
         </div>
 
         {/* TABLE */}
-        {activeView === "archive" ? (
-          <ArchivedAccountsTable
-            allUsers={users}
-            pageSize={pageSize}
-            onRestore={(ids: string[]) => {
-              setUsers((prev) =>
-                prev.map((u) =>
-                  ids.includes(u.id)
-                    ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
-                    : u,
-                ),
-              );
-              statusPopup.showSuccess("Account(s) restored successfully");
-            }}
-          />
-        ) : (
-          <div className="overflow-x-auto bg-base-100 shadow rounded-lg">
-            <table className="table table-zebra text-base md:text-lg">
-              <thead>
-                <tr>
-                  <th>
+        <div className="overflow-x-auto bg-base-100 shadow rounded-lg">
+          <table className="table table-zebra text-base md:text-lg">
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    className="checkbox checkbox-sm"
+                    type="checkbox"
+                    onChange={(e) =>
+                      setSelectedIds(
+                        e.target.checked ? paginatedUsers.map((u) => u.id) : [],
+                      )
+                    }
+                  />
+                </th>
+                <th
+                  className="text-base md:text-lg font-medium"
+                  onClick={() => setSortKey("name")}
+                >
+                  Name
+                </th>
+                <th
+                  className="text-base md:text-lg font-medium"
+                  onClick={() => setSortKey("email")}
+                >
+                  Email
+                </th>
+                <th className="text-base md:text-lg font-medium">Role</th>
+                <th className="text-base md:text-lg font-medium">Status</th>
+                <th className="text-base md:text-lg font-medium">Created</th>
+                <th className="text-base md:text-lg font-medium">Last Login</th>
+                <th className="text-base md:text-lg font-medium">Updated</th>
+
+                {canManage && (
+                  <th className="text-base md:text-lg font-medium">Actions</th>
+                )}
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginatedUsers.map((user) => (
+                <tr key={user.id}>
+                  <td>
                     <input
                       className="checkbox checkbox-sm"
                       type="checkbox"
-                      onChange={(e) =>
-                        setSelectedIds(
-                          e.target.checked
-                            ? paginatedUsers.map((u) => u.id)
-                            : [],
-                        )
-                      }
+                      checked={selectedIds.includes(user.id)}
+                      onChange={() => toggleSelect(user.id)}
                     />
-                  </th>
-                  <th
-                    className="text-base md:text-lg font-medium"
-                    onClick={() => setSortKey("name")}
-                  >
-                    Name
-                  </th>
-                  <th
-                    className="text-base md:text-lg font-medium"
-                    onClick={() => setSortKey("email")}
-                  >
-                    Email
-                  </th>
-                  <th className="text-base md:text-lg font-medium">Role</th>
-                  <th className="text-base md:text-lg font-medium">Status</th>
-                  <th className="text-base md:text-lg font-medium">Created</th>
-                  <th className="text-base md:text-lg font-medium">
-                    Last Login
-                  </th>
-                  <th className="text-base md:text-lg font-medium">Updated</th>
+                  </td>
+                  <td className="flex items-center gap-2">{user.name}</td>
+                  <td>{user.email}</td>
 
-                  {canManage && (
-                    <th className="text-base md:text-lg font-medium">
-                      Actions
-                    </th>
-                  )}
-                </tr>
-              </thead>
-
-              <tbody>
-                {paginatedUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <input
-                        className="checkbox checkbox-sm"
-                        type="checkbox"
-                        checked={selectedIds.includes(user.id)}
-                        onChange={() => toggleSelect(user.id)}
-                      />
-                    </td>
-                    <td className="flex items-center gap-2">{user.name}</td>
-                    <td>{user.email}</td>
-
-                    <td>
-                      {canManage ? (
-                        <select
-                          className="select select-md h-11 text-base"
-                          value={user.role || Roles.USER}
-                          onChange={(e) =>
-                            requestRoleChange(user, e.target.value as Roles)
-                          }
-                        >
-                          <option value={Roles.ADMIN}>Admin</option>
-                          <option value={Roles.USER}>Staff</option>
-                          <option value={Roles.ATTY}>Atty</option>
-                        </select>
-                      ) : (
-                        user.role || Roles.USER
-                      )}
-                    </td>
-
-                    <td>
-                      <span
-                        className={`badge ${
-                          user.status === Status.ACTIVE
-                            ? "badge-success"
-                            : "badge-error"
-                        }`}
+                  <td>
+                    {canManage ? (
+                      <select
+                        className="select select-md h-11 text-base"
+                        value={user.role || Roles.USER}
+                        onChange={(e) =>
+                          requestRoleChange(user, e.target.value as Roles)
+                        }
                       >
-                        {user.status}
-                      </span>
-                    </td>
-
-                    <td>{formatDate(user.createdAt)}</td>
-                    <td>{formatDate(user.lastLogin)}</td>
-                    <td>{formatDate(user.updatedAt)}</td>
-
-                    {canManage && (
-                      <td>
-                        {user.status === Status.LOCKED ? (
-                          <button
-                            className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => requestUnlock(user)}
-                          >
-                            Unlock
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-xs btn-error"
-                            onClick={() => requestDeactivate(user)}
-                          >
-                            Deactivate
-                          </button>
-                        )}
-                      </td>
+                        <option value={Roles.ADMIN}>Admin</option>
+                        <option value={Roles.USER}>Staff</option>
+                        <option value={Roles.ATTY}>Atty</option>
+                      </select>
+                    ) : (
+                      user.role || Roles.USER
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  </td>
+
+                  <td>
+                    <span
+                      className={`badge ${
+                        user.status === Status.ACTIVE
+                          ? "badge-success"
+                          : "badge-error"
+                      }`}
+                    >
+                      {user.status}
+                    </span>
+                  </td>
+
+                  <td>{formatDate(user.createdAt)}</td>
+                  <td>{formatDate(user.lastLogin)}</td>
+                  <td>{formatDate(user.updatedAt)}</td>
+
+                  {canManage && <td>{renderActionButtons(user)}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* PAGINATION */}
         <div className="flex justify-end mt-4 gap-2">
