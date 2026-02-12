@@ -1,59 +1,49 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import { LogAction } from "@/app/generated/prisma/enums";
+import React, { useEffect, useMemo, useState } from "react";
 import { FiCopy, FiDownload, FiSearch } from "react-icons/fi";
+import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
+import { getLogs } from "./LogActions";
+import LogBadges from "./LogBadges";
+import { LogData } from "./schema";
 
-const SAMPLE_LOGS = [
-  {
-    id: "1",
-    userName: "Juan Dela Cruz",
-    userRole: "Admin",
-    action: "Add",
-    entityType: "Case",
-    entityName: "Estate Settlement",
-    description: "Created new case record for client A",
-    createdAt: "2026-02-09T10:24:00Z",
-  },
-  {
-    id: "2",
-    userName: "Maria Santos",
-    userRole: "Staff",
-    action: "Edit",
-    entityType: "Employee",
-    entityName: "R. Reyes",
-    description: "Updated contact information",
-    createdAt: "2026-02-08T14:12:00Z",
-  },
-  {
-    id: "3",
-    userName: "Attorney Gomez",
-    userRole: "Attorney",
-    action: "Login",
-    entityType: "Auth",
-    entityName: "",
-    description: "Successful login",
-    createdAt: "2026-02-07T08:03:00Z",
-  },
-];
-
-// Renderers replaced with simple, professional text (no colored badges)
+type SortConfigType = {
+  key: string;
+  order: "asc" | "desc";
+} | null;
 
 const LogsDashboard: React.FC = () => {
+  const [logs, setLogs] = useState<LogData[]>([]);
+  const statusPopup = usePopup();
+
   const [query, setQuery] = useState("");
-  const [actionFilter, setActionFilter] = useState("all");
+  const [actionFilter, setActionFilter] = useState<LogAction | "all">("all");
   const [nameFilter, setNameFilter] = useState("");
-  const [selectedLog, setSelectedLog] = useState<
-    null | (typeof SAMPLE_LOGS)[number]
-  >(null);
-  const [sortConfig, setSortConfig] = useState<{
-    key: string;
-    order: "asc" | "desc";
-  } | null>({ key: "createdAt", order: "desc" });
+  const [selectedLog, setSelectedLog] = useState<LogData | null>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfigType>({
+    key: "timestamp",
+    order: "desc",
+  });
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      const result = await getLogs();
+      if (!result.success) {
+        statusPopup.showError("Failed to fetch logs: " + result.error);
+        return;
+      }
+
+      setLogs(result.result || []);
+    };
+
+    fetchLogs();
+  }, []);
 
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    return SAMPLE_LOGS.filter((log) => {
+    return logs.filter((log) => {
       // action filter
       if (actionFilter !== "all" && log.action.toLowerCase() !== actionFilter)
         return false;
@@ -61,7 +51,7 @@ const LogsDashboard: React.FC = () => {
       // name filter
       if (
         nameFilter.trim() &&
-        !log.userName.toLowerCase().includes(nameFilter.trim().toLowerCase())
+        !log.user?.name.toLowerCase().includes(nameFilter.trim().toLowerCase())
       )
         return false;
 
@@ -69,26 +59,34 @@ const LogsDashboard: React.FC = () => {
       if (!q) return true;
 
       return (
-        log.userName.toLowerCase().includes(q) ||
-        (log.entityName || "").toLowerCase().includes(q) ||
-        (log.description || "").toLowerCase().includes(q) ||
-        (log.entityType || "").toLowerCase().includes(q) ||
-        (log.action || "").toLowerCase().includes(q) ||
-        (log.userRole || "").toLowerCase().includes(q)
+        log.user?.name.toLowerCase().includes(q) ||
+        log.action.toLowerCase().includes(q) ||
+        log.user?.role.toLowerCase().includes(q)
       );
     });
-  }, [query, actionFilter, nameFilter]);
+  }, [logs, query, actionFilter, nameFilter]);
 
   const sortedLogs = useMemo(() => {
     if (!sortConfig) return filteredLogs;
     const { key, order } = sortConfig;
     const copy = [...filteredLogs];
     copy.sort((a: any, b: any) => {
-      const va = a[key];
-      const vb = b[key];
+      let va, vb;
+
+      // Handle nested properties
+      if (key === "user.name") {
+        va = a.user?.name ?? "";
+        vb = b.user?.name ?? "";
+      } else if (key === "user.role") {
+        va = a.user?.role ?? "";
+        vb = b.user?.role ?? "";
+      } else {
+        va = a[key];
+        vb = b[key];
+      }
 
       // handle dates
-      if (key === "createdAt") {
+      if (key === "timestamp") {
         const da = new Date(va).getTime();
         const db = new Date(vb).getTime();
         return order === "asc" ? da - db : db - da;
@@ -109,8 +107,6 @@ const LogsDashboard: React.FC = () => {
     return copy;
   }, [filteredLogs, sortConfig]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / 10));
-
   const handleSort = (key: string) => {
     setSortConfig((prev) => {
       if (!prev || prev.key !== key) return { key, order: "asc" };
@@ -119,7 +115,7 @@ const LogsDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-8 md:p-12 space-y-8 w-full text-base md:text-lg">
+    <div className="space-y-8 w-full text-base md:text-lg">
       <div>
         <h1 className="text-4xl md:text-5xl font-semibold">Activity Reports</h1>
         <p className="text-lg md:text-xl text-base-content/60 mt-2">
@@ -148,7 +144,9 @@ const LogsDashboard: React.FC = () => {
 
             <select
               value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
+              onChange={(e) =>
+                setActionFilter(e.target.value as LogAction | "all")
+              }
               className="select select-bordered select-sm h-10 text-base"
             >
               <option value="all">All Actions</option>
@@ -170,17 +168,18 @@ const LogsDashboard: React.FC = () => {
         </div>
 
         <div className="bg-base-100 rounded-xl border border-base-200">
-          {(() => {
-            const headers = [
+          <Table
+            className="p-0 text-base md:text-lg font-medium"
+            headers={[
               {
-                key: "userName",
+                key: "user.name",
                 label: "User",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
                 align: "left" as const,
               },
               {
-                key: "userRole",
+                key: "user.role",
                 label: "Role",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold",
@@ -194,116 +193,38 @@ const LogsDashboard: React.FC = () => {
                 align: "left" as const,
               },
               {
-                key: "entityType",
-                label: "Entity",
-                sortable: true,
-                className: "text-base md:text-lg font-semibold",
-                align: "left" as const,
-              },
-              {
-                key: "entityName",
-                label: "Entity Name",
-                className: "text-base md:text-lg font-semibold",
-                align: "left" as const,
-              },
-              {
-                key: "description",
-                label: "Description",
-                className: "text-base md:text-lg font-semibold",
-                align: "center" as const,
-              },
-              {
-                key: "createdAt",
+                key: "timestamp",
                 label: "Timestamp",
                 sortable: true,
                 className: "text-base md:text-lg font-semibold text-right pr-4",
                 align: "right" as const,
               },
-            ];
-
-            const getAlignClass = (key: string) => {
-              const a = headers.find((h) => h.key === key)?.align ?? "left";
-              if (a === "center") return "text-center";
-              if (a === "right") return "text-right";
-              return "text-left";
-            };
-
-            return (
-              <Table
-                className="p-0 text-base md:text-lg font-medium"
-                headers={headers}
-                data={sortedLogs}
-                rowsPerPage={10}
-                sortConfig={sortConfig ?? undefined}
-                onSort={(k) => handleSort(k as string)}
-                renderRow={(log) => (
-                  <tr
-                    key={log.id}
-                    className="hover:bg-base-200 align-middle cursor-pointer"
-                    onClick={() => setSelectedLog(log)}
-                  >
-                    <td
-                      className={`font-medium py-4 align-middle ${getAlignClass("userName")}`}
-                    >
-                      {log.userName}
-                    </td>
-                    <td
-                      className={`py-4 align-middle text-base-content/80 font-medium ${getAlignClass("userRole")}`}
-                    >
-                      {log.userRole}
-                    </td>
-                    <td
-                      className={`py-4 align-middle text-base-content/80 ${getAlignClass("action")}`}
-                    >
-                      {log.action}
-                    </td>
-                    <td
-                      className={`py-4 align-middle ${getAlignClass("entityType")}`}
-                    >
-                      {log.entityType || "-"}
-                    </td>
-                    <td
-                      className={`py-4 align-middle ${getAlignClass("entityName")}`}
-                    >
-                      {log.entityName || "-"}
-                    </td>
-                    <td
-                      className={`py-4 align-middle max-w-4xl break-words text-base-content/80 ${getAlignClass("description")}`}
-                      title={log.description}
-                    >
-                      {log.description}
-                    </td>
-                    <td
-                      className={`py-4 align-middle whitespace-nowrap text-base-content/60 pr-4 ${getAlignClass("createdAt")}`}
-                    >
-                      {new Date(log.createdAt).toLocaleString()}
-                    </td>
-                  </tr>
-                )}
-              />
-            );
-          })()}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="text-base md:text-lg text-base-content/60">
-            Showing 1 to {filteredLogs.length} of {filteredLogs.length} logs
-          </div>
-          <div className="btn-group">
-            <button
-              className="btn btn-md text-base md:text-lg"
-              disabled={totalPages < 2}
-            >
-              «
-            </button>
-            <button className="btn btn-md text-base md:text-lg">1</button>
-            <button
-              className="btn btn-md text-base md:text-lg"
-              disabled={totalPages < 2}
-            >
-              »
-            </button>
-          </div>
+            ]}
+            data={sortedLogs}
+            rowsPerPage={10}
+            sortConfig={sortConfig ?? undefined}
+            onSort={(k) => handleSort(k as string)}
+            renderRow={(log) => (
+              <tr
+                key={log.id}
+                className="hover:bg-base-200 align-middle cursor-pointer"
+                onClick={() => setSelectedLog(log)}
+              >
+                <td className="font-medium py-4 align-middle text-left">
+                  {log.user?.name || "N/A"}
+                </td>
+                <td className="py-4 align-middle text-base-content/80 font-medium text-left">
+                  {log.user?.role || "N/A"}
+                </td>
+                <td className="py-4 align-middle text-base-content/80 text-left">
+                  <LogBadges logAction={log.action as LogAction} />
+                </td>
+                <td className="py-4 align-middle whitespace-nowrap text-base-content/60 pr-4 text-right">
+                  {new Date(log.timestamp).toLocaleString()}
+                </td>
+              </tr>
+            )}
+          />
         </div>
       </div>
 
@@ -324,8 +245,8 @@ const LogsDashboard: React.FC = () => {
               <h3 className="text-xl md:text-2xl font-semibold">
                 Activity Details
               </h3>
-              <p className="text-sm md:text-base opacity-90">
-                {selectedLog.action} • {selectedLog.entityType}
+              <p className="text-sm md:text-base opacity-90 mt-2">
+                <LogBadges logAction={selectedLog.action as LogAction} />
               </p>
             </div>
 
@@ -336,7 +257,7 @@ const LogsDashboard: React.FC = () => {
                     User
                   </div>
                   <div className="text-base md:text-lg font-medium">
-                    {selectedLog.userName}
+                    {selectedLog.user?.name || "N/A"}
                   </div>
                 </div>
                 <div>
@@ -344,23 +265,7 @@ const LogsDashboard: React.FC = () => {
                     Role
                   </div>
                   <div className="text-base md:text-lg font-medium">
-                    {selectedLog.userRole}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Entity
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.entityType || "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Entity Name
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.entityName || "-"}
+                    {selectedLog.user?.role || "N/A"}
                   </div>
                 </div>
                 <div>
@@ -368,7 +273,7 @@ const LogsDashboard: React.FC = () => {
                     Action
                   </div>
                   <div className="text-base md:text-lg font-medium">
-                    {selectedLog.action}
+                    <LogBadges logAction={selectedLog.action as LogAction} />
                   </div>
                 </div>
                 <div>
@@ -376,19 +281,34 @@ const LogsDashboard: React.FC = () => {
                     Timestamp
                   </div>
                   <div className="text-base md:text-lg font-medium">
-                    {new Date(selectedLog.createdAt).toLocaleString()}
+                    {new Date(selectedLog.timestamp).toLocaleString()}
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div className="text-xs uppercase tracking-wide text-base-content/60">
-                  Description
+              {selectedLog.details && (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-base-content/60">
+                    Summary
+                  </div>
+                  <div className="text-base md:text-lg font-medium leading-relaxed">
+                    {createDetailText(selectedLog)}
+                  </div>
                 </div>
-                <div className="text-base md:text-lg font-medium leading-relaxed">
-                  {selectedLog.description || "-"}
+              )}
+
+              {selectedLog.details && (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-base-content/60">
+                    Raw Details
+                  </div>
+                  <div className="text-base md:text-lg font-medium leading-relaxed">
+                    <pre className="bg-base-200 p-4 rounded overflow-auto max-h-48">
+                      {JSON.stringify(selectedLog.details, null, 2)}
+                    </pre>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="modal-action px-6 pb-6">
@@ -422,5 +342,95 @@ const LogsDashboard: React.FC = () => {
     </div>
   );
 };
+
+function createDetailText(log: LogData): string {
+  const { action, details } = log;
+
+  if (!details) {
+    switch (action) {
+      case LogAction.LOGOUT:
+        return "User logged out";
+      case LogAction.EXPORT_CASES:
+        return "Exported cases to file";
+      case LogAction.EXPORT_EMPLOYEES:
+        return "Exported employees to file";
+      default:
+        return "No additional details";
+    }
+  }
+
+  const detailsObj = details as any;
+
+  switch (action) {
+    case LogAction.CREATE_CASE:
+      return `Case #${detailsObj.id} created`;
+    case LogAction.DELETE_CASE:
+      return `Case #${detailsObj.id} deleted`;
+    case LogAction.CREATE_EMPLOYEE:
+      return `Employee #${detailsObj.id} created`;
+    case LogAction.DELETE_EMPLOYEE:
+      return `Employee #${detailsObj.id} deleted`;
+    case LogAction.CREATE_USER:
+      return `User ${detailsObj.id} created`;
+    case LogAction.DEACTIVATE_USER:
+      return `User ${detailsObj.id} deactivated`;
+    case LogAction.REACTIVATE_USER:
+      return `User ${detailsObj.id} reactivated`;
+    case LogAction.LOGIN_SUCCESS:
+      return `User ${detailsObj.id} logged in successfully`;
+    case LogAction.LOGIN_FAILED:
+      return `Login attempt with email: ${detailsObj.email}`;
+    case LogAction.UPDATE_ROLE:
+      return `Role changed from ${detailsObj.from} to ${detailsObj.to}`;
+    case LogAction.UPDATE_CASE: {
+      const changes: string[] = [];
+      const from = detailsObj.from || {};
+      const to = detailsObj.to || {};
+
+      const caseFields = [
+        "name",
+        "charge",
+        "court",
+        "detained",
+        "bond",
+        "consolidation",
+      ];
+      caseFields.forEach((field) => {
+        if (from[field] !== to[field]) {
+          changes.push(`${field}: ${from[field]} → ${to[field]}`);
+        }
+      });
+
+      return `Case updated: ${changes.length > 0 ? changes.join(", ") : "No changes"}`;
+    }
+    case LogAction.UPDATE_EMPLOYEE: {
+      const changes: string[] = [];
+      const from = detailsObj.from || {};
+      const to = detailsObj.to || {};
+
+      const employeeFields = [
+        "employeeName",
+        "position",
+        "branch",
+        "bloodType",
+        "height",
+        "weight",
+      ];
+      employeeFields.forEach((field) => {
+        if (from[field] !== to[field]) {
+          changes.push(`${field}: ${from[field]} → ${to[field]}`);
+        }
+      });
+
+      return `Employee updated: ${changes.length > 0 ? changes.join(", ") : "No changes"}`;
+    }
+    case LogAction.IMPORT_CASES:
+      return `Imported ${detailsObj.userIds?.length || 0} cases`;
+    case LogAction.IMPORT_EMPLOYEES:
+      return `Imported ${detailsObj.userIds?.length || 0} employees`;
+    default:
+      return JSON.stringify(details);
+  }
+}
 
 export default LogsDashboard;

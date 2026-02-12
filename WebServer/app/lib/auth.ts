@@ -44,12 +44,21 @@ export const auth = betterAuth({
           "Login successful for user email:",
           ctx.context.newSession?.user?.email,
         );
-        await createLog({
-          action: success ? LogAction.LOGIN_SUCCESS : LogAction.LOGIN_FAILED,
-          details: {
-            email: email,
-          },
-        });
+        if (success) {
+          await createLog({
+            action: LogAction.LOGIN_SUCCESS,
+            details: {
+              id: ctx.context.newSession?.user?.id || "",
+            },
+          });
+        } else {
+          await createLog({
+            action: LogAction.LOGIN_FAILED,
+            details: {
+              email: email,
+            },
+          });
+        }
       }
     }),
     before: createAuthMiddleware(async (ctx) => {
