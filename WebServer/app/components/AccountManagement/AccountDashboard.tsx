@@ -6,7 +6,12 @@ import Roles from "@/app/lib/Roles";
 import { formatDate } from "@/app/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import { usePopup } from "../Popup/PopupProvider";
-import { changeRole, deactivateAccount, getAccounts } from "./AccountActions";
+import {
+  changeRole,
+  deactivateAccount,
+  getAccounts,
+  unbanAccount,
+} from "./AccountActions";
 import AddAccountModal from "./AddAccountModal";
 import ArchivedAccountsTable from "./ArchivedAccountsTable";
 
@@ -37,7 +42,31 @@ const AccountDashboard = () => {
     const fetchUsers = async () => {
       const result = await getAccounts();
       if (result.success) {
-        setUsers(result.result);
+        // add some temporary locked accounts for demonstration
+        const mockLocked = [
+          {
+            id: "locked-temp-1",
+            name: "Locked Demo",
+            email: "locked.demo1@example.com",
+            role: Roles.USER,
+            status: Status.LOCKED,
+            createdAt: new Date(),
+            lastLogin: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: "locked-temp-2",
+            name: "Locked Demo 2",
+            email: "locked.demo2@example.com",
+            role: Roles.ATTY,
+            status: Status.LOCKED,
+            createdAt: new Date(),
+            lastLogin: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+
+        setUsers([...result.result, ...mockLocked]);
       } else {
         statusPopup.showError(
           "Error fetching accounts: " + result.error,
@@ -55,6 +84,7 @@ const AccountDashboard = () => {
       active: users.filter((u) => u.status === Status.ACTIVE).length,
       admins: users.filter((u) => u.role === Roles.ADMIN).length,
       inactive: users.filter((u) => u.status === Status.INACTIVE).length,
+      locked: users.filter((u) => u.status === Status.LOCKED).length,
     }),
     [users],
   );
@@ -164,6 +194,48 @@ const AccountDashboard = () => {
       ),
     );
     statusPopup.showSuccess("Account deactivated successfully");
+  }
+
+  async function requestUnlock(user: User) {
+    const confirmation = await statusPopup.showYesNo(
+      `Restore ${user.name} to active accounts?`,
+    );
+    if (!confirmation) return;
+
+    const result = await unbanAccount([user.id]);
+    if (!result.success) {
+      statusPopup.showError(
+        "Error restoring account: " + result.error,
+        "error",
+      );
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
+          : u,
+      ),
+    );
+    statusPopup.showSuccess("Account restored successfully");
+  }
+
+  async function requestLock(user: User) {
+    const confirmation = await statusPopup.showYesNo(
+      `Lock ${user.name}'s account?`,
+    );
+    if (!confirmation) return;
+
+    // client-side lock for demo only (no backend call)
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? { ...u, status: Status.LOCKED, updatedAt: new Date() }
+          : u,
+      ),
+    );
+    statusPopup.showSuccess("Account locked (local demo)");
   }
 
   async function bulkChangeRole(newRole: Roles) {
@@ -297,6 +369,7 @@ const AccountDashboard = () => {
                 {formatBadgeCount(stats.active)}
               </span>
             </button>
+
             <button
               className={`btn btn-md join-item ${
                 activeView === "archive" ? "btn-primary" : "btn-outline"
@@ -309,6 +382,7 @@ const AccountDashboard = () => {
                 {formatBadgeCount(stats.inactive)}
               </span>
             </button>
+
             <button
               className={`btn btn-md join-item ${
                 activeView === "locked" ? "btn-primary" : "btn-outline"
@@ -316,9 +390,9 @@ const AccountDashboard = () => {
               type="button"
               onClick={() => setActiveView("locked")}
             >
-              <span>locked</span>
+              <span>Locked</span>
               <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
-                {formatBadgeCount(stats.inactive)}
+                {formatBadgeCount(stats.locked)}
               </span>
             </button>
           </div>
@@ -355,7 +429,20 @@ const AccountDashboard = () => {
 
         {/* TABLE */}
         {activeView === "archive" ? (
-          <ArchivedAccountsTable allUsers={users} pageSize={pageSize} />
+          <ArchivedAccountsTable
+            allUsers={users}
+            pageSize={pageSize}
+            onRestore={(ids: string[]) => {
+              setUsers((prev) =>
+                prev.map((u) =>
+                  ids.includes(u.id)
+                    ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
+                    : u,
+                ),
+              );
+              statusPopup.showSuccess("Account(s) restored successfully");
+            }}
+          />
         ) : (
           <div className="overflow-x-auto bg-base-100 shadow rounded-lg">
             <table className="table table-zebra text-base md:text-lg">
@@ -393,6 +480,7 @@ const AccountDashboard = () => {
                     Last Login
                   </th>
                   <th className="text-base md:text-lg font-medium">Updated</th>
+
                   {canManage && (
                     <th className="text-base md:text-lg font-medium">
                       Actions
@@ -451,12 +539,21 @@ const AccountDashboard = () => {
 
                     {canManage && (
                       <td>
-                        <button
-                          className="btn btn-xs btn-error"
-                          onClick={() => requestDeactivate(user)}
-                        >
-                          Deactivate
-                        </button>
+                        {user.status === Status.LOCKED ? (
+                          <button
+                            className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => requestUnlock(user)}
+                          >
+                            Unlock
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-xs btn-error"
+                            onClick={() => requestDeactivate(user)}
+                          >
+                            Deactivate
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>

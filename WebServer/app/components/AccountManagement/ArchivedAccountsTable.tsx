@@ -1,16 +1,24 @@
+"use client";
+
 import { User } from "@/app/generated/prisma/browser";
 import { formatDate } from "@/app/lib/utils";
 import { useState } from "react";
+import { usePopup } from "../Popup/PopupProvider";
+import { unbanAccount } from "./AccountActions";
 
 const ArchivedAccountsTable = ({
   allUsers,
   pageSize,
+  onRestore,
 }: {
   allUsers: User[];
   pageSize: number;
+  onRestore?: (ids: string[]) => void;
 }) => {
   const [archivePage, setArchivePage] = useState(1);
+  const popup = usePopup();
   const archivedUsers = allUsers.filter((u) => u.status === "INACTIVE");
+
   const paginatedArchivedUsers = archivedUsers.slice(
     (archivePage - 1) * pageSize,
     archivePage * pageSize,
@@ -34,6 +42,7 @@ const ArchivedAccountsTable = ({
               <th className="font-medium">Email</th>
               <th className="font-medium">Role</th>
               <th className="font-medium">Updated</th>
+              <th className="font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -51,6 +60,29 @@ const ArchivedAccountsTable = ({
                   <td className="text-base md:text-lg">{user.role}</td>
                   <td className="text-base md:text-lg">
                     {formatDate(user.updatedAt)}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
+                      onClick={async () => {
+                        const confirm = await popup.showYesNo(
+                          `Restore ${user.name} to active accounts?`,
+                        );
+                        if (!confirm) return;
+                        const result = await unbanAccount([user.id]);
+                        if (!result.success) {
+                          popup.showError(
+                            "Error restoring account: " + result.error,
+                            "error",
+                          );
+                          return;
+                        }
+                        popup.showSuccess("Account restored successfully");
+                        if (onRestore) onRestore([user.id]);
+                      }}
+                    >
+                      Reactivate
+                    </button>
                   </td>
                 </tr>
               ))
