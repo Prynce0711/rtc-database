@@ -1,15 +1,13 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
+import { AnimatePresence } from "framer-motion";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCopy, FiDownload, FiSearch } from "react-icons/fi";
 import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCases } from "../Case/CasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
 import { usePopup } from "../Popup/PopupProvider";
-import { Pagination } from "../Pagination";
 import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
 import LogBadges from "./LogBadges";
