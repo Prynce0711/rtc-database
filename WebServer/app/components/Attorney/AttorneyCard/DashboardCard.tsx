@@ -1,34 +1,13 @@
-/**
- * Dashboard Card Component
- * 
- * Displays a statistic card with:
- * - Title and numeric value
- * - Icon representation
- * - Optional trend indicator (up/down percentage)
- * - Optional click handler for navigation
- * - Customizable color theme
- * 
- * Used in the attorney dashboard to show case statistics.
- */
-
 import React from "react";
 
-/** Props for the DashboardCard component */
 interface DashboardCardProps {
-  /** Card title text */
   title: string;
-  /** Numeric or string value to display */
   value: string | number;
-  /** Icon element to display */
   icon: React.ReactNode;
-  /** Optional trend data showing change from previous period */
   trend?: {
-    /** Percentage value of change */
     value: number;
-    /** Whether the trend is positive (going up) */
     isPositive: boolean;
   };
-  /** Color theme for the card (uses DaisyUI color classes) */
   color?:
     | "primary"
     | "secondary"
@@ -37,9 +16,19 @@ interface DashboardCardProps {
     | "success"
     | "warning"
     | "error";
-  /** Optional click handler - makes the card clickable */
   onClick?: () => void;
 }
+
+/* ✅ Tailwind SAFE Color Mapping */
+const colorClasses = {
+  primary: "text-primary",
+  secondary: "text-secondary",
+  accent: "text-accent",
+  info: "text-info",
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-error",
+};
 
 const DashboardCard: React.FC<DashboardCardProps> = ({
   title,
@@ -56,15 +45,23 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
       }`}
       onClick={onClick}
     >
-      <div className="stat-figure text-${color}">{icon}</div>
+      {/* ICON */}
+      <div className={`stat-figure ${colorClasses[color]}`}>{icon}</div>
+
+      {/* TITLE */}
       <div className="stat-title">{title}</div>
-      <div className={`stat-value text-${color}`}>{value}</div>
+
+      {/* VALUE */}
+      <div className={`stat-value ${colorClasses[color]}`}>{value}</div>
+
+      {/* TREND */}
       {trend && (
         <div
-          className={`stat-desc ${trend.isPositive ? "text-success" : "text-error"}`}
+          className={`stat-desc ${
+            trend.isPositive ? "text-success" : "text-error"
+          }`}
         >
-          {trend.isPositive ? "↗︎" : "↘︎"} {Math.abs(trend.value)}% from last
-          month
+          {trend.isPositive ? "↗︎" : "↘︎"} {Math.abs(trend.value)}%
         </div>
       )}
     </div>

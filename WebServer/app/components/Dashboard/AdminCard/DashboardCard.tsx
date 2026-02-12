@@ -3,7 +3,7 @@ import React from "react";
 interface DashboardCardProps {
   title: string;
   value: string | number;
-  icon: React.ReactNode;
+  icon?: React.ReactNode; // ✅ OPTIONAL NA
   trend?: {
     value: number;
     isPositive: boolean;
@@ -29,17 +29,23 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-base-300  rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow text-center ${
+      className={`bg-base-300 rounded-2xl shadow-lg border border-base-200 p-6 hover:shadow-xl transition-shadow text-center ${
         onClick ? "cursor-pointer" : ""
       }`}
       onClick={onClick}
     >
-      <p className="text-base font-bold text-base mb-3">{title}</p>
-      <p className="text-5xl font-bold text-primary">{value}</p>
+      {/* ICON (OPTIONAL) */}
+      {icon && <div className={`mb-2 text-${color}`}>{icon}</div>}
+
+      <p className="text-base font-bold mb-3">{title}</p>
+
+      <p className={`text-5xl font-bold text-${color}`}>{value}</p>
 
       {trend && (
         <div
-          className={`stat-desc ${trend.isPositive ? "text-success" : "text-error"}`}
+          className={`mt-2 text-sm ${
+            trend.isPositive ? "text-success" : "text-error"
+          }`}
         >
           {trend.isPositive ? "↗︎" : "↘︎"} {Math.abs(trend.value)}% from last
           month

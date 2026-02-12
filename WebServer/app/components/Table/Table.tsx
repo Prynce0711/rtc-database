@@ -76,37 +76,55 @@ const Table = <T extends Record<string, unknown>>({
   return (
     <div className={className}>
       <div className="overflow-x-auto ">
-        <table className="table  table-compact w-full text-center">
-          <thead className="bg-base-300 text-base ">
+        <table className="table table-compact w-full">
+          <thead className="bg-base-300 text-base">
             <tr>
               {headers.map((h) => (
                 <th
                   key={h.key}
-                  className={`${h.className ?? ""} text-xl font-semibold ${h.align === "center" ? "text-center" : h.align === "right" ? "text-right" : "text-left"}`}
+                  className={`
+                ${h.className ?? ""}
+                ${
+                  h.align === "center"
+                    ? "text-center"
+                    : h.align === "right"
+                      ? "text-right"
+                      : "text-left"
+                }
+              `}
                 >
                   {h.sortable ? (
                     <button
                       type="button"
-                      className="flex items-center gap-2 mx-auto"
+                      className={`flex w-full items-center gap-2 ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
                       onClick={() => {
                         if (!onSort) return;
                         const key = h.sortKey ?? (h.key as keyof T);
                         onSort(key);
                       }}
                     >
-                      <span className="text-xl font-semibold">{h.label}</span>
-                      {sortConfig?.key === (h.sortKey ?? h.key) ? (
-                        <span>{sortConfig.order === "asc" ? "↑" : "↓"}</span>
-                      ) : null}
+                      <span className="font-semibold text-base">{h.label}</span>
+
+                      {sortConfig?.key === (h.sortKey ?? h.key) && (
+                        <span className="text-sm opacity-70">
+                          {sortConfig.order === "asc" ? "▲" : "▼"}
+                        </span>
+                      )}
                     </button>
                   ) : (
-                    <span className="text-xl font-semibold">{h.label}</span>
+                    <div
+                      className={`flex w-full ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
+                    >
+                      <span className="text-xl font-semibold">{h.label}</span>
+                    </div>
                   )}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="text-lx font-medium">
+
+          {/* BODY */}
+          <tbody className="text-sm">
             {paginated.map((d, i) =>
               renderRow(d, (page - 1) * rowsPerPage + i),
             )}
@@ -114,55 +132,58 @@ const Table = <T extends Record<string, unknown>>({
         </table>
       </div>
 
+      {/* PAGINATION */}
       {showPagination && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-4 mt-4">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
+          {/* Info */}
           <div className="text-sm text-base-content/70">
             Showing{" "}
             <span className="font-semibold">
               {(page - 1) * rowsPerPage + 1}
             </span>{" "}
-            -{" "}
+            –{" "}
             <span className="font-semibold">
               {Math.min(page * rowsPerPage, data.length)}
             </span>{" "}
             of <span className="font-semibold">{data.length}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <nav className="flex items-center gap-2">
-              <button
-                className="px-2 text-sm"
-                onClick={() => gotoPage(page - 1)}
-                disabled={page === 1}
-              >
-                Prev
-              </button>
+          {/* Controls */}
+          <nav className="flex items-center gap-1">
+            <button
+              className="btn btn-xs btn-ghost"
+              onClick={() => gotoPage(page - 1)}
+              disabled={page === 1}
+            >
+              Prev
+            </button>
 
-              {visiblePages.map((p, idx) =>
-                p === "..." ? (
-                  <span key={`dots-${idx}`} className="px-2">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={`page-${p}`}
-                    onClick={() => gotoPage(Number(p))}
-                    className={`px-2 text-sm ${page === Number(p) ? "text-primary font-medium" : "text-primary/80 hover:underline"}`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
+            {visiblePages.map((p, idx) =>
+              p === "..." ? (
+                <span key={`dots-${idx}`} className="px-2 text-sm opacity-50">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={`page-${p}`}
+                  onClick={() => gotoPage(Number(p))}
+                  className={`btn btn-xs ${
+                    page === Number(p) ? "btn-primary" : "btn-ghost"
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
 
-              <button
-                className="px-2 text-sm"
-                onClick={() => gotoPage(page + 1)}
-                disabled={page === totalPages}
-              >
-                Next
-              </button>
-            </nav>
-          </div>
+            <button
+              className="btn btn-xs btn-ghost"
+              onClick={() => gotoPage(page + 1)}
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
+          </nav>
         </div>
       )}
     </div>

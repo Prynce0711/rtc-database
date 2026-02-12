@@ -536,10 +536,10 @@ const EmployeeDashboard: React.FC = () => {
         <div className="xl:col-span-9 space-y-6">
           {/* KPI CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 ">
-            <KpiCard title="Total Employees" value={analytics.totalEmployees} />
-            <KpiCard title="Branches" value={analytics.totalBranches} />
-            <KpiCard title="Complete Profiles" value={analytics.withMedical} />
-            <KpiCard title="Pending" value={analytics.missingEmail} />
+            <KpiCard title="TOTAL EMPLOYEES" value={analytics.totalEmployees} />
+            <KpiCard title="BRANCHES" value={analytics.totalBranches} />
+            <KpiCard title="COMPLETE PROFILES" value={analytics.withMedical} />
+            <KpiCard title="PENDING" value={analytics.missingEmail} />
           </div>
 
           {/* TABLE */}

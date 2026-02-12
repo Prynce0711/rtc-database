@@ -1,313 +1,280 @@
 "use client";
 
-/**
- * Attorney Dashboard Component
- *
- * Main dashboard view for attorney users that displays:
- * - Case statistics (total, detained, pending raffle, recent)
- * - Quick action buttons for common tasks
- * - Recent cases table with the 5 most recent cases
- *
- * This component fetches all cases from the database and calculates
- * statistics and recent case data for display.
- */
-
-import React, { useEffect, useState } from "react";
+import { getCases } from "@/app/components/Case/CasesActions";
+import { BarChart3, RefreshCw, Scale, Server } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { Case } from "../../generated/prisma/client";
-import { getCases } from "../Case/CasesActions";
 import DashboardLayout from "../Dashboard/DashboardLayout";
-import { DashboardCard, QuickActions, RecentCases } from "./AttorneyCard";
+import { RecentCases } from "./AttorneyCard";
 
-/** Props for the AttorneyDashboard component */
-interface AttorneyDashboardProps {
-  /** Optional callback to navigate to different views */
+interface Props {
   onNavigate?: (view: string) => void;
 }
 
-const AttorneyDashboard: React.FC<AttorneyDashboardProps> = ({
-  onNavigate,
-}) => {
-  // ============ State Management ============
-  /** All cases loaded from the database */
-  const [cases, setCases] = useState<Case[]>([]);
-  /** Loading state for fetching cases */
+const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
+    "overview",
+  );
 
-  // ============ Data Fetching ============
-  /**
-   * Fetches all cases from the database using the getCases server action
-   * Updates the cases state on success, or sets empty array on failure
-   */
-  const fetchCases = async () => {
-    try {
-      setLoading(true);
-      const response = await getCases();
-
-      if (!response.success) {
-        console.error("Failed to load cases:", response.error);
-        setCases([]);
-        return;
-      }
-
-      setCases(response.result);
-    } catch (err) {
-      console.error("Error fetching cases:", err);
-      setCases([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load cases on component mount
+  /* ================= FETCH CASES ================= */
   useEffect(() => {
+    async function fetchCases() {
+      try {
+        const res = await getCases();
+        if (res.success) setCases(res.result);
+      } finally {
+        setLoading(false);
+      }
+    }
     fetchCases();
   }, []);
 
-  // ============ Statistics Calculation ============
-  /**
-   * Calculate various statistics from the loaded cases:
-   * - Total number of cases
-   * - Number of detained cases
-   * - Number of cases pending raffle date assignment
-   * - Number of cases filed in the last 30 days
-   */
-  const stats = {
-    totalCases: cases.length,
-    detainedCases: cases.filter((c) => c.detained).length,
-    pendingRaffle: cases.filter((c) => !c.raffleDate).length,
-    recentCases: cases.filter((c) => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return new Date(c.dateFiled) >= thirtyDaysAgo;
-    }).length,
-  };
+  /* ================= KPI STATS ================= */
+  const stats = useMemo(() => {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // ============ Recent Cases ============
-  /**
-   * Get the 5 most recently filed cases
-   * Sorted by dateFiled in descending order (newest first)
-   */
-  const recentCases = [...cases]
-    .sort(
-      (a, b) =>
-        new Date(b.dateFiled).getTime() - new Date(a.dateFiled).getTime(),
-    )
-    .slice(0, 5);
+    const total = cases.length;
+    const detained = cases.filter((c) => c.detained).length;
+    const pendingRaffle = cases.filter((c) => !c.raffleDate).length;
 
-  // ============ Quick Actions Configuration ============
-  /**
-   * Define quick action buttons for common tasks
-   * Each action has a title, description, icon, onClick handler, and color
-   */
-  const quickActions = [
-    {
-      title: "Add New Case",
-      description: "Register a new court case",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-      ),
-      onClick: () => onNavigate?.("cases"),
-      color: "btn-primary",
-    },
-    {
-      title: "View All Cases",
-      description: "Browse and manage cases",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-      ),
-      onClick: () => onNavigate?.("cases"),
-      color: "btn-secondary",
-    },
-    {
-      title: "Generate Report",
-      description: "Create case statistics report",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-      ),
-      onClick: () => alert("Report generation coming soon!"),
-      color: "btn-accent",
-    },
-    {
-      title: "Manage Users",
-      description: "Add or modify user accounts",
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-      ),
-      onClick: () => alert("User management coming soon!"),
-      color: "btn-info",
-    },
-  ];
+    const thisMonth = cases.filter(
+      (c) => new Date(c.dateFiled) >= thirtyDaysAgo,
+    ).length;
 
-  // ============ Loading State ============
-  // Show loading spinner while fetching cases
+    const lastMonth = cases.filter((c) => {
+      const date = new Date(c.dateFiled);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      return date >= sixtyDaysAgo && date < thirtyDaysAgo;
+    }).length;
+
+    const growth =
+      lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : 0;
+
+    return {
+      total,
+      detained,
+      pendingRaffle,
+      active: total - detained,
+      thisMonth,
+      growth,
+      detainedPercentage: total > 0 ? (detained / total) * 100 : 0,
+    };
+  }, [cases]);
+
+  /* ================= MONTHLY TREND ================= */
+  const monthlyTrends = useMemo(() => {
+    const monthMap: Record<string, number> = {};
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const key = date.toLocaleString("default", {
+        month: "short",
+        year: "2-digit",
+      });
+      monthMap[key] = 0;
+    }
+
+    cases.forEach((c) => {
+      const key = new Date(c.dateFiled).toLocaleString("default", {
+        month: "short",
+        year: "2-digit",
+      });
+      if (monthMap[key] !== undefined) monthMap[key]++;
+    });
+
+    return Object.entries(monthMap).map(([month, value]) => ({
+      month,
+      cases: value,
+    }));
+  }, [cases]);
+
+  /* ================= BRANCH PERFORMANCE ================= */
+  const branchPerformance = useMemo(() => {
+    const branchMap: Record<string, number> = {};
+
+    cases.forEach((c) => {
+      if (!c.branch) return;
+      branchMap[c.branch] = (branchMap[c.branch] || 0) + 1;
+    });
+
+    return Object.entries(branchMap).map(([branch, count]) => ({
+      branch,
+      cases: count,
+    }));
+  }, [cases]);
+
+  /* ================= LOADING ================= */
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
+      <DashboardLayout>
+        <div className="flex h-[60vh] items-center justify-center">
+          <Server className="h-10 w-10 animate-pulse text-primary" />
+        </div>
+      </DashboardLayout>
     );
   }
 
-  // ============ Main Dashboard Render ============
   return (
-    <DashboardLayout
-      title="Welcome, attorney"
-      subtitle="Manage court operations and personnel"
-    >
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <DashboardCard
-          title="Total Cases"
-          value={stats.totalCases}
-          icon={
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          }
-          color="primary"
-          onClick={() => onNavigate?.("cases")}
-        />
+    <DashboardLayout>
+      <div className="min-h-screen bg-base-100">
+        <div className="max-w-[1800px] mx-auto space-y-8 pb-8">
+          {/* HEADER */}
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            <div>
+              <h1 className="text-5xl font-black text-base-content">
+                Attorney Dashboard
+              </h1>
+              <p className="text-base-content/60 text-xl">
+                Legal case monitoring and performance insights
+              </p>
+            </div>
 
-        <DashboardCard
-          title="Detained Cases"
-          value={stats.detainedCases}
-          icon={
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          }
-          color="warning"
-        />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setActiveTab("overview")}
+                className={`btn ${activeTab === "overview" ? "btn-primary" : "btn-ghost"}`}
+              >
+                <BarChart3 className="h-5 w-5" /> Overview
+              </button>
+              <button
+                onClick={() => setActiveTab("analytics")}
+                className={`btn ${activeTab === "analytics" ? "btn-primary" : "btn-ghost"}`}
+              >
+                <Scale className="h-5 w-5" /> Analytics
+              </button>
+              <button className="btn btn-outline">
+                <RefreshCw className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
 
-        <DashboardCard
-          title="Pending Raffle"
-          value={stats.pendingRaffle}
-          icon={
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-          color="info"
-        />
-        <DashboardCard
-          title="Recent (30 Days)"
-          value={stats.recentCases}
-          icon={
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-              />
-            </svg>
-          }
-          color="success"
-        />
-      </div>
+          {/* ================= OVERVIEW ================= */}
+          {activeTab === "overview" && (
+            <>
+              {/* KPI */}
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-center">
+                <div className="rounded-2xl bg-base-300 p-6 shadow-lg ">
+                  <p className="font-bold uppercase mb-2">Total Cases</p>
+                  <p className="text-5xl font-black text-primary ">
+                    {stats.total}
+                  </p>
+                </div>
 
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <QuickActions actions={quickActions} />
-      </div>
+                <div className="rounded-2xl bg-base-300 p-6 shadow-lg">
+                  <p className="font-bold uppercase mb-2">Active</p>
+                  <p className="text-5xl font-black text-primary">
+                    {stats.active}
+                  </p>
+                </div>
 
-      {/* Recent Cases */}
-      <div>
-        <RecentCases
-          cases={recentCases}
-          onViewAll={() => onNavigate?.("cases")}
-        />
+                <div className="rounded-2xl bg-base-300 p-6 shadow-lg">
+                  <p className="font-bold uppercase mb-2">Detained</p>
+                  <p className="text-5xl font-black text-primary">
+                    {stats.detained}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-base-300 p-6 shadow-lg">
+                  <p className="font-bold uppercase mb-2">This Month</p>
+                  <p className="text-5xl font-black text-primary  ">
+                    {stats.thisMonth}
+                  </p>
+                </div>
+              </div>
+
+              {/* CHART */}
+              <div className="rounded-2xl bg-base-100 p-8 shadow-xl">
+                <h2 className="text-3xl font-black ">Case Growth Trends</h2>
+                <p className=" text-lg font-medium text-base-content/50 mb-6">
+                  1 month performance overview
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={monthlyTrends}>
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="cases"
+                      stroke="#4f46e5"
+                      fill="#c7d2fe"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* RECENT CASES */}
+              <RecentCases
+                cases={cases.slice(0, 5)}
+                onViewAll={() => onNavigate?.("cases")}
+              />
+            </>
+          )}
+
+          {/* ================= ANALYTICS ================= */}
+          {activeTab === "analytics" && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <div className="rounded-2xl bg-base-100 p-8 shadow-xl">
+                <h2 className="text-3xl font-black">Detention Breakdown</h2>{" "}
+                <p className=" text-base text-lg font-medium text-base-content/50  mb-6">
+                  Status breakdown
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Detained", value: stats.detained },
+                        {
+                          name: "Released",
+                          value: stats.total - stats.detained,
+                        },
+                      ]}
+                      dataKey="value"
+                      outerRadius={110}
+                    >
+                      <Cell fill="#f59e0b" />
+                      <Cell fill="#10b981" />
+                    </Pie>
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="rounded-2xl bg-base-100 p-8 shadow-xl">
+                <h2 className="text-3xl font-black ">Branch Distribution</h2>{" "}
+                <p className=" text-base text-lg font-medium text-base-content/50  mb-6">
+                  Processing completion rates
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={branchPerformance}>
+                    <XAxis dataKey="branch" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="cases" fill="#6366f1" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -14,6 +14,28 @@ const Login: React.FC = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
 
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("rememberMe") === "true";
+      }
+    } catch {
+      /* ignore */
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && rememberMe) {
+        const remembered = localStorage.getItem("rememberedEmail") || "";
+        if (remembered) setEmail(remembered);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [rememberMe]);
+
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
 
@@ -58,13 +80,25 @@ const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
     setIsLoading(true);
 
     try {
-      const { data, error: signInError } = await signIn.email({
-        email,
-        password,
-      });
+      let res: any;
+      try {
+        res = await signIn.email({ email, password });
+      } catch (e: any) {
+        setIsLoading(false);
+        const status = e?.response?.status ?? e?.status ?? null;
+        if (status && status >= 500) {
+          setError("Server error. Please try again later.");
+        } else {
+          setError("An unexpected error occurred. Please try again.");
+        }
+        return;
+      }
+
+      const { data, error: signInError } = res;
 
       if (signInError) {
         setError("Invalid email or password. Please try again.");
@@ -85,6 +119,19 @@ const Login: React.FC = () => {
         await new Promise((r) => setTimeout(r, 120));
       } catch {}
 
+      // reset attempts on successful sign in
+
+      try {
+        if (typeof window !== "undefined") {
+          if (rememberMe) {
+            localStorage.setItem("rememberMe", "true");
+            localStorage.setItem("rememberedEmail", email);
+          } else {
+            localStorage.removeItem("rememberMe");
+            localStorage.removeItem("rememberedEmail");
+          }
+        }
+      } catch {}
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -93,7 +140,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
         {/* full-screen overlay used during transition */}
         <motion.div
@@ -102,6 +149,7 @@ const Login: React.FC = () => {
           animate={overlayControls}
           style={{ pointerEvents: "none" }}
         />
+
         {/* Logo and Header */}
         <motion.div
           className="text-center mb-10"
@@ -113,24 +161,63 @@ const Login: React.FC = () => {
           }}
         >
           <div className="flex justify-center mb-6">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"></div>
+            <motion.div
+              className="relative group"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 200,
+                damping: 20,
+                delay: 0.1,
+              }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"
+                animate={{
+                  scale: [1, 1.1, 1],
+                  opacity: [0.2, 0.3, 0.2],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
               <img
                 src="/SupremeCourtLogo.webp"
                 alt="Supreme Court of the Philippines"
                 className="w-32 h-32 object-contain relative z-10 drop-shadow-lg"
               />
-            </div>
+            </motion.div>
           </div>
-          <h1 className="text-4xl font-bold text-base-content mb-2 tracking-tight">
+
+          <motion.h1
+            className="text-4xl font-bold text-base-content mb-2 tracking-tight"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
             Regional Trial Court
-          </h1>
-          <p className="text-lg text-base-content/90 font-semibold">
+          </motion.h1>
+
+          <motion.p
+            className="text-lg text-base-content/90 font-semibold"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
             Republic of the Philippines
-          </p>
-          <p className="text-sm text-base-content/60 italic mt-2 font-medium">
+          </motion.p>
+
+          <motion.p
+            className="text-sm text-base-content/60 italic mt-2 font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.6 }}
+            transition={{ delay: 0.5 }}
+          >
             "Batas at Bayan"
-          </p>
+          </motion.p>
         </motion.div>
 
         {/* Login Form */}
@@ -146,14 +233,19 @@ const Login: React.FC = () => {
           }}
           style={{ WebkitTapHighlightColor: "transparent" }}
         >
-          <div className="mb-8">
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <h2 className="text-4xl font-bold text-base-content text-center">
               Sign In
             </h2>
             <p className="text-md text-base-content/60 text-center mt-4">
               Enter your credentials to access your account
             </p>
-          </div>
+          </motion.div>
 
           {/* Error Alert */}
           <AnimatePresence mode="wait">
@@ -192,7 +284,12 @@ const Login: React.FC = () => {
           </AnimatePresence>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            <div className="form-control">
+            <motion.div
+              className="form-control"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+            >
               <label htmlFor="email" className="label">
                 <span className="label-text font-semibold text-base">
                   Email Address
@@ -203,14 +300,19 @@ const Login: React.FC = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200"
+                className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 focus:scale-[1.02]"
                 placeholder="admin@rtc.gov.ph"
                 required
                 disabled={isLoading}
               />
-            </div>
+            </motion.div>
 
-            <div className="form-control">
+            <motion.div
+              className="form-control"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+            >
               <label htmlFor="password" className="label">
                 <span className="label-text font-semibold text-base">
                   Password
@@ -223,27 +325,62 @@ const Login: React.FC = () => {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 pr-12"
+                  className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 pr-12 focus:scale-[1.02]"
                   placeholder="••••••••"
                   required
                   disabled={isLoading}
                 />
 
-                <button
+                <motion.button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content transition"
                   disabled={isLoading}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
 
-            <button
+            <motion.div
+              className="flex items-center gap-2 justify-start w-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+            >
+              <input
+                id="remember"
+                type="checkbox"
+                className="checkbox"
+                checked={rememberMe}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setRememberMe(v);
+                  try {
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("rememberMe", String(v));
+                      if (v) localStorage.setItem("rememberedEmail", email);
+                      else localStorage.removeItem("rememberedEmail");
+                    }
+                  } catch {}
+                }}
+              />
+              <label htmlFor="remember" className="text-sm cursor-pointer">
+                Remember me
+              </label>
+            </motion.div>
+
+            <motion.button
               type="submit"
               disabled={isLoading}
               className="btn btn-primary w-full text-base font-semibold mt-6 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
             >
               {isLoading ? (
                 <>
@@ -253,7 +390,7 @@ const Login: React.FC = () => {
               ) : (
                 "Sign In"
               )}
-            </button>
+            </motion.button>
           </form>
 
           <div className="divider text-xs text-base-content/50 mt-8">
@@ -268,14 +405,25 @@ const Login: React.FC = () => {
         </motion.div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-base-content/50">
+        <motion.div
+          className="text-center mt-8 text-sm text-base-content/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ delay: 0.9 }}
+        >
           <p>© 2026 Regional Trial Court. All rights reserved.</p>
-        </div>
-        <p className="mt-2 text-xs opacity-60 text-center">
+        </motion.div>
+
+        <motion.p
+          className="mt-2 text-xs opacity-60 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.6 }}
+          transition={{ delay: 1 }}
+        >
           This system contains confidential information for authorized use only.
           Unauthorized access is strictly prohibited and may lead to legal
           action.
-        </p>
+        </motion.p>
       </div>
     </div>
   );

@@ -26,19 +26,23 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
     <div className="bg-base-100 rounded-lg shadow p-6">
       {/* Header with title and optional View All button */}
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold">Recent Cases</h3>
+        <h3 className="text-3xl font-bold">Recent Cases</h3>
         {/* Only show View All button if callback is provided */}
         {onViewAll && (
-          <button className="btn btn-sm btn-ghost" onClick={onViewAll}>
+          <button
+            className="btn btn-sm btn-ghost font-black text-md"
+            onClick={onViewAll}
+          >
             View All →
           </button>
         )}
       </div>
       {/* Scrollable table container for mobile responsiveness */}
       <div className="overflow-x-auto">
-        <table className="table table-sm">
-          <thead>
-            <tr>
+        <table className="table border-separate border-spacing-y-2">
+          {/* HEADER */}
+          <thead className="bg-base-300">
+            <tr className="text-sm uppercase tracking-wide text-base-content/60">
               <th>Case Number</th>
               <th>Name</th>
               <th>Charge</th>
@@ -47,29 +51,54 @@ const RecentCases: React.FC<RecentCasesProps> = ({ cases, onViewAll }) => {
               <th>Status</th>
             </tr>
           </thead>
+
+          {/* BODY */}
           <tbody>
-            {/* Show empty state message if no cases */}
             {cases.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center opacity-50">
+                <td
+                  colSpan={6}
+                  className="text-center py-6 text-base-content/50"
+                >
                   No recent cases
                 </td>
               </tr>
             ) : (
-              /* Map through cases and display each row */
               cases.map((caseItem) => (
-                <tr key={caseItem.id} className="hover">
-                  <td className="font-medium">{caseItem.caseNumber}</td>
-                  <td>{caseItem.name}</td>
-                  <td>{caseItem.charge}</td>
-                  <td>{caseItem.branch}</td>
-                  <td>{new Date(caseItem.dateFiled).toLocaleDateString()}</td>
+                <tr
+                  key={caseItem.id}
+                  className="bg-base-100 hover:bg-base-200 transition rounded-xl"
+                >
+                  {/* Case Number */}
+                  <td className="font-semibold text-base">
+                    {caseItem.caseNumber}
+                  </td>
+
+                  {/* Name */}
+                  <td className="text-base-content/80 font-medium">
+                    {caseItem.name}
+                  </td>
+
+                  {/* Charge */}
+                  <td className="text-base-content/70">{caseItem.charge}</td>
+
+                  {/* Branch */}
+                  <td className="text-base-content/70">{caseItem.branch}</td>
+
+                  {/* Date */}
+                  <td className="text-base-content/60 text-sm">
+                    {new Date(caseItem.dateFiled).toLocaleDateString()}
+                  </td>
+
+                  {/* Status */}
                   <td>
-                    {/* Status badge: warning for detained, success for free */}
                     <span
-                      className={`badge badge-sm ${
-                        caseItem.detained ? "badge-warning" : "badge-success"
-                      }`}
+                      className={`badge backdrop-blur-md border font-medium
+                ${
+                  caseItem.detained
+                    ? "bg-red-500/15 text-red-600 border-red-400/30"
+                    : "bg-emerald-500/15 text-emerald-600 border-emerald-400/30"
+                }`}
                     >
                       {caseItem.detained ? "Detained" : "Free"}
                     </span>
