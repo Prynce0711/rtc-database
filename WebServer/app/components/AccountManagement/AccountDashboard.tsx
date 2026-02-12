@@ -29,9 +29,9 @@ const AccountDashboard = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [users, setUsers] = useState<User[]>([]);
-  const [activeView, setActiveView] = useState<"all" | "accounts" | "archive">(
-    "accounts",
-  );
+  const [activeView, setActiveView] = useState<
+    "all" | "accounts" | "archive" | "locked"
+  >("accounts");
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -59,6 +59,8 @@ const AccountDashboard = () => {
     [users],
   );
 
+  const formatBadgeCount = (n: number) => (n > 9 ? "9+" : String(n));
+
   /* ===== FILTER + SORT ===== */
   const filteredUsers = useMemo(() => {
     let data = [...users];
@@ -80,6 +82,8 @@ const AccountDashboard = () => {
       data = data.filter((u) => u.status === Status.ACTIVE);
     } else if (activeView === "archive") {
       data = data.filter((u) => u.status === Status.INACTIVE);
+    } else if (activeView === "locked") {
+      data = data.filter((u) => u.status === Status.LOCKED);
     }
 
     data.sort((a, b) => {
@@ -276,7 +280,10 @@ const AccountDashboard = () => {
               type="button"
               onClick={() => setActiveView("all")}
             >
-              All
+              <span>All</span>
+              <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
+                {formatBadgeCount(stats.total)}
+              </span>
             </button>
             <button
               className={`btn btn-md join-item ${
@@ -285,7 +292,10 @@ const AccountDashboard = () => {
               type="button"
               onClick={() => setActiveView("accounts")}
             >
-              Accounts
+              <span>Accounts</span>
+              <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
+                {formatBadgeCount(stats.active)}
+              </span>
             </button>
             <button
               className={`btn btn-md join-item ${
@@ -294,7 +304,22 @@ const AccountDashboard = () => {
               type="button"
               onClick={() => setActiveView("archive")}
             >
-              Archive
+              <span>Deactivated</span>
+              <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
+                {formatBadgeCount(stats.inactive)}
+              </span>
+            </button>
+            <button
+              className={`btn btn-md join-item ${
+                activeView === "locked" ? "btn-primary" : "btn-outline"
+              }`}
+              type="button"
+              onClick={() => setActiveView("locked")}
+            >
+              <span>locked</span>
+              <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
+                {formatBadgeCount(stats.inactive)}
+              </span>
             </button>
           </div>
 

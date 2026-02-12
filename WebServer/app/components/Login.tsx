@@ -13,6 +13,59 @@ const Login: React.FC = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
 
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("rememberMe") === "true";
+      }
+    } catch {
+      /* ignore */
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && rememberMe) {
+        const remembered = localStorage.getItem("rememberedEmail") || "";
+        if (remembered) setEmail(remembered);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [rememberMe]);
+
+  const [attemptCount, setAttemptCount] = useState<number>(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("loginAttempts");
+        return stored ? parseInt(stored, 10) || 0 : 0;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 0;
+  });
+  const locked = attemptCount >= 3;
+  const [showLockedModal, setShowLockedModal] = useState<boolean>(locked);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("loginAttempts", String(attemptCount));
+      }
+    } catch {
+      /* ignore */
+    }
+    if (attemptCount >= 3) setShowLockedModal(true);
+  }, [attemptCount]);
+
+  useEffect(() => {
+    if (!showLockedModal) return;
+    const t = setTimeout(() => setShowLockedModal(false), 3000);
+    return () => clearTimeout(t);
+  }, [showLockedModal]);
+
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
 
@@ -57,16 +110,40 @@ const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (locked) {
+      setShowLockedModal(true);
+      return;
+    }
     setIsLoading(true);
 
     try {
-      const { data, error: signInError } = await signIn.email({
-        email,
-        password,
-      });
+      let res: any;
+      try {
+        res = await signIn.email({ email, password });
+      } catch (e: any) {
+        setIsLoading(false);
+        const status = e?.response?.status ?? e?.status ?? null;
+        if (status && status >= 500) {
+          setError("Server error. Please try again later.");
+        } else {
+          setError("An unexpected error occurred. Please try again.");
+        }
+        return;
+      }
+
+      const { data, error: signInError } = res;
 
       if (signInError) {
-        setError("Invalid email or password. Please try again.");
+        const next = attemptCount + 1;
+        setAttemptCount(next);
+        if (next >= 3) {
+          setShowLockedModal(true);
+          setError(
+            "Your account has been locked. Please ask permission to unlock your account to proceed.",
+          );
+        } else {
+          setError("Invalid email or password. Please try again.");
+        }
         setIsLoading(false);
         return;
       }
@@ -84,6 +161,23 @@ const Login: React.FC = () => {
         await new Promise((r) => setTimeout(r, 120));
       } catch {}
 
+      // reset attempts on successful sign in
+      setAttemptCount(0);
+      try {
+        if (typeof window !== "undefined")
+          localStorage.removeItem("loginAttempts");
+      } catch {}
+      try {
+        if (typeof window !== "undefined") {
+          if (rememberMe) {
+            localStorage.setItem("rememberMe", "true");
+            localStorage.setItem("rememberedEmail", email);
+          } else {
+            localStorage.removeItem("rememberMe");
+            localStorage.removeItem("rememberedEmail");
+          }
+        }
+      } catch {}
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -239,6 +333,29 @@ const Login: React.FC = () => {
               </div>
             </div>
 
+            <div className="flex items-center gap-2 justify-start w-full">
+              <input
+                id="remember"
+                type="checkbox"
+                className="checkbox"
+                checked={rememberMe}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setRememberMe(v);
+                  try {
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("rememberMe", String(v));
+                      if (v) localStorage.setItem("rememberedEmail", email);
+                      else localStorage.removeItem("rememberedEmail");
+                    }
+                  } catch {}
+                }}
+              />
+              <label htmlFor="remember" className="text-sm">
+                Remember me
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
@@ -275,6 +392,34 @@ const Login: React.FC = () => {
           Unauthorized access is strictly prohibited and may lead to legal
           action.
         </p>
+        {/* Locked modal - shown when 3 failed attempts occur */}
+        {showLockedModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="bg-base-100 rounded-xl shadow-2xl p-8 z-10 max-w-lg mx-4 text-center border border-base-300">
+              <h3 className="text-xl font-bold mb-2">Account Locked</h3>
+              <p className="mb-4 text-sm text-base-content/80">
+                Your account has been locked after multiple failed sign-in
+                attempts. Please ask permission to unlock your account to
+                proceed.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowLockedModal(false);
+                  }}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );
