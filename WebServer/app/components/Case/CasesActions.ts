@@ -1,10 +1,11 @@
 "use server";
 
-import { Case } from "@/app/generated/prisma/client";
+import { Case, LogAction } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../ActionResult";
+import { createLog } from "../ActivityLogs/LogActions";
 import { CaseSchema } from "./schema";
 
 export async function getCases(): Promise<ActionResult<Case[]>> {
@@ -39,6 +40,14 @@ export async function createCase(
     const newCase = await prisma.case.create({
       data: caseData.data,
     });
+
+    await createLog({
+      action: LogAction.CREATE_CASE,
+      details: {
+        id: newCase.id,
+      },
+    });
+
     return { success: true, result: newCase };
   } catch (error) {
     console.error("Error creating case:", error);
@@ -61,10 +70,29 @@ export async function updateCase(
       throw new Error(`Invalid case data: ${caseData.error.message}`);
     }
 
+    const originalCase = await prisma.case.findUnique({
+      where: { id: caseId },
+    });
+
+    if (!originalCase) {
+      throw new Error("Case not found");
+    }
     const updatedCase = await prisma.case.update({
       where: { id: caseId },
       data: caseData.data,
     });
+    if (!updatedCase) {
+      throw new Error("Failed to update case");
+    }
+
+    await createLog({
+      action: LogAction.UPDATE_CASE,
+      details: {
+        from: originalCase,
+        to: updatedCase,
+      },
+    });
+
     return { success: true, result: updatedCase };
   } catch (error) {
     console.error("Error updating case:", error);
@@ -72,9 +100,7 @@ export async function updateCase(
   }
 }
 
-export async function deleteCase(
-  caseNumber: string,
-): Promise<ActionResult<void>> {
+export async function deleteCase(caseId: number): Promise<ActionResult<void>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
@@ -82,8 +108,16 @@ export async function deleteCase(
     }
 
     await prisma.case.delete({
-      where: { caseNumber },
+      where: { id: caseId },
     });
+
+    await createLog({
+      action: LogAction.DELETE_CASE,
+      details: {
+        id: caseId,
+      },
+    });
+
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting case:", error);

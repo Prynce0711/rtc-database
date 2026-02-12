@@ -2,12 +2,13 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import { EmployeeSchema } from "@/app/components/Employee/schema";
-import { Prisma } from "@/app/generated/prisma/client";
+import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
+import { createLog } from "../ActivityLogs/LogActions";
 
 type ExportEmployeeExcelResult = {
   fileName: string;
@@ -151,8 +152,6 @@ export async function uploadEmployeeExcel(
       };
     });
 
-    console.log("Employee mapped data sample:", mappedData[0]);
-
     const validationResults = {
       employees: [] as Prisma.EmployeeCreateManyInput[],
       total: mappedData.length,
@@ -194,7 +193,15 @@ export async function uploadEmployeeExcel(
       };
     }
 
-    await prisma.employee.createMany({ data: validationResults.employees });
+    const createdEmployees = await prisma.employee.createManyAndReturn({
+      data: validationResults.employees,
+    });
+    await createLog({
+      action: LogAction.IMPORT_EMPLOYEES,
+      details: {
+        userIds: createdEmployees.map((e) => e.id),
+      },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {
@@ -254,6 +261,11 @@ export async function exportEmployeesExcel(): Promise<
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
     const fileName = `employees-export-${Date.now()}.xlsx`;
+
+    await createLog({
+      action: LogAction.EXPORT_EMPLOYEES,
+      details: null,
+    });
 
     return { success: true, result: { fileName, base64 } };
   } catch (error) {

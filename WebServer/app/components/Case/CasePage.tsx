@@ -291,7 +291,7 @@ const CasePage: React.FC = () => {
     setFilteredByAdvanced(filtered);
   };
 
-  const handleDeleteCase = async (caseNumber: string) => {
+  const handleDeleteCase = async (caseId: number) => {
     if (
       !(await statusPopup.showYesNo(
         "Are you sure you want to delete this case?",
@@ -300,7 +300,7 @@ const CasePage: React.FC = () => {
       return;
     }
 
-    const result = await deleteCase(caseNumber);
+    const result = await deleteCase(caseId);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete case");
       return;

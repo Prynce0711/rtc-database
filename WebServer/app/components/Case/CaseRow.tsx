@@ -15,7 +15,7 @@ const CaseRow = ({
   caseItem: Case;
   setSelectedCase: (caseItem: Case) => void;
   showModal: (type: CaseModalType) => void;
-  handleDeleteCase: (caseNumber: string) => void;
+  handleDeleteCase: (caseId: number) => void;
   onRowClick: (caseItem: Case) => void;
 }) => {
   const session = useSession();
@@ -60,7 +60,7 @@ const CaseRow = ({
               className="btn btn-sm btn-error btn-ghost"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeleteCase(caseItem.caseNumber);
+                handleDeleteCase(caseItem.id);
               }}
             >
               Delete

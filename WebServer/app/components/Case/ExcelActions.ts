@@ -2,12 +2,13 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import { CaseSchema } from "@/app/components/Case/schema";
-import { Prisma } from "@/app/generated/prisma/client";
+import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
+import { createLog } from "../ActivityLogs/LogActions";
 
 type ExportExcelResult = {
   fileName: string;
@@ -114,8 +115,6 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
       committe2: row["COMMITTEE 2"] ? Number(row["COMMITTEE 2"]) : undefined,
     }));
 
-    console.log("Mapped data sample:", mappedData[0]);
-
     // Validate each row with CaseSchema
     const validationResults = {
       cases: [] as Prisma.CaseCreateManyInput[],
@@ -160,7 +159,15 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
     // TODO: Save validated data to database
     // const prisma = ...
     // await prisma.case.createMany({ data: validatedCases });
-    await prisma.case.createMany({ data: validationResults.cases });
+    const createdCases = await prisma.case.createManyAndReturn({
+      data: validationResults.cases,
+    });
+    await createLog({
+      action: LogAction.IMPORT_CASES,
+      details: {
+        userIds: createdCases.map((c) => c.id),
+      },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {
@@ -204,6 +211,11 @@ export async function exportCasesExcel(): Promise<
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
     const fileName = `cases-export-${Date.now()}.xlsx`;
+
+    await createLog({
+      action: LogAction.EXPORT_CASES,
+      details: null,
+    });
 
     return { success: true, result: { fileName, base64 } };
   } catch (error) {

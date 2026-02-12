@@ -1,13 +1,16 @@
 "use server";
 
+import { User } from "better-auth";
 import { headers } from "next/headers";
 import ActionResult from "../components/ActionResult";
+import { createLog } from "../components/ActivityLogs/LogActions";
+import { LogAction } from "../generated/prisma/enums";
 import { auth } from "./auth";
 import Roles from "./Roles";
 
 export async function validateSession(
   role?: Roles[],
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<User>> {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -16,9 +19,12 @@ export async function validateSession(
       !session?.user ||
       (role && !role.includes(session.user.role as Roles))
     ) {
-      return { success: false, error: "Unauthorized" };
+      throw new Error(
+        "Unauthorized: Invalid session or insufficient permissions",
+      );
     }
-    return { success: true, result: undefined };
+
+    return { success: true, result: session.user };
   } catch (error) {
     console.error("Error validating session:", error);
     return { success: false, error: "Error validating session" };
@@ -27,6 +33,11 @@ export async function validateSession(
 
 export async function signOut(): Promise<ActionResult<void>> {
   try {
+    await createLog({
+      action: LogAction.LOGOUT,
+      details: null,
+    });
+
     await auth.api.signOut({
       headers: await headers(),
     });

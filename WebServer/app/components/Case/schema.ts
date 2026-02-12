@@ -18,29 +18,37 @@ export const CaseSchema = z.object({
   eqcNumber: z
     .union([
       z.number().int(),
-      z.string().transform((val) => (val ? parseInt(val) : undefined)),
+      z.string().transform((val) => (val ? parseInt(val) : null)),
     ])
+    .nullable()
     .optional(),
   bond: z
-    .union([z.number(), z.string().transform((val) => parseFloat(val))])
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
     .optional(),
   raffleDate: z
     .union([
       z.date(),
-      z.string().transform((val) => (val ? new Date(val) : undefined)),
+      z.string().transform((val) => (val ? new Date(val) : null)),
     ])
+    .nullable()
     .optional(),
   committe1: z
     .union([
       z.number().int(),
-      z.string().transform((val) => (val ? parseInt(val) : undefined)),
+      z.string().transform((val) => (val ? parseInt(val) : null)),
     ])
+    .nullable()
     .optional(),
   committe2: z
     .union([
       z.number().int(),
-      z.string().transform((val) => (val ? parseInt(val) : undefined)),
+      z.string().transform((val) => (val ? parseInt(val) : null)),
     ])
+    .nullable()
     .optional(),
 });
 export type CaseSchema = z.infer<typeof CaseSchema>;

@@ -1,10 +1,11 @@
 "use server";
 
-import { Employee } from "@/app/generated/prisma/browser";
+import { Employee, LogAction } from "@/app/generated/prisma/browser";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../ActionResult";
+import { createLog } from "../ActivityLogs/LogActions";
 import { EmployeeSchema } from "./schema";
 
 export async function getEmployees(): Promise<ActionResult<Employee[]>> {
@@ -39,6 +40,14 @@ export async function createEmployee(
     const newEmployee = await prisma.employee.create({
       data: employeeData.data,
     });
+
+    await createLog({
+      action: LogAction.CREATE_EMPLOYEE,
+      details: {
+        id: newEmployee.id,
+      },
+    });
+
     return { success: true, result: newEmployee };
   } catch (error) {
     console.error("Error creating employee:", error);
@@ -61,10 +70,27 @@ export async function updateEmployee(
       throw new Error(`Invalid employee data: ${employeeData.error.message}`);
     }
 
+    const oldEmployee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!oldEmployee) {
+      throw new Error("Employee not found");
+    }
+
     const updatedEmployee = await prisma.employee.update({
       where: { id: employeeId },
       data: employeeData.data,
     });
+
+    await createLog({
+      action: LogAction.UPDATE_EMPLOYEE,
+      details: {
+        from: oldEmployee,
+        to: updatedEmployee,
+      },
+    });
+
     return { success: true, result: updatedEmployee };
   } catch (error) {
     console.error("Error updating employee:", error);
@@ -81,9 +107,29 @@ export async function deleteEmployee(
       return sessionResult;
     }
 
+    if (!employeeId) {
+      throw new Error("Employee ID is required for deletion");
+    }
+
+    const employeeToDelete = await prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!employeeToDelete) {
+      throw new Error("Employee not found");
+    }
+
     await prisma.employee.delete({
       where: { id: employeeId },
     });
+
+    await createLog({
+      action: LogAction.DELETE_EMPLOYEE,
+      details: {
+        id: employeeId,
+      },
+    });
+
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting employee:", error);

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"nodemon\" \"prisma studio --browser none\"",
+    "dev:noudp": "concurrently \"next dev\" \"prisma studio --browser none\"",
     "build": "next build",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "lint": "eslint"

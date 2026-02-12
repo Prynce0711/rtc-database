@@ -42,6 +42,10 @@ enum LogAction {
   DELETE_EMPLOYEE
   IMPORT_EMPLOYEES
   EXPORT_EMPLOYEES
+  CREATE_USER
+  UPDATE_ROLE
+  DEACTIVATE_USER
+  REACTIVATE_USER
 }
 
 model Case {
@@ -87,11 +91,14 @@ model Log {
   id          Int       @id @default(autoincrement())
   action      LogAction
 
-  details     String?
+  // stores additional details about the log entry
+  // id when creating or deleting
+  // from and to when updating
+  details     Json?
 
   timestamp   DateTime  @default(now())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress   String?
   userAgent   String?
 }
@@ -166,27 +173,4 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
-}
-
-model ActivityLog {
-  id            String   @id @default(cuid())
-  userId        String
-  userName      String
-  userRole      String
-  action        String   // add, edit, delete, login, logout
-  entityType    String   // Employee, Case, User, etc.
-  entityId      String?
-  entityName    String?
-  description   String?
-  oldValues     String?  // JSON string of previous values
-  newValues     String?  // JSON string of new values
-  ipAddress     String?
-  userAgent     String?
-  createdAt     DateTime @default(now())
-
-  @@index([userId])
-  @@index([entityType])
-  @@index([action])
-  @@index([createdAt])
-  @@map("activity_log")
 }

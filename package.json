@@ -5,7 +5,7 @@
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
-    "dev:backend": "pnpm --filter rtc-database-webserver exec next dev",
+    "dev:backend": "pnpm --filter rtc-database-webserver dev:noudp",
     "dev:frontend": "pnpm --filter rtc-database-nativeapp dev",
     "dev": "concurrently \"pnpm --filter @rtc-database/shared build:watch\" \"pnpm --filter rtc-database-webserver dev\" \"pnpm --filter rtc-database-nativeapp dev\"",
     "build": "pnpm --filter '@rtc-database/shared' build && pnpm --filter rtc-database-webserver build && pnpm --filter rtc-database-nativeapp build",
