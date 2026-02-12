@@ -1,6 +1,8 @@
 "use client";
+import { AnimatePresence, motion } from "framer-motion";
 import React, { useMemo, useState } from "react";
 import { FiCopy, FiDownload, FiSearch } from "react-icons/fi";
+import { Pagination } from "../Pagination";
 import Table from "../Table/Table";
 
 const SAMPLE_LOGS = [
@@ -285,140 +287,121 @@ const LogsDashboard: React.FC = () => {
           })()}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="text-base md:text-lg text-base-content/60">
-            Showing 1 to {filteredLogs.length} of {filteredLogs.length} logs
-          </div>
-          <div className="btn-group">
-            <button
-              className="btn btn-md text-base md:text-lg"
-              disabled={totalPages < 2}
-            >
-              «
-            </button>
-            <button className="btn btn-md text-base md:text-lg">1</button>
-            <button
-              className="btn btn-md text-base md:text-lg"
-              disabled={totalPages < 2}
-            >
-              »
-            </button>
-          </div>
-        </div>
+        {/* PAGINATION */}
+        <Pagination
+          currentPage={1}
+          totalPages={totalPages}
+          onPageChange={() => {}}
+        />
       </div>
 
-      {selectedLog && (
-        <div className="modal modal-open" onClick={() => setSelectedLog(null)}>
+      <AnimatePresence>
+        {selectedLog && (
           <div
-            className="modal-box max-w-4xl p-0 modal-pop"
-            onClick={(e) => e.stopPropagation()}
+            className="modal modal-open"
+            onClick={() => setSelectedLog(null)}
           >
-            <div className="bg-gradient-to-r from-primary to-info text-primary-content rounded-t-2xl px-6 py-4 relative">
-              <button
-                className="btn btn-sm btn-ghost absolute right-3 top-3 text-primary-content"
-                onClick={() => setSelectedLog(null)}
-                aria-label="Close"
-              >
-                ✕
-              </button>
-              <h3 className="text-xl md:text-2xl font-semibold">
-                Activity Details
-              </h3>
-              <p className="text-sm md:text-base opacity-90">
-                {selectedLog.action} • {selectedLog.entityType}
-              </p>
-            </div>
+            <motion.div
+              key="activity-modal"
+              className="modal-box max-w-4xl p-0"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, y: 6, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.985 }}
+              transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <div className="bg-gradient-to-r from-primary to-info text-primary-content rounded-t-2xl px-6 py-4 relative">
+                <button
+                  className="btn btn-sm btn-ghost absolute right-3 top-3 text-primary-content"
+                  onClick={() => setSelectedLog(null)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                <h3 className="text-xl md:text-2xl font-semibold">
+                  Activity Details
+                </h3>
+                <p className="text-sm md:text-base opacity-90">
+                  {selectedLog.action} • {selectedLog.entityType}
+                </p>
+              </div>
 
-            <div className="px-6 py-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    User
+              <div className="px-6 py-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      User
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {selectedLog.userName}
+                    </div>
                   </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.userName}
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      Role
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {selectedLog.userRole}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      Entity
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {selectedLog.entityType || "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      Entity Name
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {selectedLog.entityName || "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      Action
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {selectedLog.action}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-base-content/60">
+                      Timestamp
+                    </div>
+                    <div className="text-base md:text-lg font-medium">
+                      {new Date(selectedLog.createdAt).toLocaleString()}
+                    </div>
                   </div>
                 </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Role
+                    Description
                   </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.userRole}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Entity
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.entityType || "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Entity Name
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.entityName || "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Action
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {selectedLog.action}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-base-content/60">
-                    Timestamp
-                  </div>
-                  <div className="text-base md:text-lg font-medium">
-                    {new Date(selectedLog.createdAt).toLocaleString()}
+                  <div className="text-base md:text-lg font-medium leading-relaxed">
+                    {selectedLog.description || "-"}
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div className="text-xs uppercase tracking-wide text-base-content/60">
-                  Description
-                </div>
-                <div className="text-base md:text-lg font-medium leading-relaxed">
-                  {selectedLog.description || "-"}
-                </div>
+              <div className="modal-action px-6 pb-6">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setSelectedLog(null)}
+                >
+                  Close
+                </button>
               </div>
-            </div>
-
-            <div className="modal-action px-6 pb-6">
-              <button
-                className="btn btn-primary"
-                onClick={() => setSelectedLog(null)}
-              >
-                Close
-              </button>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      <style>{`
-        @keyframes modal-pop {
-          from {
-            opacity: 0;
-            transform: translateY(6px) scale(0.985);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        .modal-pop {
-          animation: modal-pop 160ms ease-out;
-        }
-      `}</style>
+      {/* animation handled via framer-motion */}
     </div>
   );
 };
