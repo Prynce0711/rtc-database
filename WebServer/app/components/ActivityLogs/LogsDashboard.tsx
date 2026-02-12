@@ -1,4 +1,6 @@
 "use client";
+import React, { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
 import React, { useEffect, useMemo, useState } from "react";
@@ -7,6 +9,7 @@ import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCases } from "../Case/CasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
 import { usePopup } from "../Popup/PopupProvider";
+import { Pagination } from "../Pagination";
 import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
 import LogBadges from "./LogBadges";
@@ -250,11 +253,11 @@ const LogsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {selectedLog && (
-        <div className="modal modal-open" onClick={() => setSelectedLog(null)}>
+      <AnimatePresence>
+        {selectedLog && (
           <div
-            className="modal-box max-w-4xl p-0 modal-pop"
-            onClick={(e) => e.stopPropagation()}
+            className="modal modal-open"
+            onClick={() => setSelectedLog(null)}
           >
             <div className="bg-gradient-to-r from-primary to-info text-primary-content rounded-t-2xl px-6 py-4 relative">
               <button
@@ -342,25 +345,10 @@ const LogsDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      <style>{`
-        @keyframes modal-pop {
-          from {
-            opacity: 0;
-            transform: translateY(6px) scale(0.985);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        .modal-pop {
-          animation: modal-pop 160ms ease-out;
-        }
-      `}</style>
+      {/* animation handled via framer-motion */}
     </div>
   );
 };

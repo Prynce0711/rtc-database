@@ -5,6 +5,7 @@ import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { formatDate } from "@/app/lib/utils";
 import { useEffect, useMemo, useState } from "react";
+import { Pagination } from "../Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import {
   changeRole,
@@ -326,10 +327,10 @@ const AccountDashboard = () => {
       case Status.INACTIVE:
         return (
           <button
-            className="btn btn-sm btn-primary"
+            className="badge badge-outline border-green-500 bg-white text-black p-6 cursor-pointer transition-colors duration-150 hover:bg-green-500 hover:border-green-600 hover:text-white"
             onClick={() => requestRestore(user)}
           >
-            Restore
+            Reactivate
           </button>
         );
       case Status.ACTIVE:
@@ -592,25 +593,11 @@ const AccountDashboard = () => {
         </div>
 
         {/* PAGINATION */}
-        <div className="flex justify-end mt-4 gap-2">
-          <button
-            className="btn btn-sm"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => p - 1)}
-          >
-            Prev
-          </button>
-          <span className="px-2 text-sm">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            className="btn btn-sm"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => p + 1)}
-          >
-            Next
-          </button>
-        </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
         {/* ADD ACCOUNT MODAL */}
         {showAddModal && (
           <AddAccountModal
