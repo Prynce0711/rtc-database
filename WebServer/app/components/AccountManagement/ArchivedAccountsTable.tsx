@@ -20,7 +20,7 @@ const ArchivedAccountsTable = ({
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold">Archived Accounts</h3>
+        <h3 className="text-lg font-semibold">Deactivated Accounts</h3>
         <span className="text-sm text-base-content/60">
           {archivedUsers.length} archived
         </span>
