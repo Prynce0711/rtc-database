@@ -6,7 +6,12 @@ import Roles from "@/app/lib/Roles";
 import { formatDate } from "@/app/lib/utils";
 import { useEffect, useMemo, useState } from "react";
 import { usePopup } from "../Popup/PopupProvider";
-import { changeRole, deactivateAccount, getAccounts } from "./AccountActions";
+import {
+  changeRole,
+  deactivateAccount,
+  getAccounts,
+  unbanAccount,
+} from "./AccountActions";
 import AddAccountModal from "./AddAccountModal";
 import ArchivedAccountsTable from "./ArchivedAccountsTable";
 
@@ -37,7 +42,31 @@ const AccountDashboard = () => {
     const fetchUsers = async () => {
       const result = await getAccounts();
       if (result.success) {
-        setUsers(result.result);
+        // add some temporary locked accounts for demonstration
+        const mockLocked = [
+          {
+            id: "locked-temp-1",
+            name: "Locked Demo",
+            email: "locked.demo1@example.com",
+            role: Roles.USER,
+            status: Status.LOCKED,
+            createdAt: new Date(),
+            lastLogin: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: "locked-temp-2",
+            name: "Locked Demo 2",
+            email: "locked.demo2@example.com",
+            role: Roles.ATTY,
+            status: Status.LOCKED,
+            createdAt: new Date(),
+            lastLogin: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+
+        setUsers([...result.result, ...mockLocked]);
       } else {
         statusPopup.showError(
           "Error fetching accounts: " + result.error,
@@ -165,6 +194,48 @@ const AccountDashboard = () => {
       ),
     );
     statusPopup.showSuccess("Account deactivated successfully");
+  }
+
+  async function requestUnlock(user: User) {
+    const confirmation = await statusPopup.showYesNo(
+      `Restore ${user.name} to active accounts?`,
+    );
+    if (!confirmation) return;
+
+    const result = await unbanAccount([user.id]);
+    if (!result.success) {
+      statusPopup.showError(
+        "Error restoring account: " + result.error,
+        "error",
+      );
+      return;
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
+          : u,
+      ),
+    );
+    statusPopup.showSuccess("Account restored successfully");
+  }
+
+  async function requestLock(user: User) {
+    const confirmation = await statusPopup.showYesNo(
+      `Lock ${user.name}'s account?`,
+    );
+    if (!confirmation) return;
+
+    // client-side lock for demo only (no backend call)
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === user.id
+          ? { ...u, status: Status.LOCKED, updatedAt: new Date() }
+          : u,
+      ),
+    );
+    statusPopup.showSuccess("Account locked (local demo)");
   }
 
   async function bulkChangeRole(newRole: Roles) {
@@ -468,12 +539,21 @@ const AccountDashboard = () => {
 
                     {canManage && (
                       <td>
-                        <button
-                          className="btn btn-xs btn-error"
-                          onClick={() => requestDeactivate(user)}
-                        >
-                          Deactivate
-                        </button>
+                        {user.status === Status.LOCKED ? (
+                          <button
+                            className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => requestUnlock(user)}
+                          >
+                            Unlock
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-xs btn-error"
+                            onClick={() => requestDeactivate(user)}
+                          >
+                            Deactivate
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
