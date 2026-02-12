@@ -31,6 +31,7 @@ export const CreateLogData = z
     z.object({
       action: z.literal(LogAction.UPDATE_ROLE),
       details: z.object({
+        userId: z.string(),
         from: z.enum(Roles),
         to: z.enum(Roles),
       }),

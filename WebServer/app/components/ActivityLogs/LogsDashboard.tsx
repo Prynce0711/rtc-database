@@ -1,12 +1,16 @@
 "use client";
+import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCopy, FiDownload, FiSearch } from "react-icons/fi";
+import { getAccounts } from "../AccountManagement/AccountActions";
+import { getCases } from "../Case/CasesActions";
+import { getEmployees } from "../Employee/EmployeeActions";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
 import LogBadges from "./LogBadges";
-import { LogData } from "./schema";
+import { CompleteLogData } from "./schema";
 
 type SortConfigType = {
   key: string;
@@ -14,20 +18,23 @@ type SortConfigType = {
 } | null;
 
 const LogsDashboard: React.FC = () => {
-  const [logs, setLogs] = useState<LogData[]>([]);
+  const [logs, setLogs] = useState<CompleteLogData[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const statusPopup = usePopup();
 
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState<LogAction | "all">("all");
   const [nameFilter, setNameFilter] = useState("");
-  const [selectedLog, setSelectedLog] = useState<LogData | null>(null);
+  const [selectedLog, setSelectedLog] = useState<CompleteLogData | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfigType>({
     key: "timestamp",
     order: "desc",
   });
 
   useEffect(() => {
-    const fetchLogs = async () => {
+    const fetchData = async () => {
       const result = await getLogs();
       if (!result.success) {
         statusPopup.showError("Failed to fetch logs: " + result.error);
@@ -35,9 +42,24 @@ const LogsDashboard: React.FC = () => {
       }
 
       setLogs(result.result || []);
+
+      const users = await getAccounts();
+      if (users.success) {
+        setUsers(users.result || []);
+      }
+
+      const cases = await getCases();
+      if (cases.success) {
+        setCases(cases.result || []);
+      }
+
+      const employees = await getEmployees();
+      if (employees.success) {
+        setEmployees(employees.result || []);
+      }
     };
 
-    fetchLogs();
+    fetchData();
   }, []);
 
   const filteredLogs = useMemo(() => {
@@ -292,7 +314,7 @@ const LogsDashboard: React.FC = () => {
                     Summary
                   </div>
                   <div className="text-base md:text-lg font-medium leading-relaxed">
-                    {createDetailText(selectedLog)}
+                    {createDetailText(selectedLog, users, cases, employees)}
                   </div>
                 </div>
               )}
@@ -343,7 +365,12 @@ const LogsDashboard: React.FC = () => {
   );
 };
 
-function createDetailText(log: LogData): string {
+function createDetailText(
+  log: CompleteLogData,
+  users: User[],
+  cases: Case[],
+  employees: Employee[],
+): string {
   const { action, details } = log;
 
   if (!details) {
@@ -351,9 +378,9 @@ function createDetailText(log: LogData): string {
       case LogAction.LOGOUT:
         return "User logged out";
       case LogAction.EXPORT_CASES:
-        return "Exported cases to file";
+        return "Exported all cases to file";
       case LogAction.EXPORT_EMPLOYEES:
-        return "Exported employees to file";
+        return "Exported all employees to file";
       default:
         return "No additional details";
     }
@@ -362,27 +389,46 @@ function createDetailText(log: LogData): string {
   const detailsObj = details as any;
 
   switch (action) {
-    case LogAction.CREATE_CASE:
-      return `Case #${detailsObj.id} created`;
-    case LogAction.DELETE_CASE:
-      return `Case #${detailsObj.id} deleted`;
-    case LogAction.CREATE_EMPLOYEE:
-      return `Employee #${detailsObj.id} created`;
-    case LogAction.DELETE_EMPLOYEE:
-      return `Employee #${detailsObj.id} deleted`;
-    case LogAction.CREATE_USER:
-      return `User ${detailsObj.id} created`;
-    case LogAction.DEACTIVATE_USER:
-      return `User ${detailsObj.id} deactivated`;
-    case LogAction.REACTIVATE_USER:
-      return `User ${detailsObj.id} reactivated`;
-    case LogAction.LOGIN_SUCCESS:
-      return `User ${detailsObj.id} logged in successfully`;
+    case LogAction.CREATE_CASE: {
+      const caseItem = cases.find((c) => c.id === detailsObj.id);
+      return `Case created: ${caseItem?.caseNumber || `#${detailsObj.id}`} - "${caseItem?.name || "Unknown"}"`;
+    }
+    case LogAction.DELETE_CASE: {
+      const caseItem = cases.find((c) => c.id === detailsObj.id);
+      return `Case deleted: ${caseItem?.caseNumber || `#${detailsObj.id}`} - "${caseItem?.name || "Unknown"}"`;
+    }
+    case LogAction.CREATE_EMPLOYEE: {
+      const employee = employees.find((e) => e.id === detailsObj.id);
+      return `Employee created: ${employee?.employeeName || `#${detailsObj.id}`}`;
+    }
+    case LogAction.DELETE_EMPLOYEE: {
+      const employee = employees.find((e) => e.id === detailsObj.id);
+      return `Employee deleted: ${employee?.employeeName || `#${detailsObj.id}`}`;
+    }
+    case LogAction.CREATE_USER: {
+      const user = users.find((u) => u.id === detailsObj.id);
+      return `User created: ${user?.email || detailsObj.id}`;
+    }
+    case LogAction.DEACTIVATE_USER: {
+      const user = users.find((u) => u.id === detailsObj.id);
+      return `User deactivated: ${user?.email || detailsObj.id}`;
+    }
+    case LogAction.REACTIVATE_USER: {
+      const user = users.find((u) => u.id === detailsObj.id);
+      return `User reactivated: ${user?.email || detailsObj.id}`;
+    }
+    case LogAction.LOGIN_SUCCESS: {
+      const user = users.find((u) => u.id === detailsObj.id);
+      return `User logged in successfully: ${user?.email || detailsObj.id}`;
+    }
     case LogAction.LOGIN_FAILED:
-      return `Login attempt with email: ${detailsObj.email}`;
-    case LogAction.UPDATE_ROLE:
-      return `Role changed from ${detailsObj.from} to ${detailsObj.to}`;
+      return `Login failed: Email: ${detailsObj.email}`;
+    case LogAction.UPDATE_ROLE: {
+      const user = users.find((u) => u.id === detailsObj.id);
+      return `Role updated for ${user?.email || "user"}: ${detailsObj.from} → ${detailsObj.to}`;
+    }
     case LogAction.UPDATE_CASE: {
+      const caseItem = cases.find((c) => c.id === detailsObj.id);
       const changes: string[] = [];
       const from = detailsObj.from || {};
       const to = detailsObj.to || {};
@@ -394,16 +440,23 @@ function createDetailText(log: LogData): string {
         "detained",
         "bond",
         "consolidation",
+        "branch",
+        "assistantBranch",
       ];
       caseFields.forEach((field) => {
         if (from[field] !== to[field]) {
-          changes.push(`${field}: ${from[field]} → ${to[field]}`);
+          changes.push(
+            `${field}: "${from[field] || "—"}" → "${to[field] || "—"}"`,
+          );
         }
       });
 
-      return `Case updated: ${changes.length > 0 ? changes.join(", ") : "No changes"}`;
+      return `Case updated: ${caseItem?.caseNumber || `#${detailsObj.id}`} - ${
+        changes.length > 0 ? changes.join(", ") : "No changes"
+      }`;
     }
     case LogAction.UPDATE_EMPLOYEE: {
+      const employee = employees.find((e) => e.id === detailsObj.id);
       const changes: string[] = [];
       const from = detailsObj.from || {};
       const to = detailsObj.to || {};
@@ -415,19 +468,41 @@ function createDetailText(log: LogData): string {
         "bloodType",
         "height",
         "weight",
+        "tinNumber",
+        "gsisNumber",
       ];
       employeeFields.forEach((field) => {
         if (from[field] !== to[field]) {
-          changes.push(`${field}: ${from[field]} → ${to[field]}`);
+          changes.push(
+            `${field}: "${from[field] || "—"}" → "${to[field] || "—"}"`,
+          );
         }
       });
 
-      return `Employee updated: ${changes.length > 0 ? changes.join(", ") : "No changes"}`;
+      return `Employee updated: ${employee?.employeeName || `#${detailsObj.id}`} - ${
+        changes.length > 0 ? changes.join(", ") : "No changes"
+      }`;
     }
-    case LogAction.IMPORT_CASES:
-      return `Imported ${detailsObj.userIds?.length || 0} cases`;
-    case LogAction.IMPORT_EMPLOYEES:
-      return `Imported ${detailsObj.userIds?.length || 0} employees`;
+    case LogAction.IMPORT_CASES: {
+      const importedCases = cases.filter((c) =>
+        detailsObj.userIds?.includes(c.id),
+      );
+      const displayed = importedCases.slice(0, 3);
+      const remaining = importedCases.length - displayed.length;
+      const caseNames = displayed.map((c) => c.caseNumber).join(", ");
+      const summary = remaining > 0 ? `, and ${remaining} more` : "";
+      return `Imported ${detailsObj.userIds?.length || 0} cases: ${caseNames}${summary}`;
+    }
+    case LogAction.IMPORT_EMPLOYEES: {
+      const importedEmployees = employees.filter((e) =>
+        detailsObj.userIds?.includes(e.id),
+      );
+      const displayed = importedEmployees.slice(0, 3);
+      const remaining = importedEmployees.length - displayed.length;
+      const employeeNames = displayed.map((e) => e.employeeName).join(", ");
+      const summary = remaining > 0 ? `, and ${remaining} more` : "";
+      return `Imported ${detailsObj.userIds?.length || 0} employees: ${employeeNames}${summary}`;
+    }
     default:
       return JSON.stringify(details);
   }
