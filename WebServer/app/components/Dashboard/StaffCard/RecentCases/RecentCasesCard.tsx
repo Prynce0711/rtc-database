@@ -15,44 +15,53 @@ const RecentCasesCard: React.FC<RecentCasesCardProps> = ({
   /* ================= CARD VIEW ================= */
   if (view === "card") {
     return (
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
         <div className="card-body">
-          <div className="flex justify-between items-center">
-            <h3 className="card-title text-2xl font-black">Recent Cases</h3>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-3xl font-black tracking-tight">Recent Cases</h3>
 
             {onViewAll && (
-              <button className="btn btn-sm btn-ghost" onClick={onViewAll}>
+              <button
+                className="btn btn-sm btn-outline btn-primary"
+                onClick={onViewAll}
+              >
                 View All →
               </button>
             )}
           </div>
 
-          <div className="space-y-4">
+          {/* Cases */}
+          <div className="space-y-3">
             {cases.length > 0 ? (
               cases.map((caseItem) => (
                 <div
                   key={caseItem.id}
-                  className={`border-l-4 ${
-                    caseItem.detained ? "border-error" : "border-success"
-                  } pl-4 py-2`}
+                  className={`p-4 rounded-xl border-l-4 bg-base-200 hover:bg-base-300 transition
+                  ${caseItem.detained ? "border-warning" : "border-success"}`}
                 >
-                  <p className="font-semibold">
-                    {caseItem.caseNumber} - {caseItem.charge}
+                  <p className="font-semibold text-base">
+                    {caseItem.caseNumber}
                   </p>
 
-                  <p className="text-sm opacity-70">
-                    {caseItem.name} | Branch: {caseItem.branch}
+                  <p className="text-sm text-base-content/70">
+                    {caseItem.name}
                   </p>
 
-                  <p className="text-sm opacity-70">
-                    Filed: {new Date(caseItem.dateFiled).toLocaleDateString()}
+                  <p className="text-sm text-base-content/70 mt-1">
+                    {caseItem.charge}
+                  </p>
+
+                  <p className="text-xs text-base-content/50 mt-1">
+                    {caseItem.branch} •{" "}
+                    {new Date(caseItem.dateFiled).toLocaleDateString()}
                   </p>
                 </div>
               ))
             ) : (
-              <div className="text-center py-4 opacity-70 text-xl">
+              <p className="text-center py-8 text-base-content/50 font-medium">
                 No cases found
-              </div>
+              </p>
             )}
           </div>
         </div>
@@ -63,59 +72,82 @@ const RecentCasesCard: React.FC<RecentCasesCardProps> = ({
   /* ================= TABLE VIEW ================= */
 
   return (
-    <div className="bg-base-100 rounded-lg shadow p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-4xl font-bold">Recent Cases</h3>
+    <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+      <div className="card-body">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-3xl font-black tracking-tight">Recent Cases</h3>
 
-        {onViewAll && (
-          <button className="btn btn-sm btn-ghost" onClick={onViewAll}>
-            View All →
-          </button>
-        )}
-      </div>
+          {onViewAll && (
+            <button
+              className="btn btn-sm btn-outline btn-primary"
+              onClick={onViewAll}
+            >
+              View All →
+            </button>
+          )}
+        </div>
 
-      <div className="overflow-x-auto">
-        <table className="table table-sm">
-          <thead className="bg-base-300 text-xl">
-            <tr>
-              <th>Case Number</th>
-              <th>Name</th>
-              <th>Charge</th>
-              <th>Branch</th>
-              <th>Date Filed</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {cases.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center opacity-50">
-                  No recent cases
-                </td>
+        <div className="overflow-x-auto">
+          <table className="table table-zebra text-center">
+            {/* HEADER */}
+            <thead>
+              <tr className="text-sm font-semibold text-base-content/60">
+                <th>Case</th>
+                <th>Client</th>
+                <th>Charge</th>
+                <th>Branch</th>
+                <th>Filed</th>
+                <th>Status</th>
               </tr>
-            ) : (
-              cases.map((caseItem) => (
-                <tr key={caseItem.id} className="hover text-lg">
-                  <td className="font-medium text-lg">{caseItem.caseNumber}</td>
-                  <td>{caseItem.name}</td>
-                  <td>{caseItem.charge}</td>
-                  <td>{caseItem.branch}</td>
-                  <td>{new Date(caseItem.dateFiled).toLocaleDateString()}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        caseItem.detained ? "badge-warning" : "badge-success"
-                      }`}
-                    >
-                      {caseItem.detained ? "Detained" : "Free"}
-                    </span>
+            </thead>
+
+            {/* BODY */}
+            <tbody>
+              {cases.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-base-content/50">
+                    No recent cases
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                cases.map((caseItem) => (
+                  <tr
+                    key={caseItem.id}
+                    className="hover:bg-base-200 transition"
+                  >
+                    <td className="font-semibold py-4">
+                      {caseItem.caseNumber}
+                    </td>
+
+                    <td className="font-medium text-base-content/80">
+                      {caseItem.name}
+                    </td>
+
+                    <td className="text-base-content/70">{caseItem.charge}</td>
+
+                    <td className="text-base-content/70">{caseItem.branch}</td>
+
+                    <td className="text-sm text-base-content/60">
+                      {new Date(caseItem.dateFiled).toLocaleDateString()}
+                    </td>
+
+                    <td>
+                      <span
+                        className={`badge badge-md font-semibold
+                        ${
+                          caseItem.detained ? "badge-warning" : "badge-success"
+                        }`}
+                      >
+                        {caseItem.detained ? "Detained" : "Free"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
