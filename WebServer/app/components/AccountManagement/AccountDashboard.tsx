@@ -55,6 +55,7 @@ const AccountDashboard = () => {
       active: users.filter((u) => u.status === Status.ACTIVE).length,
       admins: users.filter((u) => u.role === Roles.ADMIN).length,
       inactive: users.filter((u) => u.status === Status.INACTIVE).length,
+      locked: users.filter((u) => u.status === Status.LOCKED).length,
     }),
     [users],
   );
@@ -297,6 +298,7 @@ const AccountDashboard = () => {
                 {formatBadgeCount(stats.active)}
               </span>
             </button>
+
             <button
               className={`btn btn-md join-item ${
                 activeView === "archive" ? "btn-primary" : "btn-outline"
@@ -309,6 +311,7 @@ const AccountDashboard = () => {
                 {formatBadgeCount(stats.inactive)}
               </span>
             </button>
+
             <button
               className={`btn btn-md join-item ${
                 activeView === "locked" ? "btn-primary" : "btn-outline"
@@ -316,9 +319,9 @@ const AccountDashboard = () => {
               type="button"
               onClick={() => setActiveView("locked")}
             >
-              <span>locked</span>
+              <span>Locked</span>
               <span className="ml-2 badge badge-sm badge-error text-white -mt-0">
-                {formatBadgeCount(stats.inactive)}
+                {formatBadgeCount(stats.locked)}
               </span>
             </button>
           </div>
@@ -355,7 +358,20 @@ const AccountDashboard = () => {
 
         {/* TABLE */}
         {activeView === "archive" ? (
-          <ArchivedAccountsTable allUsers={users} pageSize={pageSize} />
+          <ArchivedAccountsTable
+            allUsers={users}
+            pageSize={pageSize}
+            onRestore={(ids: string[]) => {
+              setUsers((prev) =>
+                prev.map((u) =>
+                  ids.includes(u.id)
+                    ? { ...u, status: Status.ACTIVE, updatedAt: new Date() }
+                    : u,
+                ),
+              );
+              statusPopup.showSuccess("Account(s) restored successfully");
+            }}
+          />
         ) : (
           <div className="overflow-x-auto bg-base-100 shadow rounded-lg">
             <table className="table table-zebra text-base md:text-lg">
@@ -393,6 +409,7 @@ const AccountDashboard = () => {
                     Last Login
                   </th>
                   <th className="text-base md:text-lg font-medium">Updated</th>
+
                   {canManage && (
                     <th className="text-base md:text-lg font-medium">
                       Actions
