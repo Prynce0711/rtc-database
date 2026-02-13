@@ -222,15 +222,10 @@ const Login: React.FC = () => {
 
         {/* Login Form */}
         <motion.div
-          className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm relative z-10"
+          className=" bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm relative z-10"
           variants={cardVariants}
           initial="hidden"
           animate={cardControls}
-          whileHover={{
-            y: -4,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
-            transition: { duration: 0.3 },
-          }}
           style={{ WebkitTapHighlightColor: "transparent" }}
         >
           <motion.div
@@ -406,7 +401,7 @@ const Login: React.FC = () => {
 
         {/* Footer */}
         <motion.div
-          className="text-center mt-8 text-sm text-base-content/50"
+          className="text-center mt-8 text-sm opacity-50 mt-2 "
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.5 }}
           transition={{ delay: 0.9 }}
@@ -415,9 +410,9 @@ const Login: React.FC = () => {
         </motion.div>
 
         <motion.p
-          className="mt-2 text-xs opacity-60 text-center"
+          className="mt-2 text-xs opacity-20 text-base-content text-center"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.6 }}
+          animate={{ opacity: 0.3 }}
           transition={{ delay: 1 }}
         >
           This system contains confidential information for authorized use only.
