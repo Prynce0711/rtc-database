@@ -490,29 +490,29 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* ===== ACTION BAR ===== */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-3">
+        <div className="mb-8 flex flex-col sm:flex-row gap-3 items-center">
           <div className="relative flex-1">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
             <input
-              className="input input-bordered input-lg w-full pl-12  text-base"
+              className="input input-bordered input-lg w-full pl-14 text-base rounded-lg shadow-sm"
               placeholder="Search by name, employee #, position, branch..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`btn btn-lg btn-outline ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+              className={`btn btn-md btn-outline flex items-center gap-2 ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
               onClick={() => setFilterModalOpen(true)}
             >
-              <FiFilter size={20} />
-              <span className="text-base">Filters</span>
+              <FiFilter size={18} />
+              <span className="hidden sm:inline">Filters</span>
             </button>
 
-            <label className="btn btn-lg btn-outline">
-              <FiUpload size={20} />
-              <span className="text-base">Import</span>
+            <label className="btn btn-md btn-outline flex items-center gap-2">
+              <FiUpload size={18} />
+              <span className="hidden sm:inline">Import</span>
               <input
                 type="file"
                 accept=".xlsx,.xls"
@@ -521,14 +521,20 @@ const EmployeeDashboard: React.FC = () => {
               />
             </label>
 
-            <button className="btn btn-lg btn-outline" onClick={handleExport}>
-              <FiDownload size={20} />
-              <span className="text-base">Export</span>
+            <button
+              className="btn btn-md btn-outline flex items-center gap-2"
+              onClick={handleExport}
+            >
+              <FiDownload size={18} />
+              <span className="hidden sm:inline">Export</span>
             </button>
 
-            <button className="btn btn-lg btn-primary" onClick={openAdd}>
-              <FiPlus size={20} />
-              <span className="text-base">Add Employee</span>
+            <button
+              className="btn btn-md btn-warning flex items-center gap-2"
+              onClick={openAdd}
+            >
+              <FiPlus size={18} />
+              <span className="hidden sm:inline">Add Employee</span>
             </button>
           </div>
         </div>
@@ -543,7 +549,7 @@ const EmployeeDashboard: React.FC = () => {
           </div>
 
           {/* TABLE */}
-          <div className="rounded-2xl shadow-lg border border-base-100  overflow-hidden">
+          <div className="rounded-2xl shadow-lg border border-base-100 overflow-visible">
             <EmployeeTable
               employees={filtered}
               bloodTypeMap={bloodTypeMap}
