@@ -1,5 +1,6 @@
 "use client";
 
+import console from "node:console";
 import { useEffect, useState } from "react";
 import "./App.css";
 
@@ -14,7 +15,7 @@ export default function App() {
   const [status, setStatus] = useState<"locating" | "located" | "loading">(
     "locating",
   );
-  const [backendUrl, setBackendUrl] = useState<string | null>(null);
+  const devURL = process.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
   const [isDevMode] = useState(() => process.env.NODE_ENV === "development");
 
   useEffect(() => {
@@ -30,10 +31,13 @@ export default function App() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch("http://localhost:3000/api/health", {
-          signal: controller.signal,
-          method: "GET",
-        });
+        const response = await fetch(
+          `${process.env.VITE_DEV_SERVER_URL || "http://localhost:3000"}/api/health`,
+          {
+            signal: controller.signal,
+            method: "GET",
+          },
+        );
 
         console.log("Received response from localhost:3000:", response.status);
 
@@ -43,13 +47,12 @@ export default function App() {
           const text = await response.text();
           if (text === "OK" && isSubscribed) {
             console.log("✅ Localhost:3000 is available!");
-            setBackendUrl("http://localhost:3000");
             setStatus("located");
 
             setTimeout(() => {
               if (isSubscribed) {
                 setStatus("loading");
-                window.location.href = "http://localhost:3000";
+                window.location.href = devURL;
               }
             }, 2000);
 
@@ -79,7 +82,6 @@ export default function App() {
             if (!isSubscribed) return;
 
             console.log("✅ Backend discovered:", backend);
-            setBackendUrl(backend.url);
             setStatus("located");
 
             // After showing the backend info for 2 seconds, load it
