@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
@@ -35,7 +35,7 @@ const SpinningLoader = () => {
       {bars.map((i) => (
         <motion.div
           key={i}
-          className="absolute left-1/2 top-[30%] w-[8%] h-[24%] bg-primary rounded-full shadow-sm"
+          className="absolute left-1/2 top-[30%] w-[8%] h-[24%] bg-base-content rounded-full shadow-sm"
           style={{
             transform: `rotate(${i * 30}deg) translate(0, -130%)`,
             transformOrigin: "0% 0%",
@@ -57,6 +57,7 @@ const SpinningLoader = () => {
 
 const FirstLogin: React.FC = () => {
   const router = useRouter();
+  const overlayControls = useAnimationControls();
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -200,26 +201,26 @@ const FirstLogin: React.FC = () => {
             transition={{ duration: 0.2 }}
           >
             <motion.div
-              className="bg-base-100 rounded-2xl shadow-2xl p-7 w-full max-w-md border border-base-300"
+              className="bg-base-100 rounded-3xl shadow-2xl p-10 w-full max-w-xl border border-base-300"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ duration: 0.2 }}
             >
               {/* Header */}
-              <div className="mb-6">
-                <h3 className="text-xl font-bold mb-1.5">
+              <div className="mb-6 text-center">
+                <h3 className="text-4xl font-bold mb-4">
                   Review your password
                 </h3>
-                <p className="text-sm opacity-60">
-                  This password will only be shown once. Save it securely before
-                  continuing.
+                <p className="text-lg opacity-60">
+                  This password will only be shown once. <br /> Save it securely
+                  before continuing.
                 </p>
               </div>
 
               {/* Password Display */}
               <div className="relative mb-6">
-                <div className="bg-base-200 rounded-lg p-4 pr-20">
+                <div className="bg-base-200 rounded-xl p-5 pr-24">
                   <p className="font-mono text-sm break-all">
                     {modalShowPass ? password : "••••••••••••"}
                   </p>
@@ -297,7 +298,7 @@ const FirstLogin: React.FC = () => {
                 <button
                   disabled={!confirmedSave}
                   onClick={handleConfirmSave}
-                  className="btn btn-primary flex-1"
+                  className="btn btn-primary btn-lg flex-1"
                 >
                   Continue
                 </button>
@@ -310,28 +311,85 @@ const FirstLogin: React.FC = () => {
       {/* MAIN PAGE */}
       <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">
-          {/* Header */}
+          {/* full-screen overlay used during transition */}
+          <motion.div
+            className="fixed inset-0 z-20 bg-base-100"
+            initial={{ opacity: 0 }}
+            animate={overlayControls}
+            style={{ pointerEvents: "none" }}
+          />
+
+          {/* Logo and Header */}
           <motion.div
             className="text-center mb-10"
             initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.8,
+              ease: [0.25, 0.46, 0.45, 0.94],
+            }}
           >
-            <motion.img
-              src="/SupremeCourtLogo.webp"
-              className="w-28 h-28 mx-auto drop-shadow-lg"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            />
+            <div className="flex justify-center mb-6">
+              <motion.div
+                className="relative group"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 200,
+                  damping: 20,
+                  delay: 0.1,
+                }}
+              >
+                <motion.div
+                  className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"
+                  animate={{
+                    scale: [1, 1.1, 1],
+                    opacity: [0.2, 0.3, 0.2],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                <img
+                  src="/SupremeCourtLogo.webp"
+                  alt="Supreme Court of the Philippines"
+                  className="w-32 h-32 object-contain relative z-10 drop-shadow-lg"
+                />
+              </motion.div>
+            </div>
 
-            <motion.h1 className="text-3xl font-bold mt-4">
-              Welcome to RTC System
+            <motion.h1
+              className="text-4xl font-bold text-base-content mb-2 tracking-tight"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              Regional Trial Court
             </motion.h1>
 
-            <motion.p className="text-sm opacity-60 mt-2">
-              Create your password before continuing.
+            <motion.p
+              className="text-lg text-base-content/90 font-semibold"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              Republic of the Philippines
+            </motion.p>
+
+            <motion.p
+              className="text-sm text-base-content/60 italic mt-2 font-medium"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              transition={{ delay: 0.5 }}
+            >
+              "Batas at Bayan"
             </motion.p>
           </motion.div>
+
+          {/* Login Form */}
 
           {/* Card */}
           <motion.div
@@ -340,9 +398,13 @@ const FirstLogin: React.FC = () => {
             initial="hidden"
             animate="visible"
           >
-            <h2 className="text-3xl font-bold text-center mb-8">
+            <h2 className="text-2xl font-bold text-center mb-4">
               Set Your Password
             </h2>
+            <p className="text-xs text-center text-warning font-medium mb-8">
+              For security compliance, passwords cannot be retrieved or reset
+              without administrator verification.
+            </p>
 
             <AnimatePresence>
               {error && (

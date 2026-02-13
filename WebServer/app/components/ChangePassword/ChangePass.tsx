@@ -87,36 +87,81 @@ const ChangePassword: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
-        {/* HEADER */}
+        {/* full-screen overlay used during transition */}
+        <motion.div
+          className="fixed inset-0 z-20 bg-base-100"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0 }}
+          style={{ pointerEvents: "none" }}
+        />
+
+        {/* Logo and Header */}
         <motion.div
           className="text-center mb-10"
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.8,
+            ease: [0.25, 0.46, 0.45, 0.94],
+          }}
         >
-          <motion.img
-            src="/SupremeCourtLogo.webp"
-            className="w-28 h-28 mx-auto drop-shadow-lg"
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          />
+          <div className="flex justify-center mb-6">
+            <motion.div
+              className="relative group"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 200,
+                damping: 20,
+                delay: 0.1,
+              }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"
+                animate={{
+                  scale: [1, 1.1, 1],
+                  opacity: [0.2, 0.3, 0.2],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              <img
+                src="/SupremeCourtLogo.webp"
+                alt="Supreme Court of the Philippines"
+                className="w-32 h-32 object-contain relative z-10 drop-shadow-lg"
+              />
+            </motion.div>
+          </div>
 
           <motion.h1
-            className="text-3xl font-bold mt-4"
+            className="text-4xl font-bold text-base-content mb-2 tracking-tight"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            Change Password
+            Regional Trial Court
           </motion.h1>
 
           <motion.p
-            className="text-sm opacity-60 mt-2"
+            className="text-lg text-base-content/90 font-semibold"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
+            animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            Update your credentials securely
+            Republic of the Philippines
+          </motion.p>
+
+          <motion.p
+            className="text-sm text-base-content/60 italic mt-2 font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.6 }}
+            transition={{ delay: 0.5 }}
+          >
+            "Batas at Bayan"
           </motion.p>
         </motion.div>
 
@@ -127,10 +172,12 @@ const ChangePassword: React.FC = () => {
           initial="hidden"
           animate="visible"
         >
-          <h2 className="text-3xl font-bold text-center mb-8">
-            Password Settings
+          <h2 className="text-2xl font-bold text-center mb-2">
+            Change Password
           </h2>
-
+          <p className="text-sm text-base-content/60 text-center mb-8">
+            Update your credentials securely
+          </p>
           <AnimatePresence>
             {error && (
               <motion.div
