@@ -1,8 +1,9 @@
 "use client";
 
 import type { Employee } from "@/app/generated/prisma/browser";
+import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 
 interface Props {
   employees: Employee[];
@@ -17,6 +18,7 @@ const EmployeeTable: React.FC<Props> = ({
   onEdit,
   onDelete,
 }) => {
+  const router = useRouter();
   const rowsPerPage = 10;
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(employees.length / rowsPerPage));
@@ -29,7 +31,7 @@ const EmployeeTable: React.FC<Props> = ({
   return (
     <div className="w-full bg-base-100">
       {/* TABLE SCROLL */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-visible">
         <table className="table w-full border-separate border-spacing-y-2">
           {/* HEADER */}
           <thead className="bg-base-200">
@@ -38,18 +40,8 @@ const EmployeeTable: React.FC<Props> = ({
               <th className="py-4">Employee Name</th>
               <th className="text-center py-4">Employee #</th>
               <th className="py-4">Position</th>
-              <th className="py-4">Branch / Station</th>
-              <th className="text-center py-4">TIN</th>
-              <th className="text-center py-4">GSIS</th>
-              <th className="text-center py-4">PhilHealth</th>
-              <th className="text-center py-4">Pag-IBIG</th>
-              <th className="text-center py-4">Birthday</th>
-              <th className="text-center py-4">Blood Type</th>
-              <th className="py-4">Allergies</th>
-              <th className="text-center py-4">Height</th>
-              <th className="text-center py-4">Weight</th>
-              <th className="py-4">Contact Person</th>
-              <th className="text-center py-4">Contact Number</th>
+              <th className="py-4">Branch</th>
+              <th className="text-center py-4">Contact No</th>
               <th className="py-4">Email</th>
             </tr>
           </thead>
@@ -62,57 +54,100 @@ const EmployeeTable: React.FC<Props> = ({
                 className="bg-base-100 hover:bg-base-200 transition shadow-sm"
               >
                 {/* ACTIONS */}
-                <td>
-                  <div className="flex justify-center gap-1">
-                    <button
-                      className="btn btn-xs btn-ghost text-info hover:bg-info/10"
-                      onClick={() => onEdit(emp)}
-                    >
-                      <FiEdit size={16} />
-                    </button>
+                <td onClick={(e) => e.stopPropagation()} className="relative">
+                  <div className="flex justify-center">
+                    <div className="dropdown dropdown-end">
+                      <button
+                        tabIndex={0}
+                        className="btn btn-ghost btn-sm px-2"
+                        aria-label="Open actions"
+                      >
+                        <FiMoreHorizontal size={18} />
+                      </button>
 
-                    <button
-                      className="btn btn-xs btn-ghost text-error hover:bg-error/10"
-                      onClick={() => onDelete(emp.id)}
-                    >
-                      <FiTrash2 size={16} />
-                    </button>
+                      <ul
+                        tabIndex={0}
+                        className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-200"
+                        style={{ zIndex: 9999 }}
+                      >
+                        <li>
+                          <button
+                            className="flex items-center gap-3 text-info"
+                            onClick={() =>
+                              router.push(`/user/employees/${emp.id}`)
+                            }
+                          >
+                            <FiEye size={16} />
+                            <span>View</span>
+                          </button>
+                        </li>
+
+                        <li>
+                          <button
+                            className="flex items-center gap-3 text-warning"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(emp);
+                            }}
+                          >
+                            <FiEdit size={16} />
+                            <span>Edit</span>
+                          </button>
+                        </li>
+
+                        <li>
+                          <button
+                            className="flex items-center gap-3 text-error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(emp.id);
+                            }}
+                          >
+                            <FiTrash2 size={16} />
+                            <span>Delete</span>
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </td>
 
-                <td className="font-semibold">{emp.employeeName || "—"}</td>
-                <td className="text-center">{emp.employeeNumber || "—"}</td>
-                <td>{emp.position || "—"}</td>
-                <td>{emp.branch || "—"}</td>
-
-                <td className="text-center">{emp.tinNumber || "—"}</td>
-                <td className="text-center">{emp.gsisNumber || "—"}</td>
-                <td className="text-center">{emp.philHealthNumber || "—"}</td>
-                <td className="text-center">{emp.pagIbigNumber || "—"}</td>
-
-                <td className="text-center text-base-content/70">
-                  {emp.birthDate
-                    ? new Date(emp.birthDate).toLocaleDateString()
-                    : "—"}
+                <td
+                  className="font-semibold cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.employeeName || "—"}
                 </td>
-
-                <td className="text-center">
-                  {emp.bloodType ? bloodTypeMap[emp.bloodType] : "—"}
+                <td
+                  className="text-center cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.employeeNumber || "—"}
                 </td>
-
-                <td className="text-base-content/80">
-                  {emp.allergies &&
-                  emp.allergies.trim() !== "" &&
-                  emp.allergies.toLowerCase() !== "n/a"
-                    ? emp.allergies
-                    : "N/A"}
+                <td
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.position || "—"}
                 </td>
-
-                <td className="text-center">{emp.height ?? "—"}</td>
-                <td className="text-center">{emp.weight ?? "—"}</td>
-                <td>{emp.contactPerson || "—"}</td>
-                <td className="text-center">{emp.contactNumber || "—"}</td>
-                <td className="text-base-content/80">{emp.email || "—"}</td>
+                <td
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.branch || "—"}
+                </td>
+                <td
+                  className="text-center cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.contactNumber || "—"}
+                </td>
+                <td
+                  className="text-base-content/80 cursor-pointer"
+                  onClick={() => router.push(`/user/employees/${emp.id}`)}
+                >
+                  {emp.email || "—"}
+                </td>
               </tr>
             ))}
           </tbody>
