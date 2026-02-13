@@ -64,28 +64,23 @@ const ModalBase = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.38, ease: "easeOut" }}
+          className={`fixed inset-0 min-w-0 flex items-center justify-center z-[9999] ${
+            notTransparent ? `${bgColor}` : "bg-black/50"
+          } ${className}`}
+          onClick={() => setVisible(false)}
         >
-          <div
-            className={`fixed inset-0 min-w-0 flex items-center justify-center backdrop-brightness-50 z-9999 ${
-              notTransparent
-                ? `bg-opacity-100 ${bgColor}`
-                : "bg-opacity-50 bg-transparent"
-            } ${className}`}
-            onClick={() => setVisible(false)}
-          >
-            <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
-              <div className="flex-1 flex p-5 items-center justify-center">
-                <motion.div
-                  key="modal-content"
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.38, ease: "easeOut" }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="w-auto">{childWithStop}</div>
-                </motion.div>
-              </div>
+          <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
+            <div className="flex-1 flex p-5 items-center justify-center">
+              <motion.div
+                key="modal-content"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.38, ease: "easeOut" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-auto">{childWithStop}</div>
+              </motion.div>
             </div>
           </div>
         </motion.div>
