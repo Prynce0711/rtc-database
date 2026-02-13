@@ -2,9 +2,11 @@
 
 import { signIn, useSession } from "@/app/lib/authClient";
 import { AnimatePresence, motion, useAnimation } from "framer-motion";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import { isDarkMode } from "../lib/utils";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -13,6 +15,17 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [darkMode, setDarkMode] = useState(isDarkMode());
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setDarkMode(isDarkMode());
+    };
+    window.addEventListener("themeChange", handleThemeChange);
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, []);
 
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     try {
@@ -140,8 +153,15 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative">
+      <Image
+        src="/hahaha.jpg"
+        alt="Background"
+        fill
+        className={`object-cover ${darkMode ? "opacity-20" : "opacity-90"} pointer-events-none`}
+        priority
+      />
+      <div className="max-w-md w-full relative z-10">
         {/* full-screen overlay used during transition */}
         <motion.div
           className="fixed inset-0 z-20 bg-base-100"

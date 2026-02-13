@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: "Regional Trial Court",
   description: "Regional Trial Court management system",
 };
+
 export default function RootLayout({
   children,
 }: Readonly<{
