@@ -71,14 +71,14 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               alt="Supreme Court"
               width={90}
               height={90}
-              className="w-16 h-16 object-contain mb-3 "
+              className="w-23 h-23 object-contain mb-3 "
             />
 
-            <h1 className="text-lg font-extrabold text-base-content leading-tight">
+            <h1 className="text-2xl font-extrabold text-base-content leading-tight">
               Regional Trial Court
             </h1>
 
-            <p className="text-sm font-medium text-base-content/60">
+            <p className="text-md font-medium text-base-content/60 mt-2">
               Case & Employee System
             </p>
           </div>

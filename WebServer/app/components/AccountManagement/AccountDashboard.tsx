@@ -11,7 +11,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { FiPlus, FiSearch } from "react-icons/fi";
+import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { Pagination } from "../Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import { getAccounts } from "./AccountActions";
@@ -50,23 +50,22 @@ const AccountDashboard = () => {
   const session = useSession();
   const canManage = session.data?.user?.role === Roles.ADMIN;
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   const [users, setUsers] = useState<DashboardUser[]>([]);
   const [showDrawer, setShowDrawer] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusTab, setStatusTab] = useState<TabType>("ALL");
-
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilterType>("ALL");
-
   const [modalAction, setModalAction] = useState<ModalAction | null>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<CSSProperties>({});
-  const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Update sliding indicator position
   useEffect(() => {
     const index = tabs.findIndex((t) => t === statusTab);
     if (index === -1) return;
 
     const activeTab = tabRefs.current[index];
-
     if (!activeTab) return;
 
     setIndicatorStyle({
@@ -184,17 +183,17 @@ const AccountDashboard = () => {
     if (user.status === "PENDING")
       return (
         <button
-          className="btn btn-xs btn-info"
+          className="btn btn-sm bg-base-300  items-center justify-center text-center"
           onClick={() => handleReminder(user)}
         >
-          Reminder
+          Resend Link
         </button>
       );
 
     if (user.status === Status.SUSPENDED)
       return (
         <button
-          className="btn btn-xs btn-success"
+          className="btn btn-sm btn-success items-center justify-center text-center"
           onClick={() => handleStatusChange(user, Status.ACTIVE, "unlock")}
         >
           Unlock
@@ -204,7 +203,7 @@ const AccountDashboard = () => {
     if (user.status === Status.INACTIVE)
       return (
         <button
-          className="btn btn-xs btn-success"
+          className="btn btn-sm btn-success items-center justify-center text-center"
           onClick={() => handleStatusChange(user, Status.ACTIVE, "reactivate")}
         >
           Reactivate
@@ -214,19 +213,18 @@ const AccountDashboard = () => {
     return (
       <div className="flex gap-2">
         <button
-          className="btn btn-xs btn-error"
+          className="btn btn-sm bg-base-300  items-center justify-center text-center"
+          onClick={() => handleStatusChange(user, Status.SUSPENDED, "lock")}
+        >
+          Lock
+        </button>
+        <button
+          className="btn btn-sm btn-error items-center justify-center text-center"
           onClick={() =>
             handleStatusChange(user, Status.INACTIVE, "deactivate")
           }
         >
           Deactivate
-        </button>
-
-        <button
-          className="btn btn-xs btn-warning"
-          onClick={() => handleStatusChange(user, Status.SUSPENDED, "lock")}
-        >
-          Lock
         </button>
       </div>
     );
@@ -240,7 +238,6 @@ const AccountDashboard = () => {
         u.email.toLowerCase().includes(searchQuery.toLowerCase());
 
       const status = statusTab === "ALL" ? true : u.status === statusTab;
-
       const role = roleFilter === "ALL" ? true : u.role === roleFilter;
 
       return search && status && role;
@@ -251,80 +248,49 @@ const AccountDashboard = () => {
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
-  const getStatusConfig = (status: ExtendedStatus | "ALL") => {
-    if (status === "ALL") {
-      return {
-        label: "All Accounts",
-        className: "text-primary",
-      };
-    }
 
-    switch (status) {
-      case Status.ACTIVE:
-        return {
-          label: "Active",
-          className: "text-success",
-        };
-
-      case Status.SUSPENDED:
-        return {
-          label: "Locked",
-          className: "text-warning",
-        };
-
-      case Status.INACTIVE:
-        return {
-          label: "Inactive",
-          className: "text-error",
-        };
-
-      case "PENDING":
-        return {
-          label: "Pending",
-          className: "text-info",
-        };
-
-      default:
-        return {
-          label: status,
-          className: "",
-        };
-    }
+  const getStatusLabel = (status: ExtendedStatus | "ALL") => {
+    if (status === "ALL") return "All Accounts";
+    if (status === Status.SUSPENDED) return "Locked";
+    if (status === Status.ACTIVE) return "Active";
+    if (status === Status.INACTIVE) return "Inactive";
+    if (status === "PENDING") return "Pending";
+    return status;
   };
 
   return (
-    <div className="min-h-screen">
-      <main>
+    <div className="min-h-screen px-4 lg:px-8">
+      <main className="max-w-[1500px] mx-auto">
         {/* HEADER */}
-        <div className="flex justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div>
-            <h2 className="text-4xl font-bold">Account Management</h2>
-            <p className="opacity-60">Manage user accounts and permissions</p>
+            <h2 className="text-5xl font-black tracking-tight">
+              Account Management
+            </h2>
+            <p className="text-lg opacity-60 mt-2">
+              Manage user accounts and permissions
+            </p>
           </div>
 
           {canManage && (
             <button
-              className="btn btn-primary gap-2"
+              className="btn btn-primary btn-lg gap-2 shadow-lg"
               onClick={() => setShowDrawer(true)}
             >
-              <FiPlus /> Add Account
+              <FiPlus size={20} /> Add Account
             </button>
           )}
         </div>
 
         {/* STATUS TABS */}
-        <div
-          ref={tabsRef}
-          className="relative flex p-1 rounded-full bg-base-200 border border-base-300 w-fit mb-6"
-        >
-          {/* Sliding Indicator */}
+        <div className="relative flex p-2 rounded-full bg-base-200 border border-base-300 w-fit mb-8">
           <div
-            className="absolute top-1 bottom-1 rounded-full bg-base-100 shadow-md transition-all duration-300"
+            className="absolute top-2 bottom-2 rounded-full bg-base-100 shadow transition-all duration-300"
             style={indicatorStyle}
           />
 
           {tabs.map((tab, index) => {
-            const config = getStatusConfig(tab);
+            const label = getStatusLabel(tab);
 
             const count =
               tab === "ALL"
@@ -334,11 +300,8 @@ const AccountDashboard = () => {
             return (
               <button
                 key={tab}
-                ref={(el) => {
-                  tabRefs.current[index] = el;
-                }}
-                data-tab={tab}
-                className={`relative z-10 px-6 py-2.5 flex items-center gap-2 font-semibold text-sm transition-colors duration-200 ${
+                ref={(el) => (tabRefs.current[index] = el)}
+                className={`relative z-10 px-8 py-3 font-bold text-sm transition ${
                   statusTab === tab
                     ? "text-primary"
                     : "text-base-content/60 hover:text-base-content"
@@ -348,13 +311,13 @@ const AccountDashboard = () => {
                   setCurrentPage(1);
                 }}
               >
-                {config.label}
+                {label}
 
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
+                  className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
                     statusTab === tab
                       ? "bg-primary/10 text-primary"
-                      : "bg-base-300 text-base-content/60"
+                      : "bg-base-300"
                   }`}
                 >
                   {count}
@@ -365,95 +328,173 @@ const AccountDashboard = () => {
         </div>
 
         {/* SEARCH + FILTER */}
-        <div className="flex gap-3 mb-6">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+          <div className="relative flex-1 max-w-md">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" />
+
             <input
-              className="input input-bordered pl-10"
-              placeholder="Search..."
+              className="input input-bordered input-md pl-12 w-full shadow-sm"
+              placeholder="Search name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <select
-            className="select select-bordered"
+            className="select select-bordered select-md w-full sm:w-60 shadow-sm"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as RoleFilterType)}
           >
             <option value="ALL">All Roles</option>
             <option value={Roles.USER}>Staff</option>
-            <option value={Roles.ATTY}>Atty</option>
+            <option value={Roles.ATTY}>Attorney</option>
           </select>
         </div>
 
-        {/* TABLE */}
-        <div className="overflow-x-auto bg-base-100 shadow rounded-xl">
-          <table className="table table-zebra">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Updated</th>
-                {canManage && <th>Actions</th>}
-              </tr>
-            </thead>
+        {/* TABLE / EMPTY STATE */}
+        <div className="bg-base-100 rounded-2xl shadow-lg border border-base-300 overflow-hidden min-h-[9s00px] flex flex-col">
+          {paginated.length === 0 ? (
+            /* ⭐ CENTERED EMPTY STATE */
+            <div className="flex flex-1 items-center justify-center p-10">
+              <div className="text-center max-w-md animate-in fade-in zoom-in-95 duration-300">
+                {/* ICON */}
+                <div className="mx-auto w-24 h-24 flex items-center justify-center mb-6 ">
+                  <FiSearch size={80} className="opacity-40" />
+                </div>
 
-            <tbody>
-              {paginated.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
+                {/* TITLE */}
+                <h3 className="text-2xl font-black mb-3">No Accounts Found</h3>
 
-                  {/* ROLE EDIT */}
-                  <td>
-                    {user.role === Roles.ADMIN || user.status === "PENDING" ? (
-                      <span className="font-semibold">{user.role}</span>
-                    ) : (
-                      <select
-                        className="select select-xs select-bordered"
-                        value={user.role}
-                        onChange={(e) =>
-                          handleRoleChange(user, e.target.value as Roles)
-                        }
-                      >
-                        <option value={Roles.USER}>Staff</option>
-                        <option value={Roles.ATTY}>Attorney</option>
-                      </select>
-                    )}
-                  </td>
+                {/* DESCRIPTION */}
+                <p className="opacity-60 text-base leading-relaxed">
+                  We couldn't find any matching accounts. Try adjusting your
+                  search or filters.
+                </p>
 
-                  {/* STATUS BADGE */}
-                  <td>
-                    {(() => {
-                      const config = getStatusConfig(user.status);
-                      return (
-                        <span className={`badge ${config.className}`}>
-                          {config.label}
-                        </span>
-                      );
-                    })()}
-                  </td>
+                {/* CTA */}
+                {canManage && (
+                  <button
+                    className="btn btn-primary btn-lg mt-7 gap-2 shadow-lg hover:scale-105 transition"
+                    onClick={() => setShowDrawer(true)}
+                  >
+                    <FiPlus size={20} />
+                    Create Account
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* TABLE */}
+              <div className="overflow-x-auto">
+                <table className="table table-lg table-zebra text-center">
+                  <thead>
+                    <tr className="text-sm uppercase tracking-wider">
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                      <th>Updated</th>
+                      {canManage && <th>Actions</th>}
+                    </tr>
+                  </thead>
 
-                  <td>{formatDate(user.createdAt)}</td>
-                  <td>{formatDate(user.updatedAt)}</td>
+                  <tbody>
+                    {paginated.map((user) => (
+                      <tr key={user.id}>
+                        <td className="font-semibold text-sm">{user.name}</td>
 
-                  {canManage && <td>{renderActions(user)}</td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <td className="opacity-70 text-sm">{user.email}</td>
+
+                        {/* ROLE */}
+                        <td>
+                          {user.role === Roles.ADMIN ||
+                          user.status === "PENDING" ? (
+                            <span className="font-semibold text-base-content  opacity-70 text-sm">
+                              {user.role}
+                            </span>
+                          ) : (
+                            <select
+                              className="select select-sm select-bordered"
+                              value={user.role}
+                              onChange={(e) =>
+                                handleRoleChange(user, e.target.value as Roles)
+                              }
+                            >
+                              <option value={Roles.USER}>Staff</option>
+                              <option value={Roles.ATTY}>Attorney</option>
+                            </select>
+                          )}
+                        </td>
+
+                        {/* STATUS */}
+                        <td>
+                          <span
+                            className={`
+    inline-flex items-center gap-2
+    px-4 py-1.5
+    text-xs font-semibold
+    rounded-full
+    border backdrop-blur-sm
+    transition-all duration-200
+    ${
+      user.status === Status.ACTIVE
+        ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+        : user.status === Status.INACTIVE
+          ? "bg-red-500/10 text-red-600 border-red-500/20"
+          : user.status === "PENDING"
+            ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+            : "bg-base-200/60 text-base-content/60 border-base-300"
+    }
+  `}
+                          >
+                            {/* STATUS INDICATOR */}
+                            {user.status === Status.SUSPENDED ? (
+                              <FiLock className="w-3.5 h-3.5 opacity-70" />
+                            ) : user.status === "PENDING" ? (
+                              <span className="loading loading-spinner loading-xs" />
+                            ) : (
+                              <span
+                                className={`
+        w-1.5 h-1.5 rounded-full
+        ${user.status === Status.ACTIVE ? "bg-emerald-500" : "bg-red-500"}
+      `}
+                              />
+                            )}
+
+                            {getStatusLabel(user.status)}
+                          </span>
+                        </td>
+
+                        <td className="opacity-70 text-sm">
+                          {formatDate(user.createdAt)}
+                        </td>
+
+                        <td className="opacity-70 text-sm">
+                          {formatDate(user.updatedAt)}
+                        </td>
+
+                        {canManage && <td>{renderActions(user)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINATION CENTERED */}
+              <div className="py-8 flex justify-center">
+                <Pagination
+                  currentPage={currentPage}
+                  pageCount={Math.ceil(processedUsers.length / pageSize)}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        <Pagination
-          currentPage={currentPage}
-          pageCount={Math.ceil(processedUsers.length / pageSize)}
-          onPageChange={setCurrentPage}
-        />
-
+        {/* DRAWER */}
         <AddAccountDrawer
           isOpen={showDrawer}
           onClose={() => setShowDrawer(false)}
@@ -462,14 +503,14 @@ const AccountDashboard = () => {
               {
                 ...u,
                 role: u.role ?? Roles.USER,
-                status: "PENDING" as ExtendedStatus,
+                status: "PENDING",
               },
               ...prev,
             ])
           }
         />
 
-        {/* CONFIRMATION MODAL */}
+        {/* MODAL */}
         <ConfirmModal
           isOpen={!!modalAction}
           onClose={() => setModalAction(null)}
