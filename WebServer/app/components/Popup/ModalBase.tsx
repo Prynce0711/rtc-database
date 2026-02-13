@@ -38,16 +38,16 @@ const ModalBase = ({
 
   if (isValidElement<ClickableChild>(children)) {
     const child = children as ReactElement<
-      ClickableChild & { requestClose?: () => void }
+      ClickableChild & { requestclose?: () => void }
     >;
     childWithStop = cloneElement(child, {
       onClick: (event: ReactMouseEvent) => {
         event.stopPropagation();
         child.props.onClick?.(event);
       },
-      // provide a `requestClose` function to children so they can ask ModalBase
+      // provide a `requestclose` function to children so they can ask ModalBase
       // to perform the animated close sequence before calling the parent's onClose
-      requestClose: () => setVisible(false),
+      requestclose: () => setVisible(false),
     });
   }
 
