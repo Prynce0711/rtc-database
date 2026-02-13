@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useMemo, useState } from "react";
-import { FiEye, FiEyeOff } from "react-icons/fi";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
 
 // ===== Requirement UI Helper =====
 const Requirement = ({ ok, text }: { ok: boolean; text: string }) => (
@@ -25,13 +26,52 @@ const Requirement = ({ ok, text }: { ok: boolean; text: string }) => (
   </motion.p>
 );
 
+// ===== Custom Spinning Loader Component with Tailwind & Framer Motion =====
+const SpinningLoader = () => {
+  const bars = Array.from({ length: 12 }, (_, i) => i);
+
+  return (
+    <div className="relative w-14 h-14">
+      {bars.map((i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-[30%] w-[8%] h-[24%] bg-primary rounded-full shadow-sm"
+          style={{
+            transform: `rotate(${i * 30}deg) translate(0, -130%)`,
+            transformOrigin: "0% 0%",
+          }}
+          animate={{
+            opacity: [1, 0.25],
+          }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            ease: "linear",
+            delay: -1.1 + i * 0.1,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
 const FirstLogin: React.FC = () => {
+  const router = useRouter();
+
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
+
+  // NEW STATES
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [modalShowPass, setModalShowPass] = useState(false);
+  const [confirmedSave, setConfirmedSave] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // ===== Password Requirement Detection =====
   const checks = useMemo(() => {
@@ -44,8 +84,10 @@ const FirstLogin: React.FC = () => {
     };
   }, [password, confirm]);
 
-  // Check for password mismatch
-  React.useEffect(() => {
+  const isValid = Object.values(checks).every(Boolean);
+
+  // Check mismatch
+  useEffect(() => {
     if (confirm && password && password !== confirm) {
       setError("Passwords do not match");
     } else {
@@ -83,233 +125,341 @@ const FirstLogin: React.FC = () => {
     },
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full">
-        {/* Header */}
-        <motion.div
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <motion.img
-            src="/SupremeCourtLogo.webp"
-            className="w-28 h-28 mx-auto drop-shadow-lg"
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          />
+  const copyPassword = async () => {
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-          <motion.h1
-            className="text-3xl font-bold mt-4"
+  const handleConfirmSave = () => {
+    setShowReviewModal(false);
+    setRedirecting(true);
+
+    setTimeout(() => {
+      router.push("/");
+    }, 2000);
+  };
+
+  return (
+    <>
+      {/* 🔄 REDIRECT LOADING WITH SPINNING LOADER */}
+      <AnimatePresence>
+        {redirecting && (
+          <motion.div
+            className="fixed inset-0 bg-base-100 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           >
-            Welcome to RTC System
-          </motion.h1>
-
-          <motion.p
-            className="text-sm opacity-60 mt-2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
-            transition={{ delay: 0.4 }}
-          >
-            Create your password before continuing.
-          </motion.p>
-        </motion.div>
-
-        {/* Card */}
-        <motion.div
-          className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300"
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <h2 className="text-3xl font-bold text-center mb-8">
-            Set Your Password
-          </h2>
-
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                className="alert alert-error mb-6"
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  scale: 1,
-                  x: [0, -10, 10, -10, 10, 0],
-                }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ duration: 0.5 }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="stroke-current shrink-0 h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <form className="space-y-5">
-            {/* New Password */}
             <motion.div
-              className="form-control"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
+              className="text-center"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
             >
-              <label className="label font-semibold">New Password</label>
+              <motion.div
+                className="mb-6 flex justify-center"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                <SpinningLoader />
+              </motion.div>
 
-              <div className="relative">
+              <motion.p
+                className="text-base font-medium mb-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                Password saved
+              </motion.p>
+
+              <motion.p
+                className="text-sm opacity-60"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                Redirecting to login...
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔐 IMPROVED REVIEW MODAL */}
+      <AnimatePresence>
+        {showReviewModal && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="bg-base-100 rounded-2xl shadow-2xl p-7 w-full max-w-md border border-base-300"
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Header */}
+              <div className="mb-6">
+                <h3 className="text-xl font-bold mb-1.5">
+                  Review your password
+                </h3>
+                <p className="text-sm opacity-60">
+                  This password will only be shown once. Save it securely before
+                  continuing.
+                </p>
+              </div>
+
+              {/* Password Display */}
+              <div className="relative mb-6">
+                <div className="bg-base-200 rounded-lg p-4 pr-20">
+                  <p className="font-mono text-sm break-all">
+                    {modalShowPass ? password : "••••••••••••"}
+                  </p>
+                </div>
+
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalShowPass(!modalShowPass)}
+                    className="p-2 hover:bg-base-300 rounded-lg transition-colors"
+                    aria-label={
+                      modalShowPass ? "Hide password" : "Show password"
+                    }
+                  >
+                    {modalShowPass ? (
+                      <FiEyeOff className="w-4 h-4" />
+                    ) : (
+                      <FiEye className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={copyPassword}
+                      className="p-2 hover:bg-base-300 rounded-lg transition-colors"
+                      aria-label="Copy password"
+                    >
+                      {copied ? (
+                        <FiCheck className="w-4 h-4 text-success" />
+                      ) : (
+                        <FiCopy className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    {/* Tooltip */}
+                    <AnimatePresence>
+                      {copied && (
+                        <motion.div
+                          className="absolute -top-9 left-1/2 -translate-x-1/2 bg-success text-success-content px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap shadow-lg"
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 5 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          Copied!
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </div>
+
+              {/* Checkbox */}
+              <label className="flex items-start gap-3 mb-6 cursor-pointer group">
                 <input
-                  type={showNew ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input input-bordered w-full pr-12 bg-base-200 transition-all duration-300 focus:scale-[1.02]"
+                  type="checkbox"
+                  className="checkbox checkbox-primary mt-0.5"
+                  checked={confirmedSave}
+                  onChange={() => setConfirmedSave(!confirmedSave)}
                 />
+                <span className="text-sm select-none">
+                  I confirm that I have saved this password securely
+                </span>
+              </label>
 
+              {/* Actions */}
+              <div className="flex gap-3">
                 <button
-                  type="button"
-                  onClick={() => setShowNew(!showNew)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
+                  onClick={() => setShowReviewModal(false)}
+                  className="btn btn-ghost flex-1"
                 >
-                  {showNew ? <FiEyeOff /> : <FiEye />}
+                  Cancel
+                </button>
+                <button
+                  disabled={!confirmedSave}
+                  onClick={handleConfirmSave}
+                  className="btn btn-primary flex-1"
+                >
+                  Continue
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Strength Meter */}
+      {/* MAIN PAGE */}
+      <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full">
+          {/* Header */}
+          <motion.div
+            className="text-center mb-10"
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <motion.img
+              src="/SupremeCourtLogo.webp"
+              className="w-28 h-28 mx-auto drop-shadow-lg"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+            />
+
+            <motion.h1 className="text-3xl font-bold mt-4">
+              Welcome to RTC System
+            </motion.h1>
+
+            <motion.p className="text-sm opacity-60 mt-2">
+              Create your password before continuing.
+            </motion.p>
+          </motion.div>
+
+          {/* Card */}
+          <motion.div
+            className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300"
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <h2 className="text-3xl font-bold text-center mb-8">
+              Set Your Password
+            </h2>
+
             <AnimatePresence>
-              {password && (
+              {error && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
+                  className="alert alert-error mb-6"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
                 >
+                  <span>{error}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form className="space-y-5">
+              {/* New Password */}
+              <div>
+                <label className="label font-semibold">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showNew ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input input-bordered w-full pr-12 bg-base-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew(!showNew)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                  >
+                    {showNew ? (
+                      <FiEyeOff className="w-5 h-5" />
+                    ) : (
+                      <FiEye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Strength Meter */}
+              {password && (
+                <div>
                   <div className="relative w-full h-2 bg-base-300 rounded-full overflow-hidden">
                     <motion.div
                       className={`h-full ${getStrengthColor()} rounded-full`}
                       initial={{ width: 0 }}
                       animate={{ width: `${strengthPercent}%` }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15,
-                      }}
                     />
                   </div>
 
-                  <motion.p
-                    className="text-xs mt-2 opacity-70 flex items-center gap-2"
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 0.7, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <span className="font-semibold">Strength:</span>
-                    <motion.span
-                      key={strengthLabel}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`font-medium ${
-                        strength <= 2
-                          ? "text-warning"
-                          : strength <= 4
-                            ? "text-info"
-                            : "text-success"
-                      }`}
-                    >
-                      {strengthLabel}
-                    </motion.span>
-                  </motion.p>
-                </motion.div>
+                  <p className="text-xs mt-2 opacity-70">
+                    <span className="font-semibold">Strength:</span>{" "}
+                    {strengthLabel}
+                  </p>
+                </div>
               )}
-            </AnimatePresence>
 
-            {/* Confirm Password */}
-            <motion.div
-              className="form-control"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <label className="label font-semibold">Confirm Password</label>
-
-              <div className="relative">
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="input input-bordered w-full pr-12 bg-base-200 transition-all duration-300 focus:scale-[1.02]"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
-                >
-                  {showConfirm ? <FiEyeOff /> : <FiEye />}
-                </button>
+              {/* Confirm Password */}
+              <div>
+                <label className="label font-semibold">Confirm Password</label>
+                <div className="relative">
+                  <input
+                    type={showConfirm ? "text" : "password"}
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    className="input input-bordered w-full pr-12 bg-base-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                  >
+                    {showConfirm ? (
+                      <FiEyeOff className="w-5 h-5" />
+                    ) : (
+                      <FiEye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
-            </motion.div>
 
-            {/* Requirements */}
-            <motion.div
-              className="text-xs space-y-1"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <Requirement ok={checks.length} text="Minimum 8 characters" />
-              <Requirement ok={checks.uppercase} text="One uppercase letter" />
-              <Requirement ok={checks.number} text="One number" />
-              <Requirement ok={checks.special} text="One special character" />
-              <Requirement ok={checks.match} text="Passwords match" />
-            </motion.div>
+              {/* Requirements */}
+              <div className="text-xs space-y-1">
+                <Requirement ok={checks.length} text="Minimum 8 characters" />
+                <Requirement
+                  ok={checks.uppercase}
+                  text="One uppercase letter"
+                />
+                <Requirement ok={checks.number} text="One number" />
+                <Requirement ok={checks.special} text="One special character" />
+                <Requirement ok={checks.match} text="Passwords match" />
+              </div>
 
-            <motion.button
-              type="button"
-              className="btn btn-primary w-full mt-6"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              Save Password
-            </motion.button>
-          </form>
+              <button
+                type="button"
+                disabled={!isValid}
+                onClick={() => setShowReviewModal(true)}
+                className="btn btn-primary w-full mt-6"
+              >
+                Save Password
+              </button>
+            </form>
 
-          <div className="divider text-xs mt-8">Security Setup</div>
+            <div className="divider text-xs mt-8">Security Setup</div>
 
-          <p className="text-xs text-center opacity-60">
-            You will be redirected to login after saving password.
-          </p>
-        </motion.div>
+            <p className="text-xs text-center opacity-60">
+              You will be redirected to login after saving password.
+            </p>
+          </motion.div>
 
-        {/* Footer */}
-        <motion.div
-          className="text-center mt-8 text-sm opacity-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ delay: 0.7 }}
-        >
-          © 2026 Regional Trial Court
-        </motion.div>
+          {/* Footer */}
+          <motion.div className="text-center mt-8 text-sm opacity-50">
+            © 2026 Regional Trial Court
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

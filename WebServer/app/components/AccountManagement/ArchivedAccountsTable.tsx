@@ -15,15 +15,16 @@ const ArchivedAccountsTable = ({
   pageSize: number;
   onRestore?: (ids: string[]) => void;
 }) => {
-  const [archivePage, setArchivePage] = useState(1);
+  const [archivePage] = useState(1);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const popup = usePopup();
+
   const archivedUsers = allUsers.filter((u) => u.status === "INACTIVE");
 
   const paginatedArchivedUsers = archivedUsers.slice(
     (archivePage - 1) * pageSize,
     archivePage * pageSize,
   );
-  const archiveTotalPages = Math.ceil(archivedUsers.length / pageSize);
 
   return (
     <div className="mb-6">
@@ -45,40 +46,51 @@ const ArchivedAccountsTable = ({
               <th className="font-medium">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {archivedUsers.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center text-base-content/60">
+                <td colSpan={5} className="text-center text-base-content/60">
                   No archived accounts
                 </td>
               </tr>
             ) : (
               paginatedArchivedUsers.map((user) => (
                 <tr key={`archived-${user.id}`}>
-                  <td className="text-base md:text-lg">{user.name}</td>
-                  <td className="text-base md:text-lg">{user.email}</td>
-                  <td className="text-base md:text-lg">{user.role}</td>
-                  <td className="text-base md:text-lg">
-                    {formatDate(user.updatedAt)}
-                  </td>
+                  <td>{user.name}</td>
+                  <td>{user.email}</td>
+                  <td>{user.role}</td>
+                  <td>{formatDate(user.updatedAt)}</td>
+
                   <td>
                     <button
-                      className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
+                      className={`btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white ${
+                        loadingId === user.id ? "loading" : ""
+                      }`}
+                      disabled={loadingId === user.id}
                       onClick={async () => {
                         const confirm = await popup.showYesNo(
                           `Restore ${user.name} to active accounts?`,
                         );
                         if (!confirm) return;
-                        const result = await unbanAccount([user.id]);
-                        if (!result.success) {
-                          popup.showError(
-                            "Error restoring account: " + result.error,
-                            "error",
-                          );
-                          return;
+
+                        try {
+                          setLoadingId(user.id);
+
+                          const result = await unbanAccount([user.id]);
+                          if (!result.success) {
+                            popup.showError(
+                              "Error restoring account: " + result.error,
+                              "error",
+                            );
+                            return;
+                          }
+
+                          popup.showSuccess("Account restored successfully");
+                          onRestore?.([user.id]);
+                        } finally {
+                          setLoadingId(null);
                         }
-                        popup.showSuccess("Account restored successfully");
-                        if (onRestore) onRestore([user.id]);
                       }}
                     >
                       Reactivate
