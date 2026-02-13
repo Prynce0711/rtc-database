@@ -94,6 +94,25 @@ const CaseRow = ({
       </td>
       <td>{caseItem.committe1}</td>
       <td>{caseItem.committe2}</td>
+      <td>{caseItem.Judge}</td>
+      <td>{caseItem.AO}</td>
+      <td>{caseItem.Complainant}</td>
+      <td>{caseItem.HouseNo}</td>
+      <td>{caseItem.Street}</td>
+      <td>{caseItem.Barangay}</td>
+      <td>{caseItem.Municipality}</td>
+      <td>{caseItem.Province}</td>
+      <td>{caseItem.Is}</td>
+      <td>{caseItem.Counts}</td>
+      <td>{caseItem.Jdf}</td>
+      <td>{caseItem.Sajj}</td>
+      <td>{caseItem.Sajj2}</td>
+      <td>{caseItem.MF}</td>
+      <td>{caseItem.STF}</td>
+      <td>{caseItem.LRF}</td>
+      <td>{caseItem.VCF}</td>
+      <td>{caseItem.Total}</td>
+      <td>{caseItem.AmountInvolved}</td>
     </tr>
   );
 };

@@ -1,11 +1,3 @@
-/**
- * Case Detail Modal Component
- *
- * Displays comprehensive case information in a modern, wide modal.
- * Shows all fields from the case schema organized into logical sections.
- * Uses ModalBase for consistent modal behavior across the application.
- */
-
 "use client";
 
 import React from "react";
@@ -232,6 +224,160 @@ ${
                   <DetailItem
                     label="Committee 2"
                     value={caseData.committe2?.toString() || "Not assigned"}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Parties Section */}
+            <div className="card bg-base-200 shadow-md">
+              <div className="card-body">
+                <h3 className="card-title text-2xl mb-4 flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 text-warning"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                    />
+                  </svg>
+                  Parties Involved
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <DetailItem
+                    label="Judge"
+                    value={caseData.Judge || "Not set"}
+                  />
+                  <DetailItem label="AO" value={caseData.AO || "Not set"} />
+                  <DetailItem
+                    label="Complainant"
+                    value={caseData.Complainant || "Not set"}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Address Section */}
+            <div className="card bg-base-200 shadow-md">
+              <div className="card-body">
+                <h3 className="card-title text-2xl mb-4 flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 text-success"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  Address
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <DetailItem
+                    label="House No."
+                    value={caseData.HouseNo || "Not set"}
+                  />
+                  <DetailItem
+                    label="Street"
+                    value={caseData.Street || "Not set"}
+                  />
+                  <DetailItem
+                    label="Barangay"
+                    value={caseData.Barangay || "Not set"}
+                  />
+                  <DetailItem
+                    label="Municipality"
+                    value={caseData.Municipality || "Not set"}
+                  />
+                  <DetailItem
+                    label="Province"
+                    value={caseData.Province || "Not set"}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Details Section */}
+            <div className="card bg-base-200 shadow-md">
+              <div className="card-body">
+                <h3 className="card-title text-2xl mb-4 flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 text-error"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Financial Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <DetailItem
+                    label="Is"
+                    value={caseData.Is?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="Counts"
+                    value={caseData.Counts?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="JDF"
+                    value={caseData.Jdf?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="SAJJ"
+                    value={caseData.Sajj?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="SAJJ2"
+                    value={caseData.Sajj2?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="MF"
+                    value={caseData.MF?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="STF"
+                    value={caseData.STF?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="LRF"
+                    value={caseData.LRF?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="VCF"
+                    value={caseData.VCF?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="Total"
+                    value={caseData.Total?.toString() || "Not set"}
+                  />
+                  <DetailItem
+                    label="Amount Involved"
+                    value={caseData.AmountInvolved?.toString() || "Not set"}
                   />
                 </div>
               </div>

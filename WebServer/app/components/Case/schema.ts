@@ -69,4 +69,5 @@ export const initialCaseFormData: CaseSchema = {
   raffleDate: undefined,
   committe1: undefined,
   committe2: undefined,
+  // Add data for other fields as neededq
 };

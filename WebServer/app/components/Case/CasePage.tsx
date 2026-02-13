@@ -72,6 +72,27 @@ const CasePage: React.FC = () => {
     { key: "bond", label: "Bond Amount", type: "range" },
     { key: "dateFiled", label: "Date Filed", type: "daterange" },
     { key: "raffleDate", label: "Raffle Date", type: "daterange" },
+    { key: "committe1", label: "Committee 1", type: "number" },
+    { key: "committe2", label: "Committee 2", type: "number" },
+    { key: "Judge", label: "Judge", type: "text" },
+    { key: "AO", label: "AO", type: "text" },
+    { key: "Complainant", label: "Complainant", type: "text" },
+    { key: "HouseNo", label: "House No", type: "text" },
+    { key: "Street", label: "Street", type: "text" },
+    { key: "Barangay", label: "Barangay", type: "text" },
+    { key: "Municipality", label: "Municipality", type: "text" },
+    { key: "Province", label: "Province", type: "text" },
+    { key: "Is", label: "Is", type: "number" },
+    { key: "Counts", label: "Counts", type: "number" },
+    { key: "Jdf", label: "JDF", type: "number" },
+    { key: "Sajj", label: "SAJJ", type: "number" },
+    { key: "Sajj2", label: "SAJJ2", type: "number" },
+    { key: "MF", label: "MF", type: "number" },
+    { key: "STF", label: "STF", type: "number" },
+    { key: "LRF", label: "LRF", type: "number" },
+    { key: "VCF", label: "VCF", type: "number" },
+    { key: "Total", label: "Total", type: "number" },
+    { key: "AmountInvolved", label: "Amount Involved", type: "number" },
   ];
 
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -153,6 +174,27 @@ const CasePage: React.FC = () => {
       "infoSheet",
       "court",
       "consolidation",
+      "committe1",
+      "committe2",
+      "Judge",
+      "AO",
+      "Complainant",
+      "HouseNo",
+      "Street",
+      "Barangay",
+      "Municipality",
+      "Province",
+      "Is",
+      "Counts",
+      "Jdf",
+      "Sajj",
+      "Sajj2",
+      "MF",
+      "STF",
+      "LRF",
+      "VCF",
+      "Total",
+      "AmountInvolved",
     ];
 
     if (!textFields.includes(key)) return [];
@@ -533,18 +575,6 @@ const CasePage: React.FC = () => {
         <div className="bg-base-100  rounded-lg shadow">
           <Table
             headers={[
-              // { key: "caseNumber", label: "Case Number", sortable: true },
-              // { key: "name", label: "Name", sortable: true, align: "center" },
-              // { key: "charge", label: "Charge", sortable: true },
-              // { key: "branch", label: "Branch", sortable: true },
-              // {
-              //   key: "assistantBranch",
-              //   label: "Assistant Branch",
-              //   sortable: true,
-              // },
-              // { key: "court", label: "Court", sortable: true },
-              //BUTTON FOR ACTIONS
-
               ...(isAdminOrAtty
                 ? [
                     {
@@ -584,6 +614,29 @@ const CasePage: React.FC = () => {
               { key: "raffleDate", label: "Raffle Date", sortable: true },
               { key: "committe1", label: "Committe 1", sortable: true },
               { key: "committe2", label: "Committe 2", sortable: true },
+              { key: "Judge", label: "Judge", sortable: true },
+              { key: "AO", label: "AO", sortable: true },
+              { key: "Complainant", label: "Complainant", sortable: true },
+              { key: "HouseNo", label: "House No.", sortable: true },
+              { key: "Street", label: "Street", sortable: true },
+              { key: "Barangay", label: "Barangay", sortable: true },
+              { key: "Municipality", label: "Municipality", sortable: true },
+              { key: "Province", label: "Province", sortable: true },
+              { key: "Is", label: "Is", sortable: true },
+              { key: "Counts", label: "Counts", sortable: true },
+              { key: "Jdf", label: "JDF", sortable: true },
+              { key: "Sajj", label: "SAJJ", sortable: true },
+              { key: "Sajj2", label: "SAJJ2", sortable: true },
+              { key: "MF", label: "MF", sortable: true },
+              { key: "STF", label: "STF", sortable: true },
+              { key: "LRF", label: "LRF", sortable: true },
+              { key: "VCF", label: "VCF", sortable: true },
+              { key: "Total", label: "Total", sortable: true },
+              {
+                key: "AmountInvolved",
+                label: "Amount Involved",
+                sortable: true,
+              },
             ]}
             data={paginatedCases}
             rowsPerPage={10}
