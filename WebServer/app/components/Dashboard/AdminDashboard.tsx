@@ -7,8 +7,6 @@ import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
   AlertTriangle,
   BarChart3,
-  Building2,
-  Calendar,
   Download,
   FileText,
   Info,
@@ -20,9 +18,9 @@ import {
   Shield,
   TrendingDown,
   TrendingUp,
-  Users,
   XCircle,
 } from "lucide-react";
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -41,6 +39,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import { useRouter } from "next/navigation";
 import type { Case } from "../../generated/prisma/client";
 import { RecentCases } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";
@@ -75,6 +75,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
     "overview",
   );
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const getCssVar = (name: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -162,11 +163,11 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         title: "Incomplete Employee Records",
         message: `${stats.employeesMissing} employees missing information`,
         count: stats.employeesMissing,
-        action: () => onNavigate?.("employees"),
+        action: () => router.push("/user/employees"),
       });
     }
     return alertList;
-  }, [stats, onNavigate]);
+  }, [stats, onNavigate, router]);
 
   const auditLogs = useMemo((): AuditLog[] => {
     const logs: AuditLog[] = [];
@@ -230,6 +231,24 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       ...data,
     }));
   }, [cases]);
+  const StatCard = ({ label, value, desc }: any) => (
+    <div className="card bg-base-200">
+      <div className="card-body text-center">
+        <p className="text-xs font-bold uppercase">{label}</p>
+        <p className="text-3xl font-black">{value}</p>
+        <p className="text-sm opacity-60">{desc}</p>
+      </div>
+    </div>
+  );
+
+  const StatMini = ({ label, value }: any) => (
+    <div className="stats bg-base-200">
+      <div className="stat text-center">
+        <div className="stat-title">{label}</div>
+        <div className="stat-value">{value}</div>
+      </div>
+    </div>
+  );
 
   const dataQuality = useMemo(() => {
     const totalRecords = cases.length + employees.length + accounts.length;
@@ -527,327 +546,10 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   ))}
                 </section>
 
-                {/* SECONDARY METRICS */}
-                <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
-                  {[
-                    {
-                      label: "Employees",
-                      value: stats.employees,
-                      subtitle: `${stats.employeesMissing} incomplete`,
-                      icon: Users,
-                    },
-                    {
-                      label: "Branches",
-                      value: branchPerformance.length,
-                      subtitle: "Active locations",
-                      icon: Building2,
-                    },
-                    {
-                      label: "Data Quality",
-                      value: `${dataQuality.quality.toFixed(0)}%`,
-                      subtitle: `${dataQuality.incomplete} incomplete`,
-                      icon: BarChart3,
-                    },
-                    {
-                      label: "This Month",
-                      value: stats.casesThisMonth,
-                      subtitle: `${stats.caseGrowth >= 0 ? "+" : ""}${stats.caseGrowth.toFixed(1)}%`,
-                      icon: Calendar,
-                    },
-                  ].map((card, idx) => (
-                    <div
-                      key={idx}
-                      className="stats shadow-lg hover:shadow-xl hover:scale-105 transition-all"
-                    >
-                      <div className="stat p-4 sm:p-6 gap-2">
-                        <div className="stat-title text-xs sm:text-sm font-bold uppercase">
-                          {card.label}
-                        </div>
-                        <div className="stat-value text-2xl sm:text-3xl">
-                          {card.value}
-                        </div>
-                        <div className="stat-desc text-xs sm:text-sm font-semibold">
-                          {card.subtitle}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </section>
-
                 {/* CHARTS */}
-                <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-                  {/* TRENDS */}
-                  <div className="lg:col-span-2 card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <div className="mb-6">
-                        <h2 className="card-title text-2xl sm:text-3xl font-black">
-                          Case Filing Trends
-                        </h2>
-                        <p className="text-base sm:text-lg font-medium text-base-content/60">
-                          Six-month case volume analysis
-                        </p>
-                      </div>
-
-                      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
-                        {[
-                          {
-                            label: "Total Filed",
-                            value: monthlyTrends.reduce(
-                              (sum, m) => sum + m.cases,
-                              0,
-                            ),
-                            color: "primary",
-                            desc: "Last 6 months",
-                          },
-                          {
-                            label: "Monthly Avg",
-                            value: (
-                              monthlyTrends.reduce(
-                                (sum, m) => sum + m.cases,
-                                0,
-                              ) / monthlyTrends.length
-                            ).toFixed(0),
-                            color: "success",
-                            desc: "Cases/month",
-                          },
-                          {
-                            label: "Monthly Change",
-                            value: `${stats.caseGrowth >= 0 ? "+" : ""}${stats.caseGrowth.toFixed(1)}%`,
-                            color: stats.caseGrowth >= 0 ? "success" : "error",
-                            desc: "vs. last month",
-                          },
-                        ].map((metric, idx) => (
-                          <div
-                            key={idx}
-                            className={`card bg-${metric.color}/10 border-2 border-${metric.color}/20 hover:scale-105 transition-transform`}
-                          >
-                            <div className="card-body p-3 sm:p-4">
-                              <p
-                                className={`text-xs font-bold uppercase text-${metric.color}`}
-                              >
-                                {metric.label}
-                              </p>
-                              <p
-                                className={`text-2xl sm:text-3xl font-bold text-${metric.color}`}
-                              >
-                                {metric.value}
-                              </p>
-                              <p className="text-xs sm:text-sm font-semibold text-base-content/60">
-                                {metric.desc}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="card bg-base-200">
-                        <div className="card-body p-3 sm:p-4">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart
-                              data={monthlyTrends}
-                              margin={{
-                                top: 10,
-                                right: 10,
-                                left: -20,
-                                bottom: 0,
-                              }}
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="colorCases"
-                                  x1="0"
-                                  y1="0"
-                                  x2="0"
-                                  y2="1"
-                                >
-                                  <stop
-                                    offset="0%"
-                                    stopColor={getCssVar("--color-primary")}
-                                    stopOpacity={0.6}
-                                  />
-                                  <stop
-                                    offset="100%"
-                                    stopColor={getCssVar("--color-primary")}
-                                    stopOpacity={0.05}
-                                  />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke={getCssVar("--color-base-content")}
-                                vertical={false}
-                              />
-                              <XAxis
-                                dataKey="month"
-                                fontSize={12}
-                                fontWeight={600}
-                                tickLine={false}
-                                stroke={getCssVar("--color-base-content")}
-                              />
-                              <YAxis
-                                fontSize={12}
-                                fontWeight={600}
-                                tickLine={false}
-                                stroke={getCssVar("--color-base-content")}
-                              />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Area
-                                type="monotone"
-                                dataKey="cases"
-                                stroke={getCssVar("--color-primary")}
-                                strokeWidth={3}
-                                fillOpacity={1}
-                                fill="url(#colorCases)"
-                                name="Cases Filed"
-                                dot={{
-                                  r: 4,
-                                  fill: "oklch(var(--p))",
-                                  stroke: "#fff",
-                                  strokeWidth: 2,
-                                }}
-                                activeDot={{
-                                  r: 7,
-                                  fill: "oklch(var(--p))",
-                                  stroke: "#fff",
-                                  strokeWidth: 3,
-                                }}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* DATA QUALITY */}
-                  <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <div className="mb-6">
-                        <h2 className="card-title text-2xl sm:text-3xl font-black">
-                          Data Quality
-                        </h2>
-                        <p className="text-base sm:text-lg font-medium text-base-content/60">
-                          System completeness
-                        </p>
-                      </div>
-
-                      <ResponsiveContainer width="100%" height={220}>
-                        <RadialBarChart
-                          cx="50%"
-                          cy="50%"
-                          innerRadius="60%"
-                          outerRadius="100%"
-                          data={[
-                            {
-                              name: "Quality",
-                              value: dataQuality.quality,
-                              fill: getCssVar("--color-success"),
-                            },
-                          ]}
-                          startAngle={90}
-                          endAngle={-270}
-                        >
-                          <RadialBar
-                            minAngle={15}
-                            background={{ fill: getCssVar("--color-base-200") }}
-                            clockWise
-                            dataKey="value"
-                            cornerRadius={10}
-                          />
-
-                          <text
-                            x="50%"
-                            y="50%"
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fill={getCssVar("--color-base-content")}
-                            className="text-4xl font-bold"
-                          >
-                            {dataQuality.quality.toFixed(0)}%
-                          </text>
-                        </RadialBarChart>
-                      </ResponsiveContainer>
-
-                      <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6">
-                        <div className="stats bg-success/10 border-2 border-success/20 hover:scale-105 transition-transform">
-                          <div className="stat p-3 sm:p-4 text-center">
-                            <div className="stat-title text-xs font-bold text-success">
-                              Complete
-                            </div>
-                            <div className="stat-value text-2xl sm:text-3xl text-success">
-                              {dataQuality.complete}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="stats bg-error/10 border-2 border-error/20 hover:scale-105 transition-transform">
-                          <div className="stat p-3 sm:p-4 text-center">
-                            <div className="stat-title text-xs font-bold text-error">
-                              Incomplete
-                            </div>
-                            <div className="stat-value text-2xl sm:text-3xl text-error">
-                              {dataQuality.incomplete}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {dataQuality.incomplete > 0 && (
-                        <button className="btn btn-primary btn-block mt-4 hover:scale-105 transition-transform">
-                          Review Incomplete Records
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </section>
 
                 {/* BRANCH & ACTIVITY */}
                 <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-                  {/* BRANCH WORKLOAD */}
-                  <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <h2 className="card-title text-xl sm:text-2xl font-black">
-                        Branch Workload
-                      </h2>
-                      <p className="text-sm sm:text-base font-medium text-base-content/60">
-                        Case distribution
-                      </p>
-
-                      <ResponsiveContainer width="100%" height={700}>
-                        <BarChart
-                          data={branchPerformance.slice(0, 5)}
-                          layout="vertical"
-                          margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <XAxis
-                            type="number"
-                            fontSize={11}
-                            fontWeight={600}
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="branch"
-                            fontSize={12}
-                            fontWeight={700}
-                            width={100}
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar
-                            dataKey="cases"
-                            fill={getCssVar("--color-primary")}
-                            radius={[0, 8, 8, 0]}
-                            name="Total Cases"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
                   {/* RECENT ACTIVITY */}
                   <div className="lg:col-span-2 card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
                     <div className="card-body p-4 sm:p-6 lg:p-8">
@@ -934,112 +636,136 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
             {activeTab === "analytics" && (
               <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
                 {/* DETENTION ANALYSIS */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-xl sm:text-2xl font-black">
+                <div className="card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
                       Detention Status Analysis
                     </h2>
-                    <p className="text-sm sm:text-base font-medium text-base-content/60">
-                      Current distribution
-                    </p>
 
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={260}>
                       <PieChart>
                         <Pie
                           data={[
+                            { name: "Detained", value: stats.detained },
                             {
-                              name: "In Detention",
-                              value: stats.detained,
-                              fill: "oklch(var(--wa))",
-                            },
-                            {
-                              name: "Released/Free",
+                              name: "Released",
                               value: stats.totalCases - stats.detained,
-                              fill: getCssVar("--color-success"),
                             },
                           ]}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                          outerRadius={100}
                           dataKey="value"
+                          outerRadius={100}
                         >
                           <Cell fill={getCssVar("--color-warning")} />
                           <Cell fill={getCssVar("--color-success")} />
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={40}
-                          iconType="circle"
-                        />
+                        <Tooltip />
+                        <Legend />
                       </PieChart>
                     </ResponsiveContainer>
-
-                    <div className="grid grid-cols-2 gap-4 mt-6">
-                      <div className="stats bg-warning/10 border-2 border-warning/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-warning">
-                            Detained
-                          </div>
-                          <div className="stat-value text-3xl sm:text-4xl text-warning">
-                            {stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="stats bg-success/10 border-2 border-success/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-success">
-                            Released
-                          </div>
-                          <div className="stat-value text-3xl sm:text-4xl text-success">
-                            {stats.totalCases - stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
                 {/* BRANCH EFFICIENCY */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-xl sm:text-2xl font-black">
+                <div className="card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
                       Branch Processing Efficiency
                     </h2>
-                    <p className="text-sm sm:text-base font-medium text-base-content/60">
-                      Completion rates
-                    </p>
 
-                    <div className="space-y-5 sm:space-y-6 mt-6">
+                    <div className="space-y-4 mt-4">
                       {branchPerformance.slice(0, 5).map((branch) => (
-                        <div
-                          key={branch.branch}
-                          className="hover:scale-[1.02] transition-transform"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <span className="text-base sm:text-lg font-bold">
-                              {branch.branch}
-                            </span>
-                            <span className="text-lg sm:text-xl font-bold text-primary">
-                              {branch.efficiency.toFixed(1)}%
-                            </span>
+                        <div key={branch.branch}>
+                          <div className="flex justify-between font-bold">
+                            <span>{branch.branch}</span>
+                            <span>{branch.efficiency.toFixed(1)}%</span>
                           </div>
+
                           <progress
-                            className="progress progress-primary w-full h-3 sm:h-4"
+                            className="progress progress-primary w-full"
                             value={branch.efficiency}
                             max="100"
                           />
-                          <div className="mt-2 flex justify-between text-xs sm:text-sm font-semibold text-base-content/60">
-                            <span>{branch.cases} total cases</span>
-                            <span>{branch.pending} pending</span>
-                          </div>
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* ⭐ NEW — BRANCH WORKLOAD */}
+                <div className="lg:col-span-2 card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">Branch Workload</h2>
+
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart
+                        data={branchPerformance.slice(0, 5)}
+                        layout="vertical"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="branch" type="category" />
+                        <Tooltip content={<CustomTooltip />} />
+
+                        <Bar
+                          dataKey="cases"
+                          fill={getCssVar("--color-primary")}
+                          radius={[0, 8, 8, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* CASE FILING TRENDS */}
+                <div className="lg:col-span-2 card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
+                      Case Filing Trends
+                    </h2>
+
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={monthlyTrends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip content={<CustomTooltip />} />
+
+                        <Area
+                          type="monotone"
+                          dataKey="cases"
+                          stroke={getCssVar("--color-primary")}
+                          fillOpacity={0.3}
+                          fill={getCssVar("--color-primary")}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* DATA QUALITY */}
+                <div className="lg:col-span-2 card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">Data Quality</h2>
+
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RadialBarChart
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="60%"
+                        outerRadius="100%"
+                        data={[
+                          {
+                            name: "Quality",
+                            value: dataQuality.quality,
+                            fill: getCssVar("--color-success"),
+                          },
+                        ]}
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <RadialBar dataKey="value" cornerRadius={10} />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
