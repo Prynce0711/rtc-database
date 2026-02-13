@@ -1,6 +1,8 @@
 "use client";
 
+import { isDarkMode } from "@/app/lib/utils";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
@@ -66,7 +68,7 @@ const FirstLogin: React.FC = () => {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [error, setError] = useState("");
-
+  const [darkMode, setDarkMode] = useState(isDarkMode());
   // NEW STATES
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [modalShowPass, setModalShowPass] = useState(false);
@@ -86,7 +88,15 @@ const FirstLogin: React.FC = () => {
   }, [password, confirm]);
 
   const isValid = Object.values(checks).every(Boolean);
-
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setDarkMode(isDarkMode());
+    };
+    window.addEventListener("themeChange", handleThemeChange);
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, []);
   // Check mismatch
   useEffect(() => {
     if (confirm && password && password !== confirm) {
@@ -309,8 +319,16 @@ const FirstLogin: React.FC = () => {
       </AnimatePresence>
 
       {/* MAIN PAGE */}
-      <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 relative  bg-black/90">
+        <Image
+          src="/ha.jpg"
+          alt="Background"
+          fill
+          className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
+          priority
+        />
+
+        <div className="max-w-md w-full relative z-10 mt-16">
           {/* full-screen overlay used during transition */}
           <motion.div
             className="fixed inset-0 z-20 bg-base-100"
@@ -362,7 +380,11 @@ const FirstLogin: React.FC = () => {
             </div>
 
             <motion.h1
-              className="text-4xl font-bold text-base-content mb-2 tracking-tight"
+              className="text-4xl font-bold text-white mb-2 tracking-tight"
+              style={{
+                textShadow:
+                  "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
@@ -371,7 +393,11 @@ const FirstLogin: React.FC = () => {
             </motion.h1>
 
             <motion.p
-              className="text-lg text-base-content/90 font-semibold"
+              className="text-lg text-white/90 font-semibold"
+              style={{
+                textShadow:
+                  "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
@@ -380,12 +406,16 @@ const FirstLogin: React.FC = () => {
             </motion.p>
 
             <motion.p
-              className="text-sm text-base-content/60 italic mt-2 font-medium"
+              className="text-sm text-white/90 italic mt-2 font-medium"
+              style={{
+                textShadow:
+                  "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
+              }}
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.6 }}
+              animate={{ opacity: 0.8 }}
               transition={{ delay: 0.5 }}
             >
-              "Batas at Bayan"
+              &quot;Batas at Bayan&quot;
             </motion.p>
           </motion.div>
 
@@ -393,7 +423,14 @@ const FirstLogin: React.FC = () => {
 
           {/* Card */}
           <motion.div
-            className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300"
+            className="
+relative z-10
+rounded-2xl
+p-8
+bg-gradient-to-b from-white/90 to-white/60
+border border-white/20
+shadow-xl
+"
             variants={cardVariants}
             initial="hidden"
             animate="visible"
@@ -508,16 +545,15 @@ const FirstLogin: React.FC = () => {
               </button>
             </form>
 
-            <div className="divider text-xs mt-8">Security Setup</div>
+            <div className="divider text-xs text-base-content/70 mt-8">
+              Security Setup
+            </div>
 
-            <p className="text-xs text-center opacity-60">
-              You will be redirected to login after saving password.
-            </p>
-          </motion.div>
-
-          {/* Footer */}
-          <motion.div className="text-center mt-8 text-sm opacity-50">
-            © 2026 Regional Trial Court
+            <div className="text-center">
+              <p className="text-xs text-base-content/80 mt-3">
+                Regional Trial Court © 2026
+              </p>
+            </div>
           </motion.div>
         </div>
       </div>

@@ -2,9 +2,11 @@
 
 import { signIn, useSession } from "@/app/lib/authClient";
 import { AnimatePresence, motion, useAnimation } from "framer-motion";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import { isDarkMode } from "../lib/utils";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -13,6 +15,38 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+
+  const [darkMode, setDarkMode] = useState(isDarkMode());
+  const cardVariants = {
+    hidden: { opacity: 0, y: 30, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+    transitioning: {
+      scale: 1.06,
+      y: -40,
+      opacity: 0.98,
+      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    },
+    shake: {
+      x: [0, -15, 15, -12, 12, -8, 8, -4, 4, 0],
+      rotate: [0, -1, 1, -1, 1, 0],
+      transition: { duration: 0.7 },
+    },
+  };
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setDarkMode(isDarkMode());
+    };
+    window.addEventListener("themeChange", handleThemeChange);
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, []);
 
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     try {
@@ -38,22 +72,6 @@ const Login: React.FC = () => {
 
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 30, scale: 0.95 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
-    },
-    transitioning: {
-      scale: 1.06,
-      y: -40,
-      opacity: 0.98,
-      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
-    },
-  } as const;
 
   const { data: session } = useSession();
 
@@ -103,8 +121,23 @@ const Login: React.FC = () => {
       if (signInError) {
         setError("Invalid email or password. Please try again.");
         setIsLoading(false);
+
+        await cardControls.start("shake");
+
         return;
       }
+      // smooth transition kapag success
+      try {
+        void overlayControls.start({
+          opacity: 1,
+          transition: { duration: 0.45 },
+        });
+
+        await cardControls.start("transitioning");
+        await new Promise((r) => setTimeout(r, 120));
+      } catch {}
+
+      return;
 
       // smooth transition: animate card then fade overlay into view before navigating
       try {
@@ -140,8 +173,30 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative  bg-black/90">
+      {/* <Image
+        src="/cardo.jpg"
+        alt="Background"
+        fill
+        className={`bg-repeat ${darkMode ? "opacity-20" : "opacity-90"} pointer-events-none`}
+        priority
+      /> */}
+      {/* <Image
+        src="/jere.jpg"
+        alt="Brand"
+        width={300}
+        height={300}
+        className="absolute bottom-4 right-4 opacity-70 pointer-events-none select-none"
+      /> */}
+
+      <Image
+        src="/ha.jpg"
+        alt="Background"
+        fill
+        className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
+        priority
+      />
+      <div className="max-w-md w-full relative z-10">
         {/* full-screen overlay used during transition */}
         <motion.div
           className="fixed inset-0 z-20 bg-base-100"
@@ -193,7 +248,11 @@ const Login: React.FC = () => {
           </div>
 
           <motion.h1
-            className="text-4xl font-bold text-base-content mb-2 tracking-tight"
+            className="text-4xl font-bold text-white mb-2 tracking-tight"
+            style={{
+              textShadow:
+                "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
+            }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -202,7 +261,11 @@ const Login: React.FC = () => {
           </motion.h1>
 
           <motion.p
-            className="text-lg text-base-content/90 font-semibold"
+            className="text-lg text-white/90 font-semibold"
+            style={{
+              textShadow:
+                "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
+            }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -211,18 +274,29 @@ const Login: React.FC = () => {
           </motion.p>
 
           <motion.p
-            className="text-sm text-base-content/60 italic mt-2 font-medium"
+            className="text-sm text-white/90 italic mt-2 font-medium"
+            style={{
+              textShadow:
+                "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
+            }}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
+            animate={{ opacity: 0.8 }}
             transition={{ delay: 0.5 }}
           >
-            "Batas at Bayan"
+            &quot;Batas at Bayan&quot;
           </motion.p>
         </motion.div>
 
         {/* Login Form */}
         <motion.div
-          className=" bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300 backdrop-blur-sm relative z-10"
+          className="
+relative z-10
+rounded-2xl
+p-8
+bg-gradient-to-b from-white/90 to-white/60
+border border-white/20
+shadow-xl
+"
           variants={cardVariants}
           initial="hidden"
           animate={cardControls}
@@ -234,10 +308,10 @@ const Login: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <h2 className="text-4xl font-bold text-base-content text-center">
+            <h2 className="text-3xl font-bold text-base-content text-center">
               Sign In
             </h2>
-            <p className="text-md text-base-content/60 text-center mt-4">
+            <p className="text-sm text-base-content/90 text-center mt-2">
               Enter your credentials to access your account
             </p>
           </motion.div>
@@ -388,37 +462,18 @@ const Login: React.FC = () => {
             </motion.button>
           </form>
 
-          <div className="divider text-xs text-base-content/50 mt-8">
-            Secure Login
+          <div className="divider text-xs text-base-content/70 mt-8">
+            Authorized Access Only
           </div>
 
           <div className="text-center">
-            <p className="text-xs text-base-content/60">
-              Protected by enterprise-grade security
+            <p className="text-xs text-base-content/80 mt-3">
+              Regional Trial Court © 2026
             </p>
           </div>
         </motion.div>
 
         {/* Footer */}
-        <motion.div
-          className="text-center mt-8 text-sm opacity-50 mt-2 "
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ delay: 0.9 }}
-        >
-          <p>© 2026 Regional Trial Court. All rights reserved.</p>
-        </motion.div>
-
-        <motion.p
-          className="mt-2 text-xs opacity-20 text-base-content text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.3 }}
-          transition={{ delay: 1 }}
-        >
-          This system contains confidential information for authorized use only.
-          Unauthorized access is strictly prohibited and may lead to legal
-          action.
-        </motion.p>
       </div>
     </div>
   );

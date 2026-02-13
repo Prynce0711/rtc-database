@@ -2,8 +2,8 @@
 
 import React from "react";
 
-interface DashboardLayoutProps {
-  title: string;
+export interface DashboardLayoutProps {
+  title?: string;
   subtitle?: string;
   children?: React.ReactNode;
   className?: string;
@@ -16,17 +16,21 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   className = "",
 }) => {
   return (
-    <div className="min-h-screen bg-base-100">
-      <main className={`w-full ${className}`}>
-        <div className="">
-          <h2 className="text-3xl font-bold text-base-content mb-2 text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-xl text-base-content/70 ">{subtitle}</p>
-          )}
-        </div>
-
+    <div className="min-h-screen ">
+      <main
+        className={`w-full max-w-[1600px] mx-auto ${className}`}
+        style={{ padding: "var(--space-page-y) var(--space-page-x)" }}
+      >
+        {title && (
+          <div className="mb-6">
+            <h2 className="text-3xl lg:text-4xl font-bold text-base-content tracking-tight">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="mt-1 text-base text-muted">{subtitle}</p>
+            )}
+          </div>
+        )}
         {children}
       </main>
     </div>
