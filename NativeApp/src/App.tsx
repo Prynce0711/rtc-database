@@ -1,6 +1,5 @@
 "use client";
 
-import console from "node:console";
 import { useEffect, useState } from "react";
 import "./App.css";
 
@@ -15,8 +14,8 @@ export default function App() {
   const [status, setStatus] = useState<"locating" | "located" | "loading">(
     "locating",
   );
-  const devURL = process.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
-  const [isDevMode] = useState(() => process.env.NODE_ENV === "development");
+  const devURL = import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
+  const [isDevMode] = useState(() => import.meta.env.MODE === "development");
 
   useEffect(() => {
     let isSubscribed = true;
@@ -32,7 +31,7 @@ export default function App() {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const response = await fetch(
-          `${process.env.VITE_DEV_SERVER_URL || "http://localhost:3000"}/api/health`,
+          `${import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000"}/api/health`,
           {
             signal: controller.signal,
             method: "GET",
