@@ -99,7 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               onClick={() =>
                 setTheme((t) => (t === "winter" ? "dim" : "winter"))
               }
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition"
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition cursor-pointer"
             >
               {theme === "winter" ? (
                 <FiMoon className="text-lg" />
@@ -114,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             {/* LOGOUT */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-error hover:bg-error/10 transition"
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-error hover:bg-error/10 transition cursor-pointer"
             >
               <FiLogOut className="text-lg" />
               <span className="text-sm font-medium">Logout</span>

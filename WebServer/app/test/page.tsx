@@ -1,5 +1,5 @@
-const page = () => {
-  return <></>;
-};
+import RedirectingUI from "../components/Redirect/RedirectingUI";
 
-export default page;
+export default function page() {
+  return <RedirectingUI />;
+}

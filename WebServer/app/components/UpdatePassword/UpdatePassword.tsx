@@ -1,93 +1,68 @@
 "use client";
 
+import { authClient, useSession } from "@/app/lib/authClient";
 import { isDarkMode } from "@/app/lib/utils";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import { setInitialPassword } from "../AccountManagement/AccountActions";
+import { usePopup } from "../Popup/PopupProvider";
+import RequirementUI from "./RequirementUI";
+import StrengthMeter from "./StrengthMeter";
 
-// ===== Requirement UI Helper =====
-const Requirement = ({ ok, text }: { ok: boolean; text: string }) => (
-  <motion.p
-    className={`flex items-center gap-2 transition-colors duration-300 ${
-      ok ? "text-success" : "opacity-60"
-    }`}
-    initial={{ opacity: 0, x: -10 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.3 }}
-  >
-    <motion.span
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 500, damping: 25 }}
-    >
-      {ok ? "✔" : "•"}
-    </motion.span>
-    {text}
-  </motion.p>
-);
+export enum UpdatePasswordType {
+  FIRST_LOGIN = "FIRST_LOGIN",
+  CHANGE_PASSWORD = "CHANGE_PASSWORD",
+}
 
-// ===== Custom Spinning Loader Component with Tailwind & Framer Motion =====
-const SpinningLoader = () => {
-  const bars = Array.from({ length: 12 }, (_, i) => i);
-
-  return (
-    <div className="relative w-14 h-14">
-      {bars.map((i) => (
-        <motion.div
-          key={i}
-          className="absolute left-1/2 top-[30%] w-[8%] h-[24%] bg-base-content rounded-full shadow-sm"
-          style={{
-            transform: `rotate(${i * 30}deg) translate(0, -130%)`,
-            transformOrigin: "0% 0%",
-          }}
-          animate={{
-            opacity: [1, 0.25],
-          }}
-          transition={{
-            duration: 1,
-            repeat: Infinity,
-            ease: "linear",
-            delay: -1.1 + i * 0.1,
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-const FirstLogin: React.FC = () => {
+const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
   const router = useRouter();
   const overlayControls = useAnimationControls();
+  const statusPopup = usePopup();
+  const session = useSession();
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [current, setCurrent] = useState("");
 
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
 
   const [error, setError] = useState("");
+  const [darkMode, setDarkMode] = useState(isDarkMode());
   const [darkMode, setDarkMode] = useState(isDarkMode());
   // NEW STATES
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [modalShowPass, setModalShowPass] = useState(false);
   const [confirmedSave, setConfirmedSave] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // ===== Password Requirement Detection =====
-  const checks = useMemo(() => {
+  const strengthChecks = useMemo(() => {
     return {
       length: password.length >= 8,
       uppercase: /[A-Z]/.test(password),
       number: /[0-9]/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
-      match: password !== "" && password === confirm,
     };
-  }, [password, confirm]);
+  }, [password]);
 
+  const matchCheck = password !== "" && password === confirm;
+
+  const checks = { ...strengthChecks, match: matchCheck };
   const isValid = Object.values(checks).every(Boolean);
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setDarkMode(isDarkMode());
+    };
+    window.addEventListener("themeChange", handleThemeChange);
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, []);
   useEffect(() => {
     const handleThemeChange = () => {
       setDarkMode(isDarkMode());
@@ -106,26 +81,6 @@ const FirstLogin: React.FC = () => {
     }
   }, [password, confirm]);
 
-  const strength = Object.values(checks).filter(Boolean).length;
-
-  const strengthLabel = [
-    "Very Weak",
-    "Weak",
-    "Fair",
-    "Good",
-    "Strong",
-    "Excellent",
-  ][strength];
-
-  const strengthPercent = (strength / 5) * 100;
-
-  const getStrengthColor = () => {
-    if (strength === 0) return "bg-error";
-    if (strength <= 2) return "bg-warning";
-    if (strength <= 4) return "bg-info";
-    return "bg-success";
-  };
-
   const cardVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
     visible: {
@@ -142,67 +97,43 @@ const FirstLogin: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     setShowReviewModal(false);
-    setRedirecting(true);
+    statusPopup.showLoading("Updating password...");
 
-    setTimeout(() => {
-      router.push("/");
-    }, 2000);
+    if (!session?.data?.user) {
+      statusPopup.showError("You are not logged in.");
+      return;
+    }
+
+    if (type === UpdatePasswordType.CHANGE_PASSWORD) {
+      const { data, error } = await authClient.changePassword({
+        newPassword: password, // required
+        currentPassword: UpdatePasswordType.CHANGE_PASSWORD ? current : "", // required
+        revokeOtherSessions: true,
+      });
+
+      if (error) {
+        statusPopup.showError(error.message || "Failed to update password");
+        return;
+      }
+    } else {
+      const result = await setInitialPassword(password);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to set password");
+        return;
+      }
+    }
+
+    statusPopup.hidePopup();
+    router.push("/");
   };
 
   return (
     <>
-      {/* 🔄 REDIRECT LOADING WITH SPINNING LOADER */}
-      <AnimatePresence>
-        {redirecting && (
-          <motion.div
-            className="fixed inset-0 bg-base-100 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <motion.div
-                className="mb-6 flex justify-center"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                <SpinningLoader />
-              </motion.div>
-
-              <motion.p
-                className="text-base font-medium mb-1"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                Password saved
-              </motion.p>
-
-              <motion.p
-                className="text-sm opacity-60"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                Redirecting to login...
-              </motion.p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* 🔐 IMPROVED REVIEW MODAL */}
-      <AnimatePresence>
-        {showReviewModal && (
+      {showReviewModal && (
+        <AnimatePresence>
           <motion.div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4"
             initial={{ opacity: 0 }}
@@ -315,8 +246,8 @@ const FirstLogin: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
 
       {/* MAIN PAGE */}
       <div className="min-h-screen flex items-center justify-center px-4 py-12 relative  bg-black/90">
@@ -398,6 +329,11 @@ const FirstLogin: React.FC = () => {
                 textShadow:
                   "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
               }}
+              className="text-lg text-white/90 font-semibold"
+              style={{
+                textShadow:
+                  "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
@@ -411,6 +347,11 @@ const FirstLogin: React.FC = () => {
                 textShadow:
                   "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
               }}
+              className="text-sm text-white/90 italic mt-2 font-medium"
+              style={{
+                textShadow:
+                  "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.8 }}
               transition={{ delay: 0.5 }}
@@ -419,15 +360,13 @@ const FirstLogin: React.FC = () => {
             </motion.p>
           </motion.div>
 
-          {/* Login Form */}
-
           {/* Card */}
           <motion.div
             className="
 relative z-10
 rounded-2xl
 p-8
-bg-gradient-to-b from-white/90 to-white/60
+bg-linear-to-b from-white/90 to-white/60
 border border-white/20
 shadow-xl
 "
@@ -436,11 +375,14 @@ shadow-xl
             animate="visible"
           >
             <h2 className="text-2xl font-bold text-center mb-4">
-              Set Your Password
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Create Your Password"
+                : "Change Password"}
             </h2>
             <p className="text-xs text-center text-warning font-medium mb-8">
-              For security compliance, passwords cannot be retrieved or reset
-              without administrator verification.
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Set a strong password for your account."
+                : "For security compliance, passwords cannot be retrieved or reset without administrator verification."}
             </p>
 
             <AnimatePresence>
@@ -457,6 +399,34 @@ shadow-xl
             </AnimatePresence>
 
             <form className="space-y-5">
+              {/* Current Password - Only for CHANGE_PASSWORD */}
+              {type === UpdatePasswordType.CHANGE_PASSWORD && (
+                <div>
+                  <label className="label font-semibold">
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrent ? "text" : "password"}
+                      value={current}
+                      onChange={(e) => setCurrent(e.target.value)}
+                      className="input input-bordered w-full pr-12 bg-base-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrent(!showCurrent)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                    >
+                      {showCurrent ? (
+                        <FiEyeOff className="w-5 h-5" />
+                      ) : (
+                        <FiEye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* New Password */}
               <div>
                 <label className="label font-semibold">New Password</label>
@@ -483,20 +453,11 @@ shadow-xl
 
               {/* Strength Meter */}
               {password && (
-                <div>
-                  <div className="relative w-full h-2 bg-base-300 rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full ${getStrengthColor()} rounded-full`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${strengthPercent}%` }}
-                    />
-                  </div>
-
-                  <p className="text-xs mt-2 opacity-70">
-                    <span className="font-semibold">Strength:</span>{" "}
-                    {strengthLabel}
-                  </p>
-                </div>
+                <StrengthMeter
+                  strength={
+                    Object.values(strengthChecks).filter(Boolean).length
+                  }
+                />
               )}
 
               {/* Confirm Password */}
@@ -525,14 +486,17 @@ shadow-xl
 
               {/* Requirements */}
               <div className="text-xs space-y-1">
-                <Requirement ok={checks.length} text="Minimum 8 characters" />
-                <Requirement
+                <RequirementUI ok={checks.length} text="Minimum 8 characters" />
+                <RequirementUI
                   ok={checks.uppercase}
                   text="One uppercase letter"
                 />
-                <Requirement ok={checks.number} text="One number" />
-                <Requirement ok={checks.special} text="One special character" />
-                <Requirement ok={checks.match} text="Passwords match" />
+                <RequirementUI ok={checks.number} text="One number" />
+                <RequirementUI
+                  ok={checks.special}
+                  text="One special character"
+                />
+                <RequirementUI ok={checks.match} text="Passwords match" />
               </div>
 
               <button
@@ -546,14 +510,21 @@ shadow-xl
             </form>
 
             <div className="divider text-xs text-base-content/70 mt-8">
-              Security Setup
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Account Setup"
+                : "Security Setup"}
             </div>
 
-            <div className="text-center">
-              <p className="text-xs text-base-content/80 mt-3">
-                Regional Trial Court © 2026
-              </p>
-            </div>
+            <p className="text-xs text-center opacity-60">
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Complete your account setup to get started."
+                : "You will be redirected to login after saving password."}
+            </p>
+          </motion.div>
+
+          {/* Footer */}
+          <motion.div className="text-xs text-center text-base-content/80 mt-3">
+            © 2026 Regional Trial Court
           </motion.div>
         </div>
       </div>
@@ -561,4 +532,4 @@ shadow-xl
   );
 };
 
-export default FirstLogin;
+export default UpdatePassword;

@@ -1,6 +1,8 @@
-import FirstLogin from "@/app/components/FirstLogin/FirstLogin";
+import UpdatePassword, {
+  UpdatePasswordType,
+} from "@/app/components/UpdatePassword/UpdatePassword";
 const page = () => {
-  return <FirstLogin />;
+  return <UpdatePassword type={UpdatePasswordType.FIRST_LOGIN} />;
 };
 
 export default page;

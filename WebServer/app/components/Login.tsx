@@ -1,11 +1,17 @@
 "use client";
 
-import { signIn, useSession } from "@/app/lib/authClient";
-import { AnimatePresence, motion, useAnimation } from "framer-motion";
+import { signIn } from "@/app/lib/authClient";
+import {
+  AnimatePresence,
+  easeInOut,
+  motion,
+  useAnimation,
+} from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import { isDarkMode } from "../lib/utils";
 import { isDarkMode } from "../lib/utils";
 
 const Login: React.FC = () => {
@@ -23,13 +29,13 @@ const Login: React.FC = () => {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+      transition: { duration: 0.7, delay: 0.2, ease: easeInOut },
     },
     transitioning: {
       scale: 1.06,
       y: -40,
       opacity: 0.98,
-      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+      transition: { duration: 0.6, ease: easeInOut },
     },
     shake: {
       x: [0, -15, 15, -12, 12, -8, 8, -4, 4, 0],
@@ -72,14 +78,6 @@ const Login: React.FC = () => {
 
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
-
-  const { data: session } = useSession();
-
-  useEffect(() => {
-    if (session?.user) {
-      router.push("/user/dashboard");
-    }
-  }, [session, router]);
 
   useEffect(() => {
     // reveal card on mount
@@ -124,8 +122,23 @@ const Login: React.FC = () => {
 
         await cardControls.start("shake");
 
+
+        await cardControls.start("shake");
+
         return;
       }
+      // smooth transition kapag success
+      try {
+        void overlayControls.start({
+          opacity: 1,
+          transition: { duration: 0.45 },
+        });
+
+        await cardControls.start("transitioning");
+        await new Promise((r) => setTimeout(r, 120));
+      } catch {}
+
+      return;
       // smooth transition kapag success
       try {
         void overlayControls.start({
@@ -190,7 +203,7 @@ const Login: React.FC = () => {
       /> */}
 
       <Image
-        src="/ha.jpg"
+        src="/cardo.jpg"
         alt="Background"
         fill
         className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
@@ -253,6 +266,11 @@ const Login: React.FC = () => {
               textShadow:
                 "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
             }}
+            className="text-4xl font-bold text-white mb-2 tracking-tight"
+            style={{
+              textShadow:
+                "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
+            }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -293,7 +311,7 @@ const Login: React.FC = () => {
 relative z-10
 rounded-2xl
 p-8
-bg-gradient-to-b from-white/90 to-white/60
+bg-linear-to-b from-white/90 to-white/60
 border border-white/20
 shadow-xl
 "
@@ -309,8 +327,10 @@ shadow-xl
             transition={{ delay: 0.4 }}
           >
             <h2 className="text-3xl font-bold text-base-content text-center">
+            <h2 className="text-3xl font-bold text-base-content text-center">
               Sign In
             </h2>
+            <p className="text-sm text-base-content/90 text-center mt-2">
             <p className="text-sm text-base-content/90 text-center mt-2">
               Enter your credentials to access your account
             </p>
@@ -464,9 +484,13 @@ shadow-xl
 
           <div className="divider text-xs text-base-content/70 mt-8">
             Authorized Access Only
+          <div className="divider text-xs text-base-content/70 mt-8">
+            Authorized Access Only
           </div>
 
           <div className="text-center">
+            <p className="text-xs text-base-content/80 mt-3">
+              Regional Trial Court © 2026
             <p className="text-xs text-base-content/80 mt-3">
               Regional Trial Court © 2026
             </p>

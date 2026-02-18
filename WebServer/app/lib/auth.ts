@@ -1,9 +1,10 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
-import { admin } from "better-auth/plugins";
+import { admin, magicLink } from "better-auth/plugins";
 import { createLog } from "../components/ActivityLogs/LogActions";
 import { LogAction } from "../generated/prisma/enums";
+import { sendEmail } from "./email";
 import { prisma } from "./prisma";
 // If your Prisma file is located elsewhere, you can change the path
 
@@ -14,8 +15,21 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: true,
   },
-  plugins: [admin()],
+  plugins: [
+    admin(),
+    magicLink({
+      sendMagicLink: async ({ email, token, url }, ctx) => {
+        sendEmail(
+          email,
+          "Your Magic Link for RTC Database",
+          `Click the link to sign in: ${url}`,
+        );
+      },
+      disableSignUp: true,
+    }),
+  ],
   user: {
     additionalFields: {
       role: {
