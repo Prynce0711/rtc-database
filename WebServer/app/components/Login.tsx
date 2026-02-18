@@ -1,7 +1,12 @@
 "use client";
 
 import { signIn } from "@/app/lib/authClient";
-import { AnimatePresence, motion, useAnimation, easeInOut } from "framer-motion";
+import {
+  AnimatePresence,
+  easeInOut,
+  motion,
+  useAnimation,
+} from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -182,7 +187,7 @@ const Login: React.FC = () => {
       /> */}
 
       <Image
-        src="/ha.jpg"
+        src="/cardo.jpg"
         alt="Background"
         fill
         className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
