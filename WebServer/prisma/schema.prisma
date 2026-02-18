@@ -13,6 +13,7 @@ datasource db {
 enum Status {
   ACTIVE
   INACTIVE
+  PENDING
   SUSPENDED
   TERMINATED
 }
@@ -122,6 +123,7 @@ model User {
 
   Logs         Log[]
 
+
   @@unique([email])
   @@map("user")
 }
@@ -158,6 +160,7 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  status                Status    @default(PENDING)
 
   @@index([userId])
   @@map("account")

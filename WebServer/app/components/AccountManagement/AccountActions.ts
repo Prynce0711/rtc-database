@@ -1,12 +1,12 @@
 "use server";
 
-import { LogAction, User } from "@/app/generated/prisma/browser";
+import { LogAction, Status, User } from "@/app/generated/prisma/browser";
 import { auth } from "@/app/lib/auth";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { headers } from "next/headers";
-import { prettifyError } from "zod";
+import z, { prettifyError } from "zod";
 import ActionResult from "../ActionResult";
 import { createLog } from "../ActivityLogs/LogActions";
 import { NewUserSchema } from "./schema";
@@ -271,5 +271,32 @@ export async function setInitialPassword(
   } catch (error) {
     console.error("Error setting password:", error);
     return { success: false, error: "Failed to set password" };
+  }
+}
+
+export async function updateStatus(
+  status: Status,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const statusSchema = z.enum(Status);
+    const validation = statusSchema.safeParse(status);
+    if (!validation.success) {
+      throw new Error("Invalid status: " + prettifyError(validation.error));
+    }
+
+    await prisma.user.update({
+      where: { id: sessionValidation.result.id },
+      data: { status: status },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error updating status:", error);
+    return { success: false, error: "Failed to update status" };
   }
 }
