@@ -21,3 +21,4 @@ dist-ssr
 
 dev.db
 .env
+certificates/
