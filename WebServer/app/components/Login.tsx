@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, useSession } from "@/app/lib/authClient";
+import { signIn } from "@/app/lib/authClient";
 import { AnimatePresence, motion, useAnimation } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -54,14 +54,6 @@ const Login: React.FC = () => {
       transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
     },
   } as const;
-
-  const { data: session } = useSession();
-
-  useEffect(() => {
-    if (session?.user) {
-      router.push("/user/dashboard");
-    }
-  }, [session, router]);
 
   useEffect(() => {
     // reveal card on mount

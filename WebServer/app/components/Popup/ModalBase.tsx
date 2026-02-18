@@ -38,16 +38,20 @@ const ModalBase = ({
 
   if (isValidElement<ClickableChild>(children)) {
     const child = children as ReactElement<
-      ClickableChild & { requestclose?: () => void }
+      ClickableChild & { requestClose?: () => void }
     >;
+
+    // Only add requestClose for custom components, not native HTML elements
+    const isNativeElement = typeof child.type === "string";
+
     childWithStop = cloneElement(child, {
       onClick: (event: ReactMouseEvent) => {
         event.stopPropagation();
         child.props.onClick?.(event);
       },
-      // provide a `requestclose` function to children so they can ask ModalBase
+      // provide a `requestClose` function to children so they can ask ModalBase
       // to perform the animated close sequence before calling the parent's onClose
-      requestclose: () => setVisible(false),
+      ...(!isNativeElement && { requestClose: () => setVisible(false) }),
     });
   }
 

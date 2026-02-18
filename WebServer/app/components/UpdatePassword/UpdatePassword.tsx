@@ -1,69 +1,33 @@
 "use client";
 
+import { authClient, useSession } from "@/app/lib/authClient";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import { setInitialPassword } from "../AccountManagement/AccountActions";
+import { usePopup } from "../Popup/PopupProvider";
+import RequirementUI from "./RequirementUI";
+import StrengthMeter from "./StrengthMeter";
 
-// ===== Requirement UI Helper =====
-const Requirement = ({ ok, text }: { ok: boolean; text: string }) => (
-  <motion.p
-    className={`flex items-center gap-2 transition-colors duration-300 ${
-      ok ? "text-success" : "opacity-60"
-    }`}
-    initial={{ opacity: 0, x: -10 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.3 }}
-  >
-    <motion.span
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 500, damping: 25 }}
-    >
-      {ok ? "✔" : "•"}
-    </motion.span>
-    {text}
-  </motion.p>
-);
+export enum UpdatePasswordType {
+  FIRST_LOGIN = "FIRST_LOGIN",
+  CHANGE_PASSWORD = "CHANGE_PASSWORD",
+}
 
-// ===== Custom Spinning Loader Component with Tailwind & Framer Motion =====
-const SpinningLoader = () => {
-  const bars = Array.from({ length: 12 }, (_, i) => i);
-
-  return (
-    <div className="relative w-14 h-14">
-      {bars.map((i) => (
-        <motion.div
-          key={i}
-          className="absolute left-1/2 top-[30%] w-[8%] h-[24%] bg-base-content rounded-full shadow-sm"
-          style={{
-            transform: `rotate(${i * 30}deg) translate(0, -130%)`,
-            transformOrigin: "0% 0%",
-          }}
-          animate={{
-            opacity: [1, 0.25],
-          }}
-          transition={{
-            duration: 1,
-            repeat: Infinity,
-            ease: "linear",
-            delay: -1.1 + i * 0.1,
-          }}
-        />
-      ))}
-    </div>
-  );
-};
-
-const FirstLogin: React.FC = () => {
+const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
   const router = useRouter();
   const overlayControls = useAnimationControls();
+  const statusPopup = usePopup();
+  const session = useSession();
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [current, setCurrent] = useState("");
 
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
 
   const [error, setError] = useState("");
 
@@ -71,20 +35,21 @@ const FirstLogin: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [modalShowPass, setModalShowPass] = useState(false);
   const [confirmedSave, setConfirmedSave] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // ===== Password Requirement Detection =====
-  const checks = useMemo(() => {
+  const strengthChecks = useMemo(() => {
     return {
       length: password.length >= 8,
       uppercase: /[A-Z]/.test(password),
       number: /[0-9]/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
-      match: password !== "" && password === confirm,
     };
-  }, [password, confirm]);
+  }, [password]);
 
+  const matchCheck = password !== "" && password === confirm;
+
+  const checks = { ...strengthChecks, match: matchCheck };
   const isValid = Object.values(checks).every(Boolean);
 
   // Check mismatch
@@ -95,26 +60,6 @@ const FirstLogin: React.FC = () => {
       setError("");
     }
   }, [password, confirm]);
-
-  const strength = Object.values(checks).filter(Boolean).length;
-
-  const strengthLabel = [
-    "Very Weak",
-    "Weak",
-    "Fair",
-    "Good",
-    "Strong",
-    "Excellent",
-  ][strength];
-
-  const strengthPercent = (strength / 5) * 100;
-
-  const getStrengthColor = () => {
-    if (strength === 0) return "bg-error";
-    if (strength <= 2) return "bg-warning";
-    if (strength <= 4) return "bg-info";
-    return "bg-success";
-  };
 
   const cardVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
@@ -132,67 +77,43 @@ const FirstLogin: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     setShowReviewModal(false);
-    setRedirecting(true);
+    statusPopup.showLoading("Updating password...");
 
-    setTimeout(() => {
-      router.push("/");
-    }, 2000);
+    if (!session?.data?.user) {
+      statusPopup.showError("You are not logged in.");
+      return;
+    }
+
+    if (type === UpdatePasswordType.CHANGE_PASSWORD) {
+      const { data, error } = await authClient.changePassword({
+        newPassword: password, // required
+        currentPassword: UpdatePasswordType.CHANGE_PASSWORD ? current : "", // required
+        revokeOtherSessions: true,
+      });
+
+      if (error) {
+        statusPopup.showError(error.message || "Failed to update password");
+        return;
+      }
+    } else {
+      const result = await setInitialPassword(password);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to set password");
+        return;
+      }
+    }
+
+    statusPopup.hidePopup();
+    router.push("/");
   };
 
   return (
     <>
-      {/* 🔄 REDIRECT LOADING WITH SPINNING LOADER */}
-      <AnimatePresence>
-        {redirecting && (
-          <motion.div
-            className="fixed inset-0 bg-base-100 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <motion.div
-                className="mb-6 flex justify-center"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                <SpinningLoader />
-              </motion.div>
-
-              <motion.p
-                className="text-base font-medium mb-1"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                Password saved
-              </motion.p>
-
-              <motion.p
-                className="text-sm opacity-60"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                Redirecting to login...
-              </motion.p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* 🔐 IMPROVED REVIEW MODAL */}
-      <AnimatePresence>
-        {showReviewModal && (
+      {showReviewModal && (
+        <AnimatePresence>
           <motion.div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4"
             initial={{ opacity: 0 }}
@@ -305,11 +226,11 @@ const FirstLogin: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
 
       {/* MAIN PAGE */}
-      <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-linear-to-br from-base-200 via-base-300 to-base-200 flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">
           {/* full-screen overlay used during transition */}
           <motion.div
@@ -389,8 +310,6 @@ const FirstLogin: React.FC = () => {
             </motion.p>
           </motion.div>
 
-          {/* Login Form */}
-
           {/* Card */}
           <motion.div
             className="bg-base-100 rounded-2xl shadow-2xl p-8 border border-base-300"
@@ -399,11 +318,14 @@ const FirstLogin: React.FC = () => {
             animate="visible"
           >
             <h2 className="text-2xl font-bold text-center mb-4">
-              Set Your Password
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Create Your Password"
+                : "Change Password"}
             </h2>
             <p className="text-xs text-center text-warning font-medium mb-8">
-              For security compliance, passwords cannot be retrieved or reset
-              without administrator verification.
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Set a strong password for your account."
+                : "For security compliance, passwords cannot be retrieved or reset without administrator verification."}
             </p>
 
             <AnimatePresence>
@@ -420,6 +342,34 @@ const FirstLogin: React.FC = () => {
             </AnimatePresence>
 
             <form className="space-y-5">
+              {/* Current Password - Only for CHANGE_PASSWORD */}
+              {type === UpdatePasswordType.CHANGE_PASSWORD && (
+                <div>
+                  <label className="label font-semibold">
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrent ? "text" : "password"}
+                      value={current}
+                      onChange={(e) => setCurrent(e.target.value)}
+                      className="input input-bordered w-full pr-12 bg-base-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrent(!showCurrent)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 hover:text-primary transition-colors"
+                    >
+                      {showCurrent ? (
+                        <FiEyeOff className="w-5 h-5" />
+                      ) : (
+                        <FiEye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* New Password */}
               <div>
                 <label className="label font-semibold">New Password</label>
@@ -446,20 +396,11 @@ const FirstLogin: React.FC = () => {
 
               {/* Strength Meter */}
               {password && (
-                <div>
-                  <div className="relative w-full h-2 bg-base-300 rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full ${getStrengthColor()} rounded-full`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${strengthPercent}%` }}
-                    />
-                  </div>
-
-                  <p className="text-xs mt-2 opacity-70">
-                    <span className="font-semibold">Strength:</span>{" "}
-                    {strengthLabel}
-                  </p>
-                </div>
+                <StrengthMeter
+                  strength={
+                    Object.values(strengthChecks).filter(Boolean).length
+                  }
+                />
               )}
 
               {/* Confirm Password */}
@@ -488,14 +429,17 @@ const FirstLogin: React.FC = () => {
 
               {/* Requirements */}
               <div className="text-xs space-y-1">
-                <Requirement ok={checks.length} text="Minimum 8 characters" />
-                <Requirement
+                <RequirementUI ok={checks.length} text="Minimum 8 characters" />
+                <RequirementUI
                   ok={checks.uppercase}
                   text="One uppercase letter"
                 />
-                <Requirement ok={checks.number} text="One number" />
-                <Requirement ok={checks.special} text="One special character" />
-                <Requirement ok={checks.match} text="Passwords match" />
+                <RequirementUI ok={checks.number} text="One number" />
+                <RequirementUI
+                  ok={checks.special}
+                  text="One special character"
+                />
+                <RequirementUI ok={checks.match} text="Passwords match" />
               </div>
 
               <button
@@ -508,10 +452,16 @@ const FirstLogin: React.FC = () => {
               </button>
             </form>
 
-            <div className="divider text-xs mt-8">Security Setup</div>
+            <div className="divider text-xs mt-8">
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Account Setup"
+                : "Security Setup"}
+            </div>
 
             <p className="text-xs text-center opacity-60">
-              You will be redirected to login after saving password.
+              {type === UpdatePasswordType.FIRST_LOGIN
+                ? "Complete your account setup to get started."
+                : "You will be redirected to login after saving password."}
             </p>
           </motion.div>
 
@@ -525,4 +475,4 @@ const FirstLogin: React.FC = () => {
   );
 };
 
-export default FirstLogin;
+export default UpdatePassword;
