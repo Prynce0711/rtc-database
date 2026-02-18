@@ -37,28 +37,24 @@ const ConfirmModal = ({
       icon: FiInfo,
       iconBg: "bg-info/10",
       iconColor: "text-info",
-      borderColor: "border-info/20",
       btnClass: "btn-info",
     },
     warning: {
       icon: FiAlertTriangle,
       iconBg: "bg-warning/10",
       iconColor: "text-warning",
-      borderColor: "border-warning/20",
       btnClass: "btn-warning",
     },
     error: {
       icon: FiAlertCircle,
       iconBg: "bg-error/10",
       iconColor: "text-error",
-      borderColor: "border-error/20",
       btnClass: "btn-error",
     },
     success: {
       icon: FiCheckCircle,
       iconBg: "bg-success/10",
       iconColor: "text-success",
-      borderColor: "border-success/20",
       btnClass: "btn-success",
     },
   };
@@ -88,7 +84,7 @@ const ConfirmModal = ({
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-base-300"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}

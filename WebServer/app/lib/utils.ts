@@ -6,3 +6,7 @@ export const formatDate = (date?: Date | string | null) =>
         day: "numeric",
       })
     : "—";
+
+export function isDarkMode(): boolean {
+  return document.documentElement.getAttribute("data-theme") === "dim";
+}

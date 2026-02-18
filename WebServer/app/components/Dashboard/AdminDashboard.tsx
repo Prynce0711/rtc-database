@@ -7,22 +7,18 @@ import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
   AlertTriangle,
   BarChart3,
-  Building2,
-  Calendar,
   Download,
   FileText,
   Info,
   Lock,
-  Plus,
   RefreshCw,
   Scale,
   Server,
   Shield,
   TrendingDown,
   TrendingUp,
-  Users,
-  XCircle,
 } from "lucide-react";
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -41,6 +37,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import { useRouter } from "next/navigation";
 import type { Case } from "../../generated/prisma/client";
 import { RecentCases } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";
@@ -75,6 +73,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
     "overview",
   );
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const getCssVar = (name: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -162,11 +161,11 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         title: "Incomplete Employee Records",
         message: `${stats.employeesMissing} employees missing information`,
         count: stats.employeesMissing,
-        action: () => onNavigate?.("employees"),
+        action: () => router.push("/user/employees"),
       });
     }
     return alertList;
-  }, [stats, onNavigate]);
+  }, [stats, onNavigate, router]);
 
   const auditLogs = useMemo((): AuditLog[] => {
     const logs: AuditLog[] = [];
@@ -230,6 +229,32 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       ...data,
     }));
   }, [cases]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const calendarDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const startDay = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+
+    const days: (number | null)[] = [];
+
+    for (let i = 0; i < startDay; i++) days.push(null);
+    for (let i = 1; i <= totalDays; i++) days.push(i);
+
+    return days;
+  }, [currentDate]);
 
   const dataQuality = useMemo(() => {
     const totalRecords = cases.length + employees.length + accounts.length;
@@ -251,11 +276,17 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     return (
-      <div className="card bg-base-100 shadow-2xl border-2 border-primary/30 p-4 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        className="surface-card p-4 animate-scale-in"
+        style={{
+          boxShadow: "var(--shadow-elevated)",
+          borderColor: "var(--surface-border-strong)",
+        }}
+      >
         <p className="font-bold text-base-content mb-2 text-base">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center justify-between gap-6">
-            <span className="text-sm font-semibold text-base-content/70">
+            <span className="text-sm font-semibold text-muted">
               {entry.name}:
             </span>
             <span className="text-xl font-bold" style={{ color: entry.color }}>
@@ -282,9 +313,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
             <h2 className="text-3xl font-bold text-base-content mb-2">
               Loading Dashboard
             </h2>
-            <p className="text-lg text-base-content/60">
-              Fetching system analytics...
-            </p>
+            <p className="text-lg text-muted">Fetching system analytics...</p>
             <div className="flex items-center justify-center gap-2 mt-4">
               {[0, 150, 300].map((delay) => (
                 <div
@@ -306,8 +335,11 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         <div className="mx-auto w-full">
           <div className="space-y-6">
             {/* HEADER */}
-            <header className={`bg-base-100 `}>
-              <div className="card-body p-4 sm:p-6">
+            <header className="surface-card animate-fade-in">
+              <div
+                className="card-body"
+                style={{ padding: "var(--space-card-padding)" }}
+              >
                 <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -315,25 +347,31 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                         Administration Dashboard
                       </h1>
                     </div>
-                    <p className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3 text-sm sm:text-base font-medium text-base-content/60">
+                    <p className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3 text-sm sm:text-base font-medium text-muted">
                       <span className="flex items-center gap-2">
                         <span className="text-base sm:text-lg">
                           Real-time case management and monitoring
                         </span>
                       </span>
-                      <span className="hidden sm:inline text-base-content/40"></span>
-                      <span className="text-base-content/50">
+                      <span className="hidden sm:inline text-subtle"></span>
+                      <span className="text-subtle">
                         Last sync: {new Date().toLocaleTimeString()}
                       </span>
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <div className="relative flex p-1 rounded-full bg-base-200 border border-base-300 w-full sm:w-auto">
+                    <div
+                      className="relative flex p-1 bg-base-200 border border-base-300 w-full sm:w-auto"
+                      style={{ borderRadius: "var(--radius-pill)" }}
+                    >
                       {/* Sliding indicator */}
                       <div
-                        className="absolute top-1 bottom-1 rounded-full bg-base-100 shadow-md transition-all duration-300"
+                        className="absolute top-1 bottom-1 bg-base-100 transition-all"
                         style={{
+                          borderRadius: "var(--radius-pill)",
+                          boxShadow: "var(--shadow-soft)",
+                          transitionDuration: "var(--transition-base)",
                           width: "calc(50% - 4px)",
                           left:
                             activeTab === "overview"
@@ -358,11 +396,11 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`
           relative z-10 flex items-center gap-2 px-4 py-1.5 flex-1
-          font-semibold text-sm transition-colors duration-200
+          font-semibold text-sm
           ${
             activeTab === tab.id
               ? "text-primary"
-              : "text-base-content/60 hover:text-base-content"
+              : "text-muted hover:text-base-content"
           }
         `}
                           >
@@ -381,11 +419,23 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <button className="btn btn-outline btn-primary gap-2 flex-1 sm:flex-initial hover:scale-105 transition-transform">
+                      <button
+                        className="btn btn-outline btn-primary gap-2 flex-1 sm:flex-initial"
+                        style={{
+                          borderRadius: "var(--radius-field)",
+                          transition: "var(--transition-base)",
+                        }}
+                      >
                         <Download className="h-4 w-4 sm:h-5 sm:w-5" />
                         <span className="hidden sm:inline">Export</span>
                       </button>
-                      <button className="btn btn-primary gap-2 flex-1 sm:flex-initial hover:scale-105 transition-transform">
+                      <button
+                        className="btn btn-primary gap-2 flex-1 sm:flex-initial"
+                        style={{
+                          borderRadius: "var(--radius-field)",
+                          transition: "var(--transition-base)",
+                        }}
+                      >
                         <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
                         <span className="hidden sm:inline">Refresh</span>
                       </button>
@@ -439,7 +489,14 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
 
             {/* OVERVIEW TAB */}
             {activeTab === "overview" && (
-              <div className="space-y-6 sm:space-y-8">
+              <div
+                className="animate-fade-in"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--space-section-gap)",
+                }}
+              >
                 {/* PRIMARY KPI CARDS */}
                 <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
                   {[
@@ -479,14 +536,20 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   ].map((card, idx) => (
                     <div
                       key={idx}
-                      className={`transform transition-all duration-700 hover:scale-105 ${
+                      className={`transform hover:scale-105 ${
                         isVisible
                           ? "translate-y-0 opacity-100"
                           : "translate-y-4 opacity-0"
-                      } card  shadow-xl hover:shadow-2xl group`}
-                      style={{ transitionDelay: `${card.delay}ms` }}
+                      } card surface-card-hover group`}
+                      style={{
+                        transitionDelay: `${card.delay}ms`,
+                        transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+                      }}
                     >
-                      <div className="card-body p-4 sm:p-6 relative overflow-hidden">
+                      <div
+                        className="card-body relative overflow-hidden"
+                        style={{ padding: "var(--space-card-padding)" }}
+                      >
                         <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
                           <card.icon className="h-full w-full" />
                         </div>
@@ -499,16 +562,17 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                           <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
                             {card.value}
                           </p>
-                          <p className="text-sm sm:text-base font-semibold text-base-content/60">
+                          <p className="text-sm sm:text-base font-semibold text-muted">
                             {card.subtitle}
                           </p>
                           {card.trend !== undefined && card.trend !== 0 && (
                             <div
-                              className={`mt-3 inline-flex items-center gap-2 badge ${
+                              className={`mt-3 inline-flex items-center gap-2 px-3 py-1 text-xs font-bold ${
                                 card.trend >= 0
-                                  ? "badge-success"
-                                  : "badge-error"
+                                  ? "badge-success-soft"
+                                  : "badge-error-soft"
                               }`}
+                              style={{ borderRadius: "var(--radius-pill)" }}
                             >
                               {card.trend >= 0 ? (
                                 <TrendingUp className="h-3 w-3" />
@@ -527,400 +591,160 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   ))}
                 </section>
 
-                {/* SECONDARY METRICS */}
-                <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
-                  {[
-                    {
-                      label: "Employees",
-                      value: stats.employees,
-                      subtitle: `${stats.employeesMissing} incomplete`,
-                      icon: Users,
-                    },
-                    {
-                      label: "Branches",
-                      value: branchPerformance.length,
-                      subtitle: "Active locations",
-                      icon: Building2,
-                    },
-                    {
-                      label: "Data Quality",
-                      value: `${dataQuality.quality.toFixed(0)}%`,
-                      subtitle: `${dataQuality.incomplete} incomplete`,
-                      icon: BarChart3,
-                    },
-                    {
-                      label: "This Month",
-                      value: stats.casesThisMonth,
-                      subtitle: `${stats.caseGrowth >= 0 ? "+" : ""}${stats.caseGrowth.toFixed(1)}%`,
-                      icon: Calendar,
-                    },
-                  ].map((card, idx) => (
-                    <div
-                      key={idx}
-                      className="stats shadow-lg hover:shadow-xl hover:scale-105 transition-all"
-                    >
-                      <div className="stat p-4 sm:p-6 gap-2">
-                        <div className="stat-title text-xs sm:text-sm font-bold uppercase">
-                          {card.label}
-                        </div>
-                        <div className="stat-value text-2xl sm:text-3xl">
-                          {card.value}
-                        </div>
-                        <div className="stat-desc text-xs sm:text-sm font-semibold">
-                          {card.subtitle}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </section>
-
                 {/* CHARTS */}
+
+                {/* 🏛 RTC COMMAND CENTER */}
                 <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-                  {/* TRENDS */}
-                  <div className="lg:col-span-2 card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <div className="mb-6">
-                        <h2 className="card-title text-2xl sm:text-3xl font-black">
-                          Case Filing Trends
-                        </h2>
-                        <p className="text-base sm:text-lg font-medium text-base-content/60">
-                          Six-month case volume analysis
-                        </p>
-                      </div>
+                  {/* LEFT COLUMN */}
+                  <div className="space-y-6">
+                    {/* REAL CALENDAR */}
+                    <div className="card surface-card-hover">
+                      <div
+                        className="card-body"
+                        style={{ padding: "var(--space-card-padding)" }}
+                      >
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="card-title font-black">Calendar</h2>
 
-                      <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
-                        {[
-                          {
-                            label: "Total Filed",
-                            value: monthlyTrends.reduce(
-                              (sum, m) => sum + m.cases,
-                              0,
-                            ),
-                            color: "primary",
-                            desc: "Last 6 months",
-                          },
-                          {
-                            label: "Monthly Avg",
-                            value: (
-                              monthlyTrends.reduce(
-                                (sum, m) => sum + m.cases,
-                                0,
-                              ) / monthlyTrends.length
-                            ).toFixed(0),
-                            color: "success",
-                            desc: "Cases/month",
-                          },
-                          {
-                            label: "Monthly Change",
-                            value: `${stats.caseGrowth >= 0 ? "+" : ""}${stats.caseGrowth.toFixed(1)}%`,
-                            color: stats.caseGrowth >= 0 ? "success" : "error",
-                            desc: "vs. last month",
-                          },
-                        ].map((metric, idx) => (
-                          <div
-                            key={idx}
-                            className={`card bg-${metric.color}/10 border-2 border-${metric.color}/20 hover:scale-105 transition-transform`}
-                          >
-                            <div className="card-body p-3 sm:p-4">
-                              <p
-                                className={`text-xs font-bold uppercase text-${metric.color}`}
+                          <span className="text-sm font-semibold text-primary">
+                            {currentDate.toLocaleString("default", {
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+
+                        {/* WEEK DAYS */}
+                        <div className="grid grid-cols-7 text-xs font-bold text-center mb-3 text-muted">
+                          {[
+                            "Sun",
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri",
+                            "Sat",
+                          ].map((d) => (
+                            <div key={d}>{d}</div>
+                          ))}
+                        </div>
+
+                        {/* DAYS GRID */}
+                        <div className="grid grid-cols-7 gap-2 text-center">
+                          {calendarDays.map((day, i) => {
+                            const isToday = day === currentDate.getDate();
+
+                            return (
+                              <div
+                                key={i}
+                                className={`
+                  aspect-square flex items-center justify-center
+                  rounded-xl text-sm font-semibold transition-all
+
+                  ${day ? "cursor-pointer hover:bg-base-200" : "opacity-0"}
+
+                  ${isToday ? "bg-primary text-primary-content shadow-md scale-105" : ""}
+                `}
                               >
-                                {metric.label}
-                              </p>
-                              <p
-                                className={`text-2xl sm:text-3xl font-bold text-${metric.color}`}
-                              >
-                                {metric.value}
-                              </p>
-                              <p className="text-xs sm:text-sm font-semibold text-base-content/60">
-                                {metric.desc}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="card bg-base-200">
-                        <div className="card-body p-3 sm:p-4">
-                          <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart
-                              data={monthlyTrends}
-                              margin={{
-                                top: 10,
-                                right: 10,
-                                left: -20,
-                                bottom: 0,
-                              }}
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="colorCases"
-                                  x1="0"
-                                  y1="0"
-                                  x2="0"
-                                  y2="1"
-                                >
-                                  <stop
-                                    offset="0%"
-                                    stopColor={getCssVar("--color-primary")}
-                                    stopOpacity={0.6}
-                                  />
-                                  <stop
-                                    offset="100%"
-                                    stopColor={getCssVar("--color-primary")}
-                                    stopOpacity={0.05}
-                                  />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke={getCssVar("--color-base-content")}
-                                vertical={false}
-                              />
-                              <XAxis
-                                dataKey="month"
-                                fontSize={12}
-                                fontWeight={600}
-                                tickLine={false}
-                                stroke={getCssVar("--color-base-content")}
-                              />
-                              <YAxis
-                                fontSize={12}
-                                fontWeight={600}
-                                tickLine={false}
-                                stroke={getCssVar("--color-base-content")}
-                              />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Area
-                                type="monotone"
-                                dataKey="cases"
-                                stroke={getCssVar("--color-primary")}
-                                strokeWidth={3}
-                                fillOpacity={1}
-                                fill="url(#colorCases)"
-                                name="Cases Filed"
-                                dot={{
-                                  r: 4,
-                                  fill: "oklch(var(--p))",
-                                  stroke: "#fff",
-                                  strokeWidth: 2,
-                                }}
-                                activeDot={{
-                                  r: 7,
-                                  fill: "oklch(var(--p))",
-                                  stroke: "#fff",
-                                  strokeWidth: 3,
-                                }}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
+                                {day}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* DATA QUALITY */}
-                  <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <div className="mb-6">
-                        <h2 className="card-title text-2xl sm:text-3xl font-black">
-                          Data Quality
+                    {/* EMPLOYEE ANALYTICS */}
+                    <div className="card surface-card-hover">
+                      <div className="card-body">
+                        <h2 className="card-title font-black">
+                          Employee Compliance
                         </h2>
-                        <p className="text-base sm:text-lg font-medium text-base-content/60">
-                          System completeness
-                        </p>
-                      </div>
 
-                      <ResponsiveContainer width="100%" height={220}>
-                        <RadialBarChart
-                          cx="50%"
-                          cy="50%"
-                          innerRadius="60%"
-                          outerRadius="100%"
-                          data={[
-                            {
-                              name: "Quality",
-                              value: dataQuality.quality,
-                              fill: getCssVar("--color-success"),
-                            },
-                          ]}
-                          startAngle={90}
-                          endAngle={-270}
-                        >
-                          <RadialBar
-                            minAngle={15}
-                            background={{ fill: getCssVar("--color-base-200") }}
-                            clockWise
-                            dataKey="value"
-                            cornerRadius={10}
-                          />
-
-                          <text
-                            x="50%"
-                            y="50%"
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fill={getCssVar("--color-base-content")}
-                            className="text-4xl font-bold"
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart
+                            data={[
+                              { name: "Total", value: employees.length },
+                              {
+                                name: "Incomplete",
+                                value: stats.employeesMissing,
+                              },
+                            ]}
                           >
-                            {dataQuality.quality.toFixed(0)}%
-                          </text>
-                        </RadialBarChart>
-                      </ResponsiveContainer>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip content={<CustomTooltip />} />
 
-                      <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6">
-                        <div className="stats bg-success/10 border-2 border-success/20 hover:scale-105 transition-transform">
-                          <div className="stat p-3 sm:p-4 text-center">
-                            <div className="stat-title text-xs font-bold text-success">
-                              Complete
-                            </div>
-                            <div className="stat-value text-2xl sm:text-3xl text-success">
-                              {dataQuality.complete}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="stats bg-error/10 border-2 border-error/20 hover:scale-105 transition-transform">
-                          <div className="stat p-3 sm:p-4 text-center">
-                            <div className="stat-title text-xs font-bold text-error">
-                              Incomplete
-                            </div>
-                            <div className="stat-value text-2xl sm:text-3xl text-error">
-                              {dataQuality.incomplete}
-                            </div>
-                          </div>
-                        </div>
+                            <Bar
+                              dataKey="value"
+                              radius={[8, 8, 0, 0]}
+                              fill={getCssVar("--color-primary")}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RECENT ACTIVITY — IMPROVED */}
+                  <div className="lg:col-span-2 card surface-card-hover">
+                    <div
+                      className="card-body"
+                      style={{ padding: "var(--space-card-padding)" }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <h2 className="card-title text-xl sm:text-2xl font-black">
+                          Recent Activity
+                        </h2>
+
+                        <span className="text-xs text-subtle">
+                          Last 5 system logs
+                        </span>
                       </div>
 
-                      {dataQuality.incomplete > 0 && (
-                        <button className="btn btn-primary btn-block mt-4 hover:scale-105 transition-transform">
-                          Review Incomplete Records
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </section>
-
-                {/* BRANCH & ACTIVITY */}
-                <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-                  {/* BRANCH WORKLOAD */}
-                  <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <h2 className="card-title text-xl sm:text-2xl font-black">
-                        Branch Workload
-                      </h2>
-                      <p className="text-sm sm:text-base font-medium text-base-content/60">
-                        Case distribution
-                      </p>
-
-                      <ResponsiveContainer width="100%" height={700}>
-                        <BarChart
-                          data={branchPerformance.slice(0, 5)}
-                          layout="vertical"
-                          margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <XAxis
-                            type="number"
-                            fontSize={11}
-                            fontWeight={600}
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="branch"
-                            fontSize={12}
-                            fontWeight={700}
-                            width={100}
-                            stroke={getCssVar("--color-base-content")}
-                          />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar
-                            dataKey="cases"
-                            fill={getCssVar("--color-primary")}
-                            radius={[0, 8, 8, 0]}
-                            name="Total Cases"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* RECENT ACTIVITY */}
-                  <div className="lg:col-span-2 card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                    <div className="card-body p-4 sm:p-6 lg:p-8">
-                      <h2 className="card-title text-xl sm:text-2xl font-black">
-                        Recent Activity
-                      </h2>
-                      <p className="text-sm sm:text-base font-medium text-base-content/60">
-                        Latest system events
-                      </p>
-
-                      <div className="space-y-3 sm:space-y-4 mt-4">
-                        {auditLogs.slice(0, 5).map((log) => (
+                      {/* ⭐ 2 COLUMN ACTIVITY GRID */}
+                      <div className="grid md:grid-cols-2 gap-4 mt-5">
+                        {auditLogs.slice(0, 4).map((log) => (
                           <div
                             key={log.id}
-                            className="card bg-base-200 hover:bg-base-300 hover:scale-[1.02] transition-all"
+                            className="card hover:scale-[1.02]"
+                            style={{
+                              background: "var(--surface-inset)",
+                              transition: "var(--transition-base)",
+                              borderRadius: "var(--radius-sm)",
+                            }}
                           >
-                            <div className="card-body p-3 sm:p-4 flex-row items-start gap-3 sm:gap-4">
-                              <div
-                                className={`avatar placeholder ${
-                                  log.type === "create"
-                                    ? "bg-success"
-                                    : log.type === "update"
-                                      ? "bg-info"
-                                      : log.type === "delete"
-                                        ? "bg-error"
-                                        : log.type === "export"
-                                          ? "bg-secondary"
-                                          : "bg-neutral"
-                                }`}
-                              >
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg text-base-100">
-                                  {log.type === "create" && (
-                                    <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
-                                  )}
-                                  {log.type === "update" && (
-                                    <RefreshCw className="h-5 w-5 sm:h-6 sm:w-6" />
-                                  )}
-                                  {log.type === "delete" && (
-                                    <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-                                  )}
-                                  {log.type === "export" && (
-                                    <Download className="h-5 w-5 sm:h-6 sm:w-6" />
-                                  )}
-                                  {log.type === "login" && (
-                                    <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
-                                  )}
+                            <div className="card-body p-4 flex-row items-start gap-4">
+                              <div className="avatar placeholder bg-primary">
+                                <div className="w-10 h-10 rounded-lg text-primary-content">
+                                  <RefreshCw className="h-5 w-5" />
                                 </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-base sm:text-lg font-bold text-base-content">
+
+                              <div className="flex-1">
+                                <p className="font-bold text-base">
                                   {log.action}
                                 </p>
-                                <p className="mt-1 text-sm sm:text-base font-medium text-base-content/70">
+
+                                <p className="text-sm text-muted">
                                   {log.details}
                                 </p>
-                                <p className="mt-2 text-xs sm:text-sm font-semibold text-base-content/50">
-                                  {log.user} • {log.timestamp.toLocaleString()}
+
+                                <p className="text-xs text-subtle mt-1">
+                                  {log.timestamp.toLocaleString()}
                                 </p>
                               </div>
                             </div>
                           </div>
                         ))}
                       </div>
-
-                      <button className="btn btn-outline btn-primary btn-block mt-6  transition-transform">
-                        View All Activity
-                      </button>
                     </div>
                   </div>
                 </section>
 
                 {/* RECENT CASES */}
-                <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+                <section className="card surface-card-hover">
                   <RecentCases
                     cases={cases}
                     view="table"
@@ -932,114 +756,141 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
 
             {/* ANALYTICS TAB */}
             {activeTab === "analytics" && (
-              <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
+              <div
+                className="grid lg:grid-cols-2 animate-fade-in"
+                style={{ gap: "var(--space-section-gap)" }}
+              >
                 {/* DETENTION ANALYSIS */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-xl sm:text-2xl font-black">
+                <div className="card surface-card animate-slide-up">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
                       Detention Status Analysis
                     </h2>
-                    <p className="text-sm sm:text-base font-medium text-base-content/60">
-                      Current distribution
-                    </p>
 
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={260}>
                       <PieChart>
                         <Pie
                           data={[
+                            { name: "Detained", value: stats.detained },
                             {
-                              name: "In Detention",
-                              value: stats.detained,
-                              fill: "oklch(var(--wa))",
-                            },
-                            {
-                              name: "Released/Free",
+                              name: "Released",
                               value: stats.totalCases - stats.detained,
-                              fill: getCssVar("--color-success"),
                             },
                           ]}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                          outerRadius={100}
                           dataKey="value"
+                          outerRadius={100}
                         >
                           <Cell fill={getCssVar("--color-warning")} />
                           <Cell fill={getCssVar("--color-success")} />
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={40}
-                          iconType="circle"
-                        />
+                        <Tooltip />
+                        <Legend />
                       </PieChart>
                     </ResponsiveContainer>
-
-                    <div className="grid grid-cols-2 gap-4 mt-6">
-                      <div className="stats bg-warning/10 border-2 border-warning/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-warning">
-                            Detained
-                          </div>
-                          <div className="stat-value text-3xl sm:text-4xl text-warning">
-                            {stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="stats bg-success/10 border-2 border-success/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-success">
-                            Released
-                          </div>
-                          <div className="stat-value text-3xl sm:text-4xl text-success">
-                            {stats.totalCases - stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
                 {/* BRANCH EFFICIENCY */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-xl sm:text-2xl font-black">
+                <div className="card surface-card animate-slide-up">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
                       Branch Processing Efficiency
                     </h2>
-                    <p className="text-sm sm:text-base font-medium text-base-content/60">
-                      Completion rates
-                    </p>
 
-                    <div className="space-y-5 sm:space-y-6 mt-6">
+                    <div className="space-y-4 mt-4">
                       {branchPerformance.slice(0, 5).map((branch) => (
-                        <div
-                          key={branch.branch}
-                          className="hover:scale-[1.02] transition-transform"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <span className="text-base sm:text-lg font-bold">
-                              {branch.branch}
-                            </span>
-                            <span className="text-lg sm:text-xl font-bold text-primary">
-                              {branch.efficiency.toFixed(1)}%
-                            </span>
+                        <div key={branch.branch}>
+                          <div className="flex justify-between font-bold">
+                            <span>{branch.branch}</span>
+                            <span>{branch.efficiency.toFixed(1)}%</span>
                           </div>
+
                           <progress
-                            className="progress progress-primary w-full h-3 sm:h-4"
+                            className="progress progress-primary w-full"
                             value={branch.efficiency}
                             max="100"
                           />
-                          <div className="mt-2 flex justify-between text-xs sm:text-sm font-semibold text-base-content/60">
-                            <span>{branch.cases} total cases</span>
-                            <span>{branch.pending} pending</span>
-                          </div>
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* BRANCH WORKLOAD */}
+                <div className="lg:col-span-2 card surface-card animate-slide-up">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">Branch Workload</h2>
+
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart
+                        data={branchPerformance.slice(0, 5)}
+                        layout="vertical"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="branch" type="category" />
+                        <Tooltip content={<CustomTooltip />} />
+
+                        <Bar
+                          dataKey="cases"
+                          fill={getCssVar("--color-primary")}
+                          radius={[0, 8, 8, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* CASE FILING TRENDS */}
+                <div className="lg:col-span-2 card surface-card animate-slide-up">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">
+                      Case Filing Trends
+                    </h2>
+
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={monthlyTrends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip content={<CustomTooltip />} />
+
+                        <Area
+                          type="monotone"
+                          dataKey="cases"
+                          stroke={getCssVar("--color-primary")}
+                          fillOpacity={0.3}
+                          fill={getCssVar("--color-primary")}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* DATA QUALITY */}
+                <div className="lg:col-span-2 card surface-card animate-slide-up">
+                  <div className="card-body">
+                    <h2 className="card-title font-black">Data Quality</h2>
+
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RadialBarChart
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="60%"
+                        outerRadius="100%"
+                        data={[
+                          {
+                            name: "Quality",
+                            value: dataQuality.quality,
+                            fill: getCssVar("--color-success"),
+                          },
+                        ]}
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <RadialBar dataKey="value" cornerRadius={10} />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
