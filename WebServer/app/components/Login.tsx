@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { isDarkMode } from "../lib/utils";
-import { isDarkMode } from "../lib/utils";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -122,23 +121,8 @@ const Login: React.FC = () => {
 
         await cardControls.start("shake");
 
-
-        await cardControls.start("shake");
-
         return;
       }
-      // smooth transition kapag success
-      try {
-        void overlayControls.start({
-          opacity: 1,
-          transition: { duration: 0.45 },
-        });
-
-        await cardControls.start("transitioning");
-        await new Promise((r) => setTimeout(r, 120));
-      } catch {}
-
-      return;
       // smooth transition kapag success
       try {
         void overlayControls.start({
@@ -203,7 +187,7 @@ const Login: React.FC = () => {
       /> */}
 
       <Image
-        src="/cardo.jpg"
+        src="/ha.jpg"
         alt="Background"
         fill
         className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
@@ -266,11 +250,6 @@ const Login: React.FC = () => {
               textShadow:
                 "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
             }}
-            className="text-4xl font-bold text-white mb-2 tracking-tight"
-            style={{
-              textShadow:
-                "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
-            }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -327,10 +306,8 @@ shadow-xl
             transition={{ delay: 0.4 }}
           >
             <h2 className="text-3xl font-bold text-base-content text-center">
-            <h2 className="text-3xl font-bold text-base-content text-center">
               Sign In
             </h2>
-            <p className="text-sm text-base-content/90 text-center mt-2">
             <p className="text-sm text-base-content/90 text-center mt-2">
               Enter your credentials to access your account
             </p>
@@ -484,13 +461,9 @@ shadow-xl
 
           <div className="divider text-xs text-base-content/70 mt-8">
             Authorized Access Only
-          <div className="divider text-xs text-base-content/70 mt-8">
-            Authorized Access Only
           </div>
 
           <div className="text-center">
-            <p className="text-xs text-base-content/80 mt-3">
-              Regional Trial Court © 2026
             <p className="text-xs text-base-content/80 mt-3">
               Regional Trial Court © 2026
             </p>
