@@ -33,6 +33,7 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
 
   const [error, setError] = useState("");
   const [darkMode, setDarkMode] = useState(isDarkMode());
+  const [darkMode, setDarkMode] = useState(isDarkMode());
   // NEW STATES
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [modalShowPass, setModalShowPass] = useState(false);
@@ -53,6 +54,15 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
 
   const checks = { ...strengthChecks, match: matchCheck };
   const isValid = Object.values(checks).every(Boolean);
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setDarkMode(isDarkMode());
+    };
+    window.addEventListener("themeChange", handleThemeChange);
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, []);
   useEffect(() => {
     const handleThemeChange = () => {
       setDarkMode(isDarkMode());
@@ -319,6 +329,11 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
                 textShadow:
                   "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
               }}
+              className="text-lg text-white/90 font-semibold"
+              style={{
+                textShadow:
+                  "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
@@ -327,6 +342,11 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
             </motion.p>
 
             <motion.p
+              className="text-sm text-white/90 italic mt-2 font-medium"
+              style={{
+                textShadow:
+                  "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
+              }}
               className="text-sm text-white/90 italic mt-2 font-medium"
               style={{
                 textShadow:
