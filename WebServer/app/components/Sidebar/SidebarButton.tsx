@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React from "react";
+import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 import SidebarDropdown, { SidebarDropdownProps } from "./SidebarDropdown";
 
 const SidebarButton = ({
@@ -16,42 +19,55 @@ const SidebarButton = ({
   active: string;
   dropdowns?: SidebarDropdownProps[];
 }) => {
-  const isActive = active === href;
+  const pathname = usePathname();
+  const isActive = active === href || pathname.startsWith(`/user/${href}`);
+
+  const currentSub = pathname.split("/")[3] || "";
 
   return (
     <div className="flex flex-col">
       <Link
         href={`/user/${href}`}
-        className={`group flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-200 ${
+        className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-150 ${
           isActive
-            ? "bg-primary text-primary-content "
-            : "text-base-content/70 hover:bg-base-300 hover:text-base-content hover:scale-[1.01]"
+            ? "bg-primary text-primary-content shadow-sm"
+            : "text-base-content/60 hover:bg-base-300/60 hover:text-base-content"
         }`}
       >
         <span
-          className={`text-2xl transition-transform duration-200 ${
-            isActive ? "" : "group-hover:scale-110"
-          }`}
+          className={`text-lg flex-shrink-0 transition-transform duration-150 ${isActive ? "" : "group-hover:scale-110"}`}
         >
           {icon}
         </span>
-        <span className="text-base font-bold tracking-wide">{label}</span>
+        <span className="text-sm font-semibold tracking-wide flex-1">
+          {label}
+        </span>
 
-        {/* Active Indicator */}
-        {isActive && (
-          <div className="ml-auto">
-            <div className="h-2 w-2 rounded-full bg-primary-content animate-pulse" />
-          </div>
+        {dropdowns && dropdowns.length > 0 ? (
+          isActive ? (
+            <FiChevronDown className="w-4 h-4 opacity-70 flex-shrink-0" />
+          ) : (
+            <FiChevronRight className="w-4 h-4 opacity-40 flex-shrink-0 group-hover:opacity-70 transition-opacity" />
+          )
+        ) : (
+          isActive && (
+            <div className="h-1.5 w-1.5 rounded-full bg-primary-content/70 flex-shrink-0" />
+          )
         )}
       </Link>
 
+      {/* Dropdowns — only when parent is active */}
       {isActive && dropdowns && dropdowns.length > 0 && (
-        <div className="mt-1 ml-10 space-y-1">
+        <div className="mt-0.5 ml-4 pl-3 border-l border-base-300 space-y-0.5 py-1">
           {dropdowns.map((dropdown) => (
             <Link
               key={dropdown.href}
               href={`/user/${href}/${dropdown.href}`}
-              className="flex items-center rounded-xl px-4 py-2 transition hover:bg-base-300"
+              className={`group flex items-center rounded-lg px-3 py-2 transition-all duration-150 ${
+                currentSub === dropdown.href
+                  ? "bg-primary/10 text-primary"
+                  : "hover:bg-base-300/50"
+              }`}
             >
               <SidebarDropdown {...dropdown} />
             </Link>
