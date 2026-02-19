@@ -56,7 +56,7 @@ const EmployeeTable: React.FC<Props> = ({
                 {/* ACTIONS */}
                 <td onClick={(e) => e.stopPropagation()} className="relative">
                   <div className="flex justify-center">
-                    <div className="dropdown dropdown-end">
+                    <div className="dropdown dropdown-start">
                       <button
                         tabIndex={0}
                         className="btn btn-ghost btn-sm px-2"
