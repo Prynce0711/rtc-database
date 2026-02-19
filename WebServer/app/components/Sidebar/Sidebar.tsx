@@ -141,8 +141,8 @@ function adminSidebar(activeView: string) {
         active={activeView}
         label="Cases"
         dropdowns={[
-          { label: "test", href: "test" },
-          { label: "test2", href: "test2" },
+          { label: "Petition", href: "petition" },
+          { label: "Motion", href: "motion" },
         ]}
       />
       <SidebarButton
