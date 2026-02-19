@@ -14,7 +14,17 @@ import LogsPopup from "./LogsPopup";
 import { CompleteLogData } from "./schema";
 
 type SortConfigType = {
-  key: string;
+  key:
+    | "id"
+    | "timestamp"
+    | "userId"
+    | "ipAddress"
+    | "userAgent"
+    | "user"
+    | "action"
+    | "details"
+    | "user.name"
+    | "user.role";
   order: "asc" | "desc";
 } | null;
 
