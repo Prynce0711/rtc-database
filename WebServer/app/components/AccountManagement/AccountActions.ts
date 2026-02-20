@@ -37,8 +37,6 @@ export async function hasPassword(): Promise<ActionResult<void>> {
       where: { userId: sessionValidation.result.id, providerId: "credential" },
     });
 
-    console.log(user);
-
     if (user) {
       return { success: true, result: undefined };
     } else {
@@ -115,6 +113,14 @@ export async function sendMagicEmail(
       return sessionValidation;
     }
 
+    const hasCredential = await prisma.account.findFirst({
+      where: { providerId: "credential", user: { email: email } },
+    });
+
+    if (hasCredential) {
+      throw new Error("User already has a password set");
+    }
+
     await auth.api.signInMagicLink({
       body: {
         email: email,
@@ -132,7 +138,7 @@ export async function sendMagicEmail(
   }
 }
 
-export async function changeRole(
+export async function updateRole(
   userId: string[],
   newRole: Roles,
 ): Promise<ActionResult<void>> {
@@ -193,6 +199,18 @@ export async function deactivateAccount(
         headers: await headers(),
       });
 
+      await auth.api.revokeUserSessions({
+        body: {
+          userId: user.id,
+        },
+        headers: await headers(),
+      });
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: Status.DEACTIVATED },
+      });
+
       await createLog({
         action: LogAction.DEACTIVATE_USER,
         details: {
@@ -208,7 +226,7 @@ export async function deactivateAccount(
   }
 }
 
-export async function unbanAccount(
+export async function reactivateAccount(
   userId: string[],
 ): Promise<ActionResult<void>> {
   try {
@@ -228,6 +246,11 @@ export async function unbanAccount(
         },
         // This endpoint requires session cookies.
         headers: await headers(),
+      });
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: Status.ACTIVE },
       });
 
       await createLog({
@@ -267,6 +290,12 @@ export async function setInitialPassword(
       },
       headers: await headers(), // headers containing the user's session token
     });
+
+    await prisma.user.update({
+      where: { id: sessionValidation.result.id },
+      data: { status: Status.ACTIVE },
+    });
+
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error setting password:", error);

@@ -357,7 +357,7 @@ const CasePage: React.FC = () => {
 
   const handleDeleteCase = async (caseId: number) => {
     if (
-      !(await statusPopup.showYesNo(
+      !(await statusPopup.showConfirm(
         "Are you sure you want to delete this case?",
       ))
     ) {
