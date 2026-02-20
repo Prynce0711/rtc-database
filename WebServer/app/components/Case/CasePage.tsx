@@ -535,6 +535,7 @@ const CasePage: React.FC = () => {
             options={caseFilterOptions}
             onApply={handleApplyFilters}
             initialValues={appliedFilters}
+            initialExactMatchMap={exactMatchMap}
             getSuggestions={getCaseSuggestions}
           />
         </div>

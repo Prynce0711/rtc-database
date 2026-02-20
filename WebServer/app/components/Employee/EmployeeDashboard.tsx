@@ -527,6 +527,7 @@ const EmployeeDashboard: React.FC = () => {
             options={employeeFilterOptions}
             onApply={handleApplyEmployeeFilters}
             initialValues={appliedFilters}
+            initialExactMatchMap={exactMatchMap}
             getSuggestions={getEmployeeSuggestions}
           />
         </div>
