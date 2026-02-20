@@ -164,6 +164,7 @@ function adminSidebar(activeView: string) {
           { label: "Petition", href: "petition" },
 
           { label: "Special Proceedings", href: "proceedings" },
+          { label: "Receiving Logs", href: "Receive" },
         ]}
       />
       <SidebarButton
@@ -201,7 +202,14 @@ function attySidebar(activeView: string) {
         icon={<FiFileText />}
         href="cases"
         active={activeView}
-        label="Cases"
+        label="Case Management"
+        dropdowns={[
+          { label: "Cases", href: "" },
+          { label: "Petition", href: "petition" },
+
+          { label: "Special Proceedings", href: "proceedings" },
+          { label: "Receiving Logs", href: "Receive" },
+        ]}
       />
     </>
   );
@@ -220,7 +228,14 @@ function staffSidebar(activeView: string) {
         icon={<FiFileText />}
         href="cases"
         active={activeView}
-        label="Cases"
+        label="Case Management"
+        dropdowns={[
+          { label: "Cases", href: "" },
+          { label: "Petition", href: "petition" },
+
+          { label: "Special Proceedings", href: "proceedings" },
+          { label: "Receiving Logs", href: "Receive" },
+        ]}
       />
     </>
   );
