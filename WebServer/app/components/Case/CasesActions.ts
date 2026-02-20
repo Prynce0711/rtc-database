@@ -124,3 +124,19 @@ export async function deleteCase(caseId: number): Promise<ActionResult<void>> {
     return { success: false, error: "Error deleting case" };
   }
 }
+export async function getCaseById(id: number) {
+  try {
+    const result = await prisma.case.findUnique({
+      where: { id },
+    });
+
+    if (!result) {
+      return { success: false, error: "Case not found" };
+    }
+
+    return { success: true, result };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch case" };
+  }
+}

@@ -4,23 +4,18 @@ import { Case } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 
-import { FiEdit, FiTrash2 } from "react-icons/fi";
-import { CaseModalType } from "./CaseModal";
-
+import { useRouter } from "next/navigation";
+import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+// import { CaseModalType } from "./CaseModal";
 const CaseRow = ({
   caseItem,
-  setSelectedCase,
-  showModal,
   handleDeleteCase,
-  onRowClick,
 }: {
   caseItem: Case;
-  setSelectedCase: (caseItem: Case) => void;
-  showModal: (type: CaseModalType) => void;
   handleDeleteCase: (caseId: number) => void;
-  onRowClick: (caseItem: Case) => void;
 }) => {
   const session = useSession();
+  const router = useRouter();
   const isAdminOrAtty =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.ATTY;
@@ -28,32 +23,68 @@ const CaseRow = ({
   return (
     <tr
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onRowClick(caseItem)}
+      onClick={() => router.push(`/user/cases/${caseItem.id}`)}
     >
       {/* ACTIONS */}
       {isAdminOrAtty && (
-        <td className="text-center" onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-center gap-1">
-            <button
-              className="btn btn-xs btn-ghost text-info hover:bg-info/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedCase(caseItem);
-                showModal(CaseModalType.EDIT);
-              }}
-            >
-              <FiEdit size={15} />
-            </button>
+        <td
+          onClick={(e) => e.stopPropagation()}
+          className="relative text-center"
+        >
+          <div className="flex justify-center">
+            <div className="dropdown dropdown-start">
+              <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
+                <FiMoreHorizontal size={18} />
+              </button>
 
-            <button
-              className="btn btn-xs btn-ghost text-error hover:bg-error/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteCase(caseItem.id);
-              }}
-            >
-              <FiTrash2 size={15} />
-            </button>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
+                style={{ zIndex: 9999 }}
+              >
+                {/* VIEW */}
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-info"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/user/cases/${caseItem.id}`);
+                    }}
+                  >
+                    <FiEye size={16} />
+                    <span>View</span>
+                  </button>
+                </li>
+
+                {/* EDIT */}
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-warning"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/user/casesmanage/${caseItem.id}/edit`);
+                    }}
+                  >
+                    <FiEdit size={16} />
+                    <span>Edit</span>
+                  </button>
+                </li>
+
+                {/* DELETE */}
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteCase(caseItem.id);
+                    }}
+                  >
+                    <FiTrash2 size={16} />
+                    <span>Delete</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </td>
       )}
