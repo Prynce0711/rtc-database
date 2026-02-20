@@ -6,7 +6,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../Filter/FilterTypes";
 import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
@@ -214,52 +218,60 @@ const CasePage: React.FC = () => {
     exactMatchMap: ExactMatchMap = {},
   ): Case[] => {
     return items.filter((caseItem) => {
+      // Helper function to check text match based on exact/partial setting
+      const matchesText = (
+        itemValue: string,
+        filterValue: string,
+        key: string,
+      ): boolean => {
+        const isExact = exactMatchMap[key] ?? true;
+        const itemLower = itemValue.toLowerCase();
+        const filterLower = filterValue.toLowerCase();
+        return isExact
+          ? itemLower === filterLower
+          : itemLower.includes(filterLower);
+      };
+
       if (
         filters.branch &&
-        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
+        !matchesText(caseItem.branch, filters.branch, "branch")
       )
         return false;
       if (
         filters.assistantBranch &&
-        !caseItem.assistantBranch
-          .toLowerCase()
-          .includes(filters.assistantBranch.toLowerCase())
+        !matchesText(
+          caseItem.assistantBranch,
+          filters.assistantBranch,
+          "assistantBranch",
+        )
       )
         return false;
       if (
         filters.caseNumber &&
-        !caseItem.caseNumber
-          .toLowerCase()
-          .includes(filters.caseNumber.toLowerCase())
+        !matchesText(caseItem.caseNumber, filters.caseNumber, "caseNumber")
       )
         return false;
-      if (
-        filters.name &&
-        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
-      )
+      if (filters.name && !matchesText(caseItem.name, filters.name, "name"))
         return false;
       if (
         filters.charge &&
-        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
+        !matchesText(caseItem.charge, filters.charge, "charge")
       )
         return false;
       if (
         filters.infoSheet &&
-        !caseItem.infoSheet
-          .toLowerCase()
-          .includes(filters.infoSheet.toLowerCase())
+        !matchesText(caseItem.infoSheet, filters.infoSheet, "infoSheet")
       )
         return false;
-      if (
-        filters.court &&
-        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
-      )
+      if (filters.court && !matchesText(caseItem.court, filters.court, "court"))
         return false;
       if (
         filters.consolidation &&
-        !caseItem.consolidation
-          .toLowerCase()
-          .includes(filters.consolidation.toLowerCase())
+        !matchesText(
+          caseItem.consolidation,
+          filters.consolidation,
+          "consolidation",
+        )
       )
         return false;
       if (
