@@ -44,8 +44,7 @@ export const auth = betterAuth({
   },
   session: {
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // Cache duration in seconds (5 minutes)
+      enabled: false,
     },
   },
   hooks: {
@@ -54,10 +53,6 @@ export const auth = betterAuth({
         const email = ctx.body?.email;
         const success = ctx.context.newSession?.user ? true : false;
 
-        console.log(
-          "Login successful for user email:",
-          ctx.context.newSession?.user?.email,
-        );
         if (success) {
           await createLog({
             action: LogAction.LOGIN_SUCCESS,

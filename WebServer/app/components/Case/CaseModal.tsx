@@ -72,7 +72,7 @@ const NewCaseModal = ({
     e.preventDefault();
 
     if (
-      !(await statusPopup.showYesNo(
+      !(await statusPopup.showConfirm(
         type === CaseModalType.EDIT
           ? "Are you sure you want to update this case?"
           : "Are you sure you want to create this case?",

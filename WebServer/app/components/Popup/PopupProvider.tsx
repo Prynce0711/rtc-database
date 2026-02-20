@@ -1,9 +1,9 @@
 "use client";
 import { createContext, useContext, useRef, useState } from "react";
+import ConfirmPopup from "./ConfirmPopup";
 import ErrorPopup from "./ErrorPopup";
 import LoadingPopup from "./LoadingPopup";
 import SuccessPopup from "./SuccessPopup";
-import YesNoPopup from "./YesNoPopup";
 
 interface PopupProviderContextType {
   showLoading: (message?: string) => void;
@@ -17,7 +17,7 @@ interface PopupProviderContextType {
     redirectTo?: string,
     onClose?: () => void,
   ) => void;
-  showYesNo: (
+  showConfirm: (
     message: string,
     onYesCallback?: () => void,
     onNoCallback?: () => void,
@@ -39,7 +39,7 @@ enum PopupType {
   LOADING = "LOADING",
   SUCCESS = "SUCCESS",
   ERROR = "ERROR",
-  YESNO = "YESNO",
+  CONFIRM = "CONFIRM",
   WARNING = "WARNING",
 }
 
@@ -62,7 +62,7 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
   // Keep a resolver for pending Yes/No prompts so callers can await the result
   const pendingResolveRef = useRef<((result: boolean) => void) | null>(null);
 
-  function handleYesNo(
+  function handleConfirm(
     msg: string,
     onYesCallback?: () => void,
     onNoCallback?: () => void,
@@ -94,7 +94,7 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
         setOnYes(null);
         setOnNo(null);
       });
-      setPopupType(warning ? PopupType.WARNING : PopupType.YESNO);
+      setPopupType(warning ? PopupType.WARNING : PopupType.CONFIRM);
     });
   }
 
@@ -118,24 +118,24 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 
       setPopupType(PopupType.ERROR);
     },
-    showYesNo: (
+    showConfirm: (
       msg: string,
       onYesCallback?: () => void,
       onNoCallback?: () => void,
     ) => {
-      return handleYesNo(msg, onYesCallback, onNoCallback, false);
+      return handleConfirm(msg, onYesCallback, onNoCallback, false);
     },
     showWarning: (
       msg: string,
       onYesCallback?: () => void,
       onNoCallback?: () => void,
     ) => {
-      return handleYesNo(msg, onYesCallback, onNoCallback, true);
+      return handleConfirm(msg, onYesCallback, onNoCallback, true);
     },
     hidePopup: () => {
       // If a Yes/No is pending and user programmatically hides the popup, resolve as false
       if (
-        (popupType === PopupType.YESNO || popupType === PopupType.WARNING) &&
+        (popupType === PopupType.CONFIRM || popupType === PopupType.WARNING) &&
         pendingResolveRef.current
       ) {
         pendingResolveRef.current(false);
@@ -165,15 +165,15 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
           redirectTo={redirectTo || undefined}
         />
       )}
-      {popupType === PopupType.YESNO && (
-        <YesNoPopup
+      {popupType === PopupType.CONFIRM && (
+        <ConfirmPopup
           message={message || undefined}
           onYes={onYes || undefined}
           onNo={onNo || undefined}
         />
       )}
       {popupType === PopupType.WARNING && (
-        <YesNoPopup
+        <ConfirmPopup
           message={message || undefined}
           onYes={onYes || undefined}
           onNo={onNo || undefined}
