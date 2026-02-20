@@ -23,8 +23,12 @@ import {
 
 import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
-import EmployeeModal from "./EmployeeModal";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../Filter/FilterTypes";
+import EmployeeDrawer from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
 import KpiCard from "./KpiCard";
 
@@ -41,6 +45,7 @@ const EmployeeDashboard: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Employee[]>([]);
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -231,6 +236,7 @@ const EmployeeDashboard: React.FC = () => {
   const applyEmployeeFilters = (
     filters: FilterValues,
     list: Employee[],
+    exactMatchMap: ExactMatchMap = {},
   ): Employee[] => {
     return list.filter((e) => {
       if (
@@ -319,10 +325,18 @@ const EmployeeDashboard: React.FC = () => {
     });
   };
 
-  const handleApplyEmployeeFilters = (filters: FilterValues) => {
-    const filtered = applyEmployeeFilters(filters, employees);
+  const handleApplyEmployeeFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
+    const filtered = applyEmployeeFilters(
+      filters,
+      employees,
+      exactMatchMapParam,
+    );
     setAppliedFilters(filters);
     setFilteredByAdvanced(filtered);
+    setExactMatchMap(exactMatchMapParam);
   };
 
   function openAdd() {
@@ -531,7 +545,7 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* MODAL */}
-        <EmployeeModal
+        <EmployeeDrawer
           showModal={showModal}
           isEdit={isEdit}
           form={form}

@@ -153,7 +153,7 @@ const AccountDashboard = () => {
   /* ===== ACTION REQUESTS ===== */
 
   async function requestRoleChange(user: User, newRole: Roles) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Are you sure you want to change ${user.name}'s role to ${newRole}?`,
     );
     if (!confirmation) return;
@@ -173,7 +173,7 @@ const AccountDashboard = () => {
   }
 
   async function requestDeactivate(user: User) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Are you sure you want to deactivate ${user.name}'s account?`,
     );
     if (!confirmation) return;
@@ -197,7 +197,7 @@ const AccountDashboard = () => {
   }
 
   async function requestUnlock(user: User) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Unlock ${user.name}'s account?`,
     );
     if (!confirmation) return;
@@ -222,7 +222,7 @@ const AccountDashboard = () => {
   }
 
   async function requestRestore(user: User) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Restore ${user.name} to active accounts?`,
     );
     if (!confirmation) return;
@@ -247,7 +247,7 @@ const AccountDashboard = () => {
   }
 
   async function requestLock(user: User) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Lock ${user.name}'s account?`,
     );
     if (!confirmation) return;
@@ -264,7 +264,7 @@ const AccountDashboard = () => {
   }
 
   async function bulkChangeRole(newRole: Roles) {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Are you sure you want to change the role of ${selectedIds.length} selected users to ${newRole}?`,
     );
     if (!confirmation) return;
@@ -287,7 +287,7 @@ const AccountDashboard = () => {
   }
 
   async function bulkDeactivate() {
-    const confirmation = await statusPopup.showYesNo(
+    const confirmation = await statusPopup.showConfirm(
       `Are you sure you want to deactivate ${selectedIds.length} selected accounts?`,
     );
     if (!confirmation) return;

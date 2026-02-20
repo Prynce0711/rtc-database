@@ -99,9 +99,20 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let res: any;
       try {
-        res = await signIn.email({ email, password });
+        const { data, error: signInError } = await signIn.email({
+          email,
+          password,
+        });
+
+        if (signInError) {
+          setError(signInError.message || "Invalid email or password");
+          setIsLoading(false);
+
+          await cardControls.start("shake");
+
+          return;
+        }
       } catch (e: any) {
         setIsLoading(false);
         const status = e?.response?.status ?? e?.status ?? null;
@@ -113,55 +124,28 @@ const Login: React.FC = () => {
         return;
       }
 
-      const { data, error: signInError } = res;
-
-      if (signInError) {
-        setError("Invalid email or password. Please try again.");
-        setIsLoading(false);
-
-        await cardControls.start("shake");
-
-        return;
-      }
-      // smooth transition kapag success
-      try {
-        void overlayControls.start({
-          opacity: 1,
-          transition: { duration: 0.45 },
-        });
-
-        await cardControls.start("transitioning");
-        await new Promise((r) => setTimeout(r, 120));
-      } catch {}
-
-      return;
-
       // smooth transition: animate card then fade overlay into view before navigating
-      try {
-        // fade in subtle overlay
-        void overlayControls.start({
-          opacity: 1,
-          transition: { duration: 0.45 },
-        });
-        // animate card lift/scale
-        await cardControls.start("transitioning");
-        // small delay to let overlay settle
-        await new Promise((r) => setTimeout(r, 120));
-      } catch {}
+      // fade in subtle overlay
+      void overlayControls.start({
+        opacity: 1,
+        transition: { duration: 0.45 },
+      });
+      // animate card lift/scale
+      await cardControls.start("transitioning");
+      // small delay to let overlay settle
+      await new Promise((r) => setTimeout(r, 120));
 
       // reset attempts on successful sign in
 
-      try {
-        if (typeof window !== "undefined") {
-          if (rememberMe) {
-            localStorage.setItem("rememberMe", "true");
-            localStorage.setItem("rememberedEmail", email);
-          } else {
-            localStorage.removeItem("rememberMe");
-            localStorage.removeItem("rememberedEmail");
-          }
+      if (typeof window !== "undefined") {
+        if (rememberMe) {
+          localStorage.setItem("rememberMe", "true");
+          localStorage.setItem("rememberedEmail", email);
+        } else {
+          localStorage.removeItem("rememberMe");
+          localStorage.removeItem("rememberedEmail");
         }
-      } catch {}
+      }
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");

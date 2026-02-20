@@ -56,6 +56,7 @@ const CasePage: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const caseFilterOptions: FilterOption[] = [
     { key: "branch", label: "Branch", type: "text" },
@@ -210,6 +211,7 @@ const CasePage: React.FC = () => {
   const applyCaseFilters = (
     filters: CaseFilterValues,
     items: Case[],
+    exactMatchMap: ExactMatchMap = {},
   ): Case[] => {
     return items.filter((caseItem) => {
       if (
@@ -314,16 +316,20 @@ const CasePage: React.FC = () => {
     });
   };
 
-  const handleApplyFilters = (filters: FilterValues) => {
+  const handleApplyFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
     const typed = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typed, cases);
+    const filtered = applyCaseFilters(typed, cases, exactMatchMapParam);
     setAppliedFilters(typed);
     setFilteredByAdvanced(filtered);
+    setExactMatchMap(exactMatchMapParam);
   };
 
   const handleDeleteCase = async (caseId: number) => {
     if (
-      !(await statusPopup.showYesNo(
+      !(await statusPopup.showConfirm(
         "Are you sure you want to delete this case?",
       ))
     )

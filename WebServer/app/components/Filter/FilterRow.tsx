@@ -15,6 +15,8 @@ interface FilterRowProps {
   onBlur: () => void;
   suggestions: string[];
   onSuggestionClick: (key: string, suggestion: string) => void;
+  exactMatch?: boolean;
+  onExactMatchChange?: (key: string, exactMatch: boolean) => void;
 }
 
 const FilterRow: React.FC<FilterRowProps> = ({
@@ -28,6 +30,8 @@ const FilterRow: React.FC<FilterRowProps> = ({
   onBlur,
   suggestions,
   onSuggestionClick,
+  exactMatch = true,
+  onExactMatchChange,
 }) => {
   return (
     <div className="py-3 border-b border-base-300 hover:bg-base-200/40 transition-colors rounded-lg px-2">
@@ -45,132 +49,152 @@ const FilterRow: React.FC<FilterRowProps> = ({
           </label>
 
           {enabled && (
-            <div className="mt-3">
-              {option.type === "text" && (
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder={`Enter ${option.label.toLowerCase()}...`}
-                    className="input input-bordered w-full"
-                    value={(value as string) || ""}
-                    onChange={(e) => onChange(option.key, e.target.value)}
-                    onFocus={() => onFocus(option.key)}
-                    onBlur={onBlur}
-                  />
-                  {focused && suggestions.length > 0 && (
-                    <Suggestions
-                      suggestions={suggestions}
-                      onClick={(s) => onSuggestionClick(option.key, s)}
-                    />
-                  )}
-                </div>
-              )}
-
-              {option.type === "number" && (
-                <input
-                  type="number"
-                  placeholder={`Enter ${option.label.toLowerCase()}...`}
-                  className="input input-bordered w-full"
-                  value={(value as number) || ""}
-                  onChange={(e) =>
-                    onChange(
-                      option.key,
-                      e.target.value ? Number(e.target.value) : undefined,
-                    )
-                  }
-                />
-              )}
-
-              {option.type === "checkbox" && (
-                <div className="flex items-center gap-3">
+            <>
+              {option.type === "text" && onExactMatchChange && (
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-sm text-base-content/70">
+                    Partial Match
+                  </span>
                   <input
                     type="checkbox"
-                    className="checkbox"
-                    checked={Boolean(value)}
-                    onChange={(e) => onChange(option.key, e.target.checked)}
+                    className="toggle toggle-sm"
+                    checked={exactMatch}
+                    onChange={(e) =>
+                      onExactMatchChange(option.key, e.target.checked)
+                    }
                   />
-                  <span className="text-sm">{option.label}</span>
+                  <span className="text-sm text-base-content/70">
+                    Exact Match
+                  </span>
                 </div>
               )}
+              <div className="mt-3">
+                {option.type === "text" && (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={`Enter ${option.label.toLowerCase()}...`}
+                      className="input input-bordered w-full"
+                      value={(value as string) || ""}
+                      onChange={(e) => onChange(option.key, e.target.value)}
+                      onFocus={() => onFocus(option.key)}
+                      onBlur={onBlur}
+                    />
+                    {focused && suggestions.length > 0 && (
+                      <Suggestions
+                        suggestions={suggestions}
+                        onClick={(s) => onSuggestionClick(option.key, s)}
+                      />
+                    )}
+                  </div>
+                )}
 
-              {option.type === "range" && (
-                <div className="flex gap-2">
+                {option.type === "number" && (
                   <input
                     type="number"
-                    placeholder="Min amount"
-                    className="input input-bordered flex-1"
-                    step="0.01"
-                    value={((value || {}) as { min?: number }).min || ""}
-                    onChange={(e) => {
-                      const current = (value || {}) as {
-                        min?: number;
-                        max?: number;
-                      };
-                      onChange(option.key, {
-                        ...current,
-                        min: e.target.value
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                      });
-                    }}
+                    placeholder={`Enter ${option.label.toLowerCase()}...`}
+                    className="input input-bordered w-full"
+                    value={(value as number) || ""}
+                    onChange={(e) =>
+                      onChange(
+                        option.key,
+                        e.target.value ? Number(e.target.value) : undefined,
+                      )
+                    }
                   />
-                  <input
-                    type="number"
-                    placeholder="Max amount"
-                    className="input input-bordered flex-1"
-                    step="0.01"
-                    value={((value || {}) as { max?: number }).max || ""}
-                    onChange={(e) => {
-                      const current = (value || {}) as {
-                        min?: number;
-                        max?: number;
-                      };
-                      onChange(option.key, {
-                        ...current,
-                        max: e.target.value
-                          ? parseFloat(e.target.value)
-                          : undefined,
-                      });
-                    }}
-                  />
-                </div>
-              )}
+                )}
 
-              {option.type === "daterange" && (
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    className="input input-bordered input-sm flex-1"
-                    value={((value || {}) as { start?: string }).start || ""}
-                    onChange={(e) => {
-                      const current = (value || {}) as {
-                        start?: string;
-                        end?: string;
-                      };
-                      onChange(option.key, {
-                        ...current,
-                        start: e.target.value || undefined,
-                      });
-                    }}
-                  />
-                  <input
-                    type="date"
-                    className="input input-bordered input-sm flex-1"
-                    value={((value || {}) as { end?: string }).end || ""}
-                    onChange={(e) => {
-                      const current = (value || {}) as {
-                        start?: string;
-                        end?: string;
-                      };
-                      onChange(option.key, {
-                        ...current,
-                        end: e.target.value || undefined,
-                      });
-                    }}
-                  />
-                </div>
-              )}
-            </div>
+                {option.type === "checkbox" && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="checkbox"
+                      checked={Boolean(value)}
+                      onChange={(e) => onChange(option.key, e.target.checked)}
+                    />
+                    <span className="text-sm">{option.label}</span>
+                  </div>
+                )}
+
+                {option.type === "range" && (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Min amount"
+                      className="input input-bordered flex-1"
+                      step="0.01"
+                      value={((value || {}) as { min?: number }).min || ""}
+                      onChange={(e) => {
+                        const current = (value || {}) as {
+                          min?: number;
+                          max?: number;
+                        };
+                        onChange(option.key, {
+                          ...current,
+                          min: e.target.value
+                            ? parseFloat(e.target.value)
+                            : undefined,
+                        });
+                      }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max amount"
+                      className="input input-bordered flex-1"
+                      step="0.01"
+                      value={((value || {}) as { max?: number }).max || ""}
+                      onChange={(e) => {
+                        const current = (value || {}) as {
+                          min?: number;
+                          max?: number;
+                        };
+                        onChange(option.key, {
+                          ...current,
+                          max: e.target.value
+                            ? parseFloat(e.target.value)
+                            : undefined,
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
+                {option.type === "daterange" && (
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      className="input input-bordered input-sm flex-1"
+                      value={((value || {}) as { start?: string }).start || ""}
+                      onChange={(e) => {
+                        const current = (value || {}) as {
+                          start?: string;
+                          end?: string;
+                        };
+                        onChange(option.key, {
+                          ...current,
+                          start: e.target.value || undefined,
+                        });
+                      }}
+                    />
+                    <input
+                      type="date"
+                      className="input input-bordered input-sm flex-1"
+                      value={((value || {}) as { end?: string }).end || ""}
+                      onChange={(e) => {
+                        const current = (value || {}) as {
+                          start?: string;
+                          end?: string;
+                        };
+                        onChange(option.key, {
+                          ...current,
+                          end: e.target.value || undefined,
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

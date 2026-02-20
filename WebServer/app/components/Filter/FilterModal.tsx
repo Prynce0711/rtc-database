@@ -25,8 +25,9 @@ const FilterModal: React.FC<FilterModalProps> = ({
       const initial = initialValues || {};
       setFilters(initial);
       setEnabledFilters(new Set(Object.keys(initial)));
+      setExactMatchMap(initialExactMatchMap || {});
     }
-  }, [isOpen, initialValues]);
+  }, [isOpen, initialValues, initialExactMatchMap]);
 
   const toggleFilter = (key: string) => {
     const next = new Set(enabledFilters);
@@ -46,6 +47,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const resetFilters = () => {
     setEnabledFilters(new Set());
     setFilters({});
+    setExactMatchMap({});
   };
 
   const applyFilters = () => {
