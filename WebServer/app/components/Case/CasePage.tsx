@@ -1,20 +1,15 @@
 "use client";
 
 import { useSession } from "@/app/lib/authClient";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
-import {
-  ExactMatchMap,
-  FilterOption,
-  FilterValues,
-} from "../Filter/FilterTypes";
-
+import { FilterOption, FilterValues } from "../Filter/FilterTypes";
 import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
-import CaseDetailModal from "./CaseDetailModal";
 import NewCaseModal, { CaseModalType } from "./CaseModal";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
@@ -43,7 +38,7 @@ const CasePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
-  const [caseForDetailView, setCaseForDetailView] = useState<Case | null>(null);
+
   const session = useSession();
   const isAdminOrAtty =
     session?.data?.user?.role === "admin" ||
@@ -103,12 +98,10 @@ const CasePage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 25;
 
-  // Reset to page 1 when search or filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, appliedFilters]);
 
-  // Fetch cases from API
   useEffect(() => {
     fetchCases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,7 +130,6 @@ const CasePage: React.FC = () => {
   const stats = useMemo(() => calculateCaseStats(cases), [cases]);
 
   const filteredAndSortedCases = useMemo(() => {
-    // Start with advanced filtered cases if filters are applied, otherwise use all cases
     const baseList =
       Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
 
@@ -156,7 +148,6 @@ const CasePage: React.FC = () => {
   const totalItems = filteredAndSortedCases.length;
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  // Paginated data for current page
   const paginatedCases = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
@@ -169,6 +160,7 @@ const CasePage: React.FC = () => {
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
   };
+
   const getCaseSuggestions = (key: string, inputValue: string): string[] => {
     const textFields = [
       "branch",
@@ -222,112 +214,76 @@ const CasePage: React.FC = () => {
     exactMatchMap: ExactMatchMap = {},
   ): Case[] => {
     return items.filter((caseItem) => {
-      if (filters.branch) {
-        const useExact = exactMatchMap.branch ?? true;
-        const branchMatch = useExact
-          ? caseItem.branch.toLowerCase() === filters.branch.toLowerCase()
-          : caseItem.branch
-              .toLowerCase()
-              .includes(filters.branch.toLowerCase());
-        if (!branchMatch) return false;
-      }
-
-      if (filters.assistantBranch) {
-        const useExact = exactMatchMap.assistantBranch ?? true;
-        const assistantBranchMatch = useExact
-          ? caseItem.assistantBranch.toLowerCase() ===
-            filters.assistantBranch.toLowerCase()
-          : caseItem.assistantBranch
-              .toLowerCase()
-              .includes(filters.assistantBranch.toLowerCase());
-        if (!assistantBranchMatch) return false;
-      }
-
-      if (filters.caseNumber) {
-        const useExact = exactMatchMap.caseNumber ?? true;
-        const caseNumberMatch = useExact
-          ? caseItem.caseNumber.toLowerCase() ===
-            filters.caseNumber.toLowerCase()
-          : caseItem.caseNumber
-              .toLowerCase()
-              .includes(filters.caseNumber.toLowerCase());
-        if (!caseNumberMatch) return false;
-      }
-
-      if (filters.name) {
-        const useExact = exactMatchMap.name ?? true;
-        const nameMatch = useExact
-          ? caseItem.name.toLowerCase() === filters.name.toLowerCase()
-          : caseItem.name.toLowerCase().includes(filters.name.toLowerCase());
-        if (!nameMatch) return false;
-      }
-
-      if (filters.charge) {
-        const useExact = exactMatchMap.charge ?? true;
-        const chargeMatch = useExact
-          ? caseItem.charge.toLowerCase() === filters.charge.toLowerCase()
-          : caseItem.charge
-              .toLowerCase()
-              .includes(filters.charge.toLowerCase());
-        if (!chargeMatch) return false;
-      }
-
-      if (filters.infoSheet) {
-        const useExact = exactMatchMap.infoSheet ?? true;
-        const infoSheetMatch = useExact
-          ? caseItem.infoSheet.toLowerCase() === filters.infoSheet.toLowerCase()
-          : caseItem.infoSheet
-              .toLowerCase()
-              .includes(filters.infoSheet.toLowerCase());
-        if (!infoSheetMatch) return false;
-      }
-
-      if (filters.court) {
-        const useExact = exactMatchMap.court ?? true;
-        const courtMatch = useExact
-          ? caseItem.court.toLowerCase() === filters.court.toLowerCase()
-          : caseItem.court.toLowerCase().includes(filters.court.toLowerCase());
-        if (!courtMatch) return false;
-      }
-
-      if (filters.consolidation) {
-        const useExact = exactMatchMap.consolidation ?? true;
-        const consolidationMatch = useExact
-          ? caseItem.consolidation.toLowerCase() ===
-            filters.consolidation.toLowerCase()
-          : caseItem.consolidation
-              .toLowerCase()
-              .includes(filters.consolidation.toLowerCase());
-        if (!consolidationMatch) return false;
-      }
-
+      if (
+        filters.branch &&
+        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      )
+        return false;
+      if (
+        filters.assistantBranch &&
+        !caseItem.assistantBranch
+          .toLowerCase()
+          .includes(filters.assistantBranch.toLowerCase())
+      )
+        return false;
+      if (
+        filters.caseNumber &&
+        !caseItem.caseNumber
+          .toLowerCase()
+          .includes(filters.caseNumber.toLowerCase())
+      )
+        return false;
+      if (
+        filters.name &&
+        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
+      )
+        return false;
+      if (
+        filters.charge &&
+        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
+      )
+        return false;
+      if (
+        filters.infoSheet &&
+        !caseItem.infoSheet
+          .toLowerCase()
+          .includes(filters.infoSheet.toLowerCase())
+      )
+        return false;
+      if (
+        filters.court &&
+        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
+      )
+        return false;
+      if (
+        filters.consolidation &&
+        !caseItem.consolidation
+          .toLowerCase()
+          .includes(filters.consolidation.toLowerCase())
+      )
+        return false;
       if (
         filters.eqcNumber !== undefined &&
         caseItem.eqcNumber !== filters.eqcNumber
-      ) {
+      )
         return false;
-      }
-
       if (
         filters.detained !== undefined &&
         caseItem.detained !== filters.detained
-      ) {
+      )
         return false;
-      }
 
       if (filters.bond) {
         if (
           filters.bond.min !== undefined &&
           (caseItem.bond === null || caseItem.bond < filters.bond.min)
-        ) {
+        )
           return false;
-        }
         if (
           filters.bond.max !== undefined &&
           (caseItem.bond === null || caseItem.bond > filters.bond.max)
-        ) {
+        )
           return false;
-        }
       }
 
       if (filters.dateFiled) {
@@ -335,34 +291,25 @@ const CasePage: React.FC = () => {
         if (
           filters.dateFiled.start &&
           caseDate < new Date(filters.dateFiled.start)
-        ) {
+        )
           return false;
-        }
-        if (
-          filters.dateFiled.end &&
-          caseDate > new Date(filters.dateFiled.end)
-        ) {
+        if (filters.dateFiled.end && caseDate > new Date(filters.dateFiled.end))
           return false;
-        }
       }
 
       if (filters.raffleDate) {
-        if (caseItem.raffleDate === null) {
-          return false;
-        }
+        if (caseItem.raffleDate === null) return false;
         const caseDate = new Date(caseItem.raffleDate);
         if (
           filters.raffleDate.start &&
           caseDate < new Date(filters.raffleDate.start)
-        ) {
+        )
           return false;
-        }
         if (
           filters.raffleDate.end &&
           caseDate > new Date(filters.raffleDate.end)
-        ) {
+        )
           return false;
-        }
       }
 
       return true;
@@ -385,9 +332,8 @@ const CasePage: React.FC = () => {
       !(await statusPopup.showConfirm(
         "Are you sure you want to delete this case?",
       ))
-    ) {
+    )
       return;
-    }
 
     const result = await deleteCase(caseId);
     if (!result.success) {
@@ -460,8 +406,10 @@ const CasePage: React.FC = () => {
     setModalType(type);
   };
 
+  const router = useRouter();
+
   const handleRowClick = (caseItem: Case) => {
-    setCaseForDetailView(caseItem);
+    router.push(`/user/cases/${caseItem.id}`);
   };
 
   if (loading) {
@@ -490,80 +438,95 @@ const CasePage: React.FC = () => {
           </h2>
           <p className="text-xl text-base-content/70">Manage all court cases</p>
         </div>
-        {/* Search and Add */}
-        <div className="flex gap-4 mb-6">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
-          <input
-            type="text"
-            placeholder="Search cases..."
-            className="input input-bordered input-lg w-full pl-12  text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleImportExcel}
-          />
-          <button
-            className="btn btn-outline"
-            onClick={() => setFilterModalOpen(true)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Filter
-          </button>
-          {isAdminOrAtty && (
+
+        {/* ✅ OUTER relative wrapper — FilterModal mag-sstetch dito */}
+        <div className="relative mb-6">
+          <div className="flex gap-4">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+            <input
+              type="text"
+              placeholder="Search cases..."
+              className="input input-bordered input-lg w-full pl-12 text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportExcel}
+            />
             <button
-              className={`btn btn-outline ${uploading ? "loading" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? "Importing..." : "Import Excel"}
-            </button>
-          )}
-          {isAdminOrAtty && (
-            <button
-              className={`btn btn-outline ${exporting ? "loading" : ""}`}
-              onClick={handleExportExcel}
-              disabled={exporting}
-            >
-              {exporting ? "Exporting..." : "Export Excel"}
-            </button>
-          )}
-          {isAdminOrAtty && (
-            <button
-              className="btn btn-primary"
-              onClick={() => showModal(CaseModalType.ADD)}
+              className="btn btn-outline flex items-center gap-2"
+              onClick={() => setFilterModalOpen((prev) => !prev)}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
+                className="h-5 w-5"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
                 <path
                   fillRule="evenodd"
-                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
                   clipRule="evenodd"
                 />
               </svg>
-              Add Case
+              Filter
             </button>
-          )}
+
+            {isAdminOrAtty && (
+              <button
+                className={`btn btn-outline ${uploading ? "loading" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Importing..." : "Import Excel"}
+              </button>
+            )}
+            {isAdminOrAtty && (
+              <button
+                className={`btn btn-outline ${exporting ? "loading" : ""}`}
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                {exporting ? "Exporting..." : "Export Excel"}
+              </button>
+            )}
+            {isAdminOrAtty && (
+              <button
+                className="btn btn-primary"
+                onClick={() => showModal(CaseModalType.ADD)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Add Case
+              </button>
+            )}
+          </div>
+
+          {/* ✅ FilterModal nasa labas ng flex row — full width na ngayon */}
+          <FilterModal
+            isOpen={filterModalOpen}
+            onClose={() => setFilterModalOpen(false)}
+            options={caseFilterOptions}
+            onApply={handleApplyFilters}
+            initialValues={appliedFilters}
+            getSuggestions={getCaseSuggestions}
+          />
         </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medium text-center">
           <div className="stat bg-base-300 rounded-lg shadow">
@@ -597,7 +560,7 @@ const CasePage: React.FC = () => {
         </div>
 
         {/* Cases Table */}
-        <div className="bg-base-100  rounded-lg shadow">
+        <div className="bg-base-100 rounded-lg shadow">
           <Table
             headers={[
               ...(isAdminOrAtty
@@ -627,13 +590,7 @@ const CasePage: React.FC = () => {
                 sortable: true,
                 align: "center",
               },
-
-              {
-                key: "consolidation",
-                label: "Consolidation",
-                sortable: true,
-              },
-
+              { key: "consolidation", label: "Consolidation", sortable: true },
               { key: "eqcNumber", label: "EQC Number", sortable: true },
               { key: "bond", label: "Bond", sortable: true },
               { key: "raffleDate", label: "Raffle Date", sortable: true },
@@ -665,19 +622,13 @@ const CasePage: React.FC = () => {
             ]}
             data={paginatedCases}
             rowsPerPage={10}
-            sortConfig={{
-              key: sortConfig.key,
-              order: sortConfig.order,
-            }}
+            sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
             onSort={(k) => handleSort(k)}
             renderRow={(caseItem) => (
               <CaseRow
                 key={caseItem.id}
                 caseItem={caseItem}
-                setSelectedCase={setSelectedCase}
-                showModal={showModal}
                 handleDeleteCase={handleDeleteCase}
-                onRowClick={handleRowClick}
               />
             )}
           />
@@ -714,25 +665,6 @@ const CasePage: React.FC = () => {
             }}
           />
         )}
-
-        {/* Case Detail Modal */}
-        {caseForDetailView && (
-          <CaseDetailModal
-            caseData={caseForDetailView}
-            onClose={() => setCaseForDetailView(null)}
-          />
-        )}
-
-        {/* Filter Modal */}
-        <FilterModal
-          isOpen={filterModalOpen}
-          onClose={() => setFilterModalOpen(false)}
-          options={caseFilterOptions}
-          onApply={handleApplyFilters}
-          initialValues={appliedFilters}
-          getSuggestions={getCaseSuggestions}
-          initialExactMatchMap={exactMatchMap}
-        />
       </main>
     </div>
   );

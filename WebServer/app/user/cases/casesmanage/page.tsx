@@ -1,7 +1,7 @@
-import CasePage from "@/app/components/Case/CasePage";
+// import CasePage from "@/app/components/Case/CasePage";
 
-const page = () => {
-  return <CasePage />;
-};
+// const page = () => {
+//   return <CasePage />;
+// };
 
-export default page;
+// export default page;

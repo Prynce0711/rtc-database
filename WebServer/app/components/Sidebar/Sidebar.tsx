@@ -160,7 +160,7 @@ function adminSidebar(activeView: string) {
         active={activeView}
         label="Case Management"
         dropdowns={[
-          { label: "Cases", href: "/" },
+          { label: "Cases", href: "" },
           { label: "Petition", href: "petition" },
 
           { label: "Special Proceedings", href: "proceedings" },

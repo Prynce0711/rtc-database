@@ -163,7 +163,6 @@ const EmployeeDashboard: React.FC = () => {
     setShowModal(true);
   }
 
-  /* ================= ANALYTICS ================= */
   const analytics = useMemo(() => {
     const totalEmployees = employees.length;
     const totalBranches = new Set(employees.map((e) => e.branch)).size;
@@ -178,15 +177,9 @@ const EmployeeDashboard: React.FC = () => {
 
     const missingEmail = employees.filter((e) => !e.email).length;
 
-    return {
-      totalEmployees,
-      totalBranches,
-      withMedical,
-      missingEmail,
-    };
+    return { totalEmployees, totalBranches, withMedical, missingEmail };
   }, [employees]);
 
-  /* ================= SEARCH ================= */
   const filtered = useMemo(() => {
     const baseList =
       Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : employees;
@@ -248,105 +241,71 @@ const EmployeeDashboard: React.FC = () => {
     return list.filter((e) => {
       if (
         typeof filters.employeeName === "string" &&
-        filters.employeeName.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.employeeName ?? true;
-        const nameMatch = useExact
-          ? e.employeeName.toLowerCase() === filters.employeeName.toLowerCase()
-          : e.employeeName
-              .toLowerCase()
-              .includes(filters.employeeName.toLowerCase());
-        if (!nameMatch) return false;
-      }
+        filters.employeeName.trim() !== "" &&
+        !e.employeeName
+          .toLowerCase()
+          .includes(filters.employeeName.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.employeeNumber === "string" &&
-        filters.employeeNumber.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.employeeNumber ?? true;
-        const numberMatch = useExact
-          ? (e.employeeNumber || "").toLowerCase() ===
-            filters.employeeNumber.toLowerCase()
-          : (e.employeeNumber || "")
-              .toLowerCase()
-              .includes(filters.employeeNumber.toLowerCase());
-        if (!numberMatch) return false;
-      }
+        filters.employeeNumber.trim() !== "" &&
+        !(e.employeeNumber || "")
+          .toLowerCase()
+          .includes(filters.employeeNumber.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.position === "string" &&
-        filters.position.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.position ?? true;
-        const positionMatch = useExact
-          ? e.position.toLowerCase() === filters.position.toLowerCase()
-          : e.position.toLowerCase().includes(filters.position.toLowerCase());
-        if (!positionMatch) return false;
-      }
+        filters.position.trim() !== "" &&
+        !e.position.toLowerCase().includes(filters.position.toLowerCase())
+      )
+        return false;
 
-      if (typeof filters.branch === "string" && filters.branch.trim() !== "") {
-        const useExact = exactMatchMap.branch ?? true;
-        const branchMatch = useExact
-          ? e.branch.toLowerCase() === filters.branch.toLowerCase()
-          : e.branch.toLowerCase().includes(filters.branch.toLowerCase());
-        if (!branchMatch) return false;
-      }
+      if (
+        typeof filters.branch === "string" &&
+        filters.branch.trim() !== "" &&
+        !e.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.tinNumber === "string" &&
-        filters.tinNumber.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.tinNumber ?? true;
-        const tinMatch = useExact
-          ? (e.tinNumber || "").toLowerCase() ===
-            filters.tinNumber.toLowerCase()
-          : (e.tinNumber || "")
-              .toLowerCase()
-              .includes(filters.tinNumber.toLowerCase());
-        if (!tinMatch) return false;
-      }
+        filters.tinNumber.trim() !== "" &&
+        !(e.tinNumber || "")
+          .toLowerCase()
+          .includes(filters.tinNumber.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.gsisNumber === "string" &&
-        filters.gsisNumber.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.gsisNumber ?? true;
-        const gsisMatch = useExact
-          ? (e.gsisNumber || "").toLowerCase() ===
-            filters.gsisNumber.toLowerCase()
-          : (e.gsisNumber || "")
-              .toLowerCase()
-              .includes(filters.gsisNumber.toLowerCase());
-        if (!gsisMatch) return false;
-      }
+        filters.gsisNumber.trim() !== "" &&
+        !(e.gsisNumber || "")
+          .toLowerCase()
+          .includes(filters.gsisNumber.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.philHealthNumber === "string" &&
-        filters.philHealthNumber.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.philHealthNumber ?? true;
-        const philHealthMatch = useExact
-          ? (e.philHealthNumber || "").toLowerCase() ===
-            filters.philHealthNumber.toLowerCase()
-          : (e.philHealthNumber || "")
-              .toLowerCase()
-              .includes(filters.philHealthNumber.toLowerCase());
-        if (!philHealthMatch) return false;
-      }
+        filters.philHealthNumber.trim() !== "" &&
+        !(e.philHealthNumber || "")
+          .toLowerCase()
+          .includes(filters.philHealthNumber.toLowerCase())
+      )
+        return false;
 
       if (
         typeof filters.pagIbigNumber === "string" &&
-        filters.pagIbigNumber.trim() !== ""
-      ) {
-        const useExact = exactMatchMap.pagIbigNumber ?? true;
-        const pagIbigMatch = useExact
-          ? (e.pagIbigNumber || "").toLowerCase() ===
-            filters.pagIbigNumber.toLowerCase()
-          : (e.pagIbigNumber || "")
-              .toLowerCase()
-              .includes(filters.pagIbigNumber.toLowerCase());
-        if (!pagIbigMatch) return false;
-      }
+        filters.pagIbigNumber.trim() !== "" &&
+        !(e.pagIbigNumber || "")
+          .toLowerCase()
+          .includes(filters.pagIbigNumber.toLowerCase())
+      )
+        return false;
 
       if (typeof filters.hasMedicalInfo === "boolean") {
         const hasMedical =
@@ -354,16 +313,12 @@ const EmployeeDashboard: React.FC = () => {
           (!!e.allergies &&
             e.allergies.trim() !== "" &&
             e.allergies.toLowerCase() !== "n/a");
-        if (filters.hasMedicalInfo !== hasMedical) {
-          return false;
-        }
+        if (filters.hasMedicalInfo !== hasMedical) return false;
       }
 
       if (typeof filters.hasEmail === "boolean") {
         const hasEmail = !!e.email && e.email.trim() !== "";
-        if (filters.hasEmail !== hasEmail) {
-          return false;
-        }
+        if (filters.hasEmail !== hasEmail) return false;
       }
 
       return true;
@@ -397,11 +352,9 @@ const EmployeeDashboard: React.FC = () => {
 
     if (!form.employeeName?.trim())
       newErrors.employeeName = "Employee name is required";
-
     if (!form.position?.trim()) newErrors.position = "Position is required";
     if (!form.branch?.trim()) newErrors.branch = "Branch is required";
     if (!form.birthDate) newErrors.birthDate = "Birth date is required";
-
     if (!form.contactPerson?.trim())
       newErrors.contactPerson = "Contact person is required";
     if (
@@ -409,10 +362,8 @@ const EmployeeDashboard: React.FC = () => {
       form.contactNumber.replace(/\D/g, "").length !== 11
     )
       newErrors.contactNumber = "Contact number must be 11 digits";
-
-    if (form.email && !/^[^@]+@[^@]+$/.test(form.email)) {
+    if (form.email && !/^[^@]+@[^@]+$/.test(form.email))
       newErrors.email = "Invalid email format";
-    }
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
@@ -426,17 +377,14 @@ const EmployeeDashboard: React.FC = () => {
             form.allergies?.toLowerCase() === "n/a"
               ? undefined
               : form.allergies,
-
           height:
             typeof form.height === "number" && !Number.isNaN(form.height)
               ? form.height
               : undefined,
-
           weight:
             typeof form.weight === "number" && !Number.isNaN(form.weight)
               ? form.weight
               : undefined,
-
           email: form.email?.trim() === "" ? undefined : form.email?.trim(),
         };
 
@@ -444,14 +392,8 @@ const EmployeeDashboard: React.FC = () => {
           Number(form.id),
           sanitizedForm as Record<string, unknown>,
         );
-
-        if (!res.success) {
-          throw new Error(res.error);
-        }
-
-        if (!res.result) {
-          throw new Error("No result returned");
-        }
+        if (!res.success) throw new Error(res.error);
+        if (!res.result) throw new Error("No result returned");
 
         setEmployees((prev) =>
           prev.map((emp) => (emp.id === form.id ? res.result! : emp)),
@@ -464,12 +406,10 @@ const EmployeeDashboard: React.FC = () => {
             typeof form.height === "number" && !Number.isNaN(form.height)
               ? form.height
               : undefined,
-
           weight:
             typeof form.weight === "number" && !Number.isNaN(form.weight)
               ? form.weight
               : undefined,
-
           email: form.email?.trim() === "" ? undefined : form.email?.trim(),
           allergies:
             form.allergies?.trim() === "" ||
@@ -481,14 +421,8 @@ const EmployeeDashboard: React.FC = () => {
         const res = await createEmployee(
           sanitizedForm as Record<string, unknown>,
         );
-
-        if (!res.success) {
-          throw new Error(res.error);
-        }
-
-        if (!res.result) {
-          throw new Error("No result returned");
-        }
+        if (!res.success) throw new Error(res.error);
+        if (!res.result) throw new Error("No result returned");
 
         setEmployees((prev) => [res.result!, ...prev]);
       }
@@ -507,9 +441,7 @@ const EmployeeDashboard: React.FC = () => {
 
     try {
       const res = await deleteEmployee(id);
-
       if (!res.success) throw new Error(res.error);
-
       setEmployees((prev) => prev.filter((emp) => emp.id !== id));
     } catch (error: any) {
       alert(error.message);
@@ -517,8 +449,8 @@ const EmployeeDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen  bg-base-100 from-base-200 via-base-100 to-base-200 ">
-      <div className="w-full max-w-[2000px] mx-auto ">
+    <div className="min-h-screen bg-base-100 from-base-200 via-base-100 to-base-200">
+      <div className="w-full max-w-[2000px] mx-auto">
         {/* ===== HEADER ===== */}
         <div className="mb-8">
           <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
@@ -530,58 +462,71 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* ===== ACTION BAR ===== */}
-        <div className="mb-8 flex flex-col sm:flex-row gap-3 items-center">
-          <div className="relative flex-1">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
-            <input
-              className="input input-bordered input-lg w-full pl-14 text-base rounded-lg shadow-sm"
-              placeholder="Search by name, employee #, position, branch..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className={`btn btn-md btn-outline flex items-center gap-2 ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
-              onClick={() => setFilterModalOpen(true)}
-            >
-              <FiFilter size={18} />
-              <span className="hidden sm:inline">Filters</span>
-            </button>
-
-            <label className="btn btn-md btn-outline flex items-center gap-2">
-              <FiUpload size={18} />
-              <span className="hidden sm:inline">Import</span>
+        {/* ✅ Outer relative wrapper — FilterModal mag-stretch dito */}
+        <div className="relative mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
               <input
-                type="file"
-                accept=".xlsx,.xls"
-                hidden
-                onChange={handleImport}
+                className="input input-bordered input-lg w-full pl-14 text-base rounded-lg shadow-sm"
+                placeholder="Search by name, employee #, position, branch..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
-            </label>
+            </div>
 
-            <button
-              className="btn btn-md btn-outline flex items-center gap-2"
-              onClick={handleExport}
-            >
-              <FiDownload size={18} />
-              <span className="hidden sm:inline">Export</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={`btn btn-md btn-outline flex items-center gap-2 ${Object.keys(appliedFilters).length > 0 ? "btn-active" : ""}`}
+                onClick={() => setFilterModalOpen(true)}
+              >
+                <FiFilter size={18} />
+                <span className="hidden sm:inline">Filters</span>
+              </button>
 
-            <button
-              className="btn btn-md btn-warning flex items-center gap-2"
-              onClick={openAdd}
-            >
-              <FiPlus size={18} />
-              <span className="hidden sm:inline">Add Employee</span>
-            </button>
+              <label className="btn btn-md btn-outline flex items-center gap-2">
+                <FiUpload size={18} />
+                <span className="hidden sm:inline">Import</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  hidden
+                  onChange={handleImport}
+                />
+              </label>
+
+              <button
+                className="btn btn-md btn-outline flex items-center gap-2"
+                onClick={handleExport}
+              >
+                <FiDownload size={18} />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+
+              <button
+                className="btn btn-md btn-warning flex items-center gap-2"
+                onClick={openAdd}
+              >
+                <FiPlus size={18} />
+                <span className="hidden sm:inline">Add Employee</span>
+              </button>
+            </div>
           </div>
+
+          {/* ✅ FilterModal nasa labas ng flex row — full width na ngayon */}
+          <FilterModal
+            isOpen={filterModalOpen}
+            onClose={() => setFilterModalOpen(false)}
+            options={employeeFilterOptions}
+            onApply={handleApplyEmployeeFilters}
+            initialValues={appliedFilters}
+            getSuggestions={getEmployeeSuggestions}
+          />
         </div>
 
         <div className="xl:col-span-9 space-y-6">
           {/* KPI CARDS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 ">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             <KpiCard title="TOTAL EMPLOYEES" value={analytics.totalEmployees} />
             <KpiCard title="BRANCHES" value={analytics.totalBranches} />
             <KpiCard title="COMPLETE PROFILES" value={analytics.withMedical} />
@@ -609,16 +554,6 @@ const EmployeeDashboard: React.FC = () => {
           setForm={setForm}
           setShowModal={setShowModal}
           handleSave={handleSave}
-        />
-
-        <FilterModal
-          isOpen={filterModalOpen}
-          onClose={() => setFilterModalOpen(false)}
-          options={employeeFilterOptions}
-          onApply={handleApplyEmployeeFilters}
-          initialValues={appliedFilters}
-          getSuggestions={getEmployeeSuggestions}
-          initialExactMatchMap={exactMatchMap}
         />
       </div>
     </div>
