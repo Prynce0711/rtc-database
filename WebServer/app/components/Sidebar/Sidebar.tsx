@@ -42,6 +42,8 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     });
   }
 
+  const role = session?.user?.role;
+
   return (
     <div className="drawer lg:drawer-open bg-base-100">
       <input id="app-drawer" type="checkbox" className="drawer-toggle" />
@@ -53,12 +55,13 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="min-h-screen p-6 lg:p-15"
+          className="min-h-screen p-6 lg:p-12"
         >
-          <>{children}</>
+          {children}
         </motion.main>
       </div>
 
+      {/* ================= SIDEBAR ================= */}
       {/* ================= SIDEBAR ================= */}
       <div className="drawer-side">
         <label htmlFor="app-drawer" className="drawer-overlay" />
@@ -74,38 +77,52 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               className="w-23 h-23 object-contain mb-3 "
             />
 
-            <h1 className="text-2xl font-extrabold text-base-content leading-tight">
+            <h1 className="text-xl font-extrabold text-base-content leading-tight">
               Regional Trial Court
             </h1>
 
-            <p className="text-md font-medium text-base-content/60 mt-2">
+            <p className="text-sm font-medium text-base-content/60 mt-2">
               Case & Employee System
             </p>
           </div>
-
-          {/* ===== NAVIGATION ===== */}
+          {/* ===== NAV ===== */}
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {session?.user?.role === "admin"
+            {role === "admin"
               ? adminSidebar(activeView)
-              : session?.user?.role === "attorney"
+              : role === "attorney"
                 ? attySidebar(activeView)
                 : staffSidebar(activeView)}
           </nav>
 
-          {/* ===== FOOTER CONTROLS ===== */}
-          <div className="border-t border-base-300 p-4 space-y-3">
-            {/* THEME TOGGLE */}
+          {/* ===== FOOTER ===== */}
+          <div className="border-t border-base-300 p-4 space-y-2">
+            {/* USER PILL */}
+            {session?.user && (
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-base-100 border border-base-300">
+                <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary">
+                    {session.user.name?.charAt(0).toUpperCase() ?? "U"}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {session.user.name}
+                  </p>
+                  <p className="text-xs text-base-content/50 capitalize">
+                    {session.user.role}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* THEME */}
             <button
               onClick={() =>
                 setTheme((t) => (t === "winter" ? "dim" : "winter"))
               }
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-base-300 transition"
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-base-300 transition"
             >
-              {theme === "winter" ? (
-                <FiMoon className="text-lg" />
-              ) : (
-                <FiSun className="text-lg" />
-              )}
+              {theme === "winter" ? <FiMoon /> : <FiSun />}
               <span className="text-sm font-medium">
                 {theme === "winter" ? "Dark Mode" : "Light Mode"}
               </span>
@@ -114,9 +131,9 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             {/* LOGOUT */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-error hover:bg-error/10 transition"
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-error hover:bg-error/10 transition"
             >
-              <FiLogOut className="text-lg" />
+              <FiLogOut />
               <span className="text-sm font-medium">Logout</span>
             </button>
           </div>
@@ -125,6 +142,8 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     </div>
   );
 };
+
+/* ================= ROLE NAVS ================= */
 
 function adminSidebar(activeView: string) {
   return (
@@ -139,10 +158,12 @@ function adminSidebar(activeView: string) {
         icon={<FiFileText />}
         href="cases"
         active={activeView}
-        label="Cases"
+        label="Case Management"
         dropdowns={[
+          { label: "Cases", href: "/" },
           { label: "Petition", href: "petition" },
-          { label: "Motion", href: "motion" },
+
+          { label: "Special Proceedings", href: "proceedings" },
         ]}
       />
       <SidebarButton

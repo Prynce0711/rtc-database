@@ -15,9 +15,12 @@ export async function validateSession(
     const session = await auth.api.getSession({
       headers: await headers(),
     });
+
+    console.log("Session:", session);
     if (
       !session?.user ||
-      (role && !role.includes(session.user.role as Roles))
+      (role && !role.includes(session.user.role as Roles)) ||
+      session.user.banned
     ) {
       throw new Error(
         "Unauthorized: Invalid session or insufficient permissions",

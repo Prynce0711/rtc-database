@@ -1,9 +1,10 @@
 "use client";
 
-import { Status } from "@/app/generated/prisma/enums";
+import { User } from "@/app/generated/prisma/browser";
+import { Employee } from "@/app/generated/prisma/client";
 import Roles from "@/app/lib/Roles";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FiAlertCircle,
   FiCheck,
@@ -14,51 +15,10 @@ import {
   FiUserPlus,
   FiX,
 } from "react-icons/fi";
+import { getEmployees } from "../Employee/EmployeeActions";
 import { usePopup } from "../Popup/PopupProvider";
-
-export type MockUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: Status | "PENDING";
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-// Mock existing employees data
-const EXISTING_EMPLOYEES = [
-  {
-    id: "emp-1",
-    name: "Juan Dela Cruz",
-    email: "juan.delacruz@rtc.gov.ph",
-    position: "Legal Assistant",
-  },
-  {
-    id: "emp-2",
-    name: "Maria Santos",
-    email: "maria.santos@rtc.gov.ph",
-    position: "Court Stenographer",
-  },
-  {
-    id: "emp-3",
-    name: "Jose Reyes",
-    email: "jose.reyes@rtc.gov.ph",
-    position: "Process Server",
-  },
-  {
-    id: "emp-4",
-    name: "Ana Garcia",
-    email: "ana.garcia@rtc.gov.ph",
-    position: "Legal Researcher",
-  },
-  {
-    id: "emp-5",
-    name: "Pedro Ramos",
-    email: "pedro.ramos@rtc.gov.ph",
-    position: "Court Interpreter",
-  },
-];
+import { createAccount } from "./AccountActions";
+import { NewUserSchema } from "./schema";
 
 type AccountType = "EXISTING" | "NEW" | null;
 
@@ -69,20 +29,22 @@ const AddAccountDrawer = ({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (user: MockUser) => void;
+  onCreate: (user: User) => void;
 }) => {
-  const popup = usePopup();
+  const statusPopup = usePopup();
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [accountType, setAccountType] = useState<AccountType>(null);
   const [step, setStep] = useState<"SELECT_TYPE" | "FORM" | "REVIEW">(
     "SELECT_TYPE",
   );
   const [loading, setLoading] = useState(false);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<
+    NewUserSchema & { selectedEmployeeId?: number }
+  >({
     name: "",
     email: "",
     role: Roles.USER,
-    selectedEmployeeId: "",
   });
 
   const resetForm = () => {
@@ -90,44 +52,56 @@ const AddAccountDrawer = ({
       name: "",
       email: "",
       role: Roles.USER,
-      selectedEmployeeId: "",
     });
     setAccountType(null);
     setStep("SELECT_TYPE");
   };
 
-  const handleEmployeeSelect = (employeeId: string) => {
-    const employee = EXISTING_EMPLOYEES.find((e) => e.id === employeeId);
+  useEffect(() => {
+    async function fetchEmployees() {
+      try {
+        const result = await getEmployees();
+        if (result.success) {
+          setEmployees(result.result);
+        } else {
+          statusPopup.showError("Failed to fetch employees");
+        }
+      } catch (error) {
+        statusPopup.showError("An error occurred while fetching employees");
+      }
+    }
+
+    fetchEmployees();
+  }, []);
+
+  const handleEmployeeSelect = (employeeId: number) => {
+    const employee = employees.find((e) => e.id === employeeId);
     if (employee) {
       setForm({
         ...form,
+        name: employee.employeeName,
+        email: employee.email || "",
         selectedEmployeeId: employeeId,
-        name: employee.name,
-        email: employee.email,
       });
     }
   };
 
   const handleCreate = async () => {
     setLoading(true);
+    statusPopup.showLoading("Creating account...");
 
-    await new Promise((r) => setTimeout(r, 1500));
+    const result = await createAccount(form);
 
-    const newUser: MockUser = {
-      id: crypto.randomUUID(),
-      name: form.name,
-      email: form.email,
-      role: form.role,
-      status: "PENDING",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    popup.showSuccess("Account created successfully! Activation link sent.");
-    onCreate(newUser);
-    resetForm();
-    onClose();
     setLoading(false);
+
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to create account");
+      return;
+    }
+
+    statusPopup.showSuccess("Account Created. Activation link sent.");
+    onCreate(result.result);
+    onClose();
   };
 
   const handleTypeSelect = (type: AccountType) => {
@@ -221,11 +195,144 @@ const AddAccountDrawer = ({
                       </p>
                     </div>
 
-                    <motion.button
-                      className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
-                      onClick={() => handleTypeSelect("EXISTING")}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
+                  {accountType === "EXISTING" ? (
+                    <>
+                      {/* Employee Selection */}
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-bold text-base">
+                            Select Employee
+                          </span>
+                          <span className="label-text-alt text-error">
+                            Required
+                          </span>
+                        </label>
+                        <select
+                          className="select select-bordered w-full text-base"
+                          value={form.selectedEmployeeId}
+                          onChange={(e) => {
+                            if (isNaN(Number(e.target.value))) {
+                              statusPopup.showError(
+                                "Invalid employee selected",
+                              );
+                              return;
+                            }
+                            const selectedId = Number(e.target.value);
+                            handleEmployeeSelect(selectedId);
+                          }}
+                        >
+                          <option value="">Choose an employee...</option>
+                          {employees.map((emp) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.employeeName} - {emp.position}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Display Selected Employee Info (Read-only) */}
+                      {form.selectedEmployeeId && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          className="space-y-4"
+                        >
+                          <div>
+                            <label className="label">
+                              <span className="label-text font-bold text-base">
+                                Full Name
+                              </span>
+                            </label>
+                            <input
+                              type="text"
+                              className="input input-bordered w-full bg-base-200 text-base"
+                              value={form.name}
+                              readOnly
+                            />
+                          </div>
+
+                          <div>
+                            <label className="label">
+                              <span className="label-text font-bold text-base">
+                                Email Address
+                              </span>
+                            </label>
+                            <input
+                              type="email"
+                              className="input input-bordered w-full bg-base-200 text-base"
+                              value={form.email}
+                              readOnly
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Manual Entry for New Employee */}
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-bold text-base">
+                            Full Name
+                          </span>
+                          <span className="label-text-alt text-error">
+                            Required
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered w-full text-base"
+                          placeholder="Juan Dela Cruz"
+                          value={form.name}
+                          onChange={(e) =>
+                            setForm({ ...form, name: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className="label">
+                          <span className="label-text font-bold text-base">
+                            Email Address
+                          </span>
+                          <span className="label-text-alt text-error">
+                            Required
+                          </span>
+                        </label>
+                        <input
+                          type="email"
+                          className="input input-bordered w-full text-base"
+                          placeholder="juan.delacruz@rtc.gov.ph"
+                          value={form.email}
+                          onChange={(e) =>
+                            setForm({ ...form, email: e.target.value })
+                          }
+                        />
+                        <label className="label">
+                          <span className="label-text-alt text-base-content/60">
+                            Use official RTC email address
+                          </span>
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Role Selection (Common for both types) */}
+                  <div>
+                    <label className="label">
+                      <span className="label-text font-bold text-base">
+                        Account Role
+                      </span>
+                      <span className="label-text-alt text-error">
+                        Required
+                      </span>
+                    </label>
+                    <select
+                      className="select select-bordered w-full text-base"
+                      value={form.role}
+                      onChange={(e) =>
+                        setForm({ ...form, role: e.target.value as Roles })
+                      }
                     >
                       <div className="flex items-start gap-5">
                         <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">

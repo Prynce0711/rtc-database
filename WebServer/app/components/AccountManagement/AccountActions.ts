@@ -1,20 +1,19 @@
 "use server";
 
-import { LogAction, User } from "@/app/generated/prisma/browser";
+import { LogAction, Status, User } from "@/app/generated/prisma/browser";
 import { auth } from "@/app/lib/auth";
 import { validateSession } from "@/app/lib/authActions";
-import { authClient } from "@/app/lib/authClient";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import { headers } from "next/dist/server/request/headers";
-import { prettifyError } from "zod";
+import { headers } from "next/headers";
+import z, { prettifyError } from "zod";
 import ActionResult from "../ActionResult";
 import { createLog } from "../ActivityLogs/LogActions";
 import { NewUserSchema } from "./schema";
 
 export async function getAccounts(): Promise<ActionResult<User[]>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -27,11 +26,33 @@ export async function getAccounts(): Promise<ActionResult<User[]>> {
   }
 }
 
+export async function hasPassword(): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const user = await prisma.account.findFirst({
+      where: { userId: sessionValidation.result.id, providerId: "credential" },
+    });
+
+    if (user) {
+      return { success: true, result: undefined };
+    } else {
+      return { success: false, error: "Not first login" };
+    }
+  } catch (error) {
+    console.error("Error checking first login:", error);
+    return { success: false, error: "Failed to check first login" };
+  }
+}
+
 export async function createAccount(
   newUser: NewUserSchema,
 ): Promise<ActionResult<User>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -41,13 +62,23 @@ export async function createAccount(
       throw new Error("Invalid user data: " + prettifyError(validation.error));
     }
 
-    const { data: createdUser, error } = await authClient.admin.createUser({
-      email: newUser.email, // required
-      name: newUser.name, // required
+    await auth.api.signInMagicLink({
+      body: {
+        email: validation.data.email,
+      },
+      headers: await headers(),
     });
 
-    if (error) {
-      throw new Error("Error creating user: " + error.message);
+    const createdUser = await auth.api.createUser({
+      body: {
+        email: validation.data.email,
+        name: validation.data.name,
+      },
+      headers: await headers(),
+    });
+
+    if (!createdUser.user) {
+      throw new Error("Error creating user");
     }
 
     // better auth does not support arbirary roles when creating users, so we need to update the user after creation
@@ -65,17 +96,54 @@ export async function createAccount(
 
     return { success: true, result: updatedUser };
   } catch (error) {
-    console.error("Error creating account:", error);
-    return { success: false, error: "Failed to create account" };
+    console.error("Error creating account: ", (error as Error).message);
+    return {
+      success: false,
+      error: "Failed to create account: " + (error as Error).message,
+    };
   }
 }
 
-export async function changeRole(
+export async function sendMagicEmail(
+  email: string,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const hasCredential = await prisma.account.findFirst({
+      where: { providerId: "credential", user: { email: email } },
+    });
+
+    if (hasCredential) {
+      throw new Error("User already has a password set");
+    }
+
+    await auth.api.signInMagicLink({
+      body: {
+        email: email,
+      },
+      headers: await headers(),
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error sending magic email: ", (error as Error).message);
+    return {
+      success: false,
+      error: "Failed to send magic email: " + (error as Error).message,
+    };
+  }
+}
+
+export async function updateRole(
   userId: string[],
   newRole: Roles,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -112,7 +180,7 @@ export async function deactivateAccount(
   banReason?: string,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -131,6 +199,18 @@ export async function deactivateAccount(
         headers: await headers(),
       });
 
+      await auth.api.revokeUserSessions({
+        body: {
+          userId: user.id,
+        },
+        headers: await headers(),
+      });
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: Status.DEACTIVATED },
+      });
+
       await createLog({
         action: LogAction.DEACTIVATE_USER,
         details: {
@@ -146,11 +226,11 @@ export async function deactivateAccount(
   }
 }
 
-export async function unbanAccount(
+export async function reactivateAccount(
   userId: string[],
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -168,6 +248,11 @@ export async function unbanAccount(
         headers: await headers(),
       });
 
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { status: Status.ACTIVE },
+      });
+
       await createLog({
         action: LogAction.REACTIVATE_USER,
         details: {
@@ -179,5 +264,68 @@ export async function unbanAccount(
   } catch (error) {
     console.error("Error unbanning account:", error);
     return { success: false, error: "Failed to unban account" };
+  }
+}
+
+export async function setInitialPassword(
+  password: string,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const user = await prisma.account.findFirst({
+      where: { userId: sessionValidation.result.id, providerId: "credential" },
+    });
+
+    if (user) {
+      throw new Error("Password already set");
+    }
+
+    await auth.api.setPassword({
+      body: {
+        newPassword: password,
+      },
+      headers: await headers(), // headers containing the user's session token
+    });
+
+    await prisma.user.update({
+      where: { id: sessionValidation.result.id },
+      data: { status: Status.ACTIVE },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error setting password:", error);
+    return { success: false, error: "Failed to set password" };
+  }
+}
+
+export async function updateStatus(
+  status: Status,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const statusSchema = z.enum(Status);
+    const validation = statusSchema.safeParse(status);
+    if (!validation.success) {
+      throw new Error("Invalid status: " + prettifyError(validation.error));
+    }
+
+    await prisma.user.update({
+      where: { id: sessionValidation.result.id },
+      data: { status: status },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error updating status:", error);
+    return { success: false, error: "Failed to update status" };
   }
 }

@@ -1,7 +1,12 @@
 "use client";
 
-import { signIn, useSession } from "@/app/lib/authClient";
-import { AnimatePresence, motion, useAnimation } from "framer-motion";
+import { signIn } from "@/app/lib/authClient";
+import {
+  AnimatePresence,
+  easeInOut,
+  motion,
+  useAnimation,
+} from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -23,13 +28,13 @@ const Login: React.FC = () => {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 0.7, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] },
+      transition: { duration: 0.7, delay: 0.2, ease: easeInOut },
     },
     transitioning: {
       scale: 1.06,
       y: -40,
       opacity: 0.98,
-      transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+      transition: { duration: 0.6, ease: easeInOut },
     },
     shake: {
       x: [0, -15, 15, -12, 12, -8, 8, -4, 4, 0],
@@ -73,14 +78,6 @@ const Login: React.FC = () => {
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
 
-  const { data: session } = useSession();
-
-  useEffect(() => {
-    if (session?.user) {
-      router.push("/user/dashboard");
-    }
-  }, [session, router]);
-
   useEffect(() => {
     // reveal card on mount
     void cardControls.start("visible");
@@ -102,9 +99,20 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let res: any;
       try {
-        res = await signIn.email({ email, password });
+        const { data, error: signInError } = await signIn.email({
+          email,
+          password,
+        });
+
+        if (signInError) {
+          setError(signInError.message || "Invalid email or password");
+          setIsLoading(false);
+
+          await cardControls.start("shake");
+
+          return;
+        }
       } catch (e: any) {
         setIsLoading(false);
         const status = e?.response?.status ?? e?.status ?? null;
@@ -116,55 +124,28 @@ const Login: React.FC = () => {
         return;
       }
 
-      const { data, error: signInError } = res;
-
-      if (signInError) {
-        setError("Invalid email or password. Please try again.");
-        setIsLoading(false);
-
-        await cardControls.start("shake");
-
-        return;
-      }
-      // smooth transition kapag success
-      try {
-        void overlayControls.start({
-          opacity: 1,
-          transition: { duration: 0.45 },
-        });
-
-        await cardControls.start("transitioning");
-        await new Promise((r) => setTimeout(r, 120));
-      } catch {}
-
-      return;
-
       // smooth transition: animate card then fade overlay into view before navigating
-      try {
-        // fade in subtle overlay
-        void overlayControls.start({
-          opacity: 1,
-          transition: { duration: 0.45 },
-        });
-        // animate card lift/scale
-        await cardControls.start("transitioning");
-        // small delay to let overlay settle
-        await new Promise((r) => setTimeout(r, 120));
-      } catch {}
+      // fade in subtle overlay
+      void overlayControls.start({
+        opacity: 1,
+        transition: { duration: 0.45 },
+      });
+      // animate card lift/scale
+      await cardControls.start("transitioning");
+      // small delay to let overlay settle
+      await new Promise((r) => setTimeout(r, 120));
 
       // reset attempts on successful sign in
 
-      try {
-        if (typeof window !== "undefined") {
-          if (rememberMe) {
-            localStorage.setItem("rememberMe", "true");
-            localStorage.setItem("rememberedEmail", email);
-          } else {
-            localStorage.removeItem("rememberMe");
-            localStorage.removeItem("rememberedEmail");
-          }
+      if (typeof window !== "undefined") {
+        if (rememberMe) {
+          localStorage.setItem("rememberMe", "true");
+          localStorage.setItem("rememberedEmail", email);
+        } else {
+          localStorage.removeItem("rememberMe");
+          localStorage.removeItem("rememberedEmail");
         }
-      } catch {}
+      }
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -293,7 +274,7 @@ const Login: React.FC = () => {
 relative z-10
 rounded-2xl
 p-8
-bg-gradient-to-b from-white/90 to-white/60
+bg-linear-to-b from-white/90 to-white/60
 border border-white/20
 shadow-xl
 "

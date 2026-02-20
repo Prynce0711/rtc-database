@@ -10,9 +10,16 @@ datasource db {
   provider = "sqlite"
 }
 
+enum Roles {
+  admin
+  user
+  atty
+}
+
 enum Status {
   ACTIVE
-  INACTIVE
+  DEACTIVATED
+  PENDING
   SUSPENDED
   TERMINATED
 }
@@ -111,16 +118,17 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  role          String?
+  role          Roles     @default(user)
   banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
   sessions      Session[]
   accounts      Account[]
 
-  status       Status @default(INACTIVE)
+  status       Status   @default(PENDING)
 
   Logs         Log[]
+
 
   @@unique([email])
   @@map("user")
@@ -158,6 +166,7 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  status                Status    @default(PENDING)
 
   @@index([userId])
   @@map("account")

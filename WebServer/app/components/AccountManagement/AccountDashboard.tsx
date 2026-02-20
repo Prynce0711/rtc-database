@@ -1,5 +1,6 @@
 "use client";
 
+import { User } from "@/app/generated/prisma/browser";
 import { Status } from "@/app/generated/prisma/enums";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
@@ -14,50 +15,33 @@ import {
 import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { Pagination } from "../Pagination";
 import { usePopup } from "../Popup/PopupProvider";
-import { getAccounts } from "./AccountActions";
-import AddAccountDrawer, { MockUser } from "./AddAccountDrawer";
-import ConfirmModal from "./ConfirmModal";
+import { getAccounts, updateRole } from "./AccountActions";
+import AccountActionsButton from "./AccountActionsButton";
+import AddAccountDrawer from "./AddAccountDrawer";
 
 type RoleFilterType = Roles | "ALL";
 type TabType = (typeof tabs)[number];
 
-type ExtendedStatus = Status | "PENDING";
-
-type DashboardUser = MockUser & {
-  status: ExtendedStatus;
-};
-
-type ModalAction = {
-  type: "role" | "status" | "reminder";
-  user: DashboardUser;
-  newValue?: string;
-  title: string;
-  message: string;
-  confirmText: string;
-  variant: "info" | "warning" | "error" | "success";
-};
-
 const tabs = [
   "ALL",
   Status.ACTIVE,
-  "PENDING",
+  Status.PENDING,
   Status.SUSPENDED,
-  Status.INACTIVE,
+  Status.DEACTIVATED,
 ] as const;
 
 const AccountDashboard = () => {
-  const popup = usePopup();
+  const statusPopup = usePopup();
   const session = useSession();
   const canManage = session.data?.user?.role === Roles.ADMIN;
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const [users, setUsers] = useState<DashboardUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [showDrawer, setShowDrawer] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusTab, setStatusTab] = useState<TabType>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilterType>("ALL");
-  const [modalAction, setModalAction] = useState<ModalAction | null>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<CSSProperties>({});
 
   // Update sliding indicator position
@@ -81,153 +65,27 @@ const AccountDashboard = () => {
     getAccounts().then((result) => {
       if (!result.success) return;
 
-      setUsers(
-        result.result.map((u) => ({
-          ...u,
-          role: u.role ?? Roles.USER,
-        })) as DashboardUser[],
-      );
+      setUsers(result.result);
     });
   }, []);
 
-  /* ACTION HANDLERS */
-  const updateStatus = (id: string, status: ExtendedStatus) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status } : u)));
-    popup.showSuccess(`Account ${status.toLowerCase()} successfully`);
-  };
-
-  const updateRole = (id: string, newRole: Roles) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, role: newRole } : u)),
+  const handleRoleChange = async (user: User, newRole: Roles) => {
+    const confirm = await statusPopup.showConfirm(
+      `Change ${user.name}'s role to ${newRole}?`,
     );
-    popup.showSuccess("Role updated successfully");
-  };
+    if (!confirm) return;
 
-  const handleRoleChange = (user: DashboardUser, newRole: Roles) => {
-    setModalAction({
-      type: "role",
-      user,
-      newValue: newRole,
-      title: "Change User Role",
-      message: `Are you sure you want to change ${user.name}'s role to ${newRole}?`,
-      confirmText: "Change Role",
-      variant: "warning",
-    });
-  };
-
-  const handleStatusChange = (
-    user: DashboardUser,
-    newStatus: ExtendedStatus,
-    action: string,
-  ) => {
-    const messages = {
-      unlock: `Are you sure you want to unlock ${user.name}'s account?`,
-      reactivate: `Are you sure you want to reactivate ${user.name}'s account?`,
-      deactivate: `Are you sure you want to deactivate ${user.name}'s account? They will lose access to the system.`,
-      lock: `Are you sure you want to lock ${user.name}'s account? They will be temporarily unable to log in.`,
-    };
-
-    const variants = {
-      unlock: "success" as const,
-      reactivate: "success" as const,
-      deactivate: "error" as const,
-      lock: "warning" as const,
-    };
-
-    setModalAction({
-      type: "status",
-      user,
-      newValue: newStatus,
-      title: `${action.charAt(0).toUpperCase() + action.slice(1)} Account`,
-      message: messages[action as keyof typeof messages],
-      confirmText: action.charAt(0).toUpperCase() + action.slice(1),
-      variant: variants[action as keyof typeof variants],
-    });
-  };
-
-  const handleReminder = (user: DashboardUser) => {
-    setModalAction({
-      type: "reminder",
-      user,
-      title: "Send Activation Reminder",
-      message: `Send an activation reminder email to ${user.name} at ${user.email}?`,
-      confirmText: "Send Reminder",
-      variant: "info",
-    });
-  };
-
-  const confirmAction = () => {
-    if (!modalAction) return;
-
-    switch (modalAction.type) {
-      case "role":
-        updateRole(modalAction.user.id, modalAction.newValue as Roles);
-        break;
-      case "status":
-        updateStatus(
-          modalAction.user.id,
-          modalAction.newValue as ExtendedStatus,
-        );
-        break;
-      case "reminder":
-        popup.showSuccess("Activation reminder sent successfully");
-        break;
+    const result = await updateRole([user.id], newRole);
+    if (!result.success) {
+      statusPopup.showError(
+        "Failed to update role" + (result.error ? `: ${result.error}` : ""),
+      );
+    } else {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)),
+      );
+      statusPopup.showSuccess("Role updated successfully");
     }
-
-    setModalAction(null);
-  };
-
-  const renderActions = (user: DashboardUser) => {
-    if (!canManage) return null;
-
-    if (user.status === "PENDING")
-      return (
-        <button
-          className="btn btn-sm bg-base-300  items-center justify-center text-center"
-          onClick={() => handleReminder(user)}
-        >
-          Resend Link
-        </button>
-      );
-
-    if (user.status === Status.SUSPENDED)
-      return (
-        <button
-          className="btn btn-sm btn-success items-center justify-center text-center"
-          onClick={() => handleStatusChange(user, Status.ACTIVE, "unlock")}
-        >
-          Unlock
-        </button>
-      );
-
-    if (user.status === Status.INACTIVE)
-      return (
-        <button
-          className="btn btn-sm btn-success items-center justify-center text-center"
-          onClick={() => handleStatusChange(user, Status.ACTIVE, "reactivate")}
-        >
-          Reactivate
-        </button>
-      );
-
-    return (
-      <div className="flex gap-2">
-        <button
-          className="btn btn-sm bg-base-300  items-center justify-center text-center"
-          onClick={() => handleStatusChange(user, Status.SUSPENDED, "lock")}
-        >
-          Lock
-        </button>
-        <button
-          className="btn btn-sm btn-error items-center justify-center text-center"
-          onClick={() =>
-            handleStatusChange(user, Status.INACTIVE, "deactivate")
-          }
-        >
-          Deactivate
-        </button>
-      </div>
-    );
   };
 
   /* FILTER */
@@ -249,18 +107,18 @@ const AccountDashboard = () => {
     currentPage * pageSize,
   );
 
-  const getStatusLabel = (status: ExtendedStatus | "ALL") => {
+  const getStatusLabel = (status: Status | "ALL") => {
     if (status === "ALL") return "All Accounts";
     if (status === Status.SUSPENDED) return "Locked";
     if (status === Status.ACTIVE) return "Active";
-    if (status === Status.INACTIVE) return "Inactive";
-    if (status === "PENDING") return "Pending";
+    if (status === Status.DEACTIVATED) return "Deactivated";
+    if (status === Status.PENDING) return "Pending";
     return status;
   };
 
   return (
     <div className="min-h-screen px-4 lg:px-8">
-      <main className="max-w-[1500px] mx-auto">
+      <main className="max-w-375 mx-auto">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div>
@@ -412,7 +270,7 @@ const AccountDashboard = () => {
                         {/* ROLE */}
                         <td>
                           {user.role === Roles.ADMIN ||
-                          user.status === "PENDING" ? (
+                          user.status === Status.PENDING ? (
                             <span className="font-semibold text-base-content  opacity-70 text-sm">
                               {user.role}
                             </span>
@@ -443,9 +301,9 @@ const AccountDashboard = () => {
     ${
       user.status === Status.ACTIVE
         ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
-        : user.status === Status.INACTIVE
+        : user.status === Status.DEACTIVATED
           ? "bg-red-500/10 text-red-600 border-red-500/20"
-          : user.status === "PENDING"
+          : user.status === Status.PENDING
             ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
             : "bg-base-200/60 text-base-content/60 border-base-300"
     }
@@ -454,7 +312,7 @@ const AccountDashboard = () => {
                             {/* STATUS INDICATOR */}
                             {user.status === Status.SUSPENDED ? (
                               <FiLock className="w-3.5 h-3.5 opacity-70" />
-                            ) : user.status === "PENDING" ? (
+                            ) : user.status === Status.PENDING ? (
                               <span className="loading loading-spinner loading-xs" />
                             ) : (
                               <span
@@ -477,7 +335,20 @@ const AccountDashboard = () => {
                           {formatDate(user.updatedAt)}
                         </td>
 
-                        {canManage && <td>{renderActions(user)}</td>}
+                        {canManage && (
+                          <td>
+                            <AccountActionsButton
+                              user={user}
+                              updateUser={(user) => {
+                                setUsers((prev) =>
+                                  prev.map((u) =>
+                                    u.id === user.id ? user : u,
+                                  ),
+                                );
+                              }}
+                            />
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -505,22 +376,11 @@ const AccountDashboard = () => {
               {
                 ...u,
                 role: u.role ?? Roles.USER,
-                status: "PENDING",
+                status: Status.PENDING,
               },
               ...prev,
             ])
           }
-        />
-
-        {/* MODAL */}
-        <ConfirmModal
-          isOpen={!!modalAction}
-          onClose={() => setModalAction(null)}
-          onConfirm={confirmAction}
-          title={modalAction?.title || ""}
-          message={modalAction?.message || ""}
-          confirmText={modalAction?.confirmText || "Confirm"}
-          variant={modalAction?.variant || "warning"}
         />
       </main>
     </div>

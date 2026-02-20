@@ -65,7 +65,7 @@ const ArchivedAccountsTable = ({
                     <button
                       className="btn btn-sm btn-primary bg-green-600 hover:bg-green-700 text-white"
                       onClick={async () => {
-                        const confirm = await popup.showYesNo(
+                        const confirm = await popup.showConfirm(
                           `Restore ${user.name} to active accounts?`,
                         );
                         if (!confirm) return;

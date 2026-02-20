@@ -2,7 +2,7 @@ import { HelpCircle } from "lucide-react";
 import { FaExclamation } from "react-icons/fa";
 import ModalBase from "./ModalBase";
 
-const YesNoPopup = ({
+const ConfirmPopup = ({
   message,
   onYes,
   onNo,
@@ -54,4 +54,4 @@ const YesNoPopup = ({
   );
 };
 
-export default YesNoPopup;
+export default ConfirmPopup;

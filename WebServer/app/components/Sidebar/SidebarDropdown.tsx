@@ -3,11 +3,11 @@ export interface SidebarDropdownProps {
   label: string;
 }
 
-const SidebarDropdown = ({ href, label }: SidebarDropdownProps) => {
+const SidebarDropdown = ({ label }: SidebarDropdownProps) => {
   return (
     <span className="flex items-center gap-3">
-      <span className="h-1.5 w-1.5 rounded-full bg-base-content/40" />
-      <span className="text-sm font-semibold tracking-wide text-base-content/80">
+      <span className="h-px w-4 bg-base-content/25 flex-shrink-0" />
+      <span className="text-sm font-medium text-base-content/60 group-hover:text-base-content/90 transition-colors">
         {label}
       </span>
     </span>
