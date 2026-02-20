@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { FiChevronDown, FiSliders, FiX } from "react-icons/fi";
 import FilterRow from "./FilterRow";
-import { FilterModalProps, FilterValues } from "./FilterTypes";
+import { ExactMatchMap, FilterModalProps, FilterValues } from "./FilterTypes";
 
 const FilterModal: React.FC<FilterModalProps> = ({
   isOpen,
@@ -13,9 +13,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onApply,
   initialValues,
   getSuggestions,
+  initialExactMatchMap,
 }) => {
   const [enabledFilters, setEnabledFilters] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterValues>({});
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
   const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -31,7 +33,16 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
   const toggleFilter = (key: string) => {
     const next = new Set(enabledFilters);
-    next.has(key) ? next.delete(key) : next.add(key);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+      // Set default exact match to true for text filters when first enabled
+      const filterOption = options.find((opt) => opt.key === key);
+      if (filterOption?.type === "text" && exactMatchMap[key] === undefined) {
+        setExactMatchMap((prev) => ({ ...prev, [key]: true }));
+      }
+    }
     setEnabledFilters(next);
   };
 
@@ -62,7 +73,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       }
       active[key] = value;
     });
-    onApply(active);
+    onApply(active, exactMatchMap);
     onClose();
   };
 
@@ -134,6 +145,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
                   suggestions={focusedFilter === option.key ? suggestions : []}
                   onSuggestionClick={handleSuggestionClick}
+                  exactMatch={exactMatchMap[option.key] ?? true}
+                  onExactMatchChange={(key, exact) =>
+                    setExactMatchMap((prev) => ({ ...prev, [key]: exact }))
+                  }
                 />
               ))}
             </div>

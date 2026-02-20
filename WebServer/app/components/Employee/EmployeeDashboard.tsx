@@ -239,71 +239,78 @@ const EmployeeDashboard: React.FC = () => {
     exactMatchMap: ExactMatchMap = {},
   ): Employee[] => {
     return list.filter((e) => {
+      // Helper function to check text match based on exact/partial setting
+      const matchesText = (
+        itemValue: string | null | undefined,
+        filterValue: string,
+        key: string,
+      ): boolean => {
+        if (!itemValue) return false;
+        const isExact = exactMatchMap[key] ?? true;
+        const itemLower = itemValue.toLowerCase();
+        const filterLower = filterValue.toLowerCase();
+        return isExact
+          ? itemLower === filterLower
+          : itemLower.includes(filterLower);
+      };
+
       if (
         typeof filters.employeeName === "string" &&
         filters.employeeName.trim() !== "" &&
-        !e.employeeName
-          .toLowerCase()
-          .includes(filters.employeeName.toLowerCase())
+        !matchesText(e.employeeName, filters.employeeName, "employeeName")
       )
         return false;
 
       if (
         typeof filters.employeeNumber === "string" &&
         filters.employeeNumber.trim() !== "" &&
-        !(e.employeeNumber || "")
-          .toLowerCase()
-          .includes(filters.employeeNumber.toLowerCase())
+        !matchesText(e.employeeNumber, filters.employeeNumber, "employeeNumber")
       )
         return false;
 
       if (
         typeof filters.position === "string" &&
         filters.position.trim() !== "" &&
-        !e.position.toLowerCase().includes(filters.position.toLowerCase())
+        !matchesText(e.position, filters.position, "position")
       )
         return false;
 
       if (
         typeof filters.branch === "string" &&
         filters.branch.trim() !== "" &&
-        !e.branch.toLowerCase().includes(filters.branch.toLowerCase())
+        !matchesText(e.branch, filters.branch, "branch")
       )
         return false;
 
       if (
         typeof filters.tinNumber === "string" &&
         filters.tinNumber.trim() !== "" &&
-        !(e.tinNumber || "")
-          .toLowerCase()
-          .includes(filters.tinNumber.toLowerCase())
+        !matchesText(e.tinNumber, filters.tinNumber, "tinNumber")
       )
         return false;
 
       if (
         typeof filters.gsisNumber === "string" &&
         filters.gsisNumber.trim() !== "" &&
-        !(e.gsisNumber || "")
-          .toLowerCase()
-          .includes(filters.gsisNumber.toLowerCase())
+        !matchesText(e.gsisNumber, filters.gsisNumber, "gsisNumber")
       )
         return false;
 
       if (
         typeof filters.philHealthNumber === "string" &&
         filters.philHealthNumber.trim() !== "" &&
-        !(e.philHealthNumber || "")
-          .toLowerCase()
-          .includes(filters.philHealthNumber.toLowerCase())
+        !matchesText(
+          e.philHealthNumber,
+          filters.philHealthNumber,
+          "philHealthNumber",
+        )
       )
         return false;
 
       if (
         typeof filters.pagIbigNumber === "string" &&
         filters.pagIbigNumber.trim() !== "" &&
-        !(e.pagIbigNumber || "")
-          .toLowerCase()
-          .includes(filters.pagIbigNumber.toLowerCase())
+        !matchesText(e.pagIbigNumber, filters.pagIbigNumber, "pagIbigNumber")
       )
         return false;
 
@@ -520,6 +527,7 @@ const EmployeeDashboard: React.FC = () => {
             options={employeeFilterOptions}
             onApply={handleApplyEmployeeFilters}
             initialValues={appliedFilters}
+            initialExactMatchMap={exactMatchMap}
             getSuggestions={getEmployeeSuggestions}
           />
         </div>
