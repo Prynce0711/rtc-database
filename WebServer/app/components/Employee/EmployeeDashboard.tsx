@@ -24,7 +24,7 @@ import {
 import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { FilterOption, FilterValues } from "../Filter/FilterTypes";
-import EmployeeModal from "./EmployeeModal";
+import EmployeeDrawer from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
 import KpiCard from "./KpiCard";
 
@@ -560,7 +560,7 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* MODAL */}
-        <EmployeeModal
+        <EmployeeDrawer
           showModal={showModal}
           isEdit={isEdit}
           form={form}
