@@ -13,19 +13,24 @@ const FilterModal: React.FC<FilterModalProps> = ({
   initialValues,
   getSuggestions,
   requestClose,
+  initialExactMatchMap,
 }) => {
   const [enabledFilters, setEnabledFilters] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterValues>({});
   const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [exactMatchMap, setExactMatchMap] = useState<Record<string, boolean>>(
+    {},
+  );
 
   useEffect(() => {
     if (isOpen) {
       const initial = initialValues || {};
       setFilters(initial);
       setEnabledFilters(new Set(Object.keys(initial)));
+      setExactMatchMap(initialExactMatchMap || {});
     }
-  }, [isOpen, initialValues]);
+  }, [isOpen, initialValues, initialExactMatchMap]);
 
   const toggleFilter = (key: string) => {
     const next = new Set(enabledFilters);
@@ -33,6 +38,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
       next.delete(key);
     } else {
       next.add(key);
+      // Set default exact match to true for text filters
+      const option = options.find((o) => o.key === key);
+      if (option?.type === "text" && exactMatchMap[key] === undefined) {
+        setExactMatchMap((prev) => ({ ...prev, [key]: true }));
+      }
     }
     setEnabledFilters(next);
   };
@@ -42,19 +52,18 @@ const FilterModal: React.FC<FilterModalProps> = ({
       ...prev,
       [key]: value,
     }));
-  };
 
-  const handleTextInputChange = (key: string, value: string) => {
-    handleFilterChange(key, value);
-    setFocusedFilter(key);
-
-    if (!getSuggestions) {
-      setSuggestions([]);
-      return;
+    // Update suggestions for text inputs
+    const option = options.find((opt) => opt.key === key);
+    if (
+      option?.type === "text" &&
+      getSuggestions &&
+      typeof value === "string"
+    ) {
+      setFocusedFilter(key);
+      const sugs = getSuggestions(key, value || "") || [];
+      setSuggestions(sugs.slice(0, 8));
     }
-
-    const sugs = getSuggestions(key, value || "") || [];
-    setSuggestions(sugs.slice(0, 8));
   };
 
   const handleSuggestionClick = (key: string, suggestion: string) => {
@@ -66,6 +75,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const resetFilters = () => {
     setEnabledFilters(new Set());
     setFilters({});
+    setExactMatchMap({});
   };
 
   const applyFilters = () => {
@@ -82,7 +92,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
       active[key] = value;
     });
 
-    onApply(active);
+    onApply(active, exactMatchMap);
     onClose();
   };
 
@@ -92,7 +102,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
     <ModalBase onClose={onClose}>
       <div className="bg-base-100 rounded-2xl shadow-2xl w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-primary to-primary-focus text-primary-content px-8 py-6 flex justify-between items-center">
+        <div className="bg-liner-to-r from-primary to-primary-focus text-base-content px-8 py-6 flex justify-between items-center">
           <h3 className="text-3xl font-extrabold tracking-tight">
             Advanced Search
           </h3>
@@ -140,6 +150,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
                 suggestions={focusedFilter === option.key ? suggestions : []}
                 onSuggestionClick={handleSuggestionClick}
+                exactMatch={exactMatchMap[option.key] ?? true}
+                onExactMatchChange={(key, exact) =>
+                  setExactMatchMap((prev) => ({ ...prev, [key]: exact }))
+                }
               />
             ))}
           </div>

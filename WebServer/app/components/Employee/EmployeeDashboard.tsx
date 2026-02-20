@@ -23,7 +23,11 @@ import {
 
 import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../Filter/FilterTypes";
 import EmployeeDrawer from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
 import KpiCard from "./KpiCard";
@@ -41,6 +45,7 @@ const EmployeeDashboard: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Employee[]>([]);
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -238,82 +243,109 @@ const EmployeeDashboard: React.FC = () => {
   const applyEmployeeFilters = (
     filters: FilterValues,
     list: Employee[],
+    exactMatchMap: ExactMatchMap = {},
   ): Employee[] => {
     return list.filter((e) => {
       if (
         typeof filters.employeeName === "string" &&
-        filters.employeeName.trim() !== "" &&
-        !e.employeeName
-          .toLowerCase()
-          .includes(filters.employeeName.toLowerCase())
+        filters.employeeName.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.employeeName ?? true;
+        const nameMatch = useExact
+          ? e.employeeName.toLowerCase() === filters.employeeName.toLowerCase()
+          : e.employeeName
+              .toLowerCase()
+              .includes(filters.employeeName.toLowerCase());
+        if (!nameMatch) return false;
       }
 
       if (
         typeof filters.employeeNumber === "string" &&
-        filters.employeeNumber.trim() !== "" &&
-        (e.employeeNumber || "")
-          .toLowerCase()
-          .includes(filters.employeeNumber.toLowerCase()) === false
+        filters.employeeNumber.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.employeeNumber ?? true;
+        const numberMatch = useExact
+          ? (e.employeeNumber || "").toLowerCase() ===
+            filters.employeeNumber.toLowerCase()
+          : (e.employeeNumber || "")
+              .toLowerCase()
+              .includes(filters.employeeNumber.toLowerCase());
+        if (!numberMatch) return false;
       }
 
       if (
         typeof filters.position === "string" &&
-        filters.position.trim() !== "" &&
-        !e.position.toLowerCase().includes(filters.position.toLowerCase())
+        filters.position.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.position ?? true;
+        const positionMatch = useExact
+          ? e.position.toLowerCase() === filters.position.toLowerCase()
+          : e.position.toLowerCase().includes(filters.position.toLowerCase());
+        if (!positionMatch) return false;
       }
 
-      if (
-        typeof filters.branch === "string" &&
-        filters.branch.trim() !== "" &&
-        !e.branch.toLowerCase().includes(filters.branch.toLowerCase())
-      ) {
-        return false;
+      if (typeof filters.branch === "string" && filters.branch.trim() !== "") {
+        const useExact = exactMatchMap.branch ?? true;
+        const branchMatch = useExact
+          ? e.branch.toLowerCase() === filters.branch.toLowerCase()
+          : e.branch.toLowerCase().includes(filters.branch.toLowerCase());
+        if (!branchMatch) return false;
       }
 
       if (
         typeof filters.tinNumber === "string" &&
-        filters.tinNumber.trim() !== "" &&
-        (e.tinNumber || "")
-          .toLowerCase()
-          .includes(filters.tinNumber.toLowerCase()) === false
+        filters.tinNumber.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.tinNumber ?? true;
+        const tinMatch = useExact
+          ? (e.tinNumber || "").toLowerCase() ===
+            filters.tinNumber.toLowerCase()
+          : (e.tinNumber || "")
+              .toLowerCase()
+              .includes(filters.tinNumber.toLowerCase());
+        if (!tinMatch) return false;
       }
 
       if (
         typeof filters.gsisNumber === "string" &&
-        filters.gsisNumber.trim() !== "" &&
-        (e.gsisNumber || "")
-          .toLowerCase()
-          .includes(filters.gsisNumber.toLowerCase()) === false
+        filters.gsisNumber.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.gsisNumber ?? true;
+        const gsisMatch = useExact
+          ? (e.gsisNumber || "").toLowerCase() ===
+            filters.gsisNumber.toLowerCase()
+          : (e.gsisNumber || "")
+              .toLowerCase()
+              .includes(filters.gsisNumber.toLowerCase());
+        if (!gsisMatch) return false;
       }
 
       if (
         typeof filters.philHealthNumber === "string" &&
-        filters.philHealthNumber.trim() !== "" &&
-        (e.philHealthNumber || "")
-          .toLowerCase()
-          .includes(filters.philHealthNumber.toLowerCase()) === false
+        filters.philHealthNumber.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.philHealthNumber ?? true;
+        const philHealthMatch = useExact
+          ? (e.philHealthNumber || "").toLowerCase() ===
+            filters.philHealthNumber.toLowerCase()
+          : (e.philHealthNumber || "")
+              .toLowerCase()
+              .includes(filters.philHealthNumber.toLowerCase());
+        if (!philHealthMatch) return false;
       }
 
       if (
         typeof filters.pagIbigNumber === "string" &&
-        filters.pagIbigNumber.trim() !== "" &&
-        (e.pagIbigNumber || "")
-          .toLowerCase()
-          .includes(filters.pagIbigNumber.toLowerCase()) === false
+        filters.pagIbigNumber.trim() !== ""
       ) {
-        return false;
+        const useExact = exactMatchMap.pagIbigNumber ?? true;
+        const pagIbigMatch = useExact
+          ? (e.pagIbigNumber || "").toLowerCase() ===
+            filters.pagIbigNumber.toLowerCase()
+          : (e.pagIbigNumber || "")
+              .toLowerCase()
+              .includes(filters.pagIbigNumber.toLowerCase());
+        if (!pagIbigMatch) return false;
       }
 
       if (typeof filters.hasMedicalInfo === "boolean") {
@@ -338,10 +370,18 @@ const EmployeeDashboard: React.FC = () => {
     });
   };
 
-  const handleApplyEmployeeFilters = (filters: FilterValues) => {
-    const filtered = applyEmployeeFilters(filters, employees);
+  const handleApplyEmployeeFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
+    const filtered = applyEmployeeFilters(
+      filters,
+      employees,
+      exactMatchMapParam,
+    );
     setAppliedFilters(filters);
     setFilteredByAdvanced(filtered);
+    setExactMatchMap(exactMatchMapParam);
   };
 
   function openAdd() {
@@ -578,6 +618,7 @@ const EmployeeDashboard: React.FC = () => {
           onApply={handleApplyEmployeeFilters}
           initialValues={appliedFilters}
           getSuggestions={getEmployeeSuggestions}
+          initialExactMatchMap={exactMatchMap}
         />
       </div>
     </div>
