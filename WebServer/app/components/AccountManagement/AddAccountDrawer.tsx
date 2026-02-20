@@ -195,188 +195,205 @@ const AddAccountDrawer = ({
                       </p>
                     </div>
 
-                  {accountType === "EXISTING" ? (
-                    <>
-                      {/* Employee Selection */}
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-bold text-base">
-                            Select Employee
-                          </span>
-                          <span className="label-text-alt text-error">
-                            Required
-                          </span>
-                        </label>
-                        <select
-                          className="select select-bordered w-full text-base"
-                          value={form.selectedEmployeeId}
-                          onChange={(e) => {
-                            if (isNaN(Number(e.target.value))) {
-                              statusPopup.showError(
-                                "Invalid employee selected",
-                              );
-                              return;
+                    {accountType === null ? (
+                      <div className="space-y-4">
+                        <motion.button
+                          className="w-full bg-primary/10 hover:bg-primary/20 rounded-2xl p-8 text-left transition-all border-2 border-primary group"
+                          onClick={() => handleTypeSelect("EXISTING")}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                        >
+                          <div className="flex items-start gap-5">
+                            <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                              <FiUser className="w-8 h-8 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-bold text-xl mb-2">
+                                Existing Employee
+                              </h3>
+                              <p className="text-base-content/60">
+                                Select from current RTC staff members.
+                                Information will be pre-filled from employee
+                                records.
+                              </p>
+                            </div>
+                            <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                          </div>
+                        </motion.button>
+
+                        <motion.button
+                          className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
+                          onClick={() => handleTypeSelect("NEW")}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                        >
+                          <div className="flex items-start gap-5">
+                            <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                              <FiUserPlus className="w-8 h-8 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-bold text-xl mb-2">
+                                New Employee
+                              </h3>
+                              <p className="text-base-content/60">
+                                Manually enter new staff information. Use this
+                                for newly hired employees.
+                              </p>
+                            </div>
+                            <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                          </div>
+                        </motion.button>
+                      </div>
+                    ) : accountType === "EXISTING" ? (
+                      <>
+                        {/* Employee Selection */}
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-bold text-base">
+                              Select Employee
+                            </span>
+                            <span className="label-text-alt text-error">
+                              Required
+                            </span>
+                          </label>
+                          <select
+                            className="select select-bordered w-full text-base"
+                            value={form.selectedEmployeeId}
+                            onChange={(e) => {
+                              if (isNaN(Number(e.target.value))) {
+                                statusPopup.showError(
+                                  "Invalid employee selected",
+                                );
+                                return;
+                              }
+                              const selectedId = Number(e.target.value);
+                              handleEmployeeSelect(selectedId);
+                            }}
+                          >
+                            <option value="">Choose an employee...</option>
+                            {employees.map((emp) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.employeeName} - {emp.position}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Display Selected Employee Info (Read-only) */}
+                        {form.selectedEmployeeId && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="space-y-4"
+                          >
+                            <div>
+                              <label className="label">
+                                <span className="label-text font-bold text-base">
+                                  Full Name
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                className="input input-bordered w-full bg-base-200 text-base"
+                                value={form.name}
+                                readOnly
+                              />
+                            </div>
+
+                            <div>
+                              <label className="label">
+                                <span className="label-text font-bold text-base">
+                                  Email Address
+                                </span>
+                              </label>
+                              <input
+                                type="email"
+                                className="input input-bordered w-full bg-base-200 text-base"
+                                value={form.email}
+                                readOnly
+                              />
+                            </div>
+                          </motion.div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Manual Entry for New Employee */}
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-bold text-base">
+                              Full Name
+                            </span>
+                            <span className="label-text-alt text-error">
+                              Required
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            className="input input-bordered w-full text-base"
+                            placeholder="Juan Dela Cruz"
+                            value={form.name}
+                            onChange={(e) =>
+                              setForm({ ...form, name: e.target.value })
                             }
-                            const selectedId = Number(e.target.value);
-                            handleEmployeeSelect(selectedId);
-                          }}
-                        >
-                          <option value="">Choose an employee...</option>
-                          {employees.map((emp) => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.employeeName} - {emp.position}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Display Selected Employee Info (Read-only) */}
-                      {form.selectedEmployeeId && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="space-y-4"
-                        >
-                          <div>
-                            <label className="label">
-                              <span className="label-text font-bold text-base">
-                                Full Name
-                              </span>
-                            </label>
-                            <input
-                              type="text"
-                              className="input input-bordered w-full bg-base-200 text-base"
-                              value={form.name}
-                              readOnly
-                            />
-                          </div>
-
-                          <div>
-                            <label className="label">
-                              <span className="label-text font-bold text-base">
-                                Email Address
-                              </span>
-                            </label>
-                            <input
-                              type="email"
-                              className="input input-bordered w-full bg-base-200 text-base"
-                              value={form.email}
-                              readOnly
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Manual Entry for New Employee */}
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-bold text-base">
-                            Full Name
-                          </span>
-                          <span className="label-text-alt text-error">
-                            Required
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          className="input input-bordered w-full text-base"
-                          placeholder="Juan Dela Cruz"
-                          value={form.name}
-                          onChange={(e) =>
-                            setForm({ ...form, name: e.target.value })
-                          }
-                        />
-                      </div>
-
-                      <div>
-                        <label className="label">
-                          <span className="label-text font-bold text-base">
-                            Email Address
-                          </span>
-                          <span className="label-text-alt text-error">
-                            Required
-                          </span>
-                        </label>
-                        <input
-                          type="email"
-                          className="input input-bordered w-full text-base"
-                          placeholder="juan.delacruz@rtc.gov.ph"
-                          value={form.email}
-                          onChange={(e) =>
-                            setForm({ ...form, email: e.target.value })
-                          }
-                        />
-                        <label className="label">
-                          <span className="label-text-alt text-base-content/60">
-                            Use official RTC email address
-                          </span>
-                        </label>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Role Selection (Common for both types) */}
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-bold text-base">
-                        Account Role
-                      </span>
-                      <span className="label-text-alt text-error">
-                        Required
-                      </span>
-                    </label>
-                    <select
-                      className="select select-bordered w-full text-base"
-                      value={form.role}
-                      onChange={(e) =>
-                        setForm({ ...form, role: e.target.value as Roles })
-                      }
-                    >
-                      <div className="flex items-start gap-5">
-                        <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                          <FiUser className="w-8 h-8 text-primary" />
+                          />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-bold text-xl mb-2">
-                            Existing Employee
-                          </h3>
-                          <p className="text-base-content/60">
-                            Select from current RTC staff members. Information
-                            will be pre-filled from employee records.
-                          </p>
-                        </div>
-                        <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </motion.button>
 
-                    <motion.button
-                      className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
-                      onClick={() => handleTypeSelect("NEW")}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                    >
-                      <div className="flex items-start gap-5">
-                        <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                          <FiUserPlus className="w-8 h-8 text-primary" />
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-bold text-base">
+                              Email Address
+                            </span>
+                            <span className="label-text-alt text-error">
+                              Required
+                            </span>
+                          </label>
+                          <input
+                            type="email"
+                            className="input input-bordered w-full text-base"
+                            placeholder="juan.delacruz@rtc.gov.ph"
+                            value={form.email}
+                            onChange={(e) =>
+                              setForm({ ...form, email: e.target.value })
+                            }
+                          />
+                          <label className="label">
+                            <span className="label-text-alt text-base-content/60">
+                              Use official RTC email address
+                            </span>
+                          </label>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-bold text-xl mb-2">
-                            New Employee
-                          </h3>
-                          <p className="text-base-content/60">
-                            Manually enter new staff information. Use this for
-                            newly hired employees.
-                          </p>
-                        </div>
-                        <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </motion.button>
+                      </>
+                    )}
+
+                    {/* Role Selection (Common for both types) */}
+                    <div>
+                      <label className="label">
+                        <span className="label-text font-bold text-base">
+                          Account Role
+                        </span>
+                        <span className="label-text-alt text-error">
+                          Required
+                        </span>
+                      </label>
+                      <select
+                        className="select select-bordered w-full text-base"
+                        value={form.role}
+                        onChange={(e) =>
+                          setForm({ ...form, role: e.target.value as Roles })
+                        }
+                      >
+                        <option value={Roles.USER}>Staff</option>
+                        <option value={Roles.ATTY}>Attorney</option>
+                      </select>
+                      <label className="label">
+                        <span className="label-text-alt text-base-content/60">
+                          Determines access level and permissions
+                        </span>
+                      </label>
+                    </div>
                   </motion.div>
                 )}
-
-                {/* STEP 2: FORM */}
                 {step === "FORM" && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
@@ -414,15 +431,21 @@ const AddAccountDrawer = ({
                           </label>
                           <select
                             className="select select-bordered w-full text-base"
-                            value={form.selectedEmployeeId}
-                            onChange={(e) =>
-                              handleEmployeeSelect(e.target.value)
-                            }
+                            value={form.selectedEmployeeId || ""}
+                            onChange={(e) => {
+                              if (isNaN(Number(e.target.value))) {
+                                statusPopup.showError(
+                                  "Invalid employee selected",
+                                );
+                                return;
+                              }
+                              handleEmployeeSelect(Number(e.target.value));
+                            }}
                           >
                             <option value="">Choose an employee...</option>
-                            {EXISTING_EMPLOYEES.map((emp) => (
+                            {employees.map((emp) => (
                               <option key={emp.id} value={emp.id}>
-                                {emp.name} - {emp.position}
+                                {emp.employeeName} - {emp.position}
                               </option>
                             ))}
                           </select>
