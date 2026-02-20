@@ -14,7 +14,7 @@ import {
 import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
-import NewCaseModal, { CaseModalType } from "./CaseModal";
+import NewCaseModal, { CaseModalType } from "./CaseDrawer";
 import CaseRow from "./CaseRow";
 import { deleteCase, getCases } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
