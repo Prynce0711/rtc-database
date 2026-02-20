@@ -5,7 +5,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../Filter/FilterTypes";
 
 import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
@@ -57,6 +61,7 @@ const CasePage: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const caseFilterOptions: FilterOption[] = [
     { key: "branch", label: "Branch", type: "text" },
@@ -214,70 +219,86 @@ const CasePage: React.FC = () => {
   const applyCaseFilters = (
     filters: CaseFilterValues,
     items: Case[],
+    exactMatchMap: ExactMatchMap = {},
   ): Case[] => {
     return items.filter((caseItem) => {
-      if (
-        filters.branch &&
-        !caseItem.branch.toLowerCase().includes(filters.branch.toLowerCase())
-      ) {
-        return false;
+      if (filters.branch) {
+        const useExact = exactMatchMap.branch ?? true;
+        const branchMatch = useExact
+          ? caseItem.branch.toLowerCase() === filters.branch.toLowerCase()
+          : caseItem.branch
+              .toLowerCase()
+              .includes(filters.branch.toLowerCase());
+        if (!branchMatch) return false;
       }
 
-      if (
-        filters.assistantBranch &&
-        !caseItem.assistantBranch
-          .toLowerCase()
-          .includes(filters.assistantBranch.toLowerCase())
-      ) {
-        return false;
+      if (filters.assistantBranch) {
+        const useExact = exactMatchMap.assistantBranch ?? true;
+        const assistantBranchMatch = useExact
+          ? caseItem.assistantBranch.toLowerCase() ===
+            filters.assistantBranch.toLowerCase()
+          : caseItem.assistantBranch
+              .toLowerCase()
+              .includes(filters.assistantBranch.toLowerCase());
+        if (!assistantBranchMatch) return false;
       }
 
-      if (
-        filters.caseNumber &&
-        !caseItem.caseNumber
-          .toLowerCase()
-          .includes(filters.caseNumber.toLowerCase())
-      ) {
-        return false;
+      if (filters.caseNumber) {
+        const useExact = exactMatchMap.caseNumber ?? true;
+        const caseNumberMatch = useExact
+          ? caseItem.caseNumber.toLowerCase() ===
+            filters.caseNumber.toLowerCase()
+          : caseItem.caseNumber
+              .toLowerCase()
+              .includes(filters.caseNumber.toLowerCase());
+        if (!caseNumberMatch) return false;
       }
 
-      if (
-        filters.name &&
-        !caseItem.name.toLowerCase().includes(filters.name.toLowerCase())
-      ) {
-        return false;
+      if (filters.name) {
+        const useExact = exactMatchMap.name ?? true;
+        const nameMatch = useExact
+          ? caseItem.name.toLowerCase() === filters.name.toLowerCase()
+          : caseItem.name.toLowerCase().includes(filters.name.toLowerCase());
+        if (!nameMatch) return false;
       }
 
-      if (
-        filters.charge &&
-        !caseItem.charge.toLowerCase().includes(filters.charge.toLowerCase())
-      ) {
-        return false;
+      if (filters.charge) {
+        const useExact = exactMatchMap.charge ?? true;
+        const chargeMatch = useExact
+          ? caseItem.charge.toLowerCase() === filters.charge.toLowerCase()
+          : caseItem.charge
+              .toLowerCase()
+              .includes(filters.charge.toLowerCase());
+        if (!chargeMatch) return false;
       }
 
-      if (
-        filters.infoSheet &&
-        !caseItem.infoSheet
-          .toLowerCase()
-          .includes(filters.infoSheet.toLowerCase())
-      ) {
-        return false;
+      if (filters.infoSheet) {
+        const useExact = exactMatchMap.infoSheet ?? true;
+        const infoSheetMatch = useExact
+          ? caseItem.infoSheet.toLowerCase() === filters.infoSheet.toLowerCase()
+          : caseItem.infoSheet
+              .toLowerCase()
+              .includes(filters.infoSheet.toLowerCase());
+        if (!infoSheetMatch) return false;
       }
 
-      if (
-        filters.court &&
-        !caseItem.court.toLowerCase().includes(filters.court.toLowerCase())
-      ) {
-        return false;
+      if (filters.court) {
+        const useExact = exactMatchMap.court ?? true;
+        const courtMatch = useExact
+          ? caseItem.court.toLowerCase() === filters.court.toLowerCase()
+          : caseItem.court.toLowerCase().includes(filters.court.toLowerCase());
+        if (!courtMatch) return false;
       }
 
-      if (
-        filters.consolidation &&
-        !caseItem.consolidation
-          .toLowerCase()
-          .includes(filters.consolidation.toLowerCase())
-      ) {
-        return false;
+      if (filters.consolidation) {
+        const useExact = exactMatchMap.consolidation ?? true;
+        const consolidationMatch = useExact
+          ? caseItem.consolidation.toLowerCase() ===
+            filters.consolidation.toLowerCase()
+          : caseItem.consolidation
+              .toLowerCase()
+              .includes(filters.consolidation.toLowerCase());
+        if (!consolidationMatch) return false;
       }
 
       if (
@@ -348,11 +369,15 @@ const CasePage: React.FC = () => {
     });
   };
 
-  const handleApplyFilters = (filters: FilterValues) => {
+  const handleApplyFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
     const typed = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typed, cases);
+    const filtered = applyCaseFilters(typed, cases, exactMatchMapParam);
     setAppliedFilters(typed);
     setFilteredByAdvanced(filtered);
+    setExactMatchMap(exactMatchMapParam);
   };
 
   const handleDeleteCase = async (caseId: number) => {
@@ -706,6 +731,7 @@ const CasePage: React.FC = () => {
           onApply={handleApplyFilters}
           initialValues={appliedFilters}
           getSuggestions={getCaseSuggestions}
+          initialExactMatchMap={exactMatchMap}
         />
       </main>
     </div>
