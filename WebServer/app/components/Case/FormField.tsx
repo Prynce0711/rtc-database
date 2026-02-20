@@ -12,7 +12,9 @@ type Props = {
 export default function FormField({ label, htmlFor, children, error }: Props) {
   return (
     <fieldset className="fieldset">
-      <legend className="fieldset-legend text-base font-semibold">{label}</legend>
+      <legend className="fieldset-legend text-base font-semibold">
+        {label}
+      </legend>
       <div className="mt-2 text-base">{children}</div>
       {error && (
         <p className="label mt-2">
