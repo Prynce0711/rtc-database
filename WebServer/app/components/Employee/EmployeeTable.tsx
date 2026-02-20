@@ -29,9 +29,9 @@ const EmployeeTable: React.FC<Props> = ({
   );
 
   return (
-    <div className="w-full bg-base-100">
+    <div className="w-full bg-base-100 h-auto">
       {/* TABLE SCROLL */}
-      <div className="overflow-x-auto overflow-y-visible">
+      <div className="overflow-x-auto h-auto">
         <table className="table w-full border-separate border-spacing-y-2">
           {/* HEADER */}
           <thead className="bg-base-200">
@@ -56,7 +56,7 @@ const EmployeeTable: React.FC<Props> = ({
                 {/* ACTIONS */}
                 <td onClick={(e) => e.stopPropagation()} className="relative">
                   <div className="flex justify-center">
-                    <div className="dropdown dropdown-end">
+                    <div className="dropdown dropdown-start">
                       <button
                         tabIndex={0}
                         className="btn btn-ghost btn-sm px-2"

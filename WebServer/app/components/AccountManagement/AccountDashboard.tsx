@@ -300,7 +300,9 @@ const AccountDashboard = () => {
             return (
               <button
                 key={tab}
-                ref={(el) => (tabRefs.current[index] = el)}
+                ref={(el) => {
+                  tabRefs.current[index] = el;
+                }}
                 className={`relative z-10 px-8 py-3 font-bold text-sm transition ${
                   statusTab === tab
                     ? "text-primary"
