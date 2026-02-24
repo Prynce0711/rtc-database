@@ -1,7 +1,7 @@
-import CasePage from "@/app/components/Case/CasePage";
+import PetitionLogsPage from "@/app/components/Case/Petition/PetitionLogs";
 
 const page = () => {
-  return <CasePage />;
+  return <PetitionLogsPage />;
 };
 
 export default page;

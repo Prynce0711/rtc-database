@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { FiFileText, FiMapPin, FiX } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import FormField from "../FormField";
-import { ReceiveLog } from "./ReceiveRecord";
+import { ReceiveLog } from "./PetitionRecord";
 
 export enum ReceiveDrawerType {
   ADD = "ADD",
@@ -13,14 +13,12 @@ export enum ReceiveDrawerType {
 }
 
 const EMPTY_FORM: Record<string, any> = {
-  BookAndPages: "",
-  dateReceived: new Date().toISOString().slice(0, 10),
-  Abbreviation: "",
-  "Case No": "",
-  Content: "",
-  "Branch No": "",
-  Time: "",
-  Notes: "",
+  caseNumber: "",
+  raffledToBranch: "",
+  dateFiled: new Date().toISOString().slice(0, 10),
+  petitioners: "",
+  titleNo: "",
+  nature: "",
 };
 
 const ReceiveDrawer = ({
@@ -46,16 +44,26 @@ const ReceiveDrawer = ({
     if (type === ReceiveDrawerType.EDIT && selectedLog) {
       setFormData({
         ...EMPTY_FORM,
-        BookAndPages: selectedLog.BookAndPages ?? selectedLog.receiptNo ?? "",
-        dateReceived: selectedLog.dateReceived
+        caseNumber: selectedLog.caseNumber ?? selectedLog["Case No"] ?? "",
+        raffledToBranch:
+          selectedLog.RaffledToBranch ??
+          selectedLog["Branch No"] ??
+          selectedLog.branch ??
+          "",
+        dateFiled: selectedLog.dateReceived
           ? String(selectedLog.dateReceived).slice(0, 10)
-          : EMPTY_FORM.dateReceived,
-        Abbreviation: selectedLog.Abbreviation ?? "",
-        "Case No": selectedLog["Case No"] ?? selectedLog.caseNumber ?? "",
-        Content: selectedLog.Content ?? "",
-        "Branch No": selectedLog["Branch No"] ?? selectedLog.branch ?? "",
-        Time: selectedLog.Time ?? selectedLog.timeReceived ?? "",
-        Notes: selectedLog.Notes ?? selectedLog.remarks ?? "",
+          : EMPTY_FORM.dateFiled,
+        petitioners: selectedLog.Petitioners ?? selectedLog.party ?? "",
+        titleNo:
+          selectedLog.TitleNo ??
+          selectedLog.BookAndPages ??
+          selectedLog.receiptNo ??
+          "",
+        nature:
+          selectedLog.Nature ??
+          selectedLog.Content ??
+          selectedLog.documentType ??
+          "",
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -91,7 +99,14 @@ const ReceiveDrawer = ({
   };
 
   const handleReview = () => {
-    const required = ["BookAndPages", "Case No", "dateReceived"];
+    const required = [
+      "caseNumber",
+      "raffledToBranch",
+      "dateFiled",
+      "petitioners",
+      "titleNo",
+      "nature",
+    ];
     const errs = validateRequired(required);
     if (Object.keys(errs).length > 0) {
       setFormErrors(errs);
@@ -105,8 +120,8 @@ const ReceiveDrawer = ({
     if (
       !(await statusPopup.showConfirm(
         type === ReceiveDrawerType.ADD
-          ? "Create this receiving log entry?"
-          : "Save changes to this receiving log entry?",
+          ? "Create this petition entry?"
+          : "Save changes to this petition entry?",
       ))
     )
       return;
@@ -115,14 +130,20 @@ const ReceiveDrawer = ({
     try {
       const payload = {
         id: selectedLog?.id ?? 0,
-        BookAndPages: formData.BookAndPages,
-        dateReceived: formData.dateReceived,
-        Abbreviation: formData.Abbreviation,
-        "Case No": formData["Case No"],
-        Content: formData.Content,
-        "Branch No": formData["Branch No"],
-        Time: formData.Time,
-        Notes: formData.Notes,
+        caseNumber: formData.caseNumber,
+        branch: formData.raffledToBranch,
+        dateReceived: formData.dateFiled,
+        party: formData.petitioners,
+        receiptNo: formData.titleNo,
+        documentType: formData.nature,
+        "Case No": formData.caseNumber,
+        "Branch No": formData.raffledToBranch,
+        BookAndPages: formData.titleNo,
+        Content: formData.nature,
+        RaffledToBranch: formData.raffledToBranch,
+        Petitioners: formData.petitioners,
+        TitleNo: formData.titleNo,
+        Nature: formData.nature,
       } as any;
 
       if (type === ReceiveDrawerType.ADD) {
@@ -133,8 +154,8 @@ const ReceiveDrawer = ({
 
       statusPopup.showSuccess(
         type === ReceiveDrawerType.ADD
-          ? "Receiving log created successfully"
-          : "Receiving log updated successfully",
+          ? "Petition entry created successfully"
+          : "Petition entry updated successfully",
       );
       onClose();
     } catch (err) {
@@ -144,10 +165,10 @@ const ReceiveDrawer = ({
     }
   };
 
-  const dateValue = formData.dateReceived
-    ? (formData.dateReceived instanceof Date
-        ? formData.dateReceived
-        : new Date(String(formData.dateReceived))
+  const dateValue = formData.dateFiled
+    ? (formData.dateFiled instanceof Date
+        ? formData.dateFiled
+        : new Date(String(formData.dateFiled))
       )
         .toISOString()
         .slice(0, 10)
@@ -170,23 +191,24 @@ const ReceiveDrawer = ({
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 260 }}
       >
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>
               <h2 className="text-3xl md:text-4xl font-semibold leading-tight">
                 {type === ReceiveDrawerType.ADD
-                  ? "New Receiving Log"
-                  : "Edit Receiving Log"}
+                  ? "New Petition Entry"
+                  : "Edit Petition Entry"}
               </h2>
               <p className="text-sm text-base-content/60 mt-1">
-                Fill in receiving log details
+                Fill in petition details
               </p>
             </div>
             <button
-              className="btn btn-ghost btn-sm btn-circle"
               onClick={onClose}
+              className="btn btn-ghost btn-sm btn-circle"
+              aria-label="Close drawer"
             >
-              <FiX size={18} />
+              <FiX className="w-5 h-5" />
             </button>
           </div>
 
@@ -213,11 +235,10 @@ const ReceiveDrawer = ({
               </div>
             ))}
           </div>
-
           {step === "FORM" && (
             <form className="space-y-1" onSubmit={(e) => e.preventDefault()}>
               <div className="space-y-4">
-                {/* Document Information Card */}
+                {/* Case Details Card */}
                 <div className="card rounded-2xl shadow-sm border">
                   <div className="card-body p-6">
                     <div className="flex items-start gap-3 mb-4">
@@ -225,82 +246,67 @@ const ReceiveDrawer = ({
                         <FiFileText />
                       </div>
                       <div>
-                        <h4 className="text-lg font-semibold">
-                          Document Information
-                        </h4>
+                        <h4 className="text-lg font-semibold">Case Details</h4>
                         <p className="text-xs text-base-content/60">
-                          Receipt details and date
+                          Case number, branch, and filing date
                         </p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
                       <FormField
-                        label="Book And Pages *"
-                        htmlFor="book-and-pages"
-                        error={formErrors.BookAndPages}
+                        label="Case Number *"
+                        htmlFor="case-number"
+                        error={formErrors.caseNumber}
                       >
                         <input
-                          id="book-and-pages"
-                          name="BookAndPages"
+                          id="case-number"
+                          name="caseNumber"
                           type="text"
-                          className={`input input-bordered w-full ${formErrors.BookAndPages ? "input-error" : ""}`}
-                          placeholder="e.g. OR-2026-00001"
-                          value={formData.BookAndPages}
+                          className={`input input-bordered w-full ${formErrors.caseNumber ? "input-error" : ""}`}
+                          placeholder="e.g. SPC-2026-0001"
+                          value={formData.caseNumber}
                           onChange={handleChange}
                         />
                       </FormField>
 
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
-                          label="Date Received *"
-                          htmlFor="date-received"
-                          error={formErrors.dateReceived}
+                          label="Rafled to Branch *"
+                          htmlFor="raffled-to-branch"
+                          error={formErrors.raffledToBranch}
                         >
                           <input
-                            id="date-received"
-                            name="dateReceived"
+                            id="raffled-to-branch"
+                            name="raffledToBranch"
+                            type="text"
+                            className={`input input-bordered w-full ${formErrors.raffledToBranch ? "input-error" : ""}`}
+                            placeholder="e.g. Branch 1"
+                            value={formData.raffledToBranch}
+                            onChange={handleChange}
+                          />
+                        </FormField>
+
+                        <FormField
+                          label="Date Filled *"
+                          htmlFor="date-filed"
+                          error={formErrors.dateFiled}
+                        >
+                          <input
+                            id="date-filed"
+                            name="dateFiled"
                             type="date"
-                            className={`input input-bordered w-full ${formErrors.dateReceived ? "input-error" : ""}`}
+                            className={`input input-bordered w-full ${formErrors.dateFiled ? "input-error" : ""}`}
                             value={dateValue}
                             onChange={handleChange}
                           />
                         </FormField>
-                        <FormField
-                          label="Time"
-                          htmlFor="time"
-                          error={formErrors.Time}
-                        >
-                          <input
-                            id="time"
-                            name="Time"
-                            type="time"
-                            className="input input-bordered w-full"
-                            value={formData.Time ?? ""}
-                            onChange={handleChange}
-                          />
-                        </FormField>
                       </div>
-
-                      <FormField
-                        label="Abbreviation"
-                        htmlFor="abbreviation"
-                        error={formErrors.Abbreviation}
-                      >
-                        <input
-                          id="abbreviation"
-                          name="Abbreviation"
-                          type="text"
-                          className="input input-bordered w-full"
-                          value={formData.Abbreviation}
-                          onChange={handleChange}
-                        />
-                      </FormField>
                     </div>
                   </div>
                 </div>
 
-                {/* Case & Content Card */}
+                {/* Petition Details Card */}
                 <div className="card rounded-2xl shadow-sm border">
                   <div className="card-body p-6">
                     <div className="flex items-start gap-3 mb-4">
@@ -309,74 +315,59 @@ const ReceiveDrawer = ({
                       </div>
                       <div>
                         <h4 className="text-lg font-semibold">
-                          Case & Content
+                          Petition Details
                         </h4>
                         <p className="text-xs text-base-content/60">
-                          Case information and remarks
+                          Petitioner information and petition nature
                         </p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
                       <FormField
-                        label="Case No *"
-                        htmlFor="case-no"
-                        error={formErrors["Case No"]}
+                        label="Petitioners *"
+                        htmlFor="petitioners"
+                        error={formErrors.petitioners}
                       >
                         <input
-                          id="case-no"
-                          name="Case No"
+                          id="petitioners"
+                          name="petitioners"
                           type="text"
-                          className={`input input-bordered w-full ${formErrors["Case No"] ? "input-error" : ""}`}
-                          placeholder="e.g. Crim-2026-0001"
-                          value={formData["Case No"]}
+                          className={`input input-bordered w-full ${formErrors.petitioners ? "input-error" : ""}`}
+                          placeholder="Full name of petitioner(s)"
+                          value={formData.petitioners}
                           onChange={handleChange}
                         />
                       </FormField>
 
                       <FormField
-                        label="Branch No"
-                        htmlFor="branch-no"
-                        error={formErrors["Branch No"]}
+                        label="Title No *"
+                        htmlFor="title-no"
+                        error={formErrors.titleNo}
                       >
                         <input
-                          id="branch-no"
-                          name="Branch No"
+                          id="title-no"
+                          name="titleNo"
                           type="text"
-                          className="input input-bordered w-full"
-                          value={formData["Branch No"]}
+                          className={`input input-bordered w-full ${formErrors.titleNo ? "input-error" : ""}`}
+                          placeholder="e.g. T-12345"
+                          value={formData.titleNo}
                           onChange={handleChange}
                         />
                       </FormField>
 
                       <FormField
-                        label="Content"
-                        htmlFor="content"
-                        error={formErrors.Content}
+                        label="Nature *"
+                        htmlFor="nature"
+                        error={formErrors.nature}
                       >
                         <textarea
-                          id="content"
-                          name="Content"
-                          className="textarea textarea-bordered w-full"
+                          id="nature"
+                          name="nature"
+                          className={`textarea textarea-bordered w-full ${formErrors.nature ? "textarea-error" : ""}`}
                           rows={3}
-                          placeholder="Short description/content"
-                          value={formData.Content}
-                          onChange={handleChange}
-                        />
-                      </FormField>
-
-                      <FormField
-                        label="Notes"
-                        htmlFor="notes"
-                        error={formErrors.Notes}
-                      >
-                        <textarea
-                          id="notes"
-                          name="Notes"
-                          className="textarea textarea-bordered w-full"
-                          rows={3}
-                          placeholder="Optional notes"
-                          value={formData.Notes}
+                          placeholder="e.g. Petition for Adoption"
+                          value={formData.nature}
                           onChange={handleChange}
                         />
                       </FormField>
@@ -394,14 +385,12 @@ const ReceiveDrawer = ({
               </p>
               {(
                 [
-                  ["Book And Pages", formData.BookAndPages],
-                  ["Date Received", dateValue],
-                  ["Time", formData.Time || "—"],
-                  ["Abbreviation", formData.Abbreviation || "—"],
-                  ["Case No", formData["Case No"] || "—"],
-                  ["Content", formData.Content || "—"],
-                  ["Branch No", formData["Branch No"] || "—"],
-                  ["Notes", formData.Notes || "—"],
+                  ["Case Number", formData.caseNumber || "—"],
+                  ["Rafled to Branch", formData.raffledToBranch || "—"],
+                  ["Date Filled", dateValue],
+                  ["Petitioners", formData.petitioners || "—"],
+                  ["Title No", formData.titleNo || "—"],
+                  ["Nature", formData.nature || "—"],
                 ] as [string, string][]
               ).map(([label, value]) => (
                 <div
@@ -435,9 +424,12 @@ const ReceiveDrawer = ({
                 className="btn btn-primary"
                 onClick={handleReview}
                 disabled={
-                  !formData.BookAndPages ||
-                  !formData["Case No"] ||
-                  !formData.dateReceived
+                  !formData.caseNumber ||
+                  !formData.raffledToBranch ||
+                  !formData.dateFiled ||
+                  !formData.petitioners ||
+                  !formData.titleNo ||
+                  !formData.nature
                 }
               >
                 Review

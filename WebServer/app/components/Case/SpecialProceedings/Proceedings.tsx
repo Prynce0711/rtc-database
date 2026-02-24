@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiCheck,
   FiEdit,
   FiEye,
+  FiFileText,
+  FiMapPin,
   FiMoreHorizontal,
   FiSearch,
   FiTrash2,
@@ -14,7 +15,7 @@ import {
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
-import { FilterOption, FilterValues } from "../Filter/FilterTypes";
+import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -238,190 +239,272 @@ const SPCaseDrawer = ({
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
-            <div className="sticky top-0 bg-base-100 border-b border-base-300 p-6 flex items-center justify-between z-10 shadow-sm">
-              <div>
-                <h2 className="text-3xl font-bold">
-                  {isEdit
-                    ? "Edit Special Proceeding"
-                    : "Add Special Proceeding"}
-                </h2>
-                <p className="text-sm text-base-content/60 mt-1">
-                  {step === "FORM" &&
-                    (isEdit ? "Update case details" : "Enter case details")}
-                  {step === "REVIEW" && "Review and confirm"}
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="btn btn-ghost btn-sm btn-circle"
-              >
-                <FiX className="w-5 h-5" />
-              </button>
-            </div>
-
             <div className="p-8">
-              {step === "FORM" && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-5"
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-semibold leading-tight">
+                    {isEdit
+                      ? "Edit Special Proceeding"
+                      : "Add Special Proceeding"}
+                  </h2>
+                  <p className="text-sm text-base-content/60 mt-1">
+                    {step === "FORM"
+                      ? isEdit
+                        ? "Update case details"
+                        : "Enter case details"
+                      : "Review and confirm"}
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="btn btn-ghost btn-sm btn-circle"
                 >
-                  {[
-                    {
-                      name: "spcNo",
-                      label: "SPC. No.",
-                      placeholder: "SPC-2024-0001",
-                    },
-                    {
-                      name: "raffledToBranch",
-                      label: "Raffled to Branch",
-                      placeholder: "Branch 1",
-                    },
-                    {
-                      name: "petitioners",
-                      label: "Petitioners",
-                      placeholder: "Full name of petitioner(s)",
-                    },
-                    {
-                      name: "nature",
-                      label: "Nature",
-                      placeholder: "e.g. Petition for Adoption",
-                    },
-                    {
-                      name: "respondent",
-                      label: "Respondent",
-                      placeholder: "e.g. Republic of the Philippines",
-                    },
-                  ].map(({ name, label, placeholder }) => (
-                    <div key={name}>
-                      <label className="label">
-                        <span className="label-text font-bold text-base">
-                          {label}
-                        </span>
-                        <span className="label-text-alt text-error">
-                          Required
-                        </span>
-                      </label>
-                      <input
-                        name={name}
-                        className="input input-bordered w-full text-base"
-                        value={(form as any)[name]}
-                        onChange={handleChange}
-                        placeholder={placeholder}
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <label className="label">
-                      <span className="label-text font-bold text-base">
-                        Date Filed
-                      </span>
-                      <span className="label-text-alt text-error">
-                        Required
-                      </span>
-                    </label>
-                    <input
-                      type="date"
-                      name="dateFiled"
-                      className="input input-bordered w-full text-base"
-                      value={form.dateFiled}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-6">
-                    <button className="btn btn-ghost flex-1" onClick={onClose}>
-                      Cancel
-                    </button>
-                    <button
-                      className="btn btn-primary flex-1"
-                      onClick={() => setStep("REVIEW")}
-                      disabled={!canProceedToReview()}
-                    >
-                      Review
-                    </button>
-                  </div>
-                </motion.div>
-              )}
+                  <FiX className="w-5 h-5" />
+                </button>
+              </div>
 
-              {step === "REVIEW" && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
-                >
-                  <div className="card bg-base-200 shadow-sm">
+              <div className="flex gap-2 mb-6">
+                {(["FORM", "REVIEW"] as const).map((s, i) => (
+                  <div key={s} className="flex items-center gap-2">
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                        step === s
+                          ? "bg-primary text-primary-content border-primary"
+                          : step === "REVIEW" && s === "FORM"
+                            ? "bg-success text-success-content border-success"
+                            : "border-base-300 text-base-content/40"
+                      }`}
+                    >
+                      {i + 1}
+                    </div>
+                    <span
+                      className={`text-sm ${step === s ? "font-semibold text-primary" : "text-base-content/50"}`}
+                    >
+                      {s === "FORM" ? "Details" : "Review"}
+                    </span>
+                    {i < 1 && (
+                      <span className="text-base-content/30 mx-1">›</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {step === "FORM" && (
+                <div className="space-y-4">
+                  {/* Case Information Card */}
+                  <div className="card rounded-2xl shadow-sm border">
                     <div className="card-body p-6">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
-                          <FiCheck className="w-6 h-6 text-success" />
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="p-2 rounded-md bg-sky-100 text-sky-600">
+                          <FiFileText />
                         </div>
                         <div>
-                          <h3 className="font-bold text-xl">
-                            Review Case Details
-                          </h3>
-                          <p className="text-sm text-base-content/60">
-                            Please verify all information before{" "}
-                            {isEdit ? "saving" : "creating"}
+                          <h4 className="text-lg font-semibold">
+                            Case Information
+                          </h4>
+                          <p className="text-xs text-base-content/60">
+                            SPC number, branch, and filing date
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-3">
-                        {(
-                          [
-                            ["SPC. No.", form.spcNo],
-                            ["Raffled to Branch", form.raffledToBranch],
-                            ["Date Filed", formatDate(form.dateFiled)],
-                            ["Petitioners", form.petitioners],
-                            ["Nature", form.nature],
-                            ["Respondent", form.respondent],
-                          ] as [string, string][]
-                        ).map(([label, value]) => (
-                          <div
-                            key={label}
-                            className="flex items-start gap-4 p-4 rounded-xl bg-base-100"
-                          >
-                            <div className="flex-1">
-                              <p className="text-xs text-base-content/60 mb-1 font-semibold uppercase tracking-wide">
-                                {label}
-                              </p>
-                              <p className="font-bold text-base">
-                                {value || "—"}
-                              </p>
-                            </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-semibold block mb-1">
+                              SPC. No. *
+                            </span>
+                          </label>
+                          <input
+                            name="spcNo"
+                            type="text"
+                            className="input input-bordered w-full"
+                            value={form.spcNo}
+                            onChange={handleChange}
+                            placeholder="SPC-2024-0001"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label">
+                              <span className="label-text font-semibold block mb-1">
+                                Raffled to Branch *
+                              </span>
+                            </label>
+                            <input
+                              name="raffledToBranch"
+                              type="text"
+                              className="input input-bordered w-full"
+                              value={form.raffledToBranch}
+                              onChange={handleChange}
+                              placeholder="Branch 1"
+                            />
                           </div>
-                        ))}
+
+                          <div>
+                            <label className="label">
+                              <span className="label-text font-semibold block mb-1">
+                                Date Filed *
+                              </span>
+                            </label>
+                            <input
+                              type="date"
+                              name="dateFiled"
+                              className="input input-bordered w-full"
+                              value={form.dateFiled}
+                              onChange={handleChange}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-3 pt-6">
-                    <button
-                      className="btn btn-ghost flex-1"
-                      onClick={() => setStep("FORM")}
-                      disabled={loading}
-                    >
-                      Back
-                    </button>
-                    <button
-                      className="btn btn-primary flex-1"
-                      onClick={handleSave}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <>
-                          <span className="loading loading-spinner loading-sm" />
-                          {isEdit ? "Saving..." : "Creating..."}
-                        </>
-                      ) : (
-                        <>
-                          <FiCheck className="w-4 h-4" />
-                          {isEdit ? "Save Changes" : "Confirm & Create"}
-                        </>
-                      )}
-                    </button>
+
+                  {/* Petition Details Card */}
+                  <div className="card rounded-2xl shadow-sm border">
+                    <div className="card-body p-6">
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="p-2 rounded-md bg-purple-100 text-purple-600">
+                          <FiMapPin />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold">
+                            Petition Details
+                          </h4>
+                          <p className="text-xs text-base-content/60">
+                            Petitioner information and case nature
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-semibold block mb-1">
+                              Petitioners *
+                            </span>
+                          </label>
+                          <input
+                            name="petitioners"
+                            type="text"
+                            className="input input-bordered w-full"
+                            value={form.petitioners}
+                            onChange={handleChange}
+                            placeholder="Full name of petitioner(s)"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-semibold block mb-1">
+                              Nature *
+                            </span>
+                          </label>
+                          <input
+                            name="nature"
+                            type="text"
+                            className="input input-bordered w-full"
+                            value={form.nature}
+                            onChange={handleChange}
+                            placeholder="e.g. Petition for Adoption"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="label">
+                            <span className="label-text font-semibold block mb-1">
+                              Respondent *
+                            </span>
+                          </label>
+                          <input
+                            name="respondent"
+                            type="text"
+                            className="input input-bordered w-full"
+                            value={form.respondent}
+                            onChange={handleChange}
+                            placeholder="e.g. Republic of the Philippines"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </motion.div>
+                </div>
+              )}
+
+              {step === "REVIEW" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-base-content/60 mb-4">
+                    Please review the details before saving.
+                  </p>
+                  {(
+                    [
+                      ["SPC. No.", form.spcNo],
+                      ["Raffled to Branch", form.raffledToBranch],
+                      ["Date Filed", formatDate(form.dateFiled)],
+                      ["Petitioners", form.petitioners],
+                      ["Nature", form.nature],
+                      ["Respondent", form.respondent],
+                    ] as [string, string][]
+                  ).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="flex justify-between items-start py-2 border-b border-base-200 last:border-0"
+                    >
+                      <span className="text-sm text-base-content/60 font-medium w-36 shrink-0">
+                        {label}
+                      </span>
+                      <span className="text-sm font-medium text-right">
+                        {value || "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 z-30 bg-base-100 border-t border-base-300 px-6 py-3 flex justify-between gap-3">
+              {step === "FORM" ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setStep("REVIEW")}
+                    disabled={!canProceedToReview()}
+                  >
+                    Review
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setStep("FORM")}
+                    disabled={loading}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-success ${loading ? "loading" : ""}`}
+                    onClick={handleSave}
+                    disabled={loading}
+                  >
+                    {loading
+                      ? "Saving..."
+                      : isEdit
+                        ? "Save Changes"
+                        : "Create Entry"}
+                  </button>
+                </>
               )}
             </div>
           </motion.div>
