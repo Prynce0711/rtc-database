@@ -2,23 +2,24 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FiSearch } from "react-icons/fi";
 import FilterModal from "../../Filter/FilterModal";
 import {
-    ExactMatchMap,
-    FilterOption,
-    FilterValues,
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
 } from "../../Filter/FilterTypes";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import Table from "../../Table/Table";
+import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import { deleteReceiveLog, getReceiveLogs } from "./Receive";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
 import {
-    ReceiveLog,
-    calculateReceiveLogStats,
-    sortReceiveLogs,
+  ReceiveLog,
+  calculateReceiveLogStats,
+  sortReceiveLogs,
 } from "./ReceiveRecord";
 import ReceiveRow from "./ReceiveRow";
 
@@ -44,6 +45,10 @@ const ReceiveLogsPage: React.FC = () => {
   const isAdminOrAtty =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.ATTY;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const statusPopup = usePopup();
 
@@ -281,6 +286,33 @@ const ReceiveLogsPage: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const result = await uploadReceiveExcel(file);
+                  if (!result.success) {
+                    statusPopup.showError(
+                      result.error || "Failed to import receiving logs",
+                    );
+                  } else {
+                    statusPopup.showSuccess(
+                      "Receiving logs imported successfully",
+                    );
+                    await fetchLogs();
+                  }
+                } finally {
+                  setUploading(false);
+                  if (e.target) e.target.value = "";
+                }
+              }}
+            />
             <button
               className="btn btn-outline flex items-center gap-2"
               onClick={() => setFilterModalOpen((prev) => !prev)}
@@ -301,27 +333,82 @@ const ReceiveLogsPage: React.FC = () => {
             </button>
 
             {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setSelectedLog(null);
-                  setDrawerType(ReceiveDrawerType.ADD);
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+              <>
+                <button
+                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Entry
-              </button>
+                  {uploading ? "Importing..." : "Import Excel"}
+                </button>
+                <button
+                  className={`btn btn-outline ${exporting ? "loading" : ""}`}
+                  onClick={async () => {
+                    setExporting(true);
+                    try {
+                      const result = await exportReceiveLogsExcel();
+                      if (!result.success) {
+                        statusPopup.showError(
+                          result.error || "Failed to export receiving logs",
+                        );
+                        return;
+                      }
+
+                      if (!result.result) {
+                        statusPopup.showError("No data to export");
+                        return;
+                      }
+
+                      const { fileName, base64 } = result.result;
+                      const byteCharacters = atob(base64);
+                      const byteNumbers = new Array(byteCharacters.length);
+                      for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                      }
+                      const byteArray = new Uint8Array(byteNumbers);
+                      const blob = new Blob([byteArray], {
+                        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                      });
+
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = fileName;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                  disabled={exporting}
+                >
+                  {exporting ? "Exporting..." : "Export Excel"}
+                </button>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedLog(null);
+                    setDrawerType(ReceiveDrawerType.ADD);
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Add Entry
+                </button>
+              </>
             )}
           </div>
 
