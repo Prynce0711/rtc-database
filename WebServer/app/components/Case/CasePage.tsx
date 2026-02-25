@@ -476,7 +476,7 @@ const CasePage: React.FC = () => {
       <main className="w-full">
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-medium text-base-content mb-2">
+          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Case Management
           </h2>
           <p className="text-xl text-base-content/70">Manage all court cases</p>
