@@ -158,15 +158,15 @@ function adminSidebar(activeView: string) {
 
       <SidebarButton
         icon={<FiFileText />}
-        href="cases"
+        href="Statistics"
         active={activeView}
         label="Statistics"
         dropdowns={[
-          { label: "Cases", href: "" },
-          { label: "Petition", href: "" },
+          { label: "Monthly Reports", href: "monthly-reports" },
+          { label: "Annual Reports", href: "annual-reports" },
 
-          { label: "Special Proceedings", href: "" },
-          { label: "Receiving Logs", href: "" },
+          { label: "Judgment Day", href: "judgment-day" },
+          { label: "Summary", href: "summary" },
         ]}
       />
 
