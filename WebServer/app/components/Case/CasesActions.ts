@@ -23,8 +23,8 @@ export async function getCases(): Promise<ActionResult<Case[]>> {
       success: true,
       result: cases.map((c) => ({
         ...c,
-        dateFiled: c.dateFiled.toISOString(),
-        raffleDate: c.raffleDate ? c.raffleDate.toISOString() : null,
+        dateFiled: c.dateFiled,
+        raffleDate: c.raffleDate ? c.raffleDate : null,
       })),
     };
   } catch (error) {
