@@ -1,10 +1,18 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useEffect, useState } from "react";
-import { FiFileText, FiMapPin, FiX } from "react-icons/fi";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FiAlertCircle,
+  FiArrowLeft,
+  FiCheck,
+  FiCopy,
+  FiEdit3,
+  FiEye,
+  FiPlus,
+  FiTrash2,
+} from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import FormField from "../FormField";
 import { ReceiveLog } from "./PetitionRecord";
 
 export enum ReceiveDrawerType {
@@ -12,16 +20,76 @@ export enum ReceiveDrawerType {
   EDIT = "EDIT",
 }
 
-const EMPTY_FORM: Record<string, any> = {
+type Step = "entry" | "review";
+
+interface EntryForm {
+  id: string;
+  caseNumber: string;
+  raffledToBranch: string;
+  dateFiled: string;
+  petitioners: string;
+  titleNo: string;
+  nature: string;
+  errors: Record<string, string>;
+  collapsed: boolean;
+  saved: boolean;
+}
+
+const today = new Date().toISOString().slice(0, 10);
+
+const emptyEntry = (id: string): EntryForm => ({
+  id,
   caseNumber: "",
   raffledToBranch: "",
-  dateFiled: new Date().toISOString().slice(0, 10),
+  dateFiled: today,
   petitioners: "",
   titleNo: "",
   nature: "",
-};
+  errors: {},
+  collapsed: false,
+  saved: false,
+});
 
-const ReceiveDrawer = ({
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+const REQUIRED_FIELDS = [
+  "caseNumber",
+  "raffledToBranch",
+  "dateFiled",
+  "petitioners",
+  "titleNo",
+  "nature",
+] as const;
+
+const COLUMNS: {
+  key: (typeof REQUIRED_FIELDS)[number];
+  label: string;
+  placeholder: string;
+}[] = [
+  { key: "caseNumber", label: "Case Number", placeholder: "SPC-2026-0001" },
+  { key: "dateFiled", label: "Date Filed", placeholder: "" },
+  {
+    key: "raffledToBranch",
+    label: "Raffled to Branch",
+    placeholder: "Branch 1",
+  },
+  { key: "titleNo", label: "Title No", placeholder: "T-12345" },
+  { key: "petitioners", label: "Petitioners", placeholder: "Full name" },
+  { key: "nature", label: "Nature", placeholder: "Petition for..." },
+];
+
+function validateEntry(entry: EntryForm): Record<string, string> {
+  const errs: Record<string, string> = {};
+  REQUIRED_FIELDS.forEach((k) => {
+    if (!entry[k] || String(entry[k]).trim() === "") {
+      errs[k] = "Required";
+    }
+  });
+  return errs;
+}
+
+/* ─── Main Page Component ────────────────────────────────────────── */
+const PetitionEntryPage = ({
   type,
   onClose,
   selectedLog = null,
@@ -34,435 +102,601 @@ const ReceiveDrawer = ({
   onCreate?: (log: any) => void;
   onUpdate?: (log: any) => void;
 }) => {
-  const [formData, setFormData] = useState<Record<string, any>>(EMPTY_FORM);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [step, setStep] = useState<"FORM" | "REVIEW">("FORM");
+  const isEdit = type === ReceiveDrawerType.EDIT;
   const statusPopup = usePopup();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<Step>("entry");
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const [entries, setEntries] = useState<EntryForm[]>(() => {
+    if (isEdit && selectedLog) {
+      return [
+        {
+          ...emptyEntry(uid()),
+          caseNumber: selectedLog.caseNumber ?? selectedLog["Case No"] ?? "",
+          raffledToBranch:
+            selectedLog.RaffledToBranch ??
+            selectedLog["Branch No"] ??
+            selectedLog.branch ??
+            "",
+          dateFiled: selectedLog.dateReceived
+            ? String(selectedLog.dateReceived).slice(0, 10)
+            : today,
+          petitioners: selectedLog.Petitioners ?? selectedLog.party ?? "",
+          titleNo:
+            selectedLog.TitleNo ??
+            selectedLog.BookAndPages ??
+            selectedLog.receiptNo ??
+            "",
+          nature:
+            selectedLog.Nature ??
+            selectedLog.Content ??
+            selectedLog.documentType ??
+            "",
+        },
+      ];
+    }
+    return [emptyEntry(uid())];
+  });
 
   useEffect(() => {
-    if (type === ReceiveDrawerType.EDIT && selectedLog) {
-      setFormData({
-        ...EMPTY_FORM,
-        caseNumber: selectedLog.caseNumber ?? selectedLog["Case No"] ?? "",
-        raffledToBranch:
-          selectedLog.RaffledToBranch ??
-          selectedLog["Branch No"] ??
-          selectedLog.branch ??
-          "",
-        dateFiled: selectedLog.dateReceived
-          ? String(selectedLog.dateReceived).slice(0, 10)
-          : EMPTY_FORM.dateFiled,
-        petitioners: selectedLog.Petitioners ?? selectedLog.party ?? "",
-        titleNo:
-          selectedLog.TitleNo ??
-          selectedLog.BookAndPages ??
-          selectedLog.receiptNo ??
-          "",
-        nature:
-          selectedLog.Nature ??
-          selectedLog.Content ??
-          selectedLog.documentType ??
-          "",
-      });
-    } else {
-      setFormData(EMPTY_FORM);
+    if (!isEdit) {
+      setEntries([emptyEntry(uid())]);
+      setStep("entry");
     }
-    setFormErrors({});
-    setStep("FORM");
   }, [type, selectedLog]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >,
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (formErrors[name]) {
-      setFormErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
+  /* Handlers */
+  const handleChange = (id: string, field: string, value: string) => {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              [field]: value,
+              errors: { ...e.errors, [field]: "" },
+            }
+          : e,
+      ),
+    );
+  };
+
+  const handleAddEntry = useCallback(() => {
+    const newEntry = emptyEntry(uid());
+    setEntries((prev) => [...prev, newEntry]);
+    setTimeout(() => {
+      tableRef.current?.scrollTo({
+        top: tableRef.current.scrollHeight,
+        behavior: "smooth",
       });
-    }
+    }, 60);
+  }, []);
+
+  const handleRemove = (id: string) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
-  const validateRequired = (keys: string[]) => {
-    const errs: Record<string, string> = {};
-    keys.forEach((k) => {
-      if (!formData[k] || String(formData[k]).trim() === "") {
-        errs[k] = "This field is required";
-      }
+  const handleDuplicate = (id: string) => {
+    const source = entries.find((e) => e.id === id);
+    if (!source) return;
+    const dup: EntryForm = {
+      ...source,
+      id: uid(),
+      caseNumber: "",
+      errors: {},
+      saved: false,
+      collapsed: false,
+    };
+    setEntries((prev) => {
+      const idx = prev.findIndex((e) => e.id === id);
+      const next = [...prev];
+      next.splice(idx + 1, 0, dup);
+      return next;
     });
-    return errs;
   };
 
-  const handleReview = () => {
-    const required = [
-      "caseNumber",
-      "raffledToBranch",
-      "dateFiled",
-      "petitioners",
-      "titleNo",
-      "nature",
-    ];
-    const errs = validateRequired(required);
-    if (Object.keys(errs).length > 0) {
-      setFormErrors(errs);
+  /* Tab on last cell of last row → auto-add new row */
+  const handleCellKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    entryId: string,
+    colIndex: number,
+  ) => {
+    if (e.key === "Tab" && !e.shiftKey) {
+      const isLastCol = colIndex === COLUMNS.length - 1;
+      const isLastRow = entries[entries.length - 1]?.id === entryId;
+      if (isLastCol && isLastRow && !isEdit) {
+        e.preventDefault();
+        handleAddEntry();
+        setTimeout(() => {
+          const rows = tableRef.current?.querySelectorAll("[data-row]");
+          const lastRow = rows?.[rows.length - 1];
+          const firstInput = lastRow?.querySelector("input");
+          firstInput?.focus();
+        }, 80);
+      }
+    }
+  };
+
+  const completedCount = entries.filter((e) =>
+    REQUIRED_FIELDS.every((k) => e[k] && String(e[k]).trim() !== ""),
+  ).length;
+
+  const allValid = completedCount === entries.length && entries.length > 0;
+
+  /* Go to review step */
+  const handleGoToReview = () => {
+    let anyError = false;
+    const validated = entries.map((e) => {
+      const errs = validateEntry(e);
+      if (Object.keys(errs).length > 0) {
+        anyError = true;
+        return { ...e, errors: errs };
+      }
+      return e;
+    });
+    setEntries(validated);
+
+    if (anyError) {
+      statusPopup.showError(
+        "Please fill in all required fields before reviewing.",
+      );
       return;
     }
-    setFormErrors({});
-    setStep("REVIEW");
+    setStep("review");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  /* Final submit from review */
   const handleSubmit = async () => {
-    if (
-      !(await statusPopup.showConfirm(
-        type === ReceiveDrawerType.ADD
-          ? "Create this petition entry?"
-          : "Save changes to this petition entry?",
-      ))
-    )
-      return;
+    const label = isEdit
+      ? "Save changes to this petition entry?"
+      : entries.length === 1
+        ? "Create this petition entry?"
+        : `Create ${entries.length} petition entries?`;
+
+    if (!(await statusPopup.showConfirm(label))) return;
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        id: selectedLog?.id ?? 0,
-        caseNumber: formData.caseNumber,
-        branch: formData.raffledToBranch,
-        dateReceived: formData.dateFiled,
-        party: formData.petitioners,
-        receiptNo: formData.titleNo,
-        documentType: formData.nature,
-        "Case No": formData.caseNumber,
-        "Branch No": formData.raffledToBranch,
-        BookAndPages: formData.titleNo,
-        Content: formData.nature,
-        RaffledToBranch: formData.raffledToBranch,
-        Petitioners: formData.petitioners,
-        TitleNo: formData.titleNo,
-        Nature: formData.nature,
-      } as any;
+      const payloads = entries.map((e) => ({
+        id: isEdit ? (selectedLog?.id ?? 0) : 0,
+        caseNumber: e.caseNumber,
+        branch: e.raffledToBranch,
+        dateReceived: e.dateFiled,
+        party: e.petitioners,
+        receiptNo: e.titleNo,
+        documentType: e.nature,
+        "Case No": e.caseNumber,
+        "Branch No": e.raffledToBranch,
+        BookAndPages: e.titleNo,
+        Content: e.nature,
+        RaffledToBranch: e.raffledToBranch,
+        Petitioners: e.petitioners,
+        TitleNo: e.titleNo,
+        Nature: e.nature,
+      }));
 
-      if (type === ReceiveDrawerType.ADD) {
-        onCreate?.(payload);
+      if (isEdit) {
+        onUpdate?.(payloads[0]);
+        statusPopup.showSuccess("Petition entry updated successfully");
       } else {
-        onUpdate?.(payload);
+        payloads.forEach((p) => onCreate?.(p));
+        statusPopup.showSuccess(
+          payloads.length === 1
+            ? "Petition entry created successfully"
+            : `${payloads.length} petition entries created successfully`,
+        );
       }
-
-      statusPopup.showSuccess(
-        type === ReceiveDrawerType.ADD
-          ? "Petition entry created successfully"
-          : "Petition entry updated successfully",
-      );
       onClose();
-    } catch (err) {
+    } catch {
       statusPopup.showError("An error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const dateValue = formData.dateFiled
-    ? (formData.dateFiled instanceof Date
-        ? formData.dateFiled
-        : new Date(String(formData.dateFiled))
-      )
-        .toISOString()
-        .slice(0, 10)
-    : "";
-
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 bg-black/40 z-40"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      />
-
-      <motion.div
-        className="fixed right-0 top-0 h-full w-full max-w-xl bg-base-100 shadow-2xl z-50 flex flex-col"
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
-        transition={{ type: "spring", damping: 28, stiffness: 260 }}
-      >
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="min-h-screen bg-base-100">
+      <main className="w-full">
+        {/* ─── Header ──────────────────────── */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={step === "review" ? () => setStep("entry") : onClose}
+              className="btn btn-ghost btn-sm px-2"
+            >
+              <FiArrowLeft size={18} />
+            </button>
             <div>
-              <h2 className="text-3xl md:text-4xl font-semibold leading-tight">
-                {type === ReceiveDrawerType.ADD
-                  ? "New Petition Entry"
-                  : "Edit Petition Entry"}
+              <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
+                {isEdit
+                  ? "Edit Petition Entry"
+                  : step === "review"
+                    ? "Review Entries"
+                    : "New Petition Entries"}
               </h2>
-              <p className="text-sm text-base-content/60 mt-1">
-                Fill in petition details
+              <p className="text-xl text-base-content/70 mt-1">
+                {step === "review"
+                  ? "Verify all entries before saving"
+                  : isEdit
+                    ? "Update the petition details below"
+                    : "Fill rows like a spreadsheet — Tab past the last cell to add a new row"}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="btn btn-ghost btn-sm btn-circle"
-              aria-label="Close drawer"
-            >
-              <FiX className="w-5 h-5" />
-            </button>
           </div>
 
-          <div className="flex gap-2 mb-6">
-            {(["FORM", "REVIEW"] as const).map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
-                    step === s
-                      ? "bg-primary text-primary-content border-primary"
-                      : step === "REVIEW" && s === "FORM"
-                        ? "bg-success text-success-content border-success"
-                        : "border-base-300 text-base-content/40"
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                <span
-                  className={`text-sm ${step === s ? "font-semibold text-primary" : "text-base-content/50"}`}
-                >
-                  {s === "FORM" ? "Details" : "Review"}
-                </span>
-                {i < 1 && <span className="text-base-content/30 mx-1">›</span>}
-              </div>
-            ))}
-          </div>
-          {step === "FORM" && (
-            <form className="space-y-1" onSubmit={(e) => e.preventDefault()}>
-              <div className="space-y-4">
-                {/* Case Details Card */}
-                <div className="card rounded-2xl shadow-sm border">
-                  <div className="card-body p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="p-2 rounded-md bg-sky-100 text-sky-600">
-                        <FiFileText />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold">Case Details</h4>
-                        <p className="text-xs text-base-content/60">
-                          Case number, branch, and filing date
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      <FormField
-                        label="Case Number *"
-                        htmlFor="case-number"
-                        error={formErrors.caseNumber}
-                      >
-                        <input
-                          id="case-number"
-                          name="caseNumber"
-                          type="text"
-                          className={`input input-bordered w-full ${formErrors.caseNumber ? "input-error" : ""}`}
-                          placeholder="e.g. SPC-2026-0001"
-                          value={formData.caseNumber}
-                          onChange={handleChange}
-                        />
-                      </FormField>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          label="Rafled to Branch *"
-                          htmlFor="raffled-to-branch"
-                          error={formErrors.raffledToBranch}
-                        >
-                          <input
-                            id="raffled-to-branch"
-                            name="raffledToBranch"
-                            type="text"
-                            className={`input input-bordered w-full ${formErrors.raffledToBranch ? "input-error" : ""}`}
-                            placeholder="e.g. Branch 1"
-                            value={formData.raffledToBranch}
-                            onChange={handleChange}
-                          />
-                        </FormField>
-
-                        <FormField
-                          label="Date Filled *"
-                          htmlFor="date-filed"
-                          error={formErrors.dateFiled}
-                        >
-                          <input
-                            id="date-filed"
-                            name="dateFiled"
-                            type="date"
-                            className={`input input-bordered w-full ${formErrors.dateFiled ? "input-error" : ""}`}
-                            value={dateValue}
-                            onChange={handleChange}
-                          />
-                        </FormField>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Petition Details Card */}
-                <div className="card rounded-2xl shadow-sm border">
-                  <div className="card-body p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="p-2 rounded-md bg-purple-100 text-purple-600">
-                        <FiMapPin />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-semibold">
-                          Petition Details
-                        </h4>
-                        <p className="text-xs text-base-content/60">
-                          Petitioner information and petition nature
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
-                      <FormField
-                        label="Petitioners *"
-                        htmlFor="petitioners"
-                        error={formErrors.petitioners}
-                      >
-                        <input
-                          id="petitioners"
-                          name="petitioners"
-                          type="text"
-                          className={`input input-bordered w-full ${formErrors.petitioners ? "input-error" : ""}`}
-                          placeholder="Full name of petitioner(s)"
-                          value={formData.petitioners}
-                          onChange={handleChange}
-                        />
-                      </FormField>
-
-                      <FormField
-                        label="Title No *"
-                        htmlFor="title-no"
-                        error={formErrors.titleNo}
-                      >
-                        <input
-                          id="title-no"
-                          name="titleNo"
-                          type="text"
-                          className={`input input-bordered w-full ${formErrors.titleNo ? "input-error" : ""}`}
-                          placeholder="e.g. T-12345"
-                          value={formData.titleNo}
-                          onChange={handleChange}
-                        />
-                      </FormField>
-
-                      <FormField
-                        label="Nature *"
-                        htmlFor="nature"
-                        error={formErrors.nature}
-                      >
-                        <textarea
-                          id="nature"
-                          name="nature"
-                          className={`textarea textarea-bordered w-full ${formErrors.nature ? "textarea-error" : ""}`}
-                          rows={3}
-                          placeholder="e.g. Petition for Adoption"
-                          value={formData.nature}
-                          onChange={handleChange}
-                        />
-                      </FormField>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {step === "REVIEW" && (
-            <div className="space-y-3">
-              <p className="text-sm text-base-content/60 mb-4">
-                Please review the details before saving.
-              </p>
+          {/* Step indicator + progress */}
+          <div className="flex items-center justify-between mt-4">
+            {/* Steps */}
+            <div className="flex items-center gap-2">
               {(
                 [
-                  ["Case Number", formData.caseNumber || "—"],
-                  ["Rafled to Branch", formData.raffledToBranch || "—"],
-                  ["Date Filled", dateValue],
-                  ["Petitioners", formData.petitioners || "—"],
-                  ["Title No", formData.titleNo || "—"],
-                  ["Nature", formData.nature || "—"],
-                ] as [string, string][]
-              ).map(([label, value]) => (
-                <div
-                  key={label}
-                  className="flex justify-between items-start py-2 border-b border-base-200 last:border-0"
-                >
-                  <span className="text-sm text-base-content/60 font-medium w-36 shrink-0">
-                    {label}
-                  </span>
-                  <span className="text-sm font-medium text-right">
-                    {value}
-                  </span>
-                </div>
-              ))}
+                  {
+                    key: "entry" as Step,
+                    label: "Data Entry",
+                    icon: <FiEdit3 size={14} />,
+                  },
+                  {
+                    key: "review" as Step,
+                    label: "Review",
+                    icon: <FiEye size={14} />,
+                  },
+                ] as const
+              ).map((s, i, arr) => {
+                const currentIdx = step === "review" ? 1 : 0;
+                return (
+                  <React.Fragment key={s.key}>
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className={`
+                          w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+                          ${i < currentIdx ? "bg-success text-success-content" : i === currentIdx ? "bg-primary text-primary-content" : "bg-base-300 text-base-content/40"}
+                        `}
+                      >
+                        {i < currentIdx ? (
+                          <FiCheck size={12} strokeWidth={3} />
+                        ) : (
+                          s.icon
+                        )}
+                      </div>
+                      <span
+                        className={`text-sm font-semibold ${i === currentIdx ? "text-base-content" : "text-base-content/40"}`}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div
+                        className={`w-10 h-0.5 rounded ${i < currentIdx ? "bg-success" : "bg-base-300"}`}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {/* Progress stats */}
+            {!isEdit && step === "entry" && (
+              <div className="text-sm text-base-content/70">
+                <span className="font-bold text-base-content">
+                  {completedCount}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-base-content">
+                  {entries.length}
+                </span>{" "}
+                rows complete
+              </div>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          {!isEdit && step === "entry" && (
+            <div className="mt-3">
+              <progress
+                className="progress progress-primary w-full"
+                value={completedCount}
+                max={entries.length}
+              />
             </div>
           )}
         </div>
 
-        <div className="px-6 py-3 border-t border-base-300 flex justify-between gap-3">
-          {step === "FORM" ? (
-            <>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={onClose}
+        {/* ─── Content ───────────────────────────────────────────── */}
+        <AnimatePresence mode="wait">
+          {step === "entry" ? (
+            /* ─── STEP 1: Spreadsheet Entry ────────────────────── */
+            <motion.div
+              key="entry"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Table */}
+              <div
+                ref={tableRef}
+                className="bg-base-100 rounded-lg shadow overflow-auto"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleReview}
-                disabled={
-                  !formData.caseNumber ||
-                  !formData.raffledToBranch ||
-                  !formData.dateFiled ||
-                  !formData.petitioners ||
-                  !formData.titleNo ||
-                  !formData.nature
-                }
-              >
-                Review
-              </button>
-            </>
+                <table className="table table-sm w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-center w-12">#</th>
+                      {COLUMNS.map((col) => (
+                        <th key={col.key}>{col.label}</th>
+                      ))}
+                      <th className="text-center w-20">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <AnimatePresence initial={false}>
+                      {entries.map((entry, rowIdx) => {
+                        const hasErrors = Object.keys(entry.errors).length > 0;
+                        const isComplete = REQUIRED_FIELDS.every(
+                          (k) => entry[k] && String(entry[k]).trim() !== "",
+                        );
+
+                        return (
+                          <motion.tr
+                            key={entry.id}
+                            data-row
+                            layout
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className={`
+                              ${hasErrors ? "bg-error/5" : isComplete ? "bg-success/5" : "bg-base-100"}
+                              hover:bg-base-200 transition-colors
+                            `}
+                          >
+                            {/* Row number */}
+                            <td className="text-center">
+                              <span
+                                className={`
+                                  inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
+                                  ${hasErrors ? "bg-error/20 text-error" : isComplete ? "bg-success/20 text-success" : "bg-base-300 text-base-content/50"}
+                                `}
+                              >
+                                {isComplete && !hasErrors ? (
+                                  <FiCheck size={12} strokeWidth={3} />
+                                ) : (
+                                  rowIdx + 1
+                                )}
+                              </span>
+                            </td>
+
+                            {/* Data cells */}
+                            {COLUMNS.map((col, colIdx) => (
+                              <td key={col.key} className="p-0">
+                                <input
+                                  type={
+                                    col.key === "dateFiled" ? "date" : "text"
+                                  }
+                                  value={entry[col.key]}
+                                  placeholder={col.placeholder}
+                                  onChange={(e) =>
+                                    handleChange(
+                                      entry.id,
+                                      col.key,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleCellKeyDown(e, entry.id, colIdx)
+                                  }
+                                  title={entry.errors[col.key] || ""}
+                                  className={`
+                                    input input-sm input-ghost w-full rounded-none text-sm
+                                    ${entry.errors[col.key] ? "input-error bg-error/10" : ""}
+                                  `}
+                                />
+                                {entry.errors[col.key] && (
+                                  <span className="text-error text-[10px] px-2 pb-1 flex items-center gap-1">
+                                    <FiAlertCircle size={10} />{" "}
+                                    {entry.errors[col.key]}
+                                  </span>
+                                )}
+                              </td>
+                            ))}
+
+                            {/* Action buttons */}
+                            <td className="text-center">
+                              <div className="flex justify-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicate(entry.id)}
+                                  className="btn btn-ghost btn-xs px-1.5"
+                                  title="Duplicate row"
+                                >
+                                  <FiCopy size={13} />
+                                </button>
+                                {entries.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemove(entry.id)}
+                                    className="btn btn-ghost btn-xs px-1.5 text-error"
+                                    title="Remove row"
+                                  >
+                                    <FiTrash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+
+                {/* Add row button */}
+                {!isEdit && (
+                  <button
+                    type="button"
+                    onClick={handleAddEntry}
+                    className="btn btn-ghost btn-sm w-full border-t border-dashed border-base-300 rounded-none text-primary"
+                  >
+                    <FiPlus size={14} strokeWidth={2.5} />
+                    Add Row
+                  </button>
+                )}
+              </div>
+
+              {/* Entry footer */}
+              <div className="mt-6 flex items-center justify-between">
+                <div>
+                  {!isEdit && entries.length > 1 && (
+                    <p className="text-sm text-base-content/70">
+                      <span className="font-bold text-base-content">
+                        {entries.length} rows
+                      </span>{" "}
+                      ·{" "}
+                      <span
+                        className={
+                          allValid
+                            ? "text-success font-semibold"
+                            : "text-warning font-semibold"
+                        }
+                      >
+                        {completedCount} complete
+                      </span>
+                      {entries.length - completedCount > 0 && (
+                        <span className="text-error font-semibold">
+                          , {entries.length - completedCount} incomplete
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn btn-outline"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGoToReview}
+                    className="btn btn-primary"
+                  >
+                    <FiEye size={16} />
+                    Review{entries.length > 1 ? ` (${entries.length})` : ""}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           ) : (
-            <>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setStep("FORM")}
-                disabled={isSubmitting}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className={`btn btn-success ${isSubmitting ? "loading" : ""}`}
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting
-                  ? "Saving..."
-                  : type === ReceiveDrawerType.ADD
-                    ? "Create Entry"
-                    : "Save Changes"}
-              </button>
-            </>
+            /* ─── STEP 2: Review ───────────────────────────────── */
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Summary banner */}
+              <div className="mb-5 flex items-center justify-between bg-base-300 rounded-lg shadow px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="stat-figure text-primary">
+                    <FiEye size={24} />
+                  </div>
+                  <div>
+                    <p className="text-base-content font-bold">
+                      Review {entries.length}{" "}
+                      {entries.length === 1 ? "Entry" : "Entries"}
+                    </p>
+                    <p className="text-sm text-base-content/70">
+                      Please verify all information is correct before saving
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setStep("entry")}
+                  className="btn btn-outline btn-sm gap-1"
+                >
+                  <FiEdit3 size={14} />
+                  Edit
+                </button>
+              </div>
+
+              {/* Review table (read-only) */}
+              <div className="bg-base-100 rounded-lg shadow overflow-auto">
+                <table className="table w-full">
+                  <thead>
+                    <tr>
+                      <th className="text-center w-12">#</th>
+                      {COLUMNS.map((col) => (
+                        <th key={col.key}>{col.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry, idx) => (
+                      <tr
+                        key={entry.id}
+                        className="bg-base-100 hover:bg-base-200 transition-colors text-sm"
+                      >
+                        <td className="font-semibold text-center">{idx + 1}</td>
+                        <td className="font-semibold">
+                          {entry.caseNumber || "\u2014"}
+                        </td>
+                        <td className="text-base-content/70">
+                          {entry.dateFiled
+                            ? new Date(entry.dateFiled).toLocaleDateString()
+                            : "\u2014"}
+                        </td>
+                        <td>{entry.raffledToBranch || "\u2014"}</td>
+                        <td>{entry.titleNo || "\u2014"}</td>
+                        <td>{entry.petitioners || "\u2014"}</td>
+                        <td>{entry.nature || "\u2014"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Review footer */}
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setStep("entry")}
+                  className="btn btn-outline gap-2"
+                >
+                  <FiArrowLeft size={14} />
+                  Back to Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className={`btn btn-primary gap-2 ${isSubmitting ? "loading" : ""}`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <FiCheck size={16} strokeWidth={2.5} />
+                      {isEdit
+                        ? "Save Changes"
+                        : entries.length === 1
+                          ? "Confirm & Save"
+                          : `Confirm & Save ${entries.length} Entries`}
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
           )}
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </AnimatePresence>
+      </main>
+    </div>
   );
 };
 
-export default ReceiveDrawer;
+export default PetitionEntryPage;

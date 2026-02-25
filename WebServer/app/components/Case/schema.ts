@@ -50,6 +50,79 @@ export const CaseSchema = z.object({
     ])
     .nullable()
     .optional(),
+  Judge: z.string().nullable().optional(),
+  AO: z.string().nullable().optional(),
+  Complainant: z.string().nullable().optional(),
+  HouseNo: z.string().nullable().optional(),
+  Street: z.string().nullable().optional(),
+  Barangay: z.string().nullable().optional(),
+  Municipality: z.string().nullable().optional(),
+  Province: z.string().nullable().optional(),
+  Is: z.string().nullable().optional(),
+  Counts: z.string().nullable().optional(),
+  Jdf: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  Sajj: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  Sajj2: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  MF: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  STF: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  LRF: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  VCF: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  Total: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
+  AmountInvolved: z
+    .union([
+      z.number(),
+      z.string().transform((val) => (val ? parseFloat(val) : null)),
+    ])
+    .nullable()
+    .optional(),
 });
 export type CaseSchema = z.infer<typeof CaseSchema>;
 
@@ -69,5 +142,23 @@ export const initialCaseFormData: CaseSchema = {
   raffleDate: undefined,
   committe1: undefined,
   committe2: undefined,
-  // Add data for other fields as neededq
+  Judge: undefined,
+  AO: undefined,
+  Complainant: undefined,
+  HouseNo: undefined,
+  Street: undefined,
+  Barangay: undefined,
+  Municipality: undefined,
+  Province: undefined,
+  Is: undefined,
+  Counts: undefined,
+  Jdf: undefined,
+  Sajj: undefined,
+  Sajj2: undefined,
+  MF: undefined,
+  STF: undefined,
+  LRF: undefined,
+  VCF: undefined,
+  Total: undefined,
+  AmountInvolved: undefined,
 };

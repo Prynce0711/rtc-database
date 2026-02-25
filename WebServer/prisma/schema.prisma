@@ -17,6 +17,7 @@ enum Roles {
 }
 
 enum Status {
+  INACTIVE
   ACTIVE
   DEACTIVATED
   PENDING
@@ -72,6 +73,25 @@ model Case {
   raffleDate      DateTime?
   committe1       Int?
   committe2       Int?
+  Judge           String?
+  AO              String?
+  Complainant     String?
+  HouseNo         String?
+  Street          String?
+  Barangay        String?
+  Municipality    String?
+  Province        String?
+  Is              String?
+  Counts          String?
+  Jdf             Float?
+  Sajj            Float?
+  Sajj2           Float?
+  MF              Float?
+  STF             Float?
+  LRF             Float?
+  VCF             Float?
+  Total           Float?
+  AmountInvolved  Float?
 }
 
 model Employee{

@@ -15,8 +15,18 @@ export async function getCases(): Promise<ActionResult<Case[]>> {
       return sessionResult;
     }
 
-    const cases = await prisma.case.findMany();
-    return { success: true, result: cases };
+    const cases = await prisma.case.findMany({
+      orderBy: { dateFiled: "desc" },
+    });
+
+    return {
+      success: true,
+      result: cases.map((c) => ({
+        ...c,
+        dateFiled: c.dateFiled.toISOString(),
+        raffleDate: c.raffleDate ? c.raffleDate.toISOString() : null,
+      })),
+    };
   } catch (error) {
     console.error("Error fetching cases:", error);
     return { success: false, error: "Error fetching cases" };

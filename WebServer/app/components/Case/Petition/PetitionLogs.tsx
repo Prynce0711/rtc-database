@@ -14,7 +14,7 @@ import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import Table from "../../Table/Table";
 import { deleteReceiveLog, getReceiveLogs } from "./Petition";
-import ReceiveDrawer, { ReceiveDrawerType } from "./PetitionDrawer";
+import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import {
   ReceiveLog,
   calculateReceiveLogStats,
@@ -257,6 +257,32 @@ const ReceiveLogsPage: React.FC = () => {
     );
   }
 
+  if (drawerType) {
+    return (
+      <PetitionEntryPage
+        type={drawerType}
+        onClose={() => {
+          setDrawerType(null);
+          setSelectedLog(null);
+          fetchLogs();
+        }}
+        selectedLog={selectedLog}
+        onCreate={(newLog) => {
+          const withId: ReceiveLog = {
+            ...newLog,
+            id: Math.max(0, ...logs.map((l) => l.id)) + 1,
+          };
+          setLogs((prev) => [withId, ...prev]);
+        }}
+        onUpdate={(updatedLog) => {
+          setLogs((prev) =>
+            prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
+          );
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
@@ -416,30 +442,6 @@ const ReceiveLogsPage: React.FC = () => {
             }}
           />
         </div>
-
-        {/* Drawer */}
-        {drawerType && (
-          <ReceiveDrawer
-            type={drawerType}
-            onClose={() => {
-              setDrawerType(null);
-              setSelectedLog(null);
-            }}
-            selectedLog={selectedLog}
-            onCreate={(newLog) => {
-              const withId: ReceiveLog = {
-                ...newLog,
-                id: Math.max(0, ...logs.map((l) => l.id)) + 1,
-              };
-              setLogs((prev) => [withId, ...prev]);
-            }}
-            onUpdate={(updatedLog) => {
-              setLogs((prev) =>
-                prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
-              );
-            }}
-          />
-        )}
       </main>
     </div>
   );
