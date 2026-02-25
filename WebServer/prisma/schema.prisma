@@ -16,6 +16,16 @@ enum Roles {
   atty
 }
 
+enum CaseType {
+  CRIMINAL
+  CIVIL
+  LAND_REGISTRATION_CASE
+  PETITION
+  ELECTION
+  SCA
+  UNKNOWN
+}
+
 enum Status {
   ACTIVE
   DEACTIVATED
@@ -182,4 +192,15 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model RecievingLog{
+  id         Int       @id @default(autoincrement())
+  bookAndPage String?
+  dateRecieved DateTime?
+  caseType     CaseType @default(UNKNOWN)
+  caseNumber String?
+  content String?
+  branchNumber String?
+  notes String?
 }

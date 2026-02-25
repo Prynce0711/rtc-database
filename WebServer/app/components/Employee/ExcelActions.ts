@@ -9,6 +9,7 @@ import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
+import { isExcel } from "@/app/lib/utils";
 
 type ExportEmployeeExcelResult = {
   fileName: string;
@@ -57,47 +58,11 @@ export async function uploadEmployeeExcel(
       return sessionResult;
     }
 
-    const validMimeTypes = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "application/x-excel",
-    ];
-
-    if (!validMimeTypes.includes(file.type)) {
-      return { success: false, error: "Invalid file type" };
-    }
-
-    const validExtensions = [".xlsx", ".xls"];
-    const fileName = file.name.toLowerCase();
-    const hasValidExtension = validExtensions.some((ext) =>
-      fileName.endsWith(ext),
-    );
-
-    if (!hasValidExtension) {
-      return { success: false, error: "Invalid file extension" };
+    if ((await isExcel(file)) === false) {
+      return { success: false, error: "File is not a valid Excel document" };
     }
 
     const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-
-    const isXlsx =
-      bytes[0] === 0x50 &&
-      bytes[1] === 0x4b &&
-      bytes[2] === 0x03 &&
-      bytes[3] === 0x04;
-    const isXls =
-      bytes[0] === 0xd0 &&
-      bytes[1] === 0xcf &&
-      bytes[2] === 0x11 &&
-      bytes[3] === 0xe0 &&
-      bytes[4] === 0xa1 &&
-      bytes[5] === 0xb1 &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0xe1;
-
-    if (!isXlsx && !isXls) {
-      return { success: false, error: "File is not a valid Excel document" };
-    }
 
     const workbook = XLSX.read(buffer, { type: "array" });
     const sheetName = workbook.SheetNames[0];
@@ -199,7 +164,7 @@ export async function uploadEmployeeExcel(
     await createLog({
       action: LogAction.IMPORT_EMPLOYEES,
       details: {
-        userIds: createdEmployees.map((e) => e.id),
+        ids: createdEmployees.map((e) => e.id),
       },
     });
 

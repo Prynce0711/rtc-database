@@ -1,5 +1,5 @@
-import RedirectingUI from "../components/Redirect/RedirectingUI";
+import ExcelImportExportTester from "./ExcelImportExportTester";
 
 export default function page() {
-  return <RedirectingUI />;
+  return <ExcelImportExportTester />;
 }
