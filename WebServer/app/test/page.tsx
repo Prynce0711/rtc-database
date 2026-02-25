@@ -1,5 +1,5 @@
-import ExcelImportExportTester from "./ExcelImportExportTester";
+import SpecialProceedingTester from "./SpecialProceedingTester";
 
 export default function page() {
-  return <ExcelImportExportTester />;
+  return <SpecialProceedingTester />;
 }

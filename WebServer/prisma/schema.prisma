@@ -102,6 +102,7 @@ model Case {
   VCF             Float?
   Total           Float?
   AmountInvolved  Float?
+  createdAt DateTime @default(now())
 }
 
 model Employee{
@@ -122,6 +123,7 @@ model Employee{
   contactPerson String
   contactNumber String?
   email       String?
+  createdAt DateTime @default(now())
 }
 
 model Log {
@@ -138,6 +140,7 @@ model Log {
   user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress   String?
   userAgent   String?
+  createdAt DateTime @default(now())
 }
 
 model User {
@@ -223,4 +226,26 @@ model RecievingLog{
   content String?
   branchNumber String?
   notes String?
+  createdAt DateTime @default(now())
+}
+
+model Petition {
+  id              Int       @id @default(autoincrement())
+  caseNumber      String    @unique
+  petitioner  String?
+  raffledTo String?
+  date       DateTime?
+  nature         String?
+  createdAt DateTime @default(now())
+}
+
+model SpecialProceeding {
+  id              Int       @id @default(autoincrement())
+  caseNumber      String    @unique
+  petitioner  String?
+  raffledTo String?
+  date       DateTime?
+  nature         String?
+  respondent String?
+  createdAt DateTime @default(now())
 }

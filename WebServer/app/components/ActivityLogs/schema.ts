@@ -1,6 +1,7 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
+import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
 import { CaseSchema } from "../Case/schema";
 import { EmployeeSchema } from "../Employee/schema";
@@ -50,6 +51,12 @@ export const CreateLogData = z
           z.object({
             from: ReceivingLogSchema,
             to: ReceivingLogSchema,
+          }),
+        )
+        .or(
+          z.object({
+            from: PetitionSchema,
+            to: PetitionSchema,
           }),
         ),
     }),
