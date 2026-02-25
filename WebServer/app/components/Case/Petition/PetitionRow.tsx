@@ -3,7 +3,7 @@
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { FiEdit, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
-import { ReceiveLog } from "./ReceiveRecord";
+import { ReceiveLog } from "./PetitionRecord";
 
 const ReceiveRow = ({
   log,

@@ -353,6 +353,41 @@ const ReceiveLogsPage: React.FC = () => {
     );
   }
 
+  // If a drawer is requested, render it as the active page instead of embedding it.
+  if (drawerType) {
+    return (
+      <div className="min-h-screen bg-base-100">
+        <main className="w-full">
+          <ReceiveDrawer
+            type={drawerType}
+            onClose={() => {
+              setDrawerType(null);
+              setSelectedLog(null);
+            }}
+            selectedLog={selectedLog}
+            onCreate={(newLog) => {
+              const withId: ReceiveLog = {
+                ...newLog,
+                id: Math.max(0, ...logs.map((l) => l.id)) + 1,
+              };
+              setLogs((prev) => [withId, ...prev]);
+              // return to list view after create
+              setDrawerType(null);
+              setSelectedLog(null);
+            }}
+            onUpdate={(updatedLog) => {
+              setLogs((prev) =>
+                prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
+              );
+              setDrawerType(null);
+              setSelectedLog(null);
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
@@ -605,30 +640,6 @@ const ReceiveLogsPage: React.FC = () => {
             }}
           />
         </div>
-
-        {/* Drawer */}
-        {drawerType && (
-          <ReceiveDrawer
-            type={drawerType}
-            onClose={() => {
-              setDrawerType(null);
-              setSelectedLog(null);
-            }}
-            selectedLog={selectedLog}
-            onCreate={(newLog) => {
-              const withId: ReceiveLog = {
-                ...newLog,
-                id: Math.max(0, ...logs.map((l) => l.id)) + 1,
-              };
-              setLogs((prev) => [withId, ...prev]);
-            }}
-            onUpdate={(updatedLog) => {
-              setLogs((prev) =>
-                prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
-              );
-            }}
-          />
-        )}
       </main>
     </div>
   );
