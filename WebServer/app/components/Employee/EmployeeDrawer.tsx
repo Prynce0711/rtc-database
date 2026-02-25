@@ -65,7 +65,7 @@ const EmployeeDrawer: React.FC<Props> = ({
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 to-sky-400 text-white p-6 rounded-tl-xl flex items-start justify-between gap-4 shadow-md">
+            <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-600 from-blue-600 text-white p-6 rounded-tl-xl flex items-start justify-between gap-4 shadow-md">
               <div>
                 <h2 className="text-2xl md:text-3xl font-semibold leading-tight">
                   {isEdit ? "Edit Employee" : "Add Employee"}
@@ -90,30 +90,20 @@ const EmployeeDrawer: React.FC<Props> = ({
                 onSubmit={handleSave}
                 className="max-w-[1100px] mx-auto space-y-6"
               >
-                <div className="flex items-center gap-4 -mt-6">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center text-xl font-semibold shadow-md">
-                    {initials}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {form.employeeName || "New Employee"}
-                    </h3>
-                    <p className="text-sm text-base-content/60">
-                      {form.position || "Unassigned Position"}
-                    </p>
-                  </div>
-                </div>
+                <div className="flex items-center gap-4 -mt-6"></div>
 
                 {/* Personal Info */}
                 <div className="card rounded-2xl shadow-sm">
                   <div className="card-body p-6">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 rounded-md bg-sky-100 text-sky-600">
-                        <FiUser />
+                      <div className="p-2 rounded-lg bg-sky-100 text-sky-600">
+                        <FiUser size={28} />
                       </div>
                       <div>
-                        <h4 className="font-semibold">Personal Information</h4>
-                        <p className="text-xs text-base-content/60">
+                        <h4 className="font-semibold text-2xl">
+                          Personal Information
+                        </h4>
+                        <p className="text-md text-base-content/60">
                           Name, employee number and basic details
                         </p>
                       </div>

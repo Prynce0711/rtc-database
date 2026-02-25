@@ -125,25 +125,25 @@ const CaseRow = ({
       </td>
       <td>{caseItem.committe1}</td>
       <td>{caseItem.committe2}</td>
-      <td>{(caseItem as any).Judge}</td>
-      <td>{(caseItem as any).AO}</td>
-      <td>{(caseItem as any).Complainant}</td>
-      <td>{(caseItem as any).HouseNo}</td>
-      <td>{(caseItem as any).Street}</td>
-      <td>{(caseItem as any).Barangay}</td>
-      <td>{(caseItem as any).Municipality}</td>
-      <td>{(caseItem as any).Province}</td>
-      <td>{(caseItem as any).Is}</td>
-      <td>{(caseItem as any).Counts}</td>
-      <td>{(caseItem as any).Jdf}</td>
-      <td>{(caseItem as any).Sajj}</td>
-      <td>{(caseItem as any).Sajj2}</td>
-      <td>{(caseItem as any).MF}</td>
-      <td>{(caseItem as any).STF}</td>
-      <td>{(caseItem as any).LRF}</td>
-      <td>{(caseItem as any).VCF}</td>
-      <td>{(caseItem as any).Total}</td>
-      <td>{(caseItem as any).AmountInvolved}</td>
+      <td>{caseItem.Judge}</td>
+      <td>{caseItem.AO}</td>
+      <td>{caseItem.Complainant}</td>
+      <td>{caseItem.HouseNo}</td>
+      <td>{caseItem.Street}</td>
+      <td>{caseItem.Barangay}</td>
+      <td>{caseItem.Municipality}</td>
+      <td>{caseItem.Province}</td>
+      <td>{caseItem.Is}</td>
+      <td>{caseItem.Counts}</td>
+      <td>{caseItem.Jdf}</td>
+      <td>{caseItem.Sajj}</td>
+      <td>{caseItem.Sajj2}</td>
+      <td>{caseItem.MF}</td>
+      <td>{caseItem.STF}</td>
+      <td>{caseItem.LRF}</td>
+      <td>{caseItem.VCF}</td>
+      <td>{caseItem.Total}</td>
+      <td>{caseItem.AmountInvolved}</td>
     </tr>
   );
 };

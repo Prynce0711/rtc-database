@@ -440,12 +440,37 @@ const CasePage: React.FC = () => {
     );
   }
 
+  if (modalType) {
+    return (
+      <NewCaseModal
+        type={modalType}
+        onClose={() => {
+          setModalType(null);
+          setSelectedCase(null);
+          fetchCases();
+        }}
+        selectedCase={selectedCase}
+        onCreate={(newCase) => {
+          setCases((prev) => [...prev, newCase]);
+          sortCases(cases, sortConfig.key, sortConfig.order);
+        }}
+        onUpdate={(updatedCase) => {
+          setCases((prev) =>
+            prev.map((c) =>
+              c.caseNumber === updatedCase.caseNumber ? updatedCase : c,
+            ),
+          );
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
+          <h2 className="text-4xl lg:text-5xl font-medium text-base-content mb-2">
             Case Management
           </h2>
           <p className="text-xl text-base-content/70">Manage all court cases</p>
@@ -658,26 +683,6 @@ const CasePage: React.FC = () => {
             }}
           />
         </div>
-
-        {/* Add/Edit Modal */}
-        {modalType && (
-          <NewCaseModal
-            type={modalType}
-            onClose={() => setModalType(null)}
-            selectedCase={selectedCase}
-            onCreate={(newCase) => {
-              setCases((prev) => [...prev, newCase]);
-              sortCases(cases, sortConfig.key, sortConfig.order);
-            }}
-            onUpdate={(updatedCase) => {
-              setCases((prev) =>
-                prev.map((c) =>
-                  c.caseNumber === updatedCase.caseNumber ? updatedCase : c,
-                ),
-              );
-            }}
-          />
-        )}
       </main>
     </div>
   );
