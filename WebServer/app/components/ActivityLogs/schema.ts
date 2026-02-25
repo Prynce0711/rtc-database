@@ -1,6 +1,7 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
+import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
 import { CaseSchema } from "../Case/schema";
 import { EmployeeSchema } from "../Employee/schema";
 
@@ -40,10 +41,17 @@ export const CreateLogData = z
   .or(
     z.object({
       action: z.literal(LogAction.UPDATE_CASE),
-      details: z.object({
-        from: CaseSchema,
-        to: CaseSchema,
-      }),
+      details: z
+        .object({
+          from: CaseSchema,
+          to: CaseSchema,
+        })
+        .or(
+          z.object({
+            from: ReceivingLogSchema,
+            to: ReceivingLogSchema,
+          }),
+        ),
     }),
   )
   .or(
@@ -71,7 +79,7 @@ export const CreateLogData = z
         .literal(LogAction.IMPORT_CASES)
         .or(z.literal(LogAction.IMPORT_EMPLOYEES)),
       details: z.object({
-        userIds: z.array(z.number()),
+        ids: z.array(z.number()),
       }),
     }),
   )

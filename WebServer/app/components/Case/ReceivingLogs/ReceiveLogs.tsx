@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { RecievingLog } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -14,23 +15,112 @@ import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
-import { deleteReceiveLog, getReceiveLogs } from "./Receive";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
-import {
-  ReceiveLog,
-  calculateReceiveLogStats,
-  sortReceiveLogs,
-} from "./ReceiveRecord";
-import ReceiveRow from "./ReceiveRow";
+import { deleteRecievingLog, getRecievingLogs } from "./RecievingLogsActions";
+
+type ReceiveLog = RecievingLog & {
+  time?: string;
+};
+
+const calculateReceiveLogStats = (logs: ReceiveLog[]) => {
+  const today = new Date().toDateString();
+  const thisMonth = new Date().getMonth();
+  return {
+    total: logs.length,
+    today: logs.filter(
+      (l) => new Date(l.dateRecieved || 0).toDateString() === today,
+    ).length,
+    thisMonth: logs.filter(
+      (l) => new Date(l.dateRecieved || 0).getMonth() === thisMonth,
+    ).length,
+    docTypes: new Set(logs.map((l) => l.caseType)).size,
+  };
+};
+
+const sortReceiveLogs = (
+  logs: ReceiveLog[],
+  key: keyof ReceiveLog,
+  order: "asc" | "desc",
+) => {
+  return [...logs].sort((a, b) => {
+    const aVal = a[key];
+    const bVal = b[key];
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
+    if (aVal < bVal) return order === "asc" ? -1 : 1;
+    if (aVal > bVal) return order === "asc" ? 1 : -1;
+    return 0;
+  });
+};
+
+const formatDate = (date: Date | string | null | undefined): string => {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleDateString();
+};
+
+const extractTime = (date: Date | string | null | undefined): string => {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+};
+
+const ReceiveRow = ({
+  log,
+  onEdit,
+  onDelete,
+  isAdminOrAtty,
+}: {
+  log: ReceiveLog;
+  onEdit: (log: ReceiveLog) => void;
+  onDelete: (log: ReceiveLog) => void;
+  isAdminOrAtty: boolean;
+}) => {
+  const time = extractTime(log.dateRecieved);
+  const date = formatDate(log.dateRecieved);
+
+  return (
+    <tr>
+      {isAdminOrAtty && (
+        <td className="text-center">
+          <div className="flex gap-2 justify-center">
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => onEdit(log)}
+            >
+              Edit
+            </button>
+            <button
+              className="btn btn-sm btn-error"
+              onClick={() => onDelete(log)}
+            >
+              Delete
+            </button>
+          </div>
+        </td>
+      )}
+      <td>{log.bookAndPage || "-"}</td>
+      <td>{date}</td>
+      <td>{log.caseType || "-"}</td>
+      <td>{log.caseNumber || "-"}</td>
+      <td>{log.content || "-"}</td>
+      <td>{log.branchNumber || "-"}</td>
+      <td>{time}</td>
+      <td>{log.notes || "-"}</td>
+    </tr>
+  );
+};
 
 type ReceiveLogFilterValues = {
-  receiptNo?: string;
+  bookAndPage?: string;
   caseNumber?: string;
-  documentType?: string;
-  party?: string;
-  receivedBy?: string;
-  branch?: string;
-  dateReceived?: { start?: string; end?: string };
+  caseType?: string;
+  branchNumber?: string;
+  dateRecieved?: { start?: string; end?: string };
 };
 
 const ReceiveLogsPage: React.FC = () => {
@@ -56,7 +146,7 @@ const ReceiveLogsPage: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ReceiveLog;
     order: "asc" | "desc";
-  }>({ key: "dateReceived", order: "desc" });
+  }>({ key: "dateRecieved", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<ReceiveLogFilterValues>(
     {},
@@ -70,14 +160,13 @@ const ReceiveLogsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const receiveFilterOptions: FilterOption[] = [
-    { key: "Book And Pages", label: "Book and pages", type: "text" },
-    { key: "Date Received", label: "Date Received", type: "daterange" },
-    { key: "Abbreviation", label: "Abbreviation", type: "text" },
-    { key: "Case No", label: "Case No.", type: "text" },
-    { key: "Content ", label: "Content", type: "text" },
-    { key: "Branch No", label: "Branch No.", type: "text" },
-    { key: "Time", label: "Time ", type: "text" },
-    { key: " Notes", label: "Notes ", type: "text" },
+    { key: "bookAndPage", label: "Book and Pages", type: "text" },
+    { key: "dateRecieved", label: "Date Received", type: "daterange" },
+    { key: "caseType", label: "Case Type", type: "text" },
+    { key: "caseNumber", label: "Case Number", type: "text" },
+    { key: "content", label: "Content", type: "text" },
+    { key: "branchNumber", label: "Branch Number", type: "text" },
+    { key: "notes", label: "Notes", type: "text" },
   ];
 
   useEffect(() => {
@@ -92,14 +181,18 @@ const ReceiveLogsPage: React.FC = () => {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const response = await getReceiveLogs();
+      const response = await getRecievingLogs();
       if (!response.success) {
         statusPopup.showError(
           response.error || "Failed to fetch receiving logs",
         );
         return;
       }
-      setLogs(response.result);
+      const logsWithTime = response.result.map((log) => ({
+        ...log,
+        time: extractTime(log.dateRecieved),
+      }));
+      setLogs(logsWithTime as ReceiveLog[]);
       setError(null);
     } catch (err) {
       setError(
@@ -149,19 +242,20 @@ const ReceiveLogsPage: React.FC = () => {
   ): ReceiveLog[] => {
     return items.filter((log) => {
       const matchesText = (
-        itemVal: string,
+        itemVal: string | null | undefined,
         filterVal: string,
         key: string,
       ): boolean => {
+        if (!itemVal) return false;
         const isExact = exactMap[key] ?? true;
-        return isExact
-          ? itemVal.toLowerCase() === filterVal.toLowerCase()
-          : itemVal.toLowerCase().includes(filterVal.toLowerCase());
+        const itemStr = itemVal.toString().toLowerCase();
+        const filterStr = filterVal.toLowerCase();
+        return isExact ? itemStr === filterStr : itemStr.includes(filterStr);
       };
 
       if (
-        filters.receiptNo &&
-        !matchesText(log.receiptNo, filters.receiptNo, "receiptNo")
+        filters.bookAndPage &&
+        !matchesText(log.bookAndPage, filters.bookAndPage, "bookAndPage")
       )
         return false;
       if (
@@ -170,28 +264,24 @@ const ReceiveLogsPage: React.FC = () => {
       )
         return false;
       if (
-        filters.documentType &&
-        !matchesText(log.documentType, filters.documentType, "documentType")
+        filters.caseType &&
+        !matchesText(log.caseType, filters.caseType, "caseType")
       )
-        return false;
-      if (filters.party && !matchesText(log.party, filters.party, "party"))
         return false;
       if (
-        filters.receivedBy &&
-        !matchesText(log.receivedBy, filters.receivedBy, "receivedBy")
+        filters.branchNumber &&
+        !matchesText(log.branchNumber, filters.branchNumber, "branchNumber")
       )
         return false;
-      if (filters.branch && !matchesText(log.branch, filters.branch, "branch"))
-        return false;
 
-      if (filters.dateReceived) {
-        const d = new Date(log.dateReceived);
+      if (filters.dateRecieved) {
+        const d = new Date(log.dateRecieved || 0);
         if (
-          filters.dateReceived.start &&
-          d < new Date(filters.dateReceived.start)
+          filters.dateRecieved.start &&
+          d < new Date(filters.dateRecieved.start)
         )
           return false;
-        if (filters.dateReceived.end && d > new Date(filters.dateReceived.end))
+        if (filters.dateRecieved.end && d > new Date(filters.dateRecieved.end))
           return false;
       }
       return true;
@@ -210,18 +300,19 @@ const ReceiveLogsPage: React.FC = () => {
 
   const getSuggestions = (key: string, inputValue: string): string[] => {
     const textFields = [
-      "receiptNo",
+      "bookAndPage",
       "caseNumber",
-      "documentType",
-      "party",
-      "receivedBy",
-      "branch",
+      "caseType",
+      "branchNumber",
+      "content",
+      "notes",
     ];
     if (!textFields.includes(key)) return [];
     const values = logs
-      .map(
-        (l) => (l[key as keyof ReceiveLog] as string | null | undefined) || "",
-      )
+      .map((l) => {
+        const val = l[key as keyof ReceiveLog];
+        return val ? val.toString() : "";
+      })
       .filter((v) => v.length > 0);
     const unique = Array.from(new Set(values)).sort();
     if (!inputValue) return unique;
@@ -237,7 +328,7 @@ const ReceiveLogsPage: React.FC = () => {
       ))
     )
       return;
-    const result = await deleteReceiveLog(logId);
+    const result = await deleteRecievingLog(logId);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete");
       return;
@@ -462,22 +553,22 @@ const ReceiveLogsPage: React.FC = () => {
                     },
                   ]
                 : []),
-              { key: "BookAndPages", label: "Book And Pages", sortable: true },
+              { key: "bookAndPage", label: "Book And Pages", sortable: true },
               {
-                key: "dateReceived",
+                key: "dateRecieved",
                 label: "Date Received",
                 sortable: true,
               },
-              { key: "Abbreviation", label: "Abbreviation", sortable: true },
-              { key: "Case No", label: "Case Number", sortable: true },
+              { key: "caseType", label: "Abbreviation", sortable: true },
+              { key: "caseNumber", label: "Case Number", sortable: true },
               {
-                key: "Content",
+                key: "content",
                 label: "Content",
                 sortable: true,
               },
-              { key: "Branch No", label: "Branch No", sortable: true },
-              { key: "Time", label: "Time", sortable: true },
-              { key: "Notes", label: "Notes", sortable: true },
+              { key: "branchNumber", label: "Branch No", sortable: true },
+              { key: "time", label: "Time", sortable: false },
+              { key: "notes", label: "Notes", sortable: true },
             ]}
             data={paginatedLogs as unknown as Record<string, unknown>[]}
             sortConfig={
@@ -492,6 +583,7 @@ const ReceiveLogsPage: React.FC = () => {
               <ReceiveRow
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
+                isAdminOrAtty={isAdminOrAtty}
                 onEdit={(l) => {
                   setSelectedLog(l);
                   setDrawerType(ReceiveDrawerType.EDIT);

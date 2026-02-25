@@ -6,6 +6,7 @@ import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { isExcel } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
@@ -21,51 +22,12 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
     if (!sessionResult.success) {
       return sessionResult;
     }
-    // Validate file type
-    const validMimeTypes = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "application/x-excel",
-    ];
 
-    if (!validMimeTypes.includes(file.type)) {
-      return { success: false, error: "Invalid file type" };
-    }
-
-    // Validate file extension
-    const validExtensions = [".xlsx", ".xls"];
-    const fileName = file.name.toLowerCase();
-    const hasValidExtension = validExtensions.some((ext) =>
-      fileName.endsWith(ext),
-    );
-
-    if (!hasValidExtension) {
-      return { success: false, error: "Invalid file extension" };
-    }
-
-    // Read file buffer and validate magic bytes
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-
-    // Check for Excel file signatures
-    const isXlsx =
-      bytes[0] === 0x50 &&
-      bytes[1] === 0x4b &&
-      bytes[2] === 0x03 &&
-      bytes[3] === 0x04; // PK.. (ZIP file)
-    const isXls =
-      bytes[0] === 0xd0 &&
-      bytes[1] === 0xcf &&
-      bytes[2] === 0x11 &&
-      bytes[3] === 0xe0 &&
-      bytes[4] === 0xa1 &&
-      bytes[5] === 0xb1 &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0xe1; // OLE2 compound document
-
-    if (!isXlsx && !isXls) {
+    if ((await isExcel(file)) === false) {
       return { success: false, error: "File is not a valid Excel document" };
     }
+
+    const buffer = await file.arrayBuffer();
 
     // Parse the Excel file
     const workbook = XLSX.read(buffer, { type: "array" });
@@ -165,7 +127,7 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
     await createLog({
       action: LogAction.IMPORT_CASES,
       details: {
-        userIds: createdCases.map((c) => c.id),
+        ids: createdCases.map((c) => c.id),
       },
     });
 
