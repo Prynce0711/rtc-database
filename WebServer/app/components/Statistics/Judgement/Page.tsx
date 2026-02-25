@@ -1,7 +1,5 @@
 "use client";
 
-import React from "react";
-
 export default function JudgementPage() {
   return (
     <div className="space-y-6">
