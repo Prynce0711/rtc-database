@@ -522,7 +522,6 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
 
   return (
     <div className="rv-card">
-      {/* ── Hero: key identifiers at a glance ── */}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -551,11 +550,8 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
         </div>
       </div>
 
-      {/* ── Body ── */}
       <div className="rv-body">
-        {/* Left: all field sections */}
         <div className="rv-body-main">
-          {/* Case Identity */}
           <div className="rv-section">
             <div className="rv-section-header">
               <FiFileText size={13} />
@@ -624,7 +620,6 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
             </div>
           </div>
 
-          {/* Personnel */}
           <div className="rv-section">
             <div className="rv-section-header">
               <FiUsers size={13} />
@@ -668,7 +663,6 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
             </div>
           </div>
 
-          {/* Address */}
           {filledAddress && (
             <div className="rv-section">
               <div className="rv-section-header">
@@ -680,7 +674,6 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
           )}
         </div>
 
-        {/* Right: financials */}
         {financialRows.length > 0 && (
           <div className="rv-fin-sidebar">
             <div className="rv-section-header" style={{ marginBottom: 12 }}>
@@ -940,326 +933,9 @@ const NewCaseModal = ({
 
   return (
     <>
-      <style>{`
-        .xls-root {
-          font-family: var(--font-montserrat), ui-sans-serif, system-ui;
-          min-height: 100vh;
-          background: var(--color-base-200);
-          color: var(--color-base-content);
-          -webkit-font-smoothing: antialiased;
-          display: flex; flex-direction: column;
-        }
-
-        /* ══ TOPBAR ══ */
-        .xls-topbar {
-          position: sticky; top: 0; z-index: 60;
-          background: var(--surface-glass-strong);
-          backdrop-filter: blur(18px) saturate(1.6);
-          border-bottom: 1px solid var(--surface-border);
-          padding: 0 32px; height: 68px;
-          display: flex; align-items: center; justify-content: space-between; gap: 16px;
-          box-shadow: var(--shadow-xs);
-        }
-        .xls-topbar-left  { display: flex; align-items: center; gap: 14px; }
-        .xls-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .xls-back-btn {
-          width: 38px; height: 38px; border-radius: var(--radius-sm);
-          border: 1px solid var(--surface-border); background: var(--surface-card);
-          display: flex; align-items: center; justify-content: center;
-          cursor: pointer; color: var(--color-muted); transition: all var(--transition-fast);
-        }
-        .xls-back-btn:hover { background: var(--surface-hover); color: var(--color-base-content); border-color: var(--surface-border-strong); }
-        .xls-breadcrumb { display: flex; align-items: center; gap: 7px; font-size: 15.5px; color: var(--color-muted); font-weight: 500; }
-        .xls-breadcrumb-sep { opacity: 0.3; }
-        .xls-breadcrumb-current { color: var(--color-base-content); font-weight: 700; }
-
-        .xls-stepper { display: flex; align-items: center; background: var(--surface-inset); border-radius: var(--radius-pill); padding: 4px; border: 1px solid var(--surface-border); }
-        .xls-step { display: flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 600; color: var(--color-muted); transition: all var(--transition-base); white-space: nowrap; }
-        .xls-step.active { background: var(--color-primary); color: var(--color-primary-content); }
-        .xls-step.done { color: var(--color-success); }
-        .xls-step-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.08); flex-shrink: 0; font-size: 12px; }
-        .xls-step.active .xls-step-dot { background: rgba(255,255,255,0.12); }
-        .xls-step.done .xls-step-dot { background: var(--color-success-soft); color: var(--color-success); }
-
-        /* ── Buttons ── */
-        .xls-btn { display: inline-flex; align-items: center; gap: 8px; padding: 0 22px; height: 42px; border-radius: var(--radius-field); font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; transition: all var(--transition-fast); white-space: nowrap; }
-        .xls-btn-ghost { background: transparent; color: var(--color-muted); border: 1px solid var(--surface-border); }
-        .xls-btn-ghost:hover { background: var(--surface-hover); color: var(--color-base-content); border-color: var(--surface-border-strong); }
-        .xls-btn-primary { background: var(--color-primary); color: var(--color-primary-content); }
-        .xls-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
-        .xls-btn-primary:active { transform: none; }
-        .xls-btn-success { background: var(--color-success); color: var(--color-success-content); box-shadow: var(--shadow-xs); }
-        .xls-btn-success:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
-        .xls-btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
-        .xls-btn-outline { background: transparent; color: var(--color-base-content); border: 1.5px solid var(--surface-border-strong); }
-        .xls-btn-outline:hover { background: var(--surface-hover); }
-        .xls-btn-icon { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); background: var(--surface-card); color: var(--color-muted); border: 1px solid var(--surface-border); cursor: pointer; transition: all var(--transition-fast); font-family: inherit; flex-shrink: 0; }
-        .xls-btn-icon:hover { background: var(--surface-hover); color: var(--color-base-content); border-color: var(--surface-border-strong); }
-        .xls-btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        /* ══ MAIN ══ */
-        .xls-main { padding: 28px 32px 64px; display: flex; flex-direction: column; gap: 20px; }
-        .xls-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-        .xls-title { font-size: 28px; font-weight: 700; letter-spacing: -0.6px; margin: 0 0 6px; }
-        .xls-subtitle { font-size: 15.5px; color: var(--color-muted); margin: 0; line-height: 1.55; }
-        .xls-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-        .xls-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; }
-        .xls-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.55; }
-        .xls-pill-neutral { background: var(--surface-inset); color: var(--color-muted); border: 1px solid var(--surface-border); }
-        .xls-pill-ok { background: var(--color-success-soft); color: var(--color-success); }
-        .xls-pill-err { background: var(--color-error-soft); color: var(--color-error); }
-        .xls-progress { height: 4px; background: var(--surface-border); border-radius: 99px; overflow: hidden; }
-        .xls-progress-fill { height: 100%; background: var(--color-primary); border-radius: 99px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
-
-        /* ══ SHEET ══ */
-        .xls-sheet-wrap { background: var(--surface-card); border: 1px solid var(--surface-border); border-radius: var(--radius-box); overflow: hidden; box-shadow: var(--shadow-soft); }
-        .xls-tab-bar { display: flex; align-items: stretch; background: var(--color-base-200); border-bottom: 1px solid var(--surface-border-strong); overflow-x: auto; scrollbar-width: none; gap: 1px; padding: 0 12px; }
-        .xls-tab-bar::-webkit-scrollbar { display: none; }
-        .xls-tab { display: flex; align-items: center; gap: 8px; padding: 0 20px; height: 50px; font-size: 14.5px; font-weight: 600; cursor: pointer; border: none; background: transparent; font-family: inherit; white-space: nowrap; color: var(--color-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all var(--transition-fast); flex-shrink: 0; }
-        .xls-tab:hover { color: var(--color-base-content); background: var(--surface-hover); }
-        .xls-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); background: var(--surface-card); }
-        .xls-tab-errbadge { min-width: 18px; height: 18px; border-radius: 9px; background: var(--color-error); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
-
-        .xls-table-outer { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 360px); position: relative; }
-        .xls-table { border-collapse: collapse; table-layout: fixed; font-size: 15px; }
-        .xls-table thead { position: sticky; top: 0; z-index: 20; }
-        .xls-thead-group th { background: var(--color-base-100); border-bottom: 1px solid var(--surface-border); padding: 0; height: 30px; }
-        .xls-group-label { display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-subtle); white-space: nowrap; height: 100%; }
-        .xls-thead-cols th { background: var(--color-base-200); border-bottom: 1.5px solid var(--surface-border-strong); padding: 11px 14px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-muted); text-align: left; white-space: nowrap; }
-        .xls-thead-cols th.req-col::after { content: ' *'; color: var(--color-error); font-size: 13px; }
-        .xls-frozen { position: sticky; background: inherit; z-index: 10; }
-        .xls-frozen::after { content: ''; position: absolute; top: 0; right: -1px; bottom: 0; width: 1px; background: var(--surface-border-strong); }
-        .xls-thead-group th.xls-frozen::after, .xls-thead-cols th.xls-frozen::after { content: ''; position: absolute; top: 0; right: -1px; bottom: 0; width: 1px; background: var(--surface-border-strong); }
-        .xls-thead-cols th.xls-frozen { z-index: 25; }
-        .xls-thead-group th.xls-frozen { z-index: 25; }
-
-        .xls-row { border-bottom: 1px solid var(--surface-border); transition: background var(--transition-fast); }
-        .xls-row:last-child { border-bottom: none; }
-        .xls-row:hover { background: var(--surface-hover); }
-        .xls-row:hover .xls-frozen { background: var(--surface-hover); }
-        .xls-row.row-ok { background: var(--color-success-soft); }
-        .xls-row.row-ok:hover { background: oklch(93% 0.035 155); }
-        .xls-row.row-ok .xls-frozen { background: var(--color-success-soft); }
-        .xls-row.row-ok:hover .xls-frozen { background: oklch(93% 0.035 155); }
-        .xls-row.row-err { background: var(--color-error-soft); }
-        .xls-row.row-err:hover { background: oklch(93% 0.055 25); }
-        .xls-row.row-err .xls-frozen { background: var(--color-error-soft); }
-        .xls-row td { padding: 0; vertical-align: top; }
-        .xls-row td.td-num { text-align: center; vertical-align: middle; padding: 0 8px; position: sticky; left: 0; z-index: 10; background: inherit; }
-        .xls-row td.td-actions { vertical-align: middle; padding: 4px 8px; }
-        .xls-rownum { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; font-size: 12px; font-weight: 700; background: var(--surface-inset); color: var(--color-muted); transition: all var(--transition-fast); }
-        .xls-rownum.ok { background: var(--color-success-soft); color: var(--color-success); }
-        .xls-rownum.err { background: var(--color-error-soft); color: var(--color-error); }
-
-        .xls-input { height: 44px; padding: 0 14px; background: transparent; border: none; outline: none; font-size: 15px; font-family: inherit; color: var(--color-base-content); width: 100%; transition: background var(--transition-fast), box-shadow var(--transition-fast); display: block; }
-        .xls-input.xls-mono { font-size: 14.5px; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
-        .xls-input::placeholder { color: var(--color-subtle); }
-        .xls-input:focus { background: var(--color-highlight); box-shadow: inset 0 0 0 2px var(--color-primary); border-radius: 4px; outline: none; }
-        .xls-input-err { background: var(--color-error-soft); box-shadow: inset 0 0 0 2px var(--color-error); border-radius: 4px; }
-        .xls-input-err:focus { box-shadow: inset 0 0 0 2px var(--color-error); }
-        .xls-cell-err { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--color-error); padding: 3px 14px 5px; }
-        .xls-checkbox { width: 19px; height: 19px; border: 1.5px solid var(--surface-border-strong); border-radius: 5px; cursor: pointer; appearance: none; background: var(--surface-card); transition: all var(--transition-fast); position: relative; }
-        .xls-checkbox:checked { background: var(--color-error); border-color: var(--color-error); }
-        .xls-checkbox:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 6px; height: 10px; border: 2px solid #fff; border-top: none; border-left: none; transform: rotate(45deg); }
-        .xls-row-actions { display: flex; gap: 3px; justify-content: center; }
-        .xls-row-btn { width: 32px; height: 32px; border-radius: var(--radius-xs); border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--color-muted); transition: all var(--transition-fast); }
-        .xls-row-btn:hover { background: var(--surface-hover); color: var(--color-base-content); }
-        .xls-row-btn.del:hover { background: var(--color-error-soft); color: var(--color-error); }
-        .xls-add-row { width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 14px; background: var(--surface-card); border: none; border-top: 1px dashed var(--surface-border-strong); cursor: pointer; font-size: 15px; font-weight: 600; color: var(--color-muted); font-family: inherit; transition: all var(--transition-fast); }
-        .xls-add-row:hover { background: var(--surface-hover); color: var(--color-base-content); }
-        .xls-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
-        .xls-footer-meta { font-size: 15px; color: var(--color-muted); display: flex; align-items: center; gap: 10px; }
-        .xls-footer-meta strong { color: var(--color-base-content); }
-        .xls-footer-right { display: flex; gap: 8px; }
-
-        /* ══ REVIEW — redesigned ══ */
-
-        /* Top summary strip */
-        .rv-summary {
-          display: flex; align-items: center; justify-content: space-between;
-          background: var(--surface-card);
-          border: 1px solid var(--surface-border);
-          border-radius: var(--radius-box);
-          padding: 18px 24px; gap: 20px; flex-wrap: wrap;
-          box-shadow: var(--shadow-xs);
-        }
-        .rv-summary-left { display: flex; align-items: center; gap: 14px; }
-        .rv-summary-icon {
-          width: 42px; height: 42px; border-radius: var(--radius-sm);
-          background: var(--surface-inset);
-          display: flex; align-items: center; justify-content: center;
-          color: var(--color-primary); flex-shrink: 0;
-        }
-        .rv-summary-title { font-size: 17px; font-weight: 700; margin: 0 0 3px; }
-        .rv-summary-sub { font-size: 14px; color: var(--color-muted); margin: 0; }
-
-        /* Wrapper: sidebar + card */
-        .rv-layout {
-          display: flex;
-          background: var(--surface-card);
-          border: 1px solid var(--surface-border);
-          border-radius: var(--radius-box);
-          overflow: hidden;
-          box-shadow: var(--shadow-soft);
-        }
-
-        /* Case list sidebar (multi-case only) */
-        .rv-sidebar {
-          width: 210px; flex-shrink: 0;
-          border-right: 1px solid var(--surface-border);
-          background: var(--color-base-200);
-          display: flex; flex-direction: column;
-        }
-        .rv-sidebar-head {
-          padding: 13px 16px 10px;
-          font-size: 11px; font-weight: 800;
-          text-transform: uppercase; letter-spacing: 0.09em;
-          color: var(--color-subtle);
-          border-bottom: 1px solid var(--surface-border);
-          flex-shrink: 0;
-        }
-        .rv-sidebar-list { overflow-y: auto; flex: 1; }
-        .rv-sidebar-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 11px 14px;
-          border-bottom: 1px solid var(--surface-border);
-          border-left: 3px solid transparent;
-          background: transparent; width: 100%;
-          text-align: left; font-family: inherit; cursor: pointer; border-top: none; border-right: none;
-          transition: all var(--transition-fast);
-        }
-        .rv-sidebar-item:last-child { border-bottom: none; }
-        .rv-sidebar-item:hover { background: var(--surface-hover); }
-        .rv-sidebar-item.active {
-          background: var(--surface-card);
-          border-left-color: var(--color-primary);
-        }
-        .rv-sidebar-num {
-          width: 24px; height: 24px; border-radius: 5px; flex-shrink: 0;
-          background: var(--surface-border); color: var(--color-muted);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 700;
-          transition: all var(--transition-fast);
-        }
-        .rv-sidebar-item.active .rv-sidebar-num {
-          background: var(--color-primary);
-          color: var(--color-primary-content);
-        }
-        .rv-sidebar-info { flex: 1; min-width: 0; }
-        .rv-sidebar-casenum { font-size: 12.5px; font-weight: 700; color: var(--color-base-content); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-        .rv-sidebar-name { font-size: 12px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-
-        /* Content panel */
-        .rv-panel {
-          flex: 1; overflow-y: auto;
-          max-height: calc(100vh - 310px);
-        }
-
-        /* Card */
-        .rv-card { display: flex; flex-direction: column; }
-
-        /* Hero */
-        .rv-hero {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          gap: 16px; padding: 22px 26px 20px;
-          border-bottom: 1px solid var(--surface-border);
-          background: var(--color-base-100);
-          flex-wrap: wrap;
-        }
-        .rv-hero-casenum {
-          font-size: 12px; font-weight: 800; letter-spacing: 0.07em;
-          text-transform: uppercase; color: var(--color-primary); margin-bottom: 7px;
-          font-variant-numeric: tabular-nums;
-        }
-        .rv-hero-name { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; line-height: 1.2; }
-        .rv-hero-charge { font-size: 15px; color: var(--color-muted); }
-        .rv-hero-badges { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; flex-direction: column; }
-
-        /* Badges */
-        .rv-badge {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 4px 12px; border-radius: var(--radius-pill);
-          font-size: 13px; font-weight: 700; white-space: nowrap;
-        }
-        .rv-badge-detained { background: var(--color-error-soft); color: var(--color-error); }
-        .rv-badge-released { background: var(--color-success-soft); color: var(--color-success); }
-        .rv-badge-court { background: var(--surface-inset); color: var(--color-muted); border: 1px solid var(--surface-border); font-weight: 600; font-size: 12.5px; }
-
-        /* Body */
-        .rv-body { display: flex; }
-        .rv-body-main { flex: 1; min-width: 0; }
-
-        /* Sections */
-        .rv-section { padding: 18px 26px; border-bottom: 1px solid var(--surface-border); }
-        .rv-section:last-child { border-bottom: none; }
-        .rv-section-header {
-          display: flex; align-items: center; gap: 7px;
-          font-size: 11.5px; font-weight: 800;
-          text-transform: uppercase; letter-spacing: 0.09em;
-          color: var(--color-subtle); margin-bottom: 14px;
-        }
-        .rv-grid { display: grid; gap: 0; }
-        .rv-grid-2 { grid-template-columns: repeat(2, 1fr); }
-        .rv-grid-3 { grid-template-columns: repeat(3, 1fr); }
-
-        .rv-field { padding: 8px 12px 8px 0; }
-        .rv-field-label {
-          font-size: 11px; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.07em;
-          color: var(--color-subtle); margin-bottom: 4px;
-        }
-        .rv-field-value { font-size: 15px; font-weight: 500; color: var(--color-base-content); line-height: 1.4; }
-        .rv-field-value.rv-mono { font-variant-numeric: tabular-nums; font-size: 14.5px; }
-        .rv-empty { color: var(--color-subtle); font-style: italic; font-size: 14px; }
-
-        /* Address */
-        .rv-address-line {
-          font-size: 15px; color: var(--color-base-content);
-          background: var(--surface-inset);
-          border: 1px solid var(--surface-border);
-          border-radius: var(--radius-sm);
-          padding: 10px 14px; line-height: 1.5;
-        }
-
-        /* Financial sidebar */
-        .rv-fin-sidebar {
-          width: 220px; flex-shrink: 0;
-          border-left: 1px solid var(--surface-border);
-          background: var(--color-base-200);
-          padding: 18px 16px;
-          position: sticky; top: 0; align-self: flex-start;
-        }
-        .rv-fin-table { display: flex; flex-direction: column; }
-        .rv-fin-row {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 7px 8px; border-radius: var(--radius-xs);
-        }
-        .rv-fin-row:hover { background: var(--surface-hover); }
-        .rv-fin-total {
-          background: var(--surface-card);
-          border: 1px solid var(--surface-border);
-          border-radius: var(--radius-sm);
-          margin-top: 8px; padding: 10px 10px;
-        }
-        .rv-fin-total:hover { background: var(--surface-hover); }
-        .rv-fin-label { font-size: 12.5px; font-weight: 600; color: var(--color-muted); }
-        .rv-fin-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--color-base-content); }
-        .rv-fin-total .rv-fin-label { font-size: 13px; font-weight: 700; color: var(--color-base-content); }
-        .rv-fin-total .rv-fin-value { font-size: 15px; font-weight: 700; color: var(--color-primary); }
-
-        /* Pager */
-        .rv-pager { display: flex; align-items: center; gap: 8px; }
-        .rv-pager-info { font-size: 14px; font-weight: 600; color: var(--color-muted); min-width: 50px; text-align: center; }
-
-        /* Spinner */
-        .xls-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: _xlsspin 0.65s linear infinite; flex-shrink: 0; }
-        @keyframes _xlsspin { to { transform: rotate(360deg); } }
-        .xls-kbd { display: inline-block; padding: 2px 7px; background: var(--surface-inset); border: 1px solid var(--surface-border-strong); border-radius: 5px; font-size: 13px; color: var(--color-muted); margin: 0 2px; }
-      `}</style>
-
       <div className="xls-root">
         {/* ══ TOPBAR ══ */}
-        <div className="xls-topbar">
+        <div className="bg-base-100 xls-topbar">
           <div className="xls-topbar-left">
             <button
               className="xls-back-btn"
@@ -1311,7 +987,7 @@ const NewCaseModal = ({
           {step === "entry" ? (
             <motion.div
               key="entry"
-              className="xls-main"
+              className="bg-base-100 xls-main"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -1319,10 +995,10 @@ const NewCaseModal = ({
             >
               <div className="xls-title-row">
                 <div>
-                  <h1 className="xls-title">
+                  <h1 className="text-5xl xls-title">
                     {isEdit ? "Edit Case Record" : "New Case Entries"}
                   </h1>
-                  <p className="xls-subtitle">
+                  <p className="text-lg mb-9 xls-subtitle">
                     {isEdit ? (
                       "Update case details. Required fields are marked *."
                     ) : (
@@ -1396,23 +1072,8 @@ const NewCaseModal = ({
                     </colgroup>
                     <thead>
                       <tr className="xls-thead-group">
-                        <th
-                          style={{
-                            width: ROW_NUM_W,
-                            position: "sticky",
-                            left: 0,
-                            zIndex: 25,
-                            background: "var(--color-base-100)",
-                          }}
-                        />
-                        <th
-                          colSpan={FROZEN_COLS.length}
-                          className="xls-frozen"
-                          style={{
-                            left: ROW_NUM_W,
-                            background: "var(--color-base-100)",
-                          }}
-                        >
+                        <th style={{ width: ROW_NUM_W }} />
+                        <th colSpan={FROZEN_COLS.length}>
                           <div className="xls-group-label">Identity</div>
                         </th>
                         <th colSpan={currentTabCols.length}>
@@ -1423,37 +1084,15 @@ const NewCaseModal = ({
                         <th />
                       </tr>
                       <tr className="xls-thead-cols">
-                        <th
-                          style={{
-                            textAlign: "center",
-                            position: "sticky",
-                            left: 0,
-                            zIndex: 25,
-                            background: "var(--color-base-200)",
-                          }}
-                        >
-                          #
-                        </th>
-                        {FROZEN_COLS.map((col, fi) => {
-                          const leftOffset =
-                            ROW_NUM_W +
-                            FROZEN_COLS.slice(0, fi).reduce(
-                              (s, c) => s + c.width,
-                              0,
-                            );
-                          return (
-                            <th
-                              key={col.key}
-                              className={`xls-frozen${col.required ? " req-col" : ""}`}
-                              style={{
-                                left: leftOffset,
-                                background: "var(--color-base-200)",
-                              }}
-                            >
-                              {col.label}
-                            </th>
-                          );
-                        })}
+                        <th style={{ textAlign: "center" }}>#</th>
+                        {FROZEN_COLS.map((col) => (
+                          <th
+                            key={col.key}
+                            className={col.required ? "req-col" : ""}
+                          >
+                            {col.label}
+                          </th>
+                        ))}
                         {currentTabCols.map((col) => (
                           <th
                             key={col.key}
@@ -1468,18 +1107,6 @@ const NewCaseModal = ({
                     <tbody>
                       <AnimatePresence initial={false}>
                         {entries.map((entry, rowIdx) => {
-                          const hasErrors =
-                            Object.keys(entry.errors).length > 0;
-                          const isComplete = REQUIRED_FIELDS.every(
-                            (k) =>
-                              entry[k as keyof FormEntry] &&
-                              String(entry[k as keyof FormEntry]).trim() !== "",
-                          );
-                          const rowClass = hasErrors
-                            ? "row-err"
-                            : isComplete
-                              ? "row-ok"
-                              : "";
                           const lastColIdx = currentTabCols.length - 1;
                           return (
                             <motion.tr
@@ -1494,52 +1121,30 @@ const NewCaseModal = ({
                                 overflow: "hidden",
                               }}
                               transition={{ duration: 0.12 }}
-                              className={`xls-row ${rowClass}`}
+                              className="xls-row"
                             >
                               <td className="td-num">
-                                <span
-                                  className={`xls-rownum${hasErrors ? " err" : isComplete ? " ok" : ""}`}
-                                >
-                                  {isComplete && !hasErrors ? (
-                                    <FiCheck size={11} strokeWidth={3} />
-                                  ) : hasErrors ? (
-                                    <FiAlertCircle size={11} />
-                                  ) : (
-                                    rowIdx + 1
-                                  )}
-                                </span>
+                                <span className="xls-rownum">{rowIdx + 1}</span>
                               </td>
-                              {FROZEN_COLS.map((col, fi) => {
-                                const leftOffset =
-                                  ROW_NUM_W +
-                                  FROZEN_COLS.slice(0, fi).reduce(
-                                    (s, c) => s + c.width,
-                                    0,
-                                  );
-                                return (
-                                  <td
-                                    key={col.key}
-                                    className="xls-frozen"
-                                    style={{ left: leftOffset }}
-                                  >
-                                    <CellInput
-                                      col={col}
-                                      value={
-                                        (
-                                          entry as unknown as Record<
-                                            string,
-                                            string | boolean
-                                          >
-                                        )[col.key]
-                                      }
-                                      error={entry.errors[col.key]}
-                                      onChange={(v) =>
-                                        handleChange(entry.id, col.key, v)
-                                      }
-                                    />
-                                  </td>
-                                );
-                              })}
+                              {FROZEN_COLS.map((col) => (
+                                <td key={col.key}>
+                                  <CellInput
+                                    col={col}
+                                    value={
+                                      (
+                                        entry as unknown as Record<
+                                          string,
+                                          string | boolean
+                                        >
+                                      )[col.key]
+                                    }
+                                    error={entry.errors[col.key]}
+                                    onChange={(v) =>
+                                      handleChange(entry.id, col.key, v)
+                                    }
+                                  />
+                                </td>
+                              ))}
                               {currentTabCols.map((col, colIdx) => (
                                 <td key={col.key}>
                                   <CellInput
@@ -1639,7 +1244,6 @@ const NewCaseModal = ({
               </div>
             </motion.div>
           ) : (
-            /* ══ REVIEW — redesigned ══ */
             <motion.div
               key="review"
               className="xls-main"
@@ -1648,7 +1252,6 @@ const NewCaseModal = ({
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.15 }}
             >
-              {/* Summary strip */}
               <div className="rv-summary">
                 <div className="rv-summary-left">
                   <div className="rv-summary-icon">
@@ -1678,9 +1281,7 @@ const NewCaseModal = ({
                 </button>
               </div>
 
-              {/* Case layout: sidebar + detail panel */}
               <div className="rv-layout">
-                {/* Sidebar — only for multi-case */}
                 {entries.length > 1 && (
                   <div className="rv-sidebar">
                     <div className="rv-sidebar-head">
@@ -1707,8 +1308,6 @@ const NewCaseModal = ({
                     </div>
                   </div>
                 )}
-
-                {/* Detail panel */}
                 <div className="rv-panel">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -1724,7 +1323,6 @@ const NewCaseModal = ({
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="xls-footer">
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button

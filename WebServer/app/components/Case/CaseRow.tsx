@@ -104,12 +104,12 @@ const CaseRow = ({
       {/* DETENTION STATUS (GLASS STYLE) */}
       <td className="text-center">
         <span
-          className={`px-3 py-1 rounded-full backdrop-blur-md border text-xs font-medium
-            ${
-              caseItem.detained
-                ? "bg-red-500/15 text-red-600 border-red-400/30"
-                : "bg-emerald-500/15 text-emerald-600 border-emerald-400/30"
-            }`}
+          className={`px-3 py-1 rounded-full border text-xs font-medium transition
+    ${
+      caseItem.detained
+        ? "bg-gray-100 text-gray-500 border-gray-200" // Detained (light gray)
+        : "bg-neutral-800 text-white border-neutral-700" // Free (soft black)
+    }`}
         >
           {caseItem.detained ? "Detained" : "Free"}
         </span>
