@@ -192,7 +192,6 @@ export default function CaseDetailsPage() {
                   Financial Details
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <Detail label="IS" value={caseData.Is} />
                   <Detail label="Counts" value={caseData.Counts} />
                   <Detail label="JDF" value={caseData.Jdf} />
                   <Detail label="SAJJ" value={caseData.Sajj} />

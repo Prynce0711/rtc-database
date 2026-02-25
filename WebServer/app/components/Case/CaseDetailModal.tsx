@@ -98,6 +98,10 @@ const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   <DetailItem label="Charge" value={caseData.charge} />
                   <DetailItem label="Court" value={caseData.court} />
                   <DetailItem
+                    label="Case Type"
+                    value={caseData.caseType || "Unknown"}
+                  />
+                  <DetailItem
                     label="Date Filed"
                     value={formatDate(caseData.dateFiled)}
                   />
@@ -342,10 +346,6 @@ ${
                   Financial Details
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <DetailItem
-                    label="Is"
-                    value={(caseData as any).Is?.toString() || "Not set"}
-                  />
                   <DetailItem
                     label="Counts"
                     value={(caseData as any).Counts?.toString() || "Not set"}

@@ -24,6 +24,7 @@ type CaseFilterValues = {
   branch?: string;
   assistantBranch?: string;
   caseNumber?: string;
+  caseType?: string;
   name?: string;
   charge?: string;
   infoSheet?: string;
@@ -66,6 +67,7 @@ const CasePage: React.FC = () => {
     { key: "branch", label: "Branch", type: "text" },
     { key: "assistantBranch", label: "Assistant Branch", type: "text" },
     { key: "caseNumber", label: "Case Number", type: "text" },
+    { key: "caseType", label: "Case Type", type: "text" },
     { key: "name", label: "Name", type: "text" },
     { key: "charge", label: "Charge", type: "text" },
     { key: "infoSheet", label: "Info Sheet", type: "text" },
@@ -86,7 +88,6 @@ const CasePage: React.FC = () => {
     { key: "Barangay", label: "Barangay", type: "text" },
     { key: "Municipality", label: "Municipality", type: "text" },
     { key: "Province", label: "Province", type: "text" },
-    { key: "Is", label: "Is", type: "number" },
     { key: "Counts", label: "Counts", type: "number" },
     { key: "Jdf", label: "JDF", type: "number" },
     { key: "Sajj", label: "SAJJ", type: "number" },
@@ -170,6 +171,7 @@ const CasePage: React.FC = () => {
       "branch",
       "assistantBranch",
       "caseNumber",
+      "caseType",
       "name",
       "charge",
       "infoSheet",
@@ -185,7 +187,6 @@ const CasePage: React.FC = () => {
       "Barangay",
       "Municipality",
       "Province",
-      "Is",
       "Counts",
       "Jdf",
       "Sajj",
@@ -264,6 +265,11 @@ const CasePage: React.FC = () => {
       )
         return false;
       if (filters.court && !matchesText(caseItem.court, filters.court, "court"))
+        return false;
+      if (
+        filters.caseType &&
+        !matchesText(caseItem.caseType, filters.caseType, "caseType")
+      )
         return false;
       if (
         filters.consolidation &&
@@ -618,6 +624,7 @@ const CasePage: React.FC = () => {
               },
               { key: "caseNumber", label: "Case Number", sortable: true },
               { key: "dateFiled", label: "Date Filed", sortable: true },
+              { key: "caseType", label: "Case Type", sortable: true },
               { key: "name", label: "Name", sortable: true },
               { key: "charge", label: "Charge", sortable: true },
               { key: "infoSheet", label: "Info Sheet", sortable: true },
@@ -642,7 +649,6 @@ const CasePage: React.FC = () => {
               { key: "Barangay", label: "Barangay", sortable: true },
               { key: "Municipality", label: "Municipality", sortable: true },
               { key: "Province", label: "Province", sortable: true },
-              { key: "Is", label: "Is", sortable: true },
               { key: "Counts", label: "Counts", sortable: true },
               { key: "Jdf", label: "JDF", sortable: true },
               { key: "Sajj", label: "SAJJ", sortable: true },
