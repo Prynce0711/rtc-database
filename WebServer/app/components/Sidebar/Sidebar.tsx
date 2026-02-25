@@ -27,7 +27,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
 
   const activeView = pathname.split("/")[2] || "dashboard";
 
-  /* ================= THEME ================= */
   const [theme, setTheme] = useState<"winter" | "dim">("winter");
 
   useEffect(() => {
@@ -48,7 +47,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     <div className="drawer lg:drawer-open bg-base-100">
       <input id="app-drawer" type="checkbox" className="drawer-toggle" />
 
-      {/* ================= CONTENT ================= */}
       <div className="drawer-content min-h-screen">
         <motion.main
           key={activeView}
@@ -61,13 +59,9 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
         </motion.main>
       </div>
 
-      {/* ================= SIDEBAR ================= */}
-      {/* ================= SIDEBAR ================= */}
       <div className="drawer-side">
         <label htmlFor="app-drawer" className="drawer-overlay" />
         <aside className="w-72 bg-base-200 min-h-full flex flex-col border-r border-base-300">
-          {/* ===== LOGO / BRAND ===== */}
-          {/* ===== LOGO / BRAND ===== */}
           <div className="px-6 py-8 border-b border-base-300 flex flex-col items-center text-center">
             <Image
               src="/SupremeCourtLogo.webp"
@@ -85,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               Case & Employee System
             </p>
           </div>
-          {/* ===== NAV ===== */}
+
           <nav className="flex-1 px-3 py-4 space-y-1">
             {role === "admin"
               ? adminSidebar(activeView)
@@ -94,9 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
                 : staffSidebar(activeView)}
           </nav>
 
-          {/* ===== FOOTER ===== */}
           <div className="border-t border-base-300 p-4 space-y-2">
-            {/* USER PILL */}
             {session?.user && (
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-base-100 border border-base-300">
                 <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center">
@@ -115,7 +107,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               </div>
             )}
 
-            {/* THEME */}
             <button
               onClick={() =>
                 setTheme((t) => (t === "winter" ? "dim" : "winter"))
@@ -128,7 +119,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               </span>
             </button>
 
-            {/* LOGOUT */}
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-error hover:bg-error/10 transition"
@@ -142,8 +132,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     </div>
   );
 };
-
-/* ================= ROLE NAVS ================= */
 
 function adminSidebar(activeView: string) {
   return (
@@ -167,6 +155,21 @@ function adminSidebar(activeView: string) {
           { label: "Receiving Logs", href: "Receive" },
         ]}
       />
+
+      <SidebarButton
+        icon={<FiFileText />}
+        href="cases"
+        active={activeView}
+        label="Statistics"
+        dropdowns={[
+          { label: "Cases", href: "" },
+          { label: "Petition", href: "" },
+
+          { label: "Special Proceedings", href: "" },
+          { label: "Receiving Logs", href: "" },
+        ]}
+      />
+
       <SidebarButton
         icon={<FiUsers />}
         href="employees"

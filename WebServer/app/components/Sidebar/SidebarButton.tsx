@@ -23,11 +23,9 @@ const SidebarButton = ({
   const isActive = active === href || pathname.startsWith(`/user/${href}`);
   const currentSub = pathname.split("/")[3] || "";
 
-  // 👉 ADD THIS
   const [open, setOpen] = React.useState(false);
   const isParentOnly = dropdowns && dropdowns.length > 0;
 
-  // 👉 AUTO OPEN kapag nasa loob ng cases/*
   React.useEffect(() => {
     if (isActive) setOpen(true);
   }, [isActive]);
@@ -76,7 +74,6 @@ const SidebarButton = ({
         </Link>
       )}
 
-      {/* Dropdowns — only when parent is active */}
       {open && dropdowns && dropdowns.length > 0 && (
         <div className="mt-0.5 ml-4 pl-3 border-l border-base-300 space-y-0.5 py-1">
           {dropdowns.map((dropdown) => (
