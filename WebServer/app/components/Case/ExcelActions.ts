@@ -4,17 +4,17 @@ import ActionResult from "@/app/components/ActionResult";
 import { CaseSchema } from "@/app/components/Case/schema";
 import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  excelDateToJSDate,
+  ExportExcelData,
+  findColumnValue,
+  isExcel,
+} from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import { isExcel } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
-
-type ExportExcelResult = {
-  fileName: string;
-  base64: string;
-};
 
 export async function uploadExcel(file: File): Promise<ActionResult<void>> {
   try {
@@ -38,44 +38,127 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
     console.log(`✓ Excel file received: ${file.name} (${file.size} bytes)`);
     console.log(`✓ Found ${rawData.length} rows in sheet "${sheetName}"`);
 
-    // Helper function to convert Excel serial date to JS Date
-    const excelDateToJSDate = (serial: number): Date => {
-      const utcDays = Math.floor(serial - 25569);
-      const utcValue = utcDays * 86400;
-      const dateInfo = new Date(utcValue * 1000);
-      return new Date(
-        dateInfo.getFullYear(),
-        dateInfo.getMonth(),
-        dateInfo.getDate(),
-      );
-    };
+    // Map Excel columns to schema properties with fuzzy matching
+    const mappedData = rawData.map((row: any) => {
+      const branchCell = findColumnValue(row, [
+        "Branch",
+        "BRANCH",
+        "Branch/Station",
+        "BRANCH/STATION",
+        "Branch Station",
+        "BR.",
+        "BR",
+      ]);
+      const assistantBranchCell = findColumnValue(row, [
+        "Assistant Branch",
+        "ASSISTANT BRANCH",
+        "Asst Branch",
+      ]);
+      const caseNumberCell = findColumnValue(row, [
+        "Case No.",
+        "Case Number",
+        "CASE NUMBER",
+        "Criminal Case No",
+        "Criminal Case No.",
+        "Criminal Case Number",
+      ]);
+      const dateFiledCell = findColumnValue(row, [
+        "Date Filed",
+        "DATE FILED",
+        "Filing Date",
+      ]);
+      const nameCell = findColumnValue(row, [
+        "Name",
+        "NAME",
+        "Accused",
+        "Accused Name",
+      ]);
+      const chargeCell = findColumnValue(row, ["Charge", "CHARGE", "Offense"]);
+      const infoSheetCell = findColumnValue(row, [
+        "Info Sheet",
+        "INFO SHEET",
+        "Information Sheet",
+        "IS",
+        "I.S.",
+        "I.S",
+        "IS.",
+      ]);
+      const courtCell = findColumnValue(row, ["Court", "COURT"]);
+      const detainedCell = findColumnValue(row, [
+        "Detained",
+        "DETAINED",
+        "Status",
+      ]);
+      const consolidationCell = findColumnValue(row, [
+        "Consolidation",
+        "CONSOLIDATION",
+      ]);
+      const eqcNumberCell = findColumnValue(row, [
+        "EQC No",
+        "ECQ No.",
+        "ECQ NO.",
+        "EQ Number",
+      ]);
+      const bondCell = findColumnValue(row, ["Bond", "BOND"]);
+      const raffleCell = findColumnValue(row, [
+        "Raffle Date",
+        "RAFFLE DATE",
+        "Raffled Date",
+      ]);
+      const committee1Cell = findColumnValue(row, [
+        "Committee 1",
+        "COMMITTEE 1",
+        "Commitee 1",
+        "COMMITEE 1",
+      ]);
+      const committee2Cell = findColumnValue(row, [
+        "Committee 2",
+        "COMMITTEE 2",
+        "Commitee 2",
+        "COMMITEE 2",
+      ]);
 
-    // Map Excel columns to schema properties
-    const mappedData = rawData.map((row: any) => ({
-      branch: row["Branch"]?.toString(),
-      assistantBranch:
-        row["ASSISTANT BRANCH"]?.toString() || row["Branch"]?.toString(),
-      caseNumber: row["CASE NO"]?.toString(),
-      dateFiled:
-        typeof row["DATE FILED"] === "number"
-          ? excelDateToJSDate(row["DATE FILED"])
-          : row["DATE FILED"],
-      name: row["NAME"]?.toString(),
-      charge: row["CHARGE"]?.toString(),
-      infoSheet: row["INFO SHEET"]?.toString(),
-      court: row["COURT"]?.toString(),
-      detained: row["DETAINED"]?.toString().toUpperCase() === "DETAINED",
-      consolidation: row["CONSOLIDATION"]?.toString(),
-      eqcNumber: row["ECQ NO."] ? Number(row["ECQ NO."]) : undefined,
-      bond: row["BOND"] ? Number(row["BOND"]) : undefined,
-      raffleDate: row["RAFFLE DATE"]
-        ? typeof row["RAFFLE DATE"] === "number"
-          ? excelDateToJSDate(row["RAFFLE DATE"])
-          : new Date(row["RAFFLE DATE"])
-        : undefined,
-      committe1: row["COMMITEE 1"] ? Number(row["COMMITEE 1"]) : undefined,
-      committe2: row["COMMITTEE 2"] ? Number(row["COMMITTEE 2"]) : undefined,
-    }));
+      let dateFiled: Date | undefined;
+      if (typeof dateFiledCell === "number") {
+        dateFiled = excelDateToJSDate(dateFiledCell);
+      } else if (dateFiledCell) {
+        const parsed = new Date(dateFiledCell);
+        if (!isNaN(parsed.getTime())) {
+          dateFiled = parsed;
+        }
+      }
+
+      let raffleDate: Date | undefined;
+      if (typeof raffleCell === "number") {
+        raffleDate = excelDateToJSDate(raffleCell);
+      } else if (raffleCell) {
+        const parsed = new Date(raffleCell);
+        if (!isNaN(parsed.getTime())) {
+          raffleDate = parsed;
+        }
+      }
+
+      return {
+        branch: branchCell?.toString(),
+        assistantBranch:
+          assistantBranchCell?.toString() || branchCell?.toString(),
+        caseNumber: caseNumberCell?.toString(),
+        dateFiled,
+        name: nameCell?.toString(),
+        charge: chargeCell?.toString(),
+        infoSheet: infoSheetCell?.toString(),
+        court: courtCell?.toString(),
+        detained:
+          detainedCell?.toString().toUpperCase() === "DETAINED" ||
+          detainedCell?.toString().toUpperCase() === "YES",
+        consolidation: consolidationCell?.toString(),
+        eqcNumber: eqcNumberCell ? Number(eqcNumberCell) : undefined,
+        bond: bondCell ? Number(bondCell) : undefined,
+        raffleDate,
+        committe1: committee1Cell ? Number(committee1Cell) : undefined,
+        committe2: committee2Cell ? Number(committee2Cell) : undefined,
+      };
+    });
 
     // Validate each row with CaseSchema
     const validationResults = {
@@ -139,7 +222,7 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
 }
 
 export async function exportCasesExcel(): Promise<
-  ActionResult<ExportExcelResult>
+  ActionResult<ExportExcelData>
 > {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);

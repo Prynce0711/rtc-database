@@ -4,54 +4,17 @@ import ActionResult from "@/app/components/ActionResult";
 import { PetitionSchema } from "@/app/components/Case/Petition/schema";
 import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  excelDateToJSDate,
+  ExportExcelData,
+  findColumnValue,
+  isExcel,
+} from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import { isExcel } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-
-type ExportPetitionExcelResult = {
-  fileName: string;
-  base64: string;
-};
-
-// Helper to convert Excel serial date to JS Date
-const excelDateToJSDate = (serial: number): Date => {
-  const utcDays = Math.floor(serial - 25569);
-  const utcValue = utcDays * 86400;
-  const dateInfo = new Date(utcValue * 1000);
-  return new Date(
-    dateInfo.getFullYear(),
-    dateInfo.getMonth(),
-    dateInfo.getDate(),
-  );
-};
-
-// Fuzzy column name matcher
-const findColumnValue = (row: any, possibleNames: string[]): any => {
-  // First try exact match (case-insensitive)
-  for (const name of possibleNames) {
-    for (const key in row) {
-      if (key.toLowerCase().trim() === name.toLowerCase().trim()) {
-        return row[key];
-      }
-    }
-  }
-
-  // Then try partial match
-  for (const name of possibleNames) {
-    for (const key in row) {
-      const keyLower = key.toLowerCase().trim();
-      const nameLower = name.toLowerCase().trim();
-      if (keyLower.includes(nameLower) || nameLower.includes(keyLower)) {
-        return row[key];
-      }
-    }
-  }
-
-  return undefined;
-};
 
 export async function uploadPetitionExcel(
   file: File,
@@ -122,7 +85,7 @@ export async function uploadPetitionExcel(
 
       return {
         caseNumber: caseNumberCell?.toString() || "",
-        petitionerName: petitionerNameCell?.toString() || undefined,
+        petitioner: petitionerNameCell?.toString() || undefined,
         raffledTo: raffledToCell?.toString() || undefined,
         date: date || undefined,
         nature: natureCell?.toString() || undefined,
@@ -189,7 +152,7 @@ export async function uploadPetitionExcel(
 }
 
 export async function exportPetitionsExcel(): Promise<
-  ActionResult<ExportPetitionExcelResult>
+  ActionResult<ExportExcelData>
 > {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);

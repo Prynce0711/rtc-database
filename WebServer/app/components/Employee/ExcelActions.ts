@@ -4,29 +4,17 @@ import ActionResult from "@/app/components/ActionResult";
 import { EmployeeSchema } from "@/app/components/Employee/schema";
 import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  excelDateToJSDate,
+  ExportExcelData,
+  findColumnValue,
+  isExcel,
+} from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
-import { isExcel } from "@/app/lib/utils";
-
-type ExportEmployeeExcelResult = {
-  fileName: string;
-  base64: string;
-};
-
-// Helper to convert Excel serial date to JS Date
-const excelDateToJSDate = (serial: number): Date => {
-  const utcDays = Math.floor(serial - 25569);
-  const utcValue = utcDays * 86400;
-  const dateInfo = new Date(utcValue * 1000);
-  return new Date(
-    dateInfo.getFullYear(),
-    dateInfo.getMonth(),
-    dateInfo.getDate(),
-  );
-};
 
 // Map blood type display values (e.g. "A+", "O-") to enum values
 const normalizeBloodType = (value: unknown): string | undefined => {
@@ -75,45 +63,100 @@ export async function uploadEmployeeExcel(
     console.log(`✓ Found ${rawData.length} rows in sheet "${sheetName}"`);
 
     const mappedData = rawData.map((row: any) => {
-      const birthdayCell = row["BIRTHDAY"];
+      const employeeNameCell = findColumnValue(row, [
+        "Employee Name",
+        "EMPLOYEE NAME",
+        "Name",
+      ]);
+      const employeeNumberCell = findColumnValue(row, [
+        "Employee Number",
+        "EMPLOYEE NUMBER",
+        "Employee No",
+        "Emp No",
+      ]);
+      const positionCell = findColumnValue(row, ["Position", "POSITION"]);
+      const branchCell = findColumnValue(row, [
+        "Branch/Station",
+        "BRANCH/STATION",
+        "Branch",
+        "BRANCH",
+        "Station",
+      ]);
+      const tinCell = findColumnValue(row, ["TIN", "Tin Number", "TIN Number"]);
+      const gsisCell = findColumnValue(row, ["GSIS", "GSIS Number"]);
+      const philHealthCell = findColumnValue(row, [
+        "PhilHealth",
+        "PHILHEALTH",
+        "PhilHealth Number",
+      ]);
+      const pagIbigCell = findColumnValue(row, [
+        "PAG-IBIG",
+        "PAG IBIG",
+        "Pag-Ibig Number",
+      ]);
+      const birthdayCell = findColumnValue(row, [
+        "Birthday",
+        "BIRTHDAY",
+        "Birth Date",
+        "Date of Birth",
+      ]);
+      const bloodTypeCell = findColumnValue(row, [
+        "Bloodtype",
+        "BLOODTYPE",
+        "Blood Type",
+        "BLOOD TYPE",
+      ]);
+      const allergiesCell = findColumnValue(row, ["Allergies", "ALLERGIES"]);
+      const heightCell = findColumnValue(row, ["Height", "HEIGHT"]);
+      const weightCell = findColumnValue(row, ["Weight", "WEIGHT"]);
+      const contactPersonCell = findColumnValue(row, [
+        "Contact Person",
+        "CONTACT PERSON",
+        "Emergency Contact",
+      ]);
+      const contactNumberCell = findColumnValue(row, [
+        "Contact Number",
+        "CONTACT NUMBER",
+        "Contact No",
+        "Phone",
+      ]);
+      const emailCell = findColumnValue(row, ["Email", "EMAIL"]);
 
-      let birthDate: Date | string | undefined;
+      let birthDate: Date | undefined;
       if (typeof birthdayCell === "number") {
         birthDate = excelDateToJSDate(birthdayCell);
       } else if (birthdayCell) {
-        birthDate = new Date(birthdayCell);
+        const parsed = new Date(birthdayCell);
+        if (!isNaN(parsed.getTime())) {
+          birthDate = parsed;
+        }
       }
 
       return {
-        employeeName: row["EMPLOYEE NAME"]?.toString(),
-        employeeNumber: row["EMPLOYEE NUMBER"]?.toString(),
-        position: row["POSITION"]?.toString(),
-        branch:
-          row["BRANCH/STATION"]?.toString() ||
-          row["BRANCH"]?.toString() ||
-          undefined,
-        tinNumber: row["TIN"]?.toString() || undefined,
-        gsisNumber: row["GSIS"]?.toString() || undefined,
-        philHealthNumber: row["PHILHEALTH"]?.toString() || undefined,
-        pagIbigNumber: row["PAG-IBIG"]?.toString() || undefined,
+        employeeName: employeeNameCell?.toString(),
+        employeeNumber: employeeNumberCell?.toString(),
+        position: positionCell?.toString(),
+        branch: branchCell?.toString(),
+        tinNumber: tinCell?.toString() || undefined,
+        gsisNumber: gsisCell?.toString() || undefined,
+        philHealthNumber: philHealthCell?.toString() || undefined,
+        pagIbigNumber: pagIbigCell?.toString() || undefined,
         birthDate,
-        bloodType: normalizeBloodType(row["BLOODTYPE"]),
-        allergies: row["ALLERGIES"]?.toString() || undefined,
+        bloodType: normalizeBloodType(bloodTypeCell),
+        allergies: allergiesCell?.toString() || undefined,
         height: (() => {
-          const value = row["HEIGHT"];
-          if (value === undefined || value === "") return undefined;
-          const num = Number(value);
+          if (heightCell === undefined || heightCell === "") return undefined;
+          const num = Number(heightCell);
           return Number.isNaN(num) ? undefined : num;
         })(),
         weight: (() => {
-          const value = row["WEIGHT"];
-          if (value === undefined || value === "") return undefined;
-          const num = Number(value);
+          if (weightCell === undefined || weightCell === "") return undefined;
+          const num = Number(weightCell);
           return Number.isNaN(num) ? undefined : num;
         })(),
-        contactPerson: row["CONTACT PERSON"]?.toString(),
-        contactNumber: row["CONTACT NUMBER"]?.toString() || undefined,
-        email: row["EMAIL"]?.toString() || "",
+        contactPerson: contactPersonCell?.toString(),
+        contactNumber: contactNumberCell?.toString() || undefined,
+        email: emailCell?.toString() || "",
       };
     });
 
@@ -176,7 +219,7 @@ export async function uploadEmployeeExcel(
 }
 
 export async function exportEmployeesExcel(): Promise<
-  ActionResult<ExportEmployeeExcelResult>
+  ActionResult<ExportExcelData>
 > {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
