@@ -69,6 +69,24 @@ export const auth = betterAuth({
           });
         }
       }
+
+      // Defensive: ensure any session user ids are safe to JSON.stringify
+      try {
+        if (ctx.context.newSession && ctx.context.newSession.user) {
+          const uid = (ctx.context.newSession.user as any).id;
+          if (typeof uid === "bigint") {
+            (ctx.context.newSession.user as any).id = String(uid);
+          }
+        }
+        if (ctx.context.session && ctx.context.session.user) {
+          const sid = (ctx.context.session.user as any).id;
+          if (typeof sid === "bigint") {
+            (ctx.context.session.user as any).id = String(sid);
+          }
+        }
+      } catch (e) {
+        // ignore failures here — non-critical
+      }
     }),
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path.startsWith("/sign-out") && ctx.method === "POST") {

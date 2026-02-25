@@ -6,11 +6,16 @@ import {
   FiAlertCircle,
   FiArrowLeft,
   FiCheck,
+  FiChevronLeft,
+  FiChevronRight,
   FiCopy,
   FiEdit3,
   FiEye,
+  FiFileText,
   FiPlus,
+  FiSave,
   FiTrash2,
+  FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import { ReceiveLog } from "./PetitionRecord";
@@ -61,22 +66,207 @@ const REQUIRED_FIELDS = [
   "nature",
 ] as const;
 
-const COLUMNS: {
-  key: (typeof REQUIRED_FIELDS)[number];
+type ColDef = {
+  key: string;
   label: string;
   placeholder: string;
-}[] = [
-  { key: "caseNumber", label: "Case Number", placeholder: "SPC-2026-0001" },
-  { key: "dateFiled", label: "Date Filed", placeholder: "" },
+  type: "text" | "date";
+  width: number;
+  required?: boolean;
+  mono?: boolean;
+};
+
+// Frozen columns — always visible
+const FROZEN_COLS: ColDef[] = [
+  {
+    key: "caseNumber",
+    label: "Case Number",
+    placeholder: "SPC-2026-0001",
+    type: "text",
+    width: 180,
+    required: true,
+    mono: true,
+  },
+  {
+    key: "dateFiled",
+    label: "Date Filed",
+    placeholder: "",
+    type: "date",
+    width: 150,
+    required: true,
+    mono: true,
+  },
+];
+
+// Tab group scrollable columns
+const TAB_COLS: ColDef[] = [
   {
     key: "raffledToBranch",
-    label: "Raffled to Branch",
+    label: "Branch",
     placeholder: "Branch 1",
+    type: "text",
+    width: 160,
+    required: true,
   },
-  { key: "titleNo", label: "Title No", placeholder: "T-12345" },
-  { key: "petitioners", label: "Petitioners", placeholder: "Full name" },
-  { key: "nature", label: "Nature", placeholder: "Petition for..." },
+  {
+    key: "titleNo",
+    label: "Title No",
+    placeholder: "T-12345",
+    type: "text",
+    width: 150,
+    mono: true,
+  },
+  {
+    key: "petitioners",
+    label: "Petitioners",
+    placeholder: "Full name",
+    type: "text",
+    width: 220,
+    required: true,
+  },
+  {
+    key: "nature",
+    label: "Nature",
+    placeholder: "Petition for...",
+    type: "text",
+    width: 240,
+    required: true,
+  },
 ];
+
+/* ─── Cell Input ─────────────────────────────────────────────── */
+const CellInput = ({
+  col,
+  value,
+  error,
+  onChange,
+  onKeyDown,
+}: {
+  col: ColDef;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}) => (
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    <input
+      type={col.type === "date" ? "date" : "text"}
+      value={value}
+      placeholder={col.placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+      title={error || col.label}
+      className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
+    />
+    {error && (
+      <span className="xls-cell-err">
+        <FiAlertCircle size={10} />
+        {error}
+      </span>
+    )}
+  </div>
+);
+
+/* ─── Review Card ────────────────────────────────────────────── */
+function ReviewCard({ entry }: { entry: EntryForm }) {
+  const fmtDate = (d: string) =>
+    d
+      ? new Date(d).toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="rv-card">
+      <div className="rv-hero">
+        <div className="rv-hero-left">
+          <div className="rv-hero-casenum">
+            {entry.caseNumber || (
+              <span style={{ opacity: 0.4 }}>No Case No.</span>
+            )}
+          </div>
+          <div className="rv-hero-name">
+            {entry.petitioners || (
+              <span style={{ opacity: 0.4, fontSize: 18 }}>
+                No petitioner entered
+              </span>
+            )}
+          </div>
+          {entry.nature && <div className="rv-hero-charge">{entry.nature}</div>}
+        </div>
+        <div className="rv-hero-badges">
+          {entry.raffledToBranch && (
+            <span className="rv-badge rv-badge-court">
+              {entry.raffledToBranch}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="rv-body">
+        <div className="rv-body-main">
+          <div className="rv-section">
+            <div className="rv-section-header">
+              <FiFileText size={13} />
+              <span>Case Identity</span>
+            </div>
+            <div className="rv-grid rv-grid-3">
+              <div className="rv-field">
+                <div className="rv-field-label">Case Number</div>
+                <div className="rv-field-value rv-mono">
+                  {entry.caseNumber || <span className="rv-empty">—</span>}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Raffled to Branch</div>
+                <div className="rv-field-value">
+                  {entry.raffledToBranch || <span className="rv-empty">—</span>}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Date Filed</div>
+                <div className="rv-field-value rv-mono">
+                  {fmtDate(entry.dateFiled) || (
+                    <span className="rv-empty">—</span>
+                  )}
+                </div>
+              </div>
+              {entry.titleNo && (
+                <div className="rv-field">
+                  <div className="rv-field-label">Title No.</div>
+                  <div className="rv-field-value rv-mono">{entry.titleNo}</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rv-section">
+            <div className="rv-section-header">
+              <FiUsers size={13} />
+              <span>Petition Details</span>
+            </div>
+            <div className="rv-grid rv-grid-2">
+              <div className="rv-field">
+                <div className="rv-field-label">Petitioners</div>
+                <div className="rv-field-value">
+                  {entry.petitioners || <span className="rv-empty">—</span>}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Nature</div>
+                <div className="rv-field-value">
+                  {entry.nature || <span className="rv-empty">—</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function validateEntry(entry: EntryForm): Record<string, string> {
   const errs: Record<string, string> = {};
@@ -88,7 +278,7 @@ function validateEntry(entry: EntryForm): Record<string, string> {
   return errs;
 }
 
-/* ─── Main Page Component ────────────────────────────────────────── */
+/* ─── Main Page Component ────────────────────────────────────── */
 const PetitionEntryPage = ({
   type,
   onClose,
@@ -106,6 +296,7 @@ const PetitionEntryPage = ({
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
+  const [reviewIdx, setReviewIdx] = useState(0);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
@@ -146,24 +337,18 @@ const PetitionEntryPage = ({
     }
   }, [type, selectedLog]);
 
-  /* Handlers */
   const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
-          ? {
-              ...e,
-              [field]: value,
-              errors: { ...e.errors, [field]: "" },
-            }
+          ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
           : e,
       ),
     );
   };
 
   const handleAddEntry = useCallback(() => {
-    const newEntry = emptyEntry(uid());
-    setEntries((prev) => [...prev, newEntry]);
+    setEntries((prev) => [...prev, emptyEntry(uid())]);
     setTimeout(() => {
       tableRef.current?.scrollTo({
         top: tableRef.current.scrollHeight,
@@ -172,9 +357,8 @@ const PetitionEntryPage = ({
     }, 60);
   }, []);
 
-  const handleRemove = (id: string) => {
+  const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
-  };
 
   const handleDuplicate = (id: string) => {
     const source = entries.find((e) => e.id === id);
@@ -195,23 +379,20 @@ const PetitionEntryPage = ({
     });
   };
 
-  /* Tab on last cell of last row → auto-add new row */
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     entryId: string,
-    colIndex: number,
+    isLast: boolean,
   ) => {
-    if (e.key === "Tab" && !e.shiftKey) {
-      const isLastCol = colIndex === COLUMNS.length - 1;
+    if (e.key === "Tab" && !e.shiftKey && isLast) {
       const isLastRow = entries[entries.length - 1]?.id === entryId;
-      if (isLastCol && isLastRow && !isEdit) {
+      if (isLastRow && !isEdit) {
         e.preventDefault();
         handleAddEntry();
         setTimeout(() => {
           const rows = tableRef.current?.querySelectorAll("[data-row]");
           const lastRow = rows?.[rows.length - 1];
-          const firstInput = lastRow?.querySelector("input");
-          firstInput?.focus();
+          (lastRow?.querySelector("input") as HTMLInputElement)?.focus();
         }, 80);
       }
     }
@@ -220,10 +401,8 @@ const PetitionEntryPage = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every((k) => e[k] && String(e[k]).trim() !== ""),
   ).length;
+  const incompleteCount = entries.length - completedCount;
 
-  const allValid = completedCount === entries.length && entries.length > 0;
-
-  /* Go to review step */
   const handleGoToReview = () => {
     let anyError = false;
     const validated = entries.map((e) => {
@@ -235,18 +414,17 @@ const PetitionEntryPage = ({
       return e;
     });
     setEntries(validated);
-
     if (anyError) {
       statusPopup.showError(
         "Please fill in all required fields before reviewing.",
       );
       return;
     }
+    setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /* Final submit from review */
   const handleSubmit = async () => {
     const label = isEdit
       ? "Save changes to this petition entry?"
@@ -257,6 +435,9 @@ const PetitionEntryPage = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setIsSubmitting(true);
+    statusPopup.showLoading(
+      isEdit ? "Updating petition entry..." : "Creating petition entry(ies)...",
+    );
     try {
       const payloads = entries.map((e) => ({
         id: isEdit ? (selectedLog?.id ?? 0) : 0,
@@ -276,237 +457,283 @@ const PetitionEntryPage = ({
         Nature: e.nature,
       }));
 
+      const resp = await fetch("/api/receive/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloads),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.success)
+        throw new Error(json.error || "Save failed");
+
+      const created: ReceiveLog[] = json.result || [];
       if (isEdit) {
-        onUpdate?.(payloads[0]);
-        statusPopup.showSuccess("Petition entry updated successfully");
+        if (created[0]) {
+          onUpdate?.(created[0]);
+          statusPopup.showSuccess("Petition entry updated successfully");
+        } else {
+          statusPopup.showError("Update failed");
+        }
       } else {
-        payloads.forEach((p) => onCreate?.(p));
+        created.forEach((c) => onCreate?.(c));
         statusPopup.showSuccess(
-          payloads.length === 1
+          created.length === 1
             ? "Petition entry created successfully"
-            : `${payloads.length} petition entries created successfully`,
+            : `${created.length} petition entries created successfully`,
         );
       }
       onClose();
-    } catch {
-      statusPopup.showError("An error occurred. Please try again.");
+    } catch (err) {
+      statusPopup.showError(
+        err instanceof Error
+          ? err.message
+          : "An error occurred. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
+      statusPopup.hidePopup();
     }
   };
 
+  const ROW_NUM_W = 48;
+  const ACTION_W = 72;
+
   return (
-    <div className="min-h-screen bg-base-100">
-      <main className="w-full">
-        {/* ─── Header ──────────────────────── */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <button
-              onClick={step === "review" ? () => setStep("entry") : onClose}
-              className="btn btn-ghost btn-sm px-2"
-            >
-              <FiArrowLeft size={18} />
-            </button>
-            <div>
-              <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
-                {isEdit
-                  ? "Edit Petition Entry"
-                  : step === "review"
-                    ? "Review Entries"
-                    : "New Petition Entries"}
-              </h2>
-              <p className="text-xl text-base-content/70 mt-1">
-                {step === "review"
-                  ? "Verify all entries before saving"
-                  : isEdit
-                    ? "Update the petition details below"
-                    : "Fill rows like a spreadsheet — Tab past the last cell to add a new row"}
-              </p>
-            </div>
-          </div>
-
-          {/* Step indicator + progress */}
-          <div className="flex items-center justify-between mt-4">
-            {/* Steps */}
-            <div className="flex items-center gap-2">
-              {(
-                [
-                  {
-                    key: "entry" as Step,
-                    label: "Data Entry",
-                    icon: <FiEdit3 size={14} />,
-                  },
-                  {
-                    key: "review" as Step,
-                    label: "Review",
-                    icon: <FiEye size={14} />,
-                  },
-                ] as const
-              ).map((s, i, arr) => {
-                const currentIdx = step === "review" ? 1 : 0;
-                return (
-                  <React.Fragment key={s.key}>
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className={`
-                          w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-                          ${i < currentIdx ? "bg-success text-success-content" : i === currentIdx ? "bg-primary text-primary-content" : "bg-base-300 text-base-content/40"}
-                        `}
-                      >
-                        {i < currentIdx ? (
-                          <FiCheck size={12} strokeWidth={3} />
-                        ) : (
-                          s.icon
-                        )}
-                      </div>
-                      <span
-                        className={`text-sm font-semibold ${i === currentIdx ? "text-base-content" : "text-base-content/40"}`}
-                      >
-                        {s.label}
-                      </span>
-                    </div>
-                    {i < arr.length - 1 && (
-                      <div
-                        className={`w-10 h-0.5 rounded ${i < currentIdx ? "bg-success" : "bg-base-300"}`}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-
-            {/* Progress stats */}
-            {!isEdit && step === "entry" && (
-              <div className="text-sm text-base-content/70">
-                <span className="font-bold text-base-content">
-                  {completedCount}
-                </span>{" "}
-                of{" "}
-                <span className="font-bold text-base-content">
-                  {entries.length}
-                </span>{" "}
-                rows complete
-              </div>
+    <div className="xls-root">
+      {/* ══ TOPBAR ══ */}
+      <div className="bg-base-100 xls-topbar">
+        <div className="xls-topbar-left">
+          <button
+            className="xls-back-btn"
+            onClick={step === "review" ? () => setStep("entry") : onClose}
+            title="Back"
+          >
+            <FiArrowLeft size={16} />
+          </button>
+          <nav className="xls-breadcrumb">
+            <span>Petitions</span>
+            <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+            <span className=" xls-breadcrumb-current">
+              {isEdit ? "Edit Petition Entry" : "New Petition Entries"}
+            </span>
+            {step === "review" && (
+              <>
+                <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+                <span className="xls-breadcrumb-current">Review</span>
+              </>
             )}
-          </div>
-
-          {/* Progress bar */}
-          {!isEdit && step === "entry" && (
-            <div className="mt-3">
-              <progress
-                className="progress progress-primary w-full"
-                value={completedCount}
-                max={entries.length}
-              />
-            </div>
-          )}
+          </nav>
         </div>
 
-        {/* ─── Content ───────────────────────────────────────────── */}
-        <AnimatePresence mode="wait">
-          {step === "entry" ? (
-            /* ─── STEP 1: Spreadsheet Entry ────────────────────── */
-            <motion.div
-              key="entry"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Table */}
-              <div
-                ref={tableRef}
-                className="bg-base-100 rounded-lg shadow overflow-auto"
-              >
-                <table className="table table-sm w-full">
+        <div className="xls-topbar-right">
+          <div className="xls-stepper">
+            <div className={`xls-step ${step === "entry" ? "active" : "done"}`}>
+              <span className="xls-step-dot">
+                {step === "review" ? (
+                  <FiCheck size={10} strokeWidth={3} />
+                ) : (
+                  <FiEdit3 size={10} />
+                )}
+              </span>
+              Data Entry
+            </div>
+            <div className={`xls-step ${step === "review" ? "active" : ""}`}>
+              <span className="xls-step-dot">
+                <FiEye size={10} />
+              </span>
+              Review
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ BODY ══ */}
+      <AnimatePresence mode="wait">
+        {step === "entry" ? (
+          <motion.div
+            key="entry"
+            className="bg-base-100 xls-main"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* Title row */}
+            <div className="xls-title-row">
+              <div>
+                <h1 className=" text-5xl xls-title">
+                  {isEdit ? "Edit Petition Entry" : "New Petition Entries"}
+                </h1>
+                <p className="text-lg mb-9 xls-subtitle">
+                  {isEdit ? (
+                    "Update petition details. Required fields are marked *."
+                  ) : (
+                    <>
+                      Fill rows like a spreadsheet —{" "}
+                      <kbd className="xls-kbd">Tab</kbd> past the last cell to
+                      add a new row.
+                    </>
+                  )}
+                </p>
+                {!isEdit && (
+                  <div className="xls-pills" style={{ marginTop: 10 }}>
+                    <span className="xls-pill xls-pill-neutral">
+                      <span className="xls-pill-dot" />
+                      {entries.length} {entries.length === 1 ? "row" : "rows"}
+                    </span>
+                    <span
+                      className={`xls-pill ${completedCount > 0 ? "xls-pill-ok" : "xls-pill-neutral"}`}
+                    >
+                      <span className="xls-pill-dot" />
+                      {completedCount} complete
+                    </span>
+                    {incompleteCount > 0 && (
+                      <span className="xls-pill xls-pill-err">
+                        <span className="xls-pill-dot" />
+                        {incompleteCount} incomplete
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            {!isEdit && (
+              <div className="xls-progress">
+                <div
+                  className="xls-progress-fill"
+                  style={{
+                    width: `${entries.length ? (completedCount / entries.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Spreadsheet */}
+            <div className="xls-sheet-wrap">
+              <div className="xls-tab-bar">
+                <button className="xls-tab active">Petition Info</button>
+              </div>
+
+              <div className="xls-table-outer" ref={tableRef}>
+                <table className="xls-table">
+                  <colgroup>
+                    <col style={{ width: ROW_NUM_W }} />
+                    {FROZEN_COLS.map((c) => (
+                      <col key={c.key} style={{ width: c.width }} />
+                    ))}
+                    {TAB_COLS.map((c) => (
+                      <col key={c.key} style={{ width: c.width }} />
+                    ))}
+                    <col style={{ width: ACTION_W }} />
+                  </colgroup>
+
                   <thead>
-                    <tr>
-                      <th className="text-center w-12">#</th>
-                      {COLUMNS.map((col) => (
-                        <th key={col.key}>{col.label}</th>
+                    <tr className="xls-thead-group">
+                      <th style={{ width: ROW_NUM_W }} />
+                      <th colSpan={FROZEN_COLS.length}>
+                        <div className="xls-group-label">Identity</div>
+                      </th>
+                      <th colSpan={TAB_COLS.length}>
+                        <div className="xls-group-label">Petition Info</div>
+                      </th>
+                      <th />
+                    </tr>
+                    <tr className="xls-thead-cols">
+                      <th style={{ textAlign: "center" }}>#</th>
+                      {FROZEN_COLS.map((col) => (
+                        <th
+                          key={col.key}
+                          className={col.required ? "req-col" : ""}
+                        >
+                          {col.label}
+                        </th>
                       ))}
-                      <th className="text-center w-20">Actions</th>
+                      {TAB_COLS.map((col) => (
+                        <th
+                          key={col.key}
+                          className={col.required ? "req-col" : ""}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                      <th />
                     </tr>
                   </thead>
+
                   <tbody>
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
-                        const hasErrors = Object.keys(entry.errors).length > 0;
-                        const isComplete = REQUIRED_FIELDS.every(
-                          (k) => entry[k] && String(entry[k]).trim() !== "",
-                        );
-
+                        const lastColIdx = TAB_COLS.length - 1;
                         return (
                           <motion.tr
                             key={entry.id}
                             data-row
                             layout
-                            initial={{ opacity: 0, y: 8 }}
+                            initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className={`
-                              ${hasErrors ? "bg-error/5" : isComplete ? "bg-success/5" : "bg-base-100"}
-                              hover:bg-base-200 transition-colors
-                            `}
+                            exit={{
+                              opacity: 0,
+                              height: 0,
+                              overflow: "hidden",
+                            }}
+                            transition={{ duration: 0.12 }}
+                            className="xls-row"
                           >
-                            {/* Row number */}
-                            <td className="text-center">
-                              <span
-                                className={`
-                                  inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
-                                  ${hasErrors ? "bg-error/20 text-error" : isComplete ? "bg-success/20 text-success" : "bg-base-300 text-base-content/50"}
-                                `}
-                              >
-                                {isComplete && !hasErrors ? (
-                                  <FiCheck size={12} strokeWidth={3} />
-                                ) : (
-                                  rowIdx + 1
-                                )}
-                              </span>
+                            <td className="td-num">
+                              <span className="xls-rownum">{rowIdx + 1}</span>
                             </td>
 
-                            {/* Data cells */}
-                            {COLUMNS.map((col, colIdx) => (
-                              <td key={col.key} className="p-0">
-                                <input
-                                  type={
-                                    col.key === "dateFiled" ? "date" : "text"
+                            {/* Frozen cols */}
+                            {FROZEN_COLS.map((col) => (
+                              <td key={col.key}>
+                                <CellInput
+                                  col={col}
+                                  value={
+                                    (
+                                      entry as unknown as Record<string, string>
+                                    )[col.key]
                                   }
-                                  value={entry[col.key]}
-                                  placeholder={col.placeholder}
-                                  onChange={(e) =>
-                                    handleChange(
-                                      entry.id,
-                                      col.key,
-                                      e.target.value,
-                                    )
+                                  error={entry.errors[col.key]}
+                                  onChange={(v) =>
+                                    handleChange(entry.id, col.key, v)
                                   }
-                                  onKeyDown={(e) =>
-                                    handleCellKeyDown(e, entry.id, colIdx)
-                                  }
-                                  title={entry.errors[col.key] || ""}
-                                  className={`
-                                    input input-sm input-ghost w-full rounded-none text-sm
-                                    ${entry.errors[col.key] ? "input-error bg-error/10" : ""}
-                                  `}
                                 />
-                                {entry.errors[col.key] && (
-                                  <span className="text-error text-[10px] px-2 pb-1 flex items-center gap-1">
-                                    <FiAlertCircle size={10} />{" "}
-                                    {entry.errors[col.key]}
-                                  </span>
-                                )}
                               </td>
                             ))}
 
-                            {/* Action buttons */}
-                            <td className="text-center">
-                              <div className="flex justify-center gap-0.5">
+                            {/* Tab cols */}
+                            {TAB_COLS.map((col, colIdx) => (
+                              <td key={col.key}>
+                                <CellInput
+                                  col={col}
+                                  value={
+                                    (
+                                      entry as unknown as Record<string, string>
+                                    )[col.key]
+                                  }
+                                  error={entry.errors[col.key]}
+                                  onChange={(v) =>
+                                    handleChange(entry.id, col.key, v)
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleCellKeyDown(
+                                      e,
+                                      entry.id,
+                                      colIdx === lastColIdx,
+                                    )
+                                  }
+                                />
+                              </td>
+                            ))}
+
+                            <td className="td-actions">
+                              <div className="xls-row-actions">
                                 <button
                                   type="button"
+                                  className="xls-row-btn"
                                   onClick={() => handleDuplicate(entry.id)}
-                                  className="btn btn-ghost btn-xs px-1.5"
                                   title="Duplicate row"
                                 >
                                   <FiCopy size={13} />
@@ -514,8 +741,8 @@ const PetitionEntryPage = ({
                                 {entries.length > 1 && (
                                   <button
                                     type="button"
+                                    className="xls-row-btn del"
                                     onClick={() => handleRemove(entry.id)}
-                                    className="btn btn-ghost btn-xs px-1.5 text-error"
                                     title="Remove row"
                                   >
                                     <FiTrash2 size={13} />
@@ -529,172 +756,198 @@ const PetitionEntryPage = ({
                     </AnimatePresence>
                   </tbody>
                 </table>
-
-                {/* Add row button */}
-                {!isEdit && (
-                  <button
-                    type="button"
-                    onClick={handleAddEntry}
-                    className="btn btn-ghost btn-sm w-full border-t border-dashed border-base-300 rounded-none text-primary"
-                  >
-                    <FiPlus size={14} strokeWidth={2.5} />
-                    Add Row
-                  </button>
-                )}
               </div>
 
-              {/* Entry footer */}
-              <div className="mt-6 flex items-center justify-between">
-                <div>
-                  {!isEdit && entries.length > 1 && (
-                    <p className="text-sm text-base-content/70">
-                      <span className="font-bold text-base-content">
-                        {entries.length} rows
-                      </span>{" "}
-                      ·{" "}
-                      <span
-                        className={
-                          allValid
-                            ? "text-success font-semibold"
-                            : "text-warning font-semibold"
-                        }
-                      >
-                        {completedCount} complete
-                      </span>
-                      {entries.length - completedCount > 0 && (
-                        <span className="text-error font-semibold">
-                          , {entries.length - completedCount} incomplete
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="btn btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleGoToReview}
-                    className="btn btn-primary"
-                  >
-                    <FiEye size={16} />
-                    Review{entries.length > 1 ? ` (${entries.length})` : ""}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            /* ─── STEP 2: Review ───────────────────────────────── */
-            <motion.div
-              key="review"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* Summary banner */}
-              <div className="mb-5 flex items-center justify-between bg-base-300 rounded-lg shadow px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="stat-figure text-primary">
-                    <FiEye size={24} />
-                  </div>
-                  <div>
-                    <p className="text-base-content font-bold">
-                      Review {entries.length}{" "}
-                      {entries.length === 1 ? "Entry" : "Entries"}
-                    </p>
-                    <p className="text-sm text-base-content/70">
-                      Please verify all information is correct before saving
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setStep("entry")}
-                  className="btn btn-outline btn-sm gap-1"
-                >
-                  <FiEdit3 size={14} />
-                  Edit
-                </button>
-              </div>
-
-              {/* Review table (read-only) */}
-              <div className="bg-base-100 rounded-lg shadow overflow-auto">
-                <table className="table w-full">
-                  <thead>
-                    <tr>
-                      <th className="text-center w-12">#</th>
-                      {COLUMNS.map((col) => (
-                        <th key={col.key}>{col.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry, idx) => (
-                      <tr
-                        key={entry.id}
-                        className="bg-base-100 hover:bg-base-200 transition-colors text-sm"
-                      >
-                        <td className="font-semibold text-center">{idx + 1}</td>
-                        <td className="font-semibold">
-                          {entry.caseNumber || "\u2014"}
-                        </td>
-                        <td className="text-base-content/70">
-                          {entry.dateFiled
-                            ? new Date(entry.dateFiled).toLocaleDateString()
-                            : "\u2014"}
-                        </td>
-                        <td>{entry.raffledToBranch || "\u2014"}</td>
-                        <td>{entry.titleNo || "\u2014"}</td>
-                        <td>{entry.petitioners || "\u2014"}</td>
-                        <td>{entry.nature || "\u2014"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Review footer */}
-              <div className="mt-6 flex items-center justify-between">
+              {!isEdit && (
                 <button
                   type="button"
+                  className="xls-add-row"
+                  onClick={handleAddEntry}
+                >
+                  <FiPlus size={14} strokeWidth={2.5} />
+                  Add Row
+                </button>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="xls-footer">
+              <div className="xls-footer-meta">
+                {!isEdit && entries.length > 1 && (
+                  <span>
+                    <strong>{completedCount}</strong> of{" "}
+                    <strong>{entries.length}</strong> rows ready
+                  </span>
+                )}
+                <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
+                  Fields marked{" "}
+                  <span style={{ color: "var(--color-error)" }}>*</span> are
+                  required
+                </span>
+              </div>
+              <div className="xls-footer-right">
+                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="xls-btn xls-btn-primary"
+                  onClick={handleGoToReview}
+                >
+                  <FiEye size={15} />
+                  Review
+                  {!isEdit && entries.length > 1 ? ` (${entries.length})` : ""}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          /* ══ REVIEW STEP ══ */
+          <motion.div
+            key="review"
+            className="xls-main"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* Summary banner */}
+            <div className="rv-summary">
+              <div className="rv-summary-left">
+                <div className="rv-summary-icon">
+                  <FiCheck size={17} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <p className="rv-summary-title">
+                    {isEdit
+                      ? "Review your edits"
+                      : entries.length === 1
+                        ? "Review before saving"
+                        : `Review ${entries.length} entries before saving`}
+                  </p>
+                  <p className="rv-summary-sub">
+                    {isEdit
+                      ? "Check the details below, then confirm your changes."
+                      : "All fields validated. Confirm the details are correct."}
+                  </p>
+                </div>
+              </div>
+              <button
+                className="xls-btn xls-btn-outline"
+                onClick={() => setStep("entry")}
+              >
+                <FiEdit3 size={14} />
+                Go Back & Edit
+              </button>
+            </div>
+
+            {/* Review layout */}
+            <div className="rv-layout">
+              {entries.length > 1 && (
+                <div className="rv-sidebar">
+                  <div className="rv-sidebar-head">
+                    {entries.length} Entries
+                  </div>
+                  <div className="rv-sidebar-list">
+                    {entries.map((entry, idx) => (
+                      <button
+                        key={entry.id}
+                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
+                        onClick={() => setReviewIdx(idx)}
+                      >
+                        <span className="rv-sidebar-num">{idx + 1}</span>
+                        <div className="rv-sidebar-info">
+                          <div className="rv-sidebar-casenum">
+                            {entry.caseNumber || "No case no."}
+                          </div>
+                          <div className="rv-sidebar-name">
+                            {entry.petitioners || "No petitioner"}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rv-panel">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={reviewIdx}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.12 }}
+                  >
+                    <ReviewCard entry={entries[reviewIdx]} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Review footer */}
+            <div className="xls-footer">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  className="xls-btn xls-btn-ghost"
                   onClick={() => setStep("entry")}
-                  className="btn btn-outline gap-2"
                 >
                   <FiArrowLeft size={14} />
                   Back to Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className={`btn btn-primary gap-2 ${isSubmitting ? "loading" : ""}`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <span className="loading loading-spinner loading-sm" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <FiCheck size={16} strokeWidth={2.5} />
-                      {isEdit
-                        ? "Save Changes"
-                        : entries.length === 1
-                          ? "Confirm & Save"
-                          : `Confirm & Save ${entries.length} Entries`}
-                    </>
-                  )}
-                </button>
+                {entries.length > 1 && (
+                  <div className="rv-pager">
+                    <button
+                      className="xls-btn-icon"
+                      onClick={() => setReviewIdx((i) => Math.max(0, i - 1))}
+                      disabled={reviewIdx === 0}
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <span className="rv-pager-info">
+                      {reviewIdx + 1} / {entries.length}
+                    </span>
+                    <button
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setReviewIdx((i) => Math.min(entries.length - 1, i + 1))
+                      }
+                      disabled={reviewIdx === entries.length - 1}
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+              <button
+                className="xls-btn xls-btn-success"
+                style={{
+                  height: 50,
+                  paddingLeft: 30,
+                  paddingRight: 30,
+                  fontSize: 16,
+                }}
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="xls-spinner" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={17} />
+                    {isEdit
+                      ? "Save Changes"
+                      : entries.length === 1
+                        ? "Confirm & Save"
+                        : `Save All ${entries.length} Entries`}
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

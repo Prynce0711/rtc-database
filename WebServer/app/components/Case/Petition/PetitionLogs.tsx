@@ -13,7 +13,6 @@ import {
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import Table from "../../Table/Table";
-import { deleteReceiveLog, getReceiveLogs } from "./Petition";
 import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import {
   ReceiveLog,
@@ -87,14 +86,15 @@ const ReceiveLogsPage: React.FC = () => {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const response = await getReceiveLogs();
-      if (!response.success) {
+      const resp = await fetch("/api/receive/list");
+      const response = await resp.json();
+      if (!resp.ok || !response.success) {
         statusPopup.showError(
           response.error || "Failed to fetch petition logs",
         );
         return;
       }
-      setLogs(response.result);
+      setLogs(response.result || []);
       setError(null);
     } catch (err) {
       setError(
@@ -232,14 +232,79 @@ const ReceiveLogsPage: React.FC = () => {
       ))
     )
       return;
-    const result = await deleteReceiveLog(logId);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete");
-      return;
+    try {
+      const resp = await fetch(`/api/receive/${logId}`, { method: "DELETE" });
+      const json = await resp.json();
+      if (!resp.ok || !json.success) {
+        statusPopup.showError(json.error || "Failed to delete");
+        return;
+      }
+      setLogs((prev) => prev.filter((l) => l.id !== logId));
+      statusPopup.showSuccess("Entry deleted successfully");
+    } catch (err) {
+      statusPopup.showError("Delete failed. See console for details.");
+      console.error(err);
     }
-    setLogs((prev) => prev.filter((l) => l.id !== logId));
-    statusPopup.showSuccess("Entry deleted successfully");
   };
+
+  /* Import handler */
+  useEffect(() => {
+    const el = document.getElementById(
+      "petition-import-input",
+    ) as HTMLInputElement | null;
+    const handleChange = async (e: Event) => {
+      const input = e.target as HTMLInputElement;
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        statusPopup.showError("File too large. Max 5 MB allowed.");
+        input.value = "";
+        return;
+      }
+      const okExt = ["xlsx", "xls"];
+      const name = file.name || "";
+      const ext = name.split(".").pop()?.toLowerCase() || "";
+      if (!okExt.includes(ext)) {
+        statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+        input.value = "";
+        return;
+      }
+
+      try {
+        statusPopup.showInfo("Importing... Please wait.");
+        const fd = new FormData();
+        fd.append("file", file);
+        const resp = await fetch("/api/receive/import", {
+          method: "POST",
+          body: fd,
+        });
+        const json = await resp.json();
+        if (!resp.ok || !json.success) {
+          statusPopup.showError(json.error || "Import failed");
+          input.value = "";
+          return;
+        }
+        const created: ReceiveLog[] = json.result || [];
+        if (created.length === 0) {
+          statusPopup.showInfo("No rows were imported.");
+        } else {
+          setLogs((prev) => [...created, ...prev]);
+          statusPopup.showSuccess(
+            `${created.length} rows imported successfully`,
+          );
+        }
+      } catch (err) {
+        statusPopup.showError("Import failed. See console for details.");
+        console.error(err);
+      } finally {
+        (e.target as HTMLInputElement).value = "";
+      }
+    };
+    el?.addEventListener("change", handleChange);
+    return () => el?.removeEventListener("change", handleChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusPopup]);
 
   if (loading) {
     return (
@@ -325,29 +390,74 @@ const ReceiveLogsPage: React.FC = () => {
               </svg>
               Filter
             </button>
-
             {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setSelectedLog(null);
-                  setDrawerType(ReceiveDrawerType.ADD);
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+              <>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  id="petition-import-input"
+                />
+
+                <button
+                  className="btn btn-outline"
+                  onClick={() => {
+                    const el = document.getElementById(
+                      "petition-import-input",
+                    ) as HTMLInputElement | null;
+                    el?.click();
+                  }}
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Entry
-              </button>
+                  Import Excel
+                </button>
+
+                <button
+                  className="btn btn-outline"
+                  onClick={async () => {
+                    try {
+                      const resp = await fetch("/api/receive/export");
+                      if (!resp.ok) throw new Error("Export failed");
+                      const blob = await resp.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "petition-logs.csv";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch (err) {
+                      statusPopup.showError(
+                        err instanceof Error ? err.message : "Export failed",
+                      );
+                    }
+                  }}
+                >
+                  Export Excel
+                </button>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedLog(null);
+                    setDrawerType(ReceiveDrawerType.ADD);
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Add Entry
+                </button>
+              </>
             )}
           </div>
 
