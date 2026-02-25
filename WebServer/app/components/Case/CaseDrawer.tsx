@@ -22,7 +22,14 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
-import { CaseSchema } from "./schema";
+import {
+  CaseSchema,
+  FormEntry,
+  caseToFormEntry,
+  createEmptyFormEntry,
+} from "./schema";
+
+const uid = () => Math.random().toString(36).slice(2, 9);
 
 export enum CaseModalType {
   ADD = "ADD",
@@ -31,97 +38,12 @@ export enum CaseModalType {
 
 type Step = "entry" | "review";
 
-interface EntryForm {
-  id: string;
-  branch: string;
-  assistantBranch: string;
-  caseNumber: string;
-  dateFiled: string;
-  name: string;
-  charge: string;
-  infoSheet: string;
-  court: string;
-  detained: boolean;
-  consolidation: string;
-  eqcNumber: string;
-  bond: string;
-  raffleDate: string;
-  committe1: string;
-  committe2: string;
-  Judge: string;
-  AO: string;
-  Complainant: string;
-  HouseNo: string;
-  Street: string;
-  Barangay: string;
-  Municipality: string;
-  Province: string;
-  Is: string;
-  Counts: string;
-  Jdf: string;
-  Sajj: string;
-  Sajj2: string;
-  MF: string;
-  STF: string;
-  LRF: string;
-  VCF: string;
-  Total: string;
-  AmountInvolved: string;
-  errors: Record<string, string>;
-  collapsed: boolean;
-  saved: boolean;
-}
-
-const today = new Date().toISOString().slice(0, 10);
-
-const emptyEntry = (id: string): EntryForm => ({
-  id,
-  branch: "",
-  assistantBranch: "",
-  caseNumber: "",
-  dateFiled: today,
-  name: "",
-  charge: "",
-  infoSheet: "",
-  court: "",
-  detained: false,
-  consolidation: "",
-  eqcNumber: "",
-  bond: "",
-  raffleDate: "",
-  committe1: "",
-  committe2: "",
-  Judge: "",
-  AO: "",
-  Complainant: "",
-  HouseNo: "",
-  Street: "",
-  Barangay: "",
-  Municipality: "",
-  Province: "",
-  Is: "",
-  Counts: "",
-  Jdf: "",
-  Sajj: "",
-  Sajj2: "",
-  MF: "",
-  STF: "",
-  LRF: "",
-  VCF: "",
-  Total: "",
-  AmountInvolved: "",
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-
 const REQUIRED_FIELDS = [
   "branch",
   "assistantBranch",
   "caseNumber",
   "dateFiled",
+  "caseType",
   "name",
   "charge",
   "infoSheet",
@@ -133,10 +55,11 @@ type ColDef = {
   key: string;
   label: string;
   placeholder: string;
-  type: "text" | "date" | "number" | "checkbox";
+  type: "text" | "date" | "number" | "checkbox" | "select";
   width: number;
   required?: boolean;
   mono?: boolean;
+  options?: { value: string; label: string }[];
 };
 
 const FROZEN_COLS: ColDef[] = [
@@ -227,6 +150,22 @@ const TAB_GROUPS: TabGroup[] = [
         width: 135,
         required: true,
       },
+      {
+        key: "caseType",
+        label: "Case Type",
+        placeholder: "Select case type",
+        type: "select",
+        width: 150,
+        options: [
+          { value: "CRIMINAL", label: "Criminal" },
+          { value: "CIVIL", label: "Civil" },
+          { value: "LAND_REGISTRATION_CASE", label: "Land Registration" },
+          { value: "PETITION", label: "Petition" },
+          { value: "ELECTION", label: "Election" },
+          { value: "SCA", label: "SCA" },
+          { value: "UNKNOWN", label: "Unknown" },
+        ],
+      },
     ],
   },
   {
@@ -307,7 +246,6 @@ const TAB_GROUPS: TabGroup[] = [
         width: 108,
         mono: true,
       },
-      { key: "Is", label: "IS", placeholder: "—", type: "text", width: 82 },
     ],
   },
   {
@@ -439,12 +377,12 @@ const TAB_GROUPS: TabGroup[] = [
   },
 ];
 
-function validateEntry(entry: EntryForm): Record<string, string> {
+function validateEntry(entry: FormEntry): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
     if (
-      !entry[k as keyof EntryForm] ||
-      String(entry[k as keyof EntryForm]).trim() === ""
+      !entry[k as keyof FormEntry] ||
+      String(entry[k as keyof FormEntry]).trim() === ""
     )
       errs[k] = "Required";
   });
@@ -486,6 +424,31 @@ const CellInput = ({
       </div>
     );
   }
+  if (col.type === "select") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <select
+          value={value as string}
+          onChange={(e) => onChange(e.target.value)}
+          title={error || col.label}
+          className={`xls-input${error ? " xls-input-err" : ""}`}
+          style={{ height: 44 }}
+        >
+          {col.options?.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {error && (
+          <span className="xls-cell-err">
+            <FiAlertCircle size={10} />
+            {error}
+          </span>
+        )}
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       <input
@@ -515,7 +478,7 @@ const CellInput = ({
 };
 
 /* ─── Review: single case card ───────────────────────────────── */
-function ReviewCard({ entry }: { entry: EntryForm }) {
+function ReviewCard({ entry }: { entry: FormEntry }) {
   const filledAddress =
     [
       entry.HouseNo,
@@ -658,12 +621,6 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
                   </div>
                 </div>
               )}
-              {entry.Is && (
-                <div className="rv-field">
-                  <div className="rv-field-label">IS</div>
-                  <div className="rv-field-value">{entry.Is}</div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -770,56 +727,16 @@ const NewCaseModal = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const makeFromCase = (sc: Case): EntryForm => ({
-    ...emptyEntry(uid()),
-    branch: sc.branch ?? "",
-    assistantBranch: sc.assistantBranch ?? "",
-    caseNumber: sc.caseNumber ?? "",
-    dateFiled: sc.dateFiled
-      ? new Date(sc.dateFiled).toISOString().slice(0, 10)
-      : today,
-    name: sc.name ?? "",
-    charge: sc.charge ?? "",
-    infoSheet: sc.infoSheet ?? "",
-    court: sc.court ?? "",
-    detained: sc.detained ?? false,
-    consolidation: sc.consolidation ?? "",
-    eqcNumber: sc.eqcNumber?.toString() ?? "",
-    bond: sc.bond?.toString() ?? "",
-    raffleDate: sc.raffleDate
-      ? new Date(sc.raffleDate).toISOString().slice(0, 10)
-      : "",
-    committe1: sc.committe1?.toString() ?? "",
-    committe2: sc.committe2?.toString() ?? "",
-    Judge: sc.Judge ?? "",
-    AO: sc.AO ?? "",
-    Complainant: sc.Complainant ?? "",
-    HouseNo: sc.HouseNo ?? "",
-    Street: sc.Street ?? "",
-    Barangay: sc.Barangay ?? "",
-    Municipality: sc.Municipality ?? "",
-    Province: sc.Province ?? "",
-    Is: sc.Is ?? "",
-    Counts: sc.Counts?.toString() ?? "",
-    Jdf: sc.Jdf?.toString() ?? "",
-    Sajj: sc.Sajj?.toString() ?? "",
-    Sajj2: sc.Sajj2?.toString() ?? "",
-    MF: sc.MF?.toString() ?? "",
-    STF: sc.STF?.toString() ?? "",
-    LRF: sc.LRF?.toString() ?? "",
-    VCF: sc.VCF?.toString() ?? "",
-    Total: sc.Total?.toString() ?? "",
-    AmountInvolved: sc.AmountInvolved?.toString() ?? "",
-  });
+  const makeFromCase = (sc: Case): FormEntry => caseToFormEntry(uid(), sc);
 
-  const [entries, setEntries] = useState<EntryForm[]>(() => {
+  const [entries, setEntries] = useState<FormEntry[]>(() => {
     if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
-    return [emptyEntry(uid())];
+    return [createEmptyFormEntry(uid())];
   });
 
   useEffect(() => {
     if (!isEdit) {
-      setEntries([emptyEntry(uid())]);
+      setEntries([createEmptyFormEntry(uid())]);
       setStep("entry");
       setActiveTab(0);
     }
@@ -836,7 +753,7 @@ const NewCaseModal = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, emptyEntry(uid())]);
+    setEntries((prev) => [...prev, createEmptyFormEntry(uid())]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -851,7 +768,7 @@ const NewCaseModal = ({
   const handleDuplicate = (id: string) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: EntryForm = {
+    const dup: FormEntry = {
       ...source,
       id: uid(),
       caseNumber: "",
@@ -889,8 +806,8 @@ const NewCaseModal = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every(
       (k) =>
-        e[k as keyof EntryForm] &&
-        String(e[k as keyof EntryForm]).trim() !== "",
+        e[k as keyof FormEntry] &&
+        String(e[k as keyof FormEntry]).trim() !== "",
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;
@@ -917,11 +834,12 @@ const NewCaseModal = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (e: EntryForm) => ({
+  const buildPayload = (e: FormEntry) => ({
     branch: e.branch,
     assistantBranch: e.assistantBranch,
     caseNumber: e.caseNumber,
     dateFiled: e.dateFiled,
+    caseType: e.caseType || "UNKNOWN",
     name: e.name,
     charge: e.charge,
     infoSheet: e.infoSheet,
@@ -941,7 +859,6 @@ const NewCaseModal = ({
     Barangay: e.Barangay || null,
     Municipality: e.Municipality || null,
     Province: e.Province || null,
-    Is: e.Is || null,
     Counts: e.Counts ? parseInt(e.Counts) : null,
     Jdf: e.Jdf ? parseFloat(e.Jdf) : null,
     Sajj: e.Sajj ? parseFloat(e.Sajj) : null,
@@ -1555,8 +1472,8 @@ const NewCaseModal = ({
                             Object.keys(entry.errors).length > 0;
                           const isComplete = REQUIRED_FIELDS.every(
                             (k) =>
-                              entry[k as keyof EntryForm] &&
-                              String(entry[k as keyof EntryForm]).trim() !== "",
+                              entry[k as keyof FormEntry] &&
+                              String(entry[k as keyof FormEntry]).trim() !== "",
                           );
                           const rowClass = hasErrors
                             ? "row-err"

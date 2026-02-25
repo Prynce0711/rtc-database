@@ -68,6 +68,7 @@ enum LogAction {
 
 model Case {
   id              Int       @id @default(autoincrement())
+  caseType       CaseType   @default(UNKNOWN)
   branch          String
   assistantBranch String
   caseNumber      String    @unique
@@ -91,7 +92,6 @@ model Case {
   Barangay        String?
   Municipality    String?
   Province        String?
-  Is              String?
   Counts          String?
   Jdf             Float?
   Sajj            Float?

@@ -133,7 +133,6 @@ const CaseRow = ({
       <td>{caseItem.Barangay}</td>
       <td>{caseItem.Municipality}</td>
       <td>{caseItem.Province}</td>
-      <td>{caseItem.Is}</td>
       <td>{caseItem.Counts}</td>
       <td>{caseItem.Jdf}</td>
       <td>{caseItem.Sajj}</td>
