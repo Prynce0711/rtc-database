@@ -15,7 +15,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    disableSignUp: true,
+    disableSignUp: process.env.NODE_ENV === "production", // Disable sign-up in production
   },
   plugins: [
     admin(),
