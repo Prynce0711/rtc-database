@@ -4,7 +4,7 @@ import { RecievingLog } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FiSearch } from "react-icons/fi";
+import { FiEdit, FiMoreHorizontal, FiSearch, FiTrash2 } from "react-icons/fi";
 import FilterModal from "../../Filter/FilterModal";
 import {
   ExactMatchMap,
@@ -84,33 +84,63 @@ const ReceiveRow = ({
   const date = formatDate(log.dateRecieved);
 
   return (
-    <tr>
+    <tr className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm">
       {isAdminOrAtty && (
-        <td className="text-center">
-          <div className="flex gap-2 justify-center">
-            <button
-              className="btn btn-sm btn-outline"
-              onClick={() => onEdit(log)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-error"
-              onClick={() => onDelete(log)}
-            >
-              Delete
-            </button>
+        <td
+          className="relative text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-center">
+            <div className="dropdown dropdown-start">
+              <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
+                <FiMoreHorizontal size={18} />
+              </button>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
+                style={{ zIndex: 9999 }}
+              >
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-warning"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(log);
+                    }}
+                  >
+                    <FiEdit size={16} />
+                    <span>Edit</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(log);
+                    }}
+                  >
+                    <FiTrash2 size={16} />
+                    <span>Delete</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </td>
       )}
-      <td>{log.bookAndPage || "-"}</td>
-      <td>{date}</td>
-      <td>{log.caseType || "-"}</td>
-      <td>{log.caseNumber || "-"}</td>
-      <td>{log.content || "-"}</td>
-      <td>{log.branchNumber || "-"}</td>
-      <td>{time}</td>
-      <td>{log.notes || "-"}</td>
+      <td className="font-semibold text-center whitespace-nowrap">
+        {log.bookAndPage || "-"}
+      </td>
+      <td className="text-center text-base-content/70 whitespace-nowrap">
+        {date}
+      </td>
+      <td className="text-center">{log.caseType || "-"}</td>
+      <td className="text-center">{log.caseNumber || "-"}</td>
+      <td className="text-center">{log.content || "-"}</td>
+      <td className="text-center">{log.branchNumber || "-"}</td>
+      <td className="text-center">{time}</td>
+      <td className="text-base-content/60 text-center">{log.notes || "-"}</td>
     </tr>
   );
 };
@@ -394,7 +424,7 @@ const ReceiveLogsPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Receiving Log
+            Receiving Logs
           </h2>
           <p className="text-xl text-base-content/70">
             Track all received documents and case filings
@@ -576,34 +606,52 @@ const ReceiveLogsPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-base-100 rounded-lg shadow">
+        <div className="bg-base-300 rounded-lg shadow overflow-x-auto">
           <Table
             headers={[
-              ...(isAdminOrAtty
-                ? [
-                    {
-                      key: "actions",
-                      label: "Actions",
-                      align: "center" as const,
-                    },
-                  ]
-                : []),
-              { key: "bookAndPage", label: "Book And Pages", sortable: true },
+              {
+                key: "actions",
+                label: "Actions",
+                align: "center" as const,
+              },
+              {
+                key: "bookAndPage",
+                label: "Book And Pages",
+                sortable: true,
+                align: "center",
+              },
               {
                 key: "dateRecieved",
                 label: "Date Received",
                 sortable: true,
+                align: "center",
               },
-              { key: "caseType", label: "Abbreviation", sortable: true },
-              { key: "caseNumber", label: "Case Number", sortable: true },
+              {
+                key: "caseType",
+                label: "Abbreviation",
+                sortable: true,
+                align: "center",
+              },
+              {
+                key: "caseNumber",
+                label: "Case Number",
+                sortable: true,
+                align: "center",
+              },
               {
                 key: "content",
                 label: "Content",
                 sortable: true,
+                align: "center",
               },
-              { key: "branchNumber", label: "Branch No", sortable: true },
-              { key: "time", label: "Time", sortable: false },
-              { key: "notes", label: "Notes", sortable: true },
+              {
+                key: "branchNumber",
+                label: "Branch No",
+                sortable: true,
+                align: "center",
+              },
+              { key: "time", label: "Time", sortable: false, align: "center" },
+              { key: "notes", label: "Notes", sortable: true, align: "center" },
             ]}
             data={paginatedLogs as unknown as Record<string, unknown>[]}
             sortConfig={

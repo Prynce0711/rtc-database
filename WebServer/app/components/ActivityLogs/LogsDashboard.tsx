@@ -150,7 +150,7 @@ const LogsDashboard: React.FC = () => {
   return (
     <div className="space-y-8 w-full text-base md:text-lg">
       <div>
-        <h1 className="text-4xl md:text-5xl font-semibold">Activity Reports</h1>
+        <h1 className="text-4xl md:text-5xl font-bold">Activity Reports</h1>
         <p className="text-lg md:text-xl text-base-content/60 mt-2">
           Review user activities and system changes across the platform.
         </p>

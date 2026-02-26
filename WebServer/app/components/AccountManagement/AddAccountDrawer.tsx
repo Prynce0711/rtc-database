@@ -7,13 +7,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   FiAlertCircle,
+  FiArrowLeft,
   FiCheck,
   FiChevronRight,
-  FiFileText,
+  FiEdit3,
+  FiEye,
   FiMail,
+  FiSave,
   FiUser,
   FiUserPlus,
-  FiX,
 } from "react-icons/fi";
 import { getEmployees } from "../Employee/EmployeeActions";
 import { usePopup } from "../Popup/PopupProvider";
@@ -21,22 +23,19 @@ import { createAccount } from "./AccountActions";
 import { NewUserSchema } from "./schema";
 
 type AccountType = "EXISTING" | "NEW" | null;
+type Step = "SELECT_TYPE" | "FORM" | "REVIEW";
 
 const AddAccountDrawer = ({
-  isOpen,
   onClose,
   onCreate,
 }: {
-  isOpen: boolean;
   onClose: () => void;
   onCreate: (user: User) => void;
 }) => {
   const statusPopup = usePopup();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accountType, setAccountType] = useState<AccountType>(null);
-  const [step, setStep] = useState<"SELECT_TYPE" | "FORM" | "REVIEW">(
-    "SELECT_TYPE",
-  );
+  const [step, setStep] = useState<Step>("SELECT_TYPE");
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState<
@@ -47,31 +46,11 @@ const AddAccountDrawer = ({
     role: Roles.USER,
   });
 
-  const resetForm = () => {
-    setForm({
-      name: "",
-      email: "",
-      role: Roles.USER,
-    });
-    setAccountType(null);
-    setStep("SELECT_TYPE");
-  };
-
   useEffect(() => {
-    async function fetchEmployees() {
-      try {
-        const result = await getEmployees();
-        if (result.success) {
-          setEmployees(result.result);
-        } else {
-          statusPopup.showError("Failed to fetch employees");
-        }
-      } catch (error) {
-        statusPopup.showError("An error occurred while fetching employees");
-      }
-    }
-
-    fetchEmployees();
+    getEmployees().then((result) => {
+      if (result.success) setEmployees(result.result);
+      else statusPopup.showError("Failed to fetch employees");
+    });
   }, []);
 
   const handleEmployeeSelect = (employeeId: number) => {
@@ -87,665 +66,547 @@ const AddAccountDrawer = ({
   };
 
   const handleCreate = async () => {
+    if (!(await statusPopup.showConfirm("Create this account?"))) return;
+
     setLoading(true);
     statusPopup.showLoading("Creating account...");
 
     const result = await createAccount(form);
-
     setLoading(false);
 
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to create account");
+      statusPopup.hidePopup();
       return;
     }
 
-    statusPopup.showSuccess("Account Created. Activation link sent.");
+    statusPopup.showSuccess("Account created. Activation link sent.");
     onCreate(result.result);
-    onClose();
-  };
-
-  const handleTypeSelect = (type: AccountType) => {
-    setAccountType(type);
-    setStep("FORM");
   };
 
   const canProceedToReview = () => {
-    if (accountType === "EXISTING") {
-      return form.selectedEmployeeId && form.role;
-    }
+    if (accountType === "EXISTING") return form.selectedEmployeeId && form.role;
     return form.name && form.email && form.role;
   };
 
+  const handleBack = () => {
+    if (step === "REVIEW") setStep("FORM");
+    else if (step === "FORM") {
+      setStep("SELECT_TYPE");
+      setAccountType(null);
+      setForm({ name: "", email: "", role: Roles.USER });
+    } else {
+      onClose();
+    }
+  };
+
+  const isReview = step === "REVIEW";
+
   return (
-    <>
-      {/* Backdrop */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-          />
-        )}
-      </AnimatePresence>
+    <div className="xls-root">
+      {/* ══ TOPBAR ══ */}
+      <div className="bg-base-100 xls-topbar">
+        <div className="xls-topbar-left">
+          <button className="xls-back-btn" onClick={handleBack} title="Back">
+            <FiArrowLeft size={16} />
+          </button>
+          <nav className="xls-breadcrumb">
+            <span>Accounts</span>
+            <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+            <span className="xls-breadcrumb-current">Add Account</span>
+            {step !== "SELECT_TYPE" && (
+              <>
+                <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+                <span className="xls-breadcrumb-current">
+                  {step === "FORM" ? "Account Details" : "Review"}
+                </span>
+              </>
+            )}
+          </nav>
+        </div>
 
-      {/* Drawer - LARGER WIDTH */}
-      <AnimatePresence>
-        {isOpen && (
+        <div className="xls-topbar-right">
+          <div className="xls-stepper">
+            <div className={`xls-step ${!isReview ? "active" : "done"}`}>
+              <span className="xls-step-dot">
+                {isReview ? (
+                  <FiCheck size={10} strokeWidth={3} />
+                ) : (
+                  <FiEdit3 size={10} />
+                )}
+              </span>
+              Account Setup
+            </div>
+            <div className={`xls-step ${isReview ? "active" : ""}`}>
+              <span className="xls-step-dot">
+                <FiEye size={10} />
+              </span>
+              Review
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ BODY ══ */}
+      <AnimatePresence mode="wait">
+        {/* ── SELECT TYPE ── */}
+        {step === "SELECT_TYPE" && (
           <motion.div
-            className="fixed right-0 top-0 h-full w-full md:w-[600px] lg:w-[700px] bg-base-100 shadow-2xl z-50 overflow-y-auto border-l border-base-300"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            key="select"
+            className="bg-base-100 xls-main"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
           >
-            {/* Header (styled like design) */}
-            <div className="sticky top-0 z-10">
-              <div className="w-full bg-gradient-to-r from-blue-600 to-cyan-400 text-white p-6 lg:p-8 flex items-center justify-between shadow-md">
-                <div>
-                  <h2 className="text-3xl font-bold">Add Account</h2>
-                  <p className="text-sm mt-1 opacity-90">
-                    Fill in employee details
-                  </p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="btn btn-ghost btn-sm btn-circle text-white/90"
-                >
-                  <FiX className="w-5 h-5" />
-                </button>
+            <div className="xls-title-row">
+              <div>
+                <h1 className="text-5xl xls-title">Add Account</h1>
+                <p className="text-lg mb-9 xls-subtitle">
+                  Choose how you want to add the new account to the system.
+                </p>
               </div>
             </div>
 
-            <div className="p-6 lg:p-8">
-              {/* Top hero: avatar + brief */}
-              <div className="mb-6 flex items-start gap-4">
-                <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-blue-600">
-                    <FiUserPlus className="w-6 h-6" />
+            <div
+              style={{
+                maxWidth: 640,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              <motion.button
+                className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
+                onClick={() => {
+                  setAccountType("EXISTING");
+                  setStep("FORM");
+                }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <div className="flex items-start gap-5">
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <FiUser className="w-8 h-8 text-primary" />
                   </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-xl mb-2">
+                      Existing Employee
+                    </h3>
+                    <p className="text-base-content/60">
+                      Select from current RTC staff members. Information will be
+                      pre-filled from employee records.
+                    </p>
+                  </div>
+                  <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">New Employee</h3>
-                  <p className="text-sm text-base-content/60 mt-1">
-                    Unassigned Position
-                  </p>
+              </motion.button>
+
+              <motion.button
+                className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
+                onClick={() => {
+                  setAccountType("NEW");
+                  setStep("FORM");
+                }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <div className="flex items-start gap-5">
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <FiUserPlus className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-xl mb-2">New Employee</h3>
+                    <p className="text-base-content/60">
+                      Manually enter new staff information. Use this for newly
+                      hired employees.
+                    </p>
+                  </div>
+                  <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
                 </div>
-              </div>
-
-              {/* Main rounded content card to emulate design */}
-              <div className="rounded-2xl bg-base-100 shadow-lg p-6">
-                {/* STEP 1: SELECT ACCOUNT TYPE */}
-                {step === "SELECT_TYPE" && (
-                  <motion.div
-                    className="space-y-5"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                  >
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold mb-2">
-                        Select Account Type
-                      </h3>
-                      <p className="text-base-content/60">
-                        Choose how you want to add the new account to the system
-                      </p>
-                    </div>
-
-                    {accountType === null ? (
-                      <div className="space-y-4">
-                        <motion.button
-                          className="w-full bg-primary/10 hover:bg-primary/20 rounded-2xl p-8 text-left transition-all border-2 border-primary group"
-                          onClick={() => handleTypeSelect("EXISTING")}
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.99 }}
-                        >
-                          <div className="flex items-start gap-5">
-                            <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                              <FiUser className="w-8 h-8 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-bold text-xl mb-2">
-                                Existing Employee
-                              </h3>
-                              <p className="text-base-content/60">
-                                Select from current RTC staff members.
-                                Information will be pre-filled from employee
-                                records.
-                              </p>
-                            </div>
-                            <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                          </div>
-                        </motion.button>
-
-                        <motion.button
-                          className="w-full bg-base-200 hover:bg-base-300 rounded-2xl p-8 text-left transition-all border-2 border-transparent hover:border-primary group"
-                          onClick={() => handleTypeSelect("NEW")}
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.99 }}
-                        >
-                          <div className="flex items-start gap-5">
-                            <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                              <FiUserPlus className="w-8 h-8 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-bold text-xl mb-2">
-                                New Employee
-                              </h3>
-                              <p className="text-base-content/60">
-                                Manually enter new staff information. Use this
-                                for newly hired employees.
-                              </p>
-                            </div>
-                            <FiChevronRight className="w-6 h-6 text-base-content/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                          </div>
-                        </motion.button>
-                      </div>
-                    ) : accountType === "EXISTING" ? (
-                      <>
-                        {/* Employee Selection */}
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Select Employee
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <select
-                            className="select select-bordered w-full text-base"
-                            value={form.selectedEmployeeId}
-                            onChange={(e) => {
-                              if (isNaN(Number(e.target.value))) {
-                                statusPopup.showError(
-                                  "Invalid employee selected",
-                                );
-                                return;
-                              }
-                              const selectedId = Number(e.target.value);
-                              handleEmployeeSelect(selectedId);
-                            }}
-                          >
-                            <option value="">Choose an employee...</option>
-                            {employees.map((emp) => (
-                              <option key={emp.id} value={emp.id}>
-                                {emp.employeeName} - {emp.position}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Display Selected Employee Info (Read-only) */}
-                        {form.selectedEmployeeId && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            className="space-y-4"
-                          >
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-bold text-base">
-                                  Full Name
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                className="input input-bordered w-full bg-base-200 text-base"
-                                value={form.name}
-                                readOnly
-                              />
-                            </div>
-
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-bold text-base">
-                                  Email Address
-                                </span>
-                              </label>
-                              <input
-                                type="email"
-                                className="input input-bordered w-full bg-base-200 text-base"
-                                value={form.email}
-                                readOnly
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {/* Manual Entry for New Employee */}
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Full Name
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            className="input input-bordered w-full text-base"
-                            placeholder="Juan Dela Cruz"
-                            value={form.name}
-                            onChange={(e) =>
-                              setForm({ ...form, name: e.target.value })
-                            }
-                          />
-                        </div>
-
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Email Address
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <input
-                            type="email"
-                            className="input input-bordered w-full text-base"
-                            placeholder="juan.delacruz@rtc.gov.ph"
-                            value={form.email}
-                            onChange={(e) =>
-                              setForm({ ...form, email: e.target.value })
-                            }
-                          />
-                          <label className="label">
-                            <span className="label-text-alt text-base-content/60">
-                              Use official RTC email address
-                            </span>
-                          </label>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Role Selection (Common for both types) */}
-                    <div>
-                      <label className="label">
-                        <span className="label-text font-bold text-base">
-                          Account Role
-                        </span>
-                        <span className="label-text-alt text-error">
-                          Required
-                        </span>
-                      </label>
-                      <select
-                        className="select select-bordered w-full text-base"
-                        value={form.role}
-                        onChange={(e) =>
-                          setForm({ ...form, role: e.target.value as Roles })
-                        }
-                      >
-                        <option value={Roles.USER}>Staff</option>
-                        <option value={Roles.ATTY}>Attorney</option>
-                      </select>
-                      <label className="label">
-                        <span className="label-text-alt text-base-content/60">
-                          Determines access level and permissions
-                        </span>
-                      </label>
-                    </div>
-                  </motion.div>
-                )}
-                {step === "FORM" && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6"
-                  >
-                    {/* Account Type Badge */}
-                    <div className="flex items-center gap-3">
-                      <div className="badge badge-lg badge-primary gap-2 px-4 py-3">
-                        {accountType === "EXISTING" ? (
-                          <FiUser className="w-4 h-4" />
-                        ) : (
-                          <FiUserPlus className="w-4 h-4" />
-                        )}
-                        <span className="font-semibold">
-                          {accountType === "EXISTING"
-                            ? "Existing Employee"
-                            : "New Employee"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {accountType === "EXISTING" ? (
-                      <>
-                        {/* Employee Selection */}
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Select Employee
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <select
-                            className="select select-bordered w-full text-base"
-                            value={form.selectedEmployeeId || ""}
-                            onChange={(e) => {
-                              if (isNaN(Number(e.target.value))) {
-                                statusPopup.showError(
-                                  "Invalid employee selected",
-                                );
-                                return;
-                              }
-                              handleEmployeeSelect(Number(e.target.value));
-                            }}
-                          >
-                            <option value="">Choose an employee...</option>
-                            {employees.map((emp) => (
-                              <option key={emp.id} value={emp.id}>
-                                {emp.employeeName} - {emp.position}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Display Selected Employee Info (Read-only) */}
-                        {form.selectedEmployeeId && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            className="space-y-4"
-                          >
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-bold text-base">
-                                  Full Name
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                className="input input-bordered w-full bg-base-200 text-base"
-                                value={form.name}
-                                readOnly
-                              />
-                            </div>
-
-                            <div>
-                              <label className="label">
-                                <span className="label-text font-bold text-base">
-                                  Email Address
-                                </span>
-                              </label>
-                              <input
-                                type="email"
-                                className="input input-bordered w-full bg-base-200 text-base"
-                                value={form.email}
-                                readOnly
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {/* Manual Entry for New Employee */}
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Full Name
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            className="input input-bordered w-full text-base"
-                            placeholder="Juan Dela Cruz"
-                            value={form.name}
-                            onChange={(e) =>
-                              setForm({ ...form, name: e.target.value })
-                            }
-                          />
-                        </div>
-
-                        <div>
-                          <label className="label">
-                            <span className="label-text font-bold text-base">
-                              Email Address
-                            </span>
-                            <span className="label-text-alt text-error">
-                              Required
-                            </span>
-                          </label>
-                          <input
-                            type="email"
-                            className="input input-bordered w-full text-base"
-                            placeholder="juan.delacruz@rtc.gov.ph"
-                            value={form.email}
-                            onChange={(e) =>
-                              setForm({ ...form, email: e.target.value })
-                            }
-                          />
-                          <label className="label">
-                            <span className="label-text-alt text-base-content/60">
-                              Use official RTC email address
-                            </span>
-                          </label>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Role Selection (Common for both types) */}
-                    <div>
-                      <label className="label">
-                        <span className="label-text font-bold text-base">
-                          Account Role
-                        </span>
-                        <span className="label-text-alt text-error">
-                          Required
-                        </span>
-                      </label>
-                      <select
-                        className="select select-bordered w-full text-base"
-                        value={form.role}
-                        onChange={(e) =>
-                          setForm({ ...form, role: e.target.value as Roles })
-                        }
-                      >
-                        <option value={Roles.USER}>Staff</option>
-                        <option value={Roles.ATTY}>Attorney</option>
-                      </select>
-                      <label className="label">
-                        <span className="label-text-alt text-base-content/60">
-                          Determines access level and permissions
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-3 pt-6">
-                      <button
-                        className="btn btn-ghost flex-1"
-                        onClick={() => {
-                          resetForm();
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="btn btn-primary flex-1"
-                        onClick={() => setStep("REVIEW")}
-                        disabled={!canProceedToReview()}
-                      >
-                        Review
-                        <FiChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* STEP 3: REVIEW */}
-                {step === "REVIEW" && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6"
-                  >
-                    <div className="card bg-base-200 shadow-sm">
-                      <div className="card-body p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
-                            <FiCheck className="w-6 h-6 text-success" />
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-xl">
-                              Review Account Details
-                            </h3>
-                            <p className="text-sm text-base-content/60">
-                              Please verify all information before creating
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex items-start gap-4 p-4 rounded-xl bg-base-100">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              {accountType === "EXISTING" ? (
-                                <FiUser className="w-5 h-5 text-primary" />
-                              ) : (
-                                <FiUserPlus className="w-5 h-5 text-primary" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-base-content/60 mb-1 font-semibold">
-                                ACCOUNT TYPE
-                              </p>
-                              <p className="font-bold text-base">
-                                {accountType === "EXISTING"
-                                  ? "Existing Employee"
-                                  : "New Employee"}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-4 p-4 rounded-xl bg-base-100">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <FiUser className="w-5 h-5 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-base-content/60 mb-1 font-semibold">
-                                FULL NAME
-                              </p>
-                              <p className="font-bold text-base">{form.name}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-4 p-4 rounded-xl bg-base-100">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <FiMail className="w-5 h-5 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-base-content/60 mb-1 font-semibold">
-                                EMAIL ADDRESS
-                              </p>
-                              <p className="font-bold text-base">
-                                {form.email}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-4 p-4 rounded-xl bg-base-100">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <FiFileText className="w-5 h-5 text-primary" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-base-content/60 mb-1 font-semibold">
-                                ACCOUNT ROLE
-                              </p>
-                              <p className="font-bold text-base">{form.role}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="alert alert-info">
-                      <FiAlertCircle className="w-5 h-5" />
-                      <div>
-                        <h4 className="font-bold">Activation Required</h4>
-                        <p className="text-sm">
-                          An activation link will be sent to{" "}
-                          <strong>{form.email}</strong>. The user must activate
-                          their account before logging in.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-3 pt-6">
-                      <button
-                        className="btn btn-ghost flex-1"
-                        onClick={() => setStep("FORM")}
-                        disabled={loading}
-                      >
-                        Back
-                      </button>
-                      <button
-                        className="btn btn-primary flex-1"
-                        onClick={handleCreate}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <>
-                            <span className="loading loading-spinner loading-sm"></span>
-                            Creating...
-                          </>
-                        ) : (
-                          <>
-                            <FiCheck className="w-4 h-4" />
-                            Confirm & Create
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+              </motion.button>
             </div>
 
-            {/* Sticky Footer (UI only) */}
-            <div className="sticky bottom-0 bg-base-100 border-t border-base-300 p-4 z-20">
-              <div className="max-w-full md:max-w-[640px] lg:max-w-[700px] mx-auto flex justify-end gap-3">
-                <button className="btn btn-ghost" onClick={onClose}>
-                  Close
-                </button>
-                <button
-                  className="btn btn-primary rounded-full"
-                  onClick={() => {
-                    if (step !== "REVIEW") {
-                      setStep("REVIEW");
-                      return;
-                    }
-                    handleCreate();
-                  }}
-                  disabled={step !== "REVIEW" ? !canProceedToReview() : loading}
-                >
-                  {step !== "REVIEW"
-                    ? "Create"
-                    : loading
-                      ? "Creating..."
-                      : "Create"}
+            <div className="xls-footer">
+              <div className="xls-footer-meta" />
+              <div className="xls-footer-right">
+                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  Cancel
                 </button>
               </div>
             </div>
           </motion.div>
         )}
+
+        {/* ── FORM ── */}
+        {step === "FORM" && (
+          <motion.div
+            key="form"
+            className="bg-base-100 xls-main"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
+          >
+            <div className="xls-title-row">
+              <div>
+                <h1 className="text-5xl xls-title">Account Details</h1>
+                <p className="text-lg mb-9 xls-subtitle">
+                  {accountType === "EXISTING"
+                    ? "Select an employee and assign their role."
+                    : "Enter the new staff member's information."}
+                </p>
+
+                {/* Account Type Badge */}
+                <div className="xls-pills" style={{ marginTop: 10 }}>
+                  <span className="xls-pill xls-pill-neutral">
+                    <span className="xls-pill-dot" />
+                    {accountType === "EXISTING"
+                      ? "Existing Employee"
+                      : "New Employee"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                maxWidth: 560,
+                display: "flex",
+                flexDirection: "column",
+                gap: 24,
+              }}
+            >
+              {accountType === "EXISTING" ? (
+                <>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-bold text-base">
+                        Select Employee
+                      </span>
+                      <span className="label-text-alt text-error">
+                        Required
+                      </span>
+                    </label>
+                    <select
+                      className="select select-bordered w-full text-base"
+                      value={form.selectedEmployeeId ?? ""}
+                      onChange={(e) => {
+                        if (!e.target.value || isNaN(Number(e.target.value)))
+                          return;
+                        handleEmployeeSelect(Number(e.target.value));
+                      }}
+                    >
+                      <option value="">Choose an employee...</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.employeeName} — {emp.position}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {form.selectedEmployeeId && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 16,
+                      }}
+                    >
+                      <div className="form-control">
+                        <label className="label">
+                          <span className="label-text font-bold text-base">
+                            Full Name
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered w-full bg-base-200 text-base"
+                          value={form.name}
+                          readOnly
+                        />
+                      </div>
+                      <div className="form-control">
+                        <label className="label">
+                          <span className="label-text font-bold text-base">
+                            Email Address
+                          </span>
+                        </label>
+                        <input
+                          type="email"
+                          className="input input-bordered w-full bg-base-200 text-base"
+                          value={form.email}
+                          readOnly
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-bold text-base">
+                        Full Name
+                      </span>
+                      <span className="label-text-alt text-error">
+                        Required
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input input-bordered w-full text-base"
+                      placeholder="Juan Dela Cruz"
+                      value={form.name}
+                      onChange={(e) =>
+                        setForm({ ...form, name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-bold text-base">
+                        Email Address
+                      </span>
+                      <span className="label-text-alt text-error">
+                        Required
+                      </span>
+                    </label>
+                    <input
+                      type="email"
+                      className="input input-bordered w-full text-base"
+                      placeholder="juan.delacruz@rtc.gov.ph"
+                      value={form.email}
+                      onChange={(e) =>
+                        setForm({ ...form, email: e.target.value })
+                      }
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-base-content/60">
+                        Use official RTC email address
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* Role */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-bold text-base">
+                    Account Role
+                  </span>
+                  <span className="label-text-alt text-error">Required</span>
+                </label>
+                <select
+                  className="select select-bordered w-full text-base"
+                  value={form.role}
+                  onChange={(e) =>
+                    setForm({ ...form, role: e.target.value as Roles })
+                  }
+                >
+                  <option value={Roles.USER}>Staff</option>
+                  <option value={Roles.ATTY}>Attorney</option>
+                </select>
+                <label className="label">
+                  <span className="label-text-alt text-base-content/60">
+                    Determines access level and permissions
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="xls-footer">
+              <div className="xls-footer-meta">
+                <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
+                  Fields marked{" "}
+                  <span style={{ color: "var(--color-error)" }}>*</span> are
+                  required
+                </span>
+              </div>
+              <div className="xls-footer-right">
+                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="xls-btn xls-btn-primary"
+                  onClick={() => setStep("REVIEW")}
+                  disabled={!canProceedToReview()}
+                >
+                  <FiEye size={15} />
+                  Review
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── REVIEW ── */}
+        {step === "REVIEW" && (
+          <motion.div
+            key="review"
+            className="xls-main"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* Summary banner */}
+            <div className="rv-summary">
+              <div className="rv-summary-left">
+                <div className="rv-summary-icon">
+                  <FiCheck size={17} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <p className="rv-summary-title">Review before creating</p>
+                  <p className="rv-summary-sub">
+                    All fields validated. Confirm the details are correct.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="xls-btn xls-btn-outline"
+                onClick={() => setStep("FORM")}
+              >
+                <FiEdit3 size={14} />
+                Go Back & Edit
+              </button>
+            </div>
+
+            {/* Review card */}
+            <div className="rv-layout">
+              <div className="rv-panel">
+                <div className="rv-card">
+                  <div className="rv-hero">
+                    <div className="rv-hero-left">
+                      <div className="rv-hero-casenum">
+                        {accountType === "EXISTING"
+                          ? "Existing Employee"
+                          : "New Employee"}
+                      </div>
+                      <div className="rv-hero-name">
+                        {form.name || (
+                          <span style={{ opacity: 0.4, fontSize: 18 }}>
+                            No name entered
+                          </span>
+                        )}
+                      </div>
+                      <div className="rv-hero-charge">{form.email}</div>
+                    </div>
+                    <div className="rv-hero-badges">
+                      <span className="rv-badge rv-badge-court">
+                        {form.role}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rv-body">
+                    <div className="rv-body-main">
+                      {/* Account Details */}
+                      <div className="rv-section">
+                        <div className="rv-section-header">
+                          <FiUser size={13} />
+                          <span>Account Details</span>
+                        </div>
+                        <div className="rv-grid rv-grid-3">
+                          <div className="rv-field">
+                            <div className="rv-field-label">Account Type</div>
+                            <div className="rv-field-value">
+                              {accountType === "EXISTING"
+                                ? "Existing Employee"
+                                : "New Employee"}
+                            </div>
+                          </div>
+                          <div className="rv-field">
+                            <div className="rv-field-label">Full Name</div>
+                            <div className="rv-field-value">
+                              {form.name || <span className="rv-empty">—</span>}
+                            </div>
+                          </div>
+                          <div className="rv-field">
+                            <div className="rv-field-label">Email Address</div>
+                            <div className="rv-field-value rv-mono">
+                              {form.email || (
+                                <span className="rv-empty">—</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rv-field">
+                            <div className="rv-field-label">Account Role</div>
+                            <div className="rv-field-value">{form.role}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Activation notice */}
+                      <div className="rv-section">
+                        <div className="rv-section-header">
+                          <FiMail size={13} />
+                          <span>Activation</span>
+                        </div>
+                        <div
+                          className="alert alert-info"
+                          style={{ marginTop: 8 }}
+                        >
+                          <FiAlertCircle className="w-5 h-5" />
+                          <div>
+                            <h4 className="font-bold">Activation Required</h4>
+                            <p className="text-sm">
+                              An activation link will be sent to{" "}
+                              <strong>{form.email}</strong>. The user must
+                              activate their account before logging in.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="xls-footer">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  className="xls-btn xls-btn-ghost"
+                  onClick={() => setStep("FORM")}
+                >
+                  <FiArrowLeft size={14} />
+                  Back to Edit
+                </button>
+              </div>
+              <button
+                className="xls-btn xls-btn-success"
+                style={{
+                  height: 50,
+                  paddingLeft: 30,
+                  paddingRight: 30,
+                  fontSize: 16,
+                }}
+                onClick={handleCreate}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="xls-spinner" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={17} />
+                    Confirm & Create
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

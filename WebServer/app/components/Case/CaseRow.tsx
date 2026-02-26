@@ -3,10 +3,28 @@
 import { Case } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
-// import { CaseModalType } from "./CaseModal";
+import Table from "../Table/Table";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatDate = (dateStr: string | Date | null | undefined) => {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type CaseSortConfig = { key: keyof Case; order: "asc" | "desc" } | null;
+
+// ─── Case Row ─────────────────────────────────────────────────────────────────
+
 const CaseRow = ({
   caseItem,
   handleDeleteCase,
@@ -22,7 +40,7 @@ const CaseRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer"
       onClick={() => router.push(`/user/cases/${caseItem.id}`)}
     >
       {/* ACTIONS */}
@@ -36,13 +54,11 @@ const CaseRow = ({
               <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
                 <FiMoreHorizontal size={18} />
               </button>
-
               <ul
                 tabIndex={0}
                 className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
                 style={{ zIndex: 9999 }}
               >
-                {/* VIEW */}
                 <li>
                   <button
                     className="flex items-center gap-3 text-info"
@@ -55,8 +71,6 @@ const CaseRow = ({
                     <span>View</span>
                   </button>
                 </li>
-
-                {/* EDIT */}
                 <li>
                   <button
                     className="flex items-center gap-3 text-warning"
@@ -69,8 +83,6 @@ const CaseRow = ({
                     <span>Edit</span>
                   </button>
                 </li>
-
-                {/* DELETE */}
                 <li>
                   <button
                     className="flex items-center gap-3 text-error"
@@ -90,26 +102,28 @@ const CaseRow = ({
       )}
 
       {/* DATA CELLS */}
+      <td className="font-semibold text-center whitespace-nowrap">
+        {caseItem.caseNumber}
+      </td>
       <td className="text-center">{caseItem.branch}</td>
       <td className="text-center">{caseItem.assistantBranch}</td>
-      <td className="font-semibold text-center">{caseItem.caseNumber}</td>
-      <td className="text-center text-base-content/70">
-        {new Date(caseItem.dateFiled).toLocaleDateString()}
+      <td className="text-center text-base-content/70 whitespace-nowrap">
+        {formatDate(caseItem.dateFiled)}
       </td>
-      <td className="font-medium">{caseItem.name}</td>
-      <td>{caseItem.charge}</td>
-      <td>{caseItem.infoSheet}</td>
-      <td>{caseItem.court}</td>
+      <td className="font-medium text-center">{caseItem.name}</td>
+      <td className="text-xs text-center">{caseItem.charge}</td>
+      <td className="text-center">{caseItem.infoSheet}</td>
+      <td className="text-center">{caseItem.court}</td>
 
-      {/* DETENTION STATUS (GLASS STYLE) */}
+      {/* DETENTION STATUS */}
       <td className="text-center">
         <span
           className={`px-3 py-1 rounded-full border text-xs font-medium transition
-    ${
-      caseItem.detained
-        ? "bg-gray-100 text-gray-500 border-gray-200" // Detained (light gray)
-        : "bg-neutral-800 text-white border-neutral-700" // Free (soft black)
-    }`}
+            ${
+              caseItem.detained
+                ? "bg-gray-100 text-gray-500 border-gray-200"
+                : "bg-neutral-800 text-white border-neutral-700"
+            }`}
         >
           {caseItem.detained ? "Detained" : "Free"}
         </span>
@@ -118,32 +132,227 @@ const CaseRow = ({
       <td className="text-center">{caseItem.consolidation}</td>
       <td className="text-center">{caseItem.eqcNumber ?? "N/A"}</td>
       <td className="text-center">{caseItem.bond}</td>
-      <td className="text-center text-base-content/70">
-        {caseItem.raffleDate
-          ? new Date(caseItem.raffleDate).toLocaleDateString()
-          : ""}
+      <td className="text-center text-base-content/70 whitespace-nowrap">
+        {formatDate(caseItem.raffleDate)}
       </td>
-      <td>{caseItem.committe1}</td>
-      <td>{caseItem.committe2}</td>
-      <td>{caseItem.Judge}</td>
-      <td>{caseItem.AO}</td>
-      <td>{caseItem.Complainant}</td>
-      <td>{caseItem.HouseNo}</td>
-      <td>{caseItem.Street}</td>
-      <td>{caseItem.Barangay}</td>
-      <td>{caseItem.Municipality}</td>
-      <td>{caseItem.Province}</td>
-      <td>{caseItem.Counts}</td>
-      <td>{caseItem.Jdf}</td>
-      <td>{caseItem.Sajj}</td>
-      <td>{caseItem.Sajj2}</td>
-      <td>{caseItem.MF}</td>
-      <td>{caseItem.STF}</td>
-      <td>{caseItem.LRF}</td>
-      <td>{caseItem.VCF}</td>
-      <td>{caseItem.Total}</td>
-      <td>{caseItem.AmountInvolved}</td>
+      <td className="text-center">{caseItem.committe1}</td>
+      <td className="text-center">{caseItem.committe2}</td>
+      <td className="text-center">{caseItem.Judge}</td>
+      <td className="text-center">{caseItem.AO}</td>
+      <td className="text-center">{caseItem.Complainant}</td>
+      <td className="text-center">{caseItem.HouseNo}</td>
+      <td className="text-center">{caseItem.Street}</td>
+      <td className="text-center">{caseItem.Barangay}</td>
+      <td className="text-center">{caseItem.Municipality}</td>
+      <td className="text-center">{caseItem.Province}</td>
+      <td className="text-center">{caseItem.Counts}</td>
+      <td className="text-center">{caseItem.Jdf}</td>
+      <td className="text-center">{caseItem.Sajj}</td>
+      <td className="text-center">{caseItem.Sajj2}</td>
+      <td className="text-center">{caseItem.MF}</td>
+      <td className="text-center">{caseItem.STF}</td>
+      <td className="text-center">{caseItem.LRF}</td>
+      <td className="text-center">{caseItem.VCF}</td>
+      <td className="text-center">{caseItem.Total}</td>
+      <td className="text-center">{caseItem.AmountInvolved}</td>
     </tr>
+  );
+};
+
+// ─── Case Table (uses generic Table component) ────────────────────────────────
+
+export const CaseTable = ({
+  data,
+  handleDeleteCase,
+}: {
+  data: Case[];
+  handleDeleteCase: (caseId: number) => void;
+}) => {
+  const session = useSession();
+  const isAdminOrAtty =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.ATTY;
+
+  const [sortConfig, setSortConfig] = useState<CaseSortConfig>({
+    key: "dateFiled",
+    order: "desc",
+  });
+
+  const handleSort = (key: keyof Case) => {
+    setSortConfig((prev) => ({
+      key,
+      order: prev?.key === key && prev.order === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const sorted = useMemo(() => {
+    if (!sortConfig) return data;
+    return [...data].sort((a, b) => {
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortConfig]);
+
+  const headers = [
+    ...(isAdminOrAtty
+      ? [{ key: "actions", label: "ACTIONS", align: "center" as const }]
+      : []),
+    {
+      key: "caseNumber",
+      label: "CASE NO.",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "branch",
+      label: "BRANCH",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "assistantBranch",
+      label: "ASST. BRANCH",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "dateFiled",
+      label: "DATE FILED",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "name", label: "NAME", sortable: true, align: "center" as const },
+    {
+      key: "charge",
+      label: "CHARGE",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "infoSheet",
+      label: "INFO SHEET",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "court", label: "COURT", sortable: true, align: "center" as const },
+    {
+      key: "detained",
+      label: "DETENTION",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "consolidation",
+      label: "CONSOLIDATION",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "eqcNumber",
+      label: "EQC NO.",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "bond", label: "BOND", sortable: true, align: "center" as const },
+    {
+      key: "raffleDate",
+      label: "RAFFLE DATE",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "committe1",
+      label: "COMMITTEE 1",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "committe2",
+      label: "COMMITTEE 2",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "Judge", label: "JUDGE", sortable: true, align: "center" as const },
+    { key: "AO", label: "AO", sortable: true, align: "center" as const },
+    {
+      key: "Complainant",
+      label: "COMPLAINANT",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "HouseNo",
+      label: "HOUSE NO.",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "Street",
+      label: "STREET",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "Barangay",
+      label: "BARANGAY",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "Municipality",
+      label: "MUNICIPALITY",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "Province",
+      label: "PROVINCE",
+      sortable: true,
+      align: "center" as const,
+    },
+    {
+      key: "Counts",
+      label: "COUNTS",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "Jdf", label: "JDF", sortable: true, align: "center" as const },
+    { key: "Sajj", label: "SAJJ", sortable: true, align: "center" as const },
+    { key: "Sajj2", label: "SAJJ 2", sortable: true, align: "center" as const },
+    { key: "MF", label: "MF", sortable: true, align: "center" as const },
+    { key: "STF", label: "STF", sortable: true, align: "center" as const },
+    { key: "LRF", label: "LRF", sortable: true, align: "center" as const },
+    { key: "VCF", label: "VCF", sortable: true, align: "center" as const },
+    { key: "Total", label: "TOTAL", sortable: true, align: "center" as const },
+    {
+      key: "AmountInvolved",
+      label: "AMOUNT INVOLVED",
+      sortable: true,
+      align: "center" as const,
+    },
+  ];
+
+  return (
+    <Table<Case>
+      headers={headers}
+      data={sorted}
+      sortConfig={sortConfig}
+      onSort={handleSort}
+      renderRow={(item) => (
+        <CaseRow
+          key={item.id}
+          caseItem={item}
+          handleDeleteCase={handleDeleteCase}
+        />
+      )}
+      rowsPerPage={25}
+      className="bg-base-300 rounded-lg shadow"
+    />
   );
 };
 
