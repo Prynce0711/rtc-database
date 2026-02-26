@@ -28,7 +28,7 @@ type TableProps<T extends Record<string, unknown>> = {
   className?: string;
 };
 
-const Table = <T extends Record<string, unknown>>({
+function Table<T extends Record<string, unknown>>({
   headers,
   data,
   renderRow,
@@ -38,7 +38,7 @@ const Table = <T extends Record<string, unknown>>({
   sortConfig,
   onSort,
   className,
-}: TableProps<T>) => {
+}: TableProps<T>) {
   const [page, setPage] = useState(initialPage);
 
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
@@ -75,56 +75,52 @@ const Table = <T extends Record<string, unknown>>({
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto ">
-        <table className="table table-compact w-full">
-          <thead className="bg-base-300 text-base">
+      <div className="overflow-x-auto">
+        <table className="table table-compact uppercase table-zebra w-full text-center">
+          <thead className="text-sm bg-base-300 rounded-lg shadow text-sm">
             <tr>
-              {headers.map((h) => (
-                <th
-                  key={h.key}
-                  className={`
-                ${h.className ?? ""}
-                ${
+              {headers.map((h) => {
+                const alignClass =
                   h.align === "center"
                     ? "text-center"
                     : h.align === "right"
                       ? "text-right"
-                      : "text-left"
-                }
-              `}
-                >
-                  {h.sortable ? (
-                    <button
-                      type="button"
-                      className={`flex w-full items-center gap-2 ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
-                      onClick={() => {
-                        if (!onSort) return;
-                        const key = h.sortKey ?? (h.key as keyof T);
-                        onSort(key);
-                      }}
-                    >
-                      <span className="font-semibold text-base">{h.label}</span>
+                      : "text-left";
+                const isActive =
+                  !!sortConfig &&
+                  sortConfig.key === (h.sortKey ?? (h.key as keyof T));
 
-                      {sortConfig?.key === (h.sortKey ?? h.key) && (
-                        <span className="text-sm opacity-70">
-                          {sortConfig.order === "asc" ? "▲" : "▼"}
-                        </span>
-                      )}
-                    </button>
-                  ) : (
+                return (
+                  <th
+                    key={h.key}
+                    className={`${h.className ?? ""} ${alignClass} ${h.sortable ? "cursor-pointer select-none hover:bg-base-200 transition-colors" : ""}`}
+                    onClick={() => {
+                      if (!h.sortable || !onSort) return;
+                      const key = h.sortKey ?? (h.key as keyof T);
+                      onSort(key);
+                    }}
+                  >
                     <div
-                      className={`flex w-full ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
+                      className={`flex w-full items-center ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
                     >
-                      <span className="text-xl font-semibold">{h.label}</span>
+                      <span className="font-bold text-sm">{h.label}</span>
+                      {h.sortable &&
+                        (isActive ? (
+                          <span className="ml-1 text-primary">
+                            {sortConfig?.order === "asc" ? "↑" : "↓"}
+                          </span>
+                        ) : (
+                          <span className="opacity-30 ml-1">↕</span>
+                        ))}
                     </div>
-                  )}
-                </th>
-              ))}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
           {/* BODY */}
-          <tbody className="text-sm">
+          <tbody className="text-sm [&_td]:py-2 [&_td]:text-sm">
             {paginated.map((d, i) =>
               renderRow(d, (page - 1) * rowsPerPage + i),
             )}
@@ -188,6 +184,6 @@ const Table = <T extends Record<string, unknown>>({
       )}
     </div>
   );
-};
+}
 
 export default Table;

@@ -2,17 +2,19 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { FiEdit, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 import { ReceiveLog } from "./PetitionRecord";
 
 const ReceiveRow = ({
   log,
   onEdit,
   onDelete,
+  onView,
 }: {
   log: ReceiveLog;
   onEdit: (log: ReceiveLog) => void;
   onDelete: (log: ReceiveLog) => void;
+  onView?: (log: ReceiveLog) => void;
 }) => {
   const session = useSession();
   const isAdminOrAtty =
@@ -21,8 +23,16 @@ const ReceiveRow = ({
 
   const dateStr =
     log.dateReceived instanceof Date
-      ? log.dateReceived.toLocaleDateString()
-      : new Date(log.dateReceived).toLocaleDateString();
+      ? log.dateReceived.toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : new Date(log.dateReceived).toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
 
   const caseNumber = (log as any)["Case No"] ?? log.caseNumber ?? "—";
   const raffledToBranch =
@@ -35,9 +45,13 @@ const ReceiveRow = ({
     (log as any).TitleNo ?? (log as any).BookAndPages ?? log.receiptNo ?? "—";
   const nature =
     (log as any).Nature ?? (log as any).Content ?? log.documentType ?? "—";
+  const respondent = (log as any).Respondent ?? "—";
 
   return (
-    <tr className="bg-base-100 hover:bg-base-200 transition-colors text-sm">
+    <tr
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      onClick={() => onView?.(log)}
+    >
       {/* ACTIONS */}
       {isAdminOrAtty && (
         <td
@@ -54,6 +68,20 @@ const ReceiveRow = ({
                 className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
                 style={{ zIndex: 9999 }}
               >
+                {/* VIEW */}
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-info"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onView?.(log);
+                    }}
+                  >
+                    <FiEye size={16} />
+                    <span>View</span>
+                  </button>
+                </li>
+
                 {/* EDIT */}
                 <li>
                   <button
@@ -87,13 +115,14 @@ const ReceiveRow = ({
         </td>
       )}
 
-      {/* DATA CELLS */}
+      {/* DATA CELLS — matching Proceedings column order */}
       <td className="font-semibold text-center">{caseNumber}</td>
       <td className="text-center">{raffledToBranch}</td>
       <td className="text-center text-base-content/70">{dateStr}</td>
-      <td>{petitioners}</td>
+      <td className="font-medium text-center">{petitioners}</td>
       <td className="text-center">{titleNo}</td>
       <td className="text-center">{nature}</td>
+      <td className="text-center">{respondent}</td>
     </tr>
   );
 };
