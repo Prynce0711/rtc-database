@@ -681,7 +681,7 @@ const ReceiveLogsPage: React.FC = () => {
               },
               {
                 key: "caseType",
-                label: "Abbreviation",
+                label: "Case Type",
                 sortable: true,
                 align: "center",
               },

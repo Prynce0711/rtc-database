@@ -22,14 +22,7 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
-import {
-  CaseSchema,
-  FormEntry,
-  caseToFormEntry,
-  createEmptyFormEntry,
-} from "./schema";
-
-const uid = () => Math.random().toString(36).slice(2, 9);
+import { CaseEntry, CaseSchema, caseToEntry, createEmptyEntry } from "./schema";
 
 export enum CaseModalType {
   ADD = "ADD",
@@ -210,28 +203,28 @@ const TAB_GROUPS: TabGroup[] = [
     label: "Personnel",
     cols: [
       {
-        key: "Judge",
+        key: "judge",
         label: "Judge",
         placeholder: "Judge name",
         type: "text",
         width: 165,
       },
       {
-        key: "AO",
+        key: "ao",
         label: "AO",
         placeholder: "AO name",
         type: "text",
         width: 145,
       },
       {
-        key: "Complainant",
+        key: "complainant",
         label: "Complainant",
         placeholder: "Complainant name",
         type: "text",
         width: 175,
       },
       {
-        key: "committe1",
+        key: "committee1",
         label: "Committee 1",
         placeholder: "—",
         type: "number",
@@ -239,7 +232,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "committe2",
+        key: "committee2",
         label: "Committee 2",
         placeholder: "—",
         type: "number",
@@ -253,35 +246,35 @@ const TAB_GROUPS: TabGroup[] = [
     label: "Address",
     cols: [
       {
-        key: "HouseNo",
+        key: "houseNo",
         label: "House No.",
         placeholder: "123",
         type: "text",
         width: 92,
       },
       {
-        key: "Street",
+        key: "street",
         label: "Street",
         placeholder: "Street name",
         type: "text",
         width: 155,
       },
       {
-        key: "Barangay",
+        key: "barangay",
         label: "Barangay",
         placeholder: "Brgy.",
         type: "text",
         width: 135,
       },
       {
-        key: "Municipality",
+        key: "municipality",
         label: "Municipality",
         placeholder: "Municipality",
         type: "text",
         width: 150,
       },
       {
-        key: "Province",
+        key: "province",
         label: "Province",
         placeholder: "Province",
         type: "text",
@@ -294,7 +287,7 @@ const TAB_GROUPS: TabGroup[] = [
     label: "Financials",
     cols: [
       {
-        key: "Counts",
+        key: "counts",
         label: "Counts",
         placeholder: "0",
         type: "number",
@@ -302,7 +295,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "AmountInvolved",
+        key: "amountInvolved",
         label: "Amt. Involved",
         placeholder: "0.00",
         type: "number",
@@ -310,7 +303,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "Jdf",
+        key: "jdf",
         label: "JDF",
         placeholder: "0.00",
         type: "number",
@@ -318,7 +311,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "Sajj",
+        key: "sajj",
         label: "SAJJ",
         placeholder: "0.00",
         type: "number",
@@ -326,7 +319,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "Sajj2",
+        key: "sajj2",
         label: "SAJJ 2",
         placeholder: "0.00",
         type: "number",
@@ -334,7 +327,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "MF",
+        key: "mf",
         label: "MF",
         placeholder: "0.00",
         type: "number",
@@ -342,7 +335,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "STF",
+        key: "stf",
         label: "STF",
         placeholder: "0.00",
         type: "number",
@@ -350,7 +343,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "LRF",
+        key: "lrf",
         label: "LRF",
         placeholder: "0.00",
         type: "number",
@@ -358,7 +351,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "VCF",
+        key: "vcf",
         label: "VCF",
         placeholder: "0.00",
         type: "number",
@@ -366,7 +359,7 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "Total",
+        key: "total",
         label: "Total",
         placeholder: "0.00",
         type: "number",
@@ -377,12 +370,12 @@ const TAB_GROUPS: TabGroup[] = [
   },
 ];
 
-function validateEntry(entry: FormEntry): Record<string, string> {
+function validateEntry(entry: CaseEntry): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
     if (
-      !entry[k as keyof FormEntry] ||
-      String(entry[k as keyof FormEntry]).trim() === ""
+      !entry[k as keyof CaseEntry] ||
+      String(entry[k as keyof CaseEntry]).trim() === ""
     )
       errs[k] = "Required";
   });
@@ -398,11 +391,18 @@ const CellInput = ({
   onKeyDown,
 }: {
   col: ColDef;
-  value: string | boolean;
+  value: string | boolean | number | Date | null | undefined;
   error?: string;
   onChange: (v: string | boolean) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) => {
+  // Convert null/undefined to empty string, Date objects to YYYY-MM-DD format
+  const stringValue =
+    value == null
+      ? ""
+      : value instanceof Date
+        ? value.toISOString().slice(0, 10)
+        : String(value);
   if (col.type === "checkbox") {
     return (
       <div
@@ -428,7 +428,7 @@ const CellInput = ({
     return (
       <div style={{ display: "flex", flexDirection: "column" }}>
         <select
-          value={value as string}
+          value={stringValue}
           onChange={(e) => onChange(e.target.value)}
           title={error || col.label}
           className={`xls-input${error ? " xls-input-err" : ""}`}
@@ -460,7 +460,7 @@ const CellInput = ({
               : "text"
         }
         step={col.type === "number" ? "0.01" : undefined}
-        value={value as string}
+        value={stringValue}
         placeholder={col.placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
@@ -478,42 +478,46 @@ const CellInput = ({
 };
 
 /* ─── Review: single case card ───────────────────────────────── */
-function ReviewCard({ entry }: { entry: FormEntry }) {
+function ReviewCard({ entry }: { entry: CaseEntry }) {
   const filledAddress =
     [
-      entry.HouseNo,
-      entry.Street,
-      entry.Barangay,
-      entry.Municipality,
-      entry.Province,
+      entry.houseNo,
+      entry.street,
+      entry.barangay,
+      entry.municipality,
+      entry.province,
     ]
       .filter(Boolean)
       .join(", ") || null;
 
   const financialRows = [
-    { label: "Counts", value: entry.Counts || null, isCurrency: false },
-    { label: "Amt. Involved", value: entry.AmountInvolved, isCurrency: true },
-    { label: "JDF", value: entry.Jdf, isCurrency: true },
-    { label: "SAJJ", value: entry.Sajj, isCurrency: true },
-    { label: "SAJJ 2", value: entry.Sajj2, isCurrency: true },
-    { label: "MF", value: entry.MF, isCurrency: true },
-    { label: "STF", value: entry.STF, isCurrency: true },
-    { label: "LRF", value: entry.LRF, isCurrency: true },
-    { label: "VCF", value: entry.VCF, isCurrency: true },
-    { label: "Total", value: entry.Total, isCurrency: true, isTotal: true },
+    { label: "Counts", value: entry.counts || null, isCurrency: false },
+    {
+      label: "Amt. Involved",
+      value: entry.amountInvolved,
+      isCurrency: true,
+    },
+    { label: "JDF", value: entry.jdf, isCurrency: true },
+    { label: "SAJJ", value: entry.sajj, isCurrency: true },
+    { label: "SAJJ 2", value: entry.sajj2, isCurrency: true },
+    { label: "MF", value: entry.mf, isCurrency: true },
+    { label: "STF", value: entry.stf, isCurrency: true },
+    { label: "LRF", value: entry.lrf, isCurrency: true },
+    { label: "VCF", value: entry.vcf, isCurrency: true },
+    { label: "Total", value: entry.total, isCurrency: true, isTotal: true },
   ]
     .filter((r) => r.value && r.value !== "")
     .map((r) => ({
       ...r,
       display:
         r.isCurrency && r.value
-          ? `₱ ${parseFloat(r.value).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+          ? `₱ ${(typeof r.value === "number" ? r.value : parseFloat(r.value)).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
           : r.value,
     }));
 
-  const fmtDate = (d: string) =>
+  const fmtDate = (d: Date | null | undefined) =>
     d
-      ? new Date(d).toLocaleDateString("en-PH", {
+      ? d.toLocaleDateString("en-PH", {
           year: "numeric",
           month: "short",
           day: "numeric",
@@ -611,7 +615,7 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
                   <div className="rv-field-label">Bond</div>
                   <div className="rv-field-value rv-mono">
                     ₱{" "}
-                    {parseFloat(entry.bond).toLocaleString("en-PH", {
+                    {entry.bond.toLocaleString("en-PH", {
                       minimumFractionDigits: 2,
                     })}
                   </div>
@@ -629,34 +633,34 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
               <div className="rv-field">
                 <div className="rv-field-label">Judge</div>
                 <div className="rv-field-value">
-                  {entry.Judge || <span className="rv-empty">—</span>}
+                  {entry.judge || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Administrative Officer</div>
                 <div className="rv-field-value">
-                  {entry.AO || <span className="rv-empty">—</span>}
+                  {entry.ao || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Complainant</div>
                 <div className="rv-field-value">
-                  {entry.Complainant || <span className="rv-empty">—</span>}
+                  {entry.complainant || <span className="rv-empty">—</span>}
                 </div>
               </div>
-              {entry.committe1 && (
+              {entry.committee1 && (
                 <div className="rv-field">
                   <div className="rv-field-label">Committee 1</div>
                   <div className="rv-field-value rv-mono">
-                    {entry.committe1}
+                    {entry.committee1}
                   </div>
                 </div>
               )}
-              {entry.committe2 && (
+              {entry.committee2 && (
                 <div className="rv-field">
                   <div className="rv-field-label">Committee 2</div>
                   <div className="rv-field-value rv-mono">
-                    {entry.committe2}
+                    {entry.committee2}
                   </div>
                 </div>
               )}
@@ -720,22 +724,22 @@ const NewCaseModal = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const makeFromCase = (sc: Case): FormEntry => caseToFormEntry(uid(), sc);
+  const makeFromCase = (sc: Case): CaseEntry => caseToEntry(sc);
 
-  const [entries, setEntries] = useState<FormEntry[]>(() => {
+  const [entries, setEntries] = useState<CaseEntry[]>(() => {
     if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
-    return [createEmptyFormEntry(uid())];
+    return [createEmptyEntry()];
   });
 
   useEffect(() => {
     if (!isEdit) {
-      setEntries([createEmptyFormEntry(uid())]);
+      setEntries([createEmptyEntry()]);
       setStep("entry");
       setActiveTab(0);
     }
   }, [type, selectedCase, isEdit]);
 
-  const handleChange = (id: string, field: string, value: string | boolean) => {
+  const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -746,7 +750,7 @@ const NewCaseModal = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyFormEntry(uid())]);
+    setEntries((prev) => [...prev, createEmptyEntry()]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -755,15 +759,15 @@ const NewCaseModal = ({
     }, 60);
   }, []);
 
-  const handleRemove = (id: string) =>
+  const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = (id: number) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: FormEntry = {
+    const dup: CaseEntry = {
       ...source,
-      id: uid(),
+      id: 0,
       caseNumber: "",
       errors: {},
       saved: false,
@@ -779,7 +783,7 @@ const NewCaseModal = ({
 
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: string,
+    entryId: number,
     isLastColOfTab: boolean,
   ) => {
     if (e.key === "Tab" && !e.shiftKey && isLastColOfTab) {
@@ -799,8 +803,8 @@ const NewCaseModal = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every(
       (k) =>
-        e[k as keyof FormEntry] &&
-        String(e[k as keyof FormEntry]).trim() !== "",
+        e[k as keyof CaseEntry] &&
+        String(e[k as keyof CaseEntry]).trim() !== "",
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;
@@ -827,42 +831,10 @@ const NewCaseModal = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (e: FormEntry) => ({
-    branch: e.branch,
-    assistantBranch: e.assistantBranch,
-    caseNumber: e.caseNumber,
-    dateFiled: e.dateFiled,
-    caseType: e.caseType || "UNKNOWN",
-    name: e.name,
-    charge: e.charge,
-    infoSheet: e.infoSheet,
-    court: e.court,
-    detained: e.detained,
-    consolidation: e.consolidation,
-    eqcNumber: e.eqcNumber ? parseInt(e.eqcNumber) : null,
-    bond: e.bond ? parseFloat(e.bond) : null,
-    raffleDate: e.raffleDate || null,
-    committe1: e.committe1 ? parseInt(e.committe1) : null,
-    committe2: e.committe2 ? parseInt(e.committe2) : null,
-    Judge: e.Judge || null,
-    AO: e.AO || null,
-    Complainant: e.Complainant || null,
-    HouseNo: e.HouseNo || null,
-    Street: e.Street || null,
-    Barangay: e.Barangay || null,
-    Municipality: e.Municipality || null,
-    Province: e.Province || null,
-    Counts: e.Counts ? parseInt(e.Counts) : null,
-    Jdf: e.Jdf ? parseFloat(e.Jdf) : null,
-    Sajj: e.Sajj ? parseFloat(e.Sajj) : null,
-    Sajj2: e.Sajj2 ? parseFloat(e.Sajj2) : null,
-    MF: e.MF ? parseFloat(e.MF) : null,
-    STF: e.STF ? parseFloat(e.STF) : null,
-    LRF: e.LRF ? parseFloat(e.LRF) : null,
-    VCF: e.VCF ? parseFloat(e.VCF) : null,
-    Total: e.Total ? parseFloat(e.Total) : null,
-    AmountInvolved: e.AmountInvolved ? parseFloat(e.AmountInvolved) : null,
-  });
+  const buildPayload = (e: CaseEntry) => {
+    const { id, errors, collapsed, saved, ...caseInput } = e;
+    return CaseSchema.safeParse(caseInput);
+  };
 
   const handleSubmit = async () => {
     const label = isEdit
@@ -877,9 +849,9 @@ const NewCaseModal = ({
     );
     try {
       if (isEdit && selectedCase) {
-        const payload = buildPayload(entries[0]);
-        const validation = CaseSchema.safeParse(payload);
-        if (!validation.success) throw new Error("Invalid data");
+        const parsed = buildPayload(entries[0]);
+        if (!parsed.success) throw new Error("Invalid data");
+        const payload = parsed.data;
         const response = await updateCase(selectedCase.id, {
           ...payload,
           dateFiled: new Date(payload.dateFiled).toISOString(),
@@ -893,9 +865,9 @@ const NewCaseModal = ({
         statusPopup.showSuccess("Case updated successfully");
       } else {
         for (const entry of entries) {
-          const payload = buildPayload(entry);
-          const validation = CaseSchema.safeParse(payload);
-          if (!validation.success) throw new Error("Invalid data");
+          const parsed = buildPayload(entry);
+          if (!parsed.success) throw new Error("Invalid data");
+          const payload = parsed.data;
           const response = await createCase({
             ...payload,
             dateFiled: new Date(payload.dateFiled).toISOString(),
@@ -1130,14 +1102,7 @@ const NewCaseModal = ({
                                 <td key={col.key}>
                                   <CellInput
                                     col={col}
-                                    value={
-                                      (
-                                        entry as unknown as Record<
-                                          string,
-                                          string | boolean
-                                        >
-                                      )[col.key]
-                                    }
+                                    value={(entry as any)[col.key]}
                                     error={entry.errors[col.key]}
                                     onChange={(v) =>
                                       handleChange(entry.id, col.key, v)
@@ -1149,14 +1114,7 @@ const NewCaseModal = ({
                                 <td key={col.key}>
                                   <CellInput
                                     col={col}
-                                    value={
-                                      (
-                                        entry as unknown as Record<
-                                          string,
-                                          string | boolean
-                                        >
-                                      )[col.key]
-                                    }
+                                    value={(entry as any)[col.key]}
                                     error={entry.errors[col.key]}
                                     onChange={(v) =>
                                       handleChange(entry.id, col.key, v)

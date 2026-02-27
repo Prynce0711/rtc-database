@@ -29,31 +29,49 @@
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 //   const statusPopup = usePopup();
 
-//   useEffect(() => {
-//     if (type === CaseModalType.EDIT && selectedCase) {
-//       setFormData({
-//         branch: selectedCase.branch,
-//         assistantBranch: selectedCase.assistantBranch,
-//         caseNumber: selectedCase.caseNumber,
-//         dateFiled: new Date(selectedCase.dateFiled),
-//         name: selectedCase.name,
-//         charge: selectedCase.charge,
-//         infoSheet: selectedCase.infoSheet,
-//         court: selectedCase.court,
-//         detained: selectedCase.detained,
-//         consolidation: selectedCase.consolidation,
-//         eqcNumber: selectedCase.eqcNumber ?? undefined,
-//         bond: selectedCase.bond ?? undefined,
-//         raffleDate: selectedCase.raffleDate
-//           ? new Date(selectedCase.raffleDate)
-//           : undefined,
-//         committe1: selectedCase.committe1 ?? undefined,
-//         committe2: selectedCase.committe2 ?? undefined,
-//       });
-//     } else {
-//       setFormData(initialCaseFormData);
-//     }
-//   }, [type, selectedCase]);
+  useEffect(() => {
+    if (type === CaseModalType.EDIT && selectedCase) {
+      setFormData({
+        branch: selectedCase.branch,
+        assistantBranch: selectedCase.assistantBranch,
+        caseNumber: selectedCase.caseNumber,
+        dateFiled: new Date(selectedCase.dateFiled),
+        name: selectedCase.name,
+        charge: selectedCase.charge,
+        infoSheet: selectedCase.infoSheet,
+        court: selectedCase.court,
+        detained: selectedCase.detained,
+        consolidation: selectedCase.consolidation,
+        eqcNumber: selectedCase.eqcNumber ?? undefined,
+        bond: selectedCase.bond ?? undefined,
+        raffleDate: selectedCase.raffleDate
+          ? new Date(selectedCase.raffleDate)
+          : undefined,
+        committee1: selectedCase.committee1 ?? undefined,
+        committee2: selectedCase.committee2 ?? undefined,
+        judge: selectedCase.judge ?? undefined,
+        ao: selectedCase.ao ?? undefined,
+        complainant: selectedCase.complainant ?? undefined,
+        houseNo: selectedCase.houseNo ?? undefined,
+        street: selectedCase.street ?? undefined,
+        barangay: selectedCase.barangay ?? undefined,
+        municipality: selectedCase.municipality ?? undefined,
+        province: selectedCase.province ?? undefined,
+        counts: selectedCase.counts ?? undefined,
+        jdf: selectedCase.jdf ?? undefined,
+        sajj: selectedCase.sajj ?? undefined,
+        sajj2: selectedCase.sajj2 ?? undefined,
+        mf: selectedCase.mf ?? undefined,
+        stf: selectedCase.stf ?? undefined,
+        lrf: selectedCase.lrf ?? undefined,
+        vcf: selectedCase.vcf ?? undefined,
+        total: selectedCase.total ?? undefined,
+        amountInvolved: selectedCase.amountInvolved ?? undefined,
+      });
+    } else {
+      setFormData(initialCaseFormData);
+    }
+  }, [type, selectedCase]);
 
 //   const getFieldErrors = (
 //     issues: z.core.$ZodIssue[],
@@ -422,46 +440,46 @@
 //               />
 //             </div>
 
-//             {/* Committee 1 */}
-//             <div className="form-control">
-//               <label className="label">
-//                 <span className="label-text">Committee 1</span>
-//               </label>
-//               <input
-//                 type="number"
-//                 className="input input-bordered"
-//                 value={formData.committe1 || ""}
-//                 onChange={(e) =>
-//                   setFormData({
-//                     ...formData,
-//                     committe1: e.target.value
-//                       ? parseInt(e.target.value)
-//                       : undefined,
-//                   })
-//                 }
-//               />
-//             </div>
+            {/* Committee 1 */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Committee 1</span>
+              </label>
+              <input
+                type="number"
+                className="input input-bordered"
+                value={formData.committee1 || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    committee1: e.target.value
+                      ? parseInt(e.target.value)
+                      : undefined,
+                  })
+                }
+              />
+            </div>
 
-//             {/* Committee 2 */}
-//             <div className="form-control">
-//               <label className="label">
-//                 <span className="label-text">Committee 2</span>
-//               </label>
-//               <input
-//                 type="number"
-//                 className="input input-bordered"
-//                 value={formData.committe2 || ""}
-//                 onChange={(e) =>
-//                   setFormData({
-//                     ...formData,
-//                     committe2: e.target.value
-//                       ? parseInt(e.target.value)
-//                       : undefined,
-//                   })
-//                 }
-//               />
-//             </div>
-//           </div>
+            {/* Committee 2 */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Committee 2</span>
+              </label>
+              <input
+                type="number"
+                className="input input-bordered"
+                value={formData.committee2 || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    committee2: e.target.value
+                      ? parseInt(e.target.value)
+                      : undefined,
+                  })
+                }
+              />
+            </div>
+          </div>
 
 //           <div className="modal-action">
 //             <button

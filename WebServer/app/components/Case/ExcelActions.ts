@@ -155,8 +155,8 @@ export async function uploadExcel(file: File): Promise<ActionResult<void>> {
         eqcNumber: eqcNumberCell ? Number(eqcNumberCell) : undefined,
         bond: bondCell ? Number(bondCell) : undefined,
         raffleDate,
-        committe1: committee1Cell ? Number(committee1Cell) : undefined,
-        committe2: committee2Cell ? Number(committee2Cell) : undefined,
+        committee1: committee1Cell ? Number(committee1Cell) : undefined,
+        committee2: committee2Cell ? Number(committee2Cell) : undefined,
       };
     });
 
@@ -246,8 +246,8 @@ export async function exportCasesExcel(): Promise<
       "ECQ NO.": item.eqcNumber ?? "",
       BOND: item.bond ?? "",
       "RAFFLE DATE": item.raffleDate ?? "",
-      "COMMITEE 1": item.committe1 ?? "",
-      "COMMITTEE 2": item.committe2 ?? "",
+      "COMMITTEE 1": item.committee1 ?? "",
+      "COMMITTEE 2": item.committee2 ?? "",
     }));
 
     const workbook = XLSX.utils.book_new();

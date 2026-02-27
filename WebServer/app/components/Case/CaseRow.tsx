@@ -135,26 +135,26 @@ const CaseRow = ({
       <td className="text-center text-base-content/70 whitespace-nowrap">
         {formatDate(caseItem.raffleDate)}
       </td>
-      <td className="text-center">{caseItem.committe1}</td>
-      <td className="text-center">{caseItem.committe2}</td>
-      <td className="text-center">{caseItem.Judge}</td>
-      <td className="text-center">{caseItem.AO}</td>
-      <td className="text-center">{caseItem.Complainant}</td>
-      <td className="text-center">{caseItem.HouseNo}</td>
-      <td className="text-center">{caseItem.Street}</td>
-      <td className="text-center">{caseItem.Barangay}</td>
-      <td className="text-center">{caseItem.Municipality}</td>
-      <td className="text-center">{caseItem.Province}</td>
-      <td className="text-center">{caseItem.Counts}</td>
-      <td className="text-center">{caseItem.Jdf}</td>
-      <td className="text-center">{caseItem.Sajj}</td>
-      <td className="text-center">{caseItem.Sajj2}</td>
-      <td className="text-center">{caseItem.MF}</td>
-      <td className="text-center">{caseItem.STF}</td>
-      <td className="text-center">{caseItem.LRF}</td>
-      <td className="text-center">{caseItem.VCF}</td>
-      <td className="text-center">{caseItem.Total}</td>
-      <td className="text-center">{caseItem.AmountInvolved}</td>
+      <td className="text-center">{caseItem.committee1}</td>
+      <td className="text-center">{caseItem.committee2}</td>
+      <td className="text-center">{caseItem.judge}</td>
+      <td className="text-center">{caseItem.ao}</td>
+      <td className="text-center">{caseItem.complainant}</td>
+      <td className="text-center">{caseItem.houseNo}</td>
+      <td className="text-center">{caseItem.street}</td>
+      <td className="text-center">{caseItem.barangay}</td>
+      <td className="text-center">{caseItem.municipality}</td>
+      <td className="text-center">{caseItem.province}</td>
+      <td className="text-center">{caseItem.counts}</td>
+      <td className="text-center">{caseItem.jdf}</td>
+      <td className="text-center">{caseItem.sajj}</td>
+      <td className="text-center">{caseItem.sajj2}</td>
+      <td className="text-center">{caseItem.mf}</td>
+      <td className="text-center">{caseItem.stf}</td>
+      <td className="text-center">{caseItem.lrf}</td>
+      <td className="text-center">{caseItem.vcf}</td>
+      <td className="text-center">{caseItem.total}</td>
+      <td className="text-center">{caseItem.amountInvolved}</td>
     </tr>
   );
 };
@@ -266,71 +266,76 @@ export const CaseTable = ({
       align: "center" as const,
     },
     {
-      key: "committe1",
+      key: "committee1",
       label: "COMMITTEE 1",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "committe2",
+      key: "committee2",
       label: "COMMITTEE 2",
       sortable: true,
       align: "center" as const,
     },
-    { key: "Judge", label: "JUDGE", sortable: true, align: "center" as const },
-    { key: "AO", label: "AO", sortable: true, align: "center" as const },
     {
-      key: "Complainant",
+      key: "judge",
+      label: "JUDGE",
+      sortable: true,
+      align: "center" as const,
+    },
+    { key: "ao", label: "AO", sortable: true, align: "center" as const },
+    {
+      key: "complainant",
       label: "COMPLAINANT",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "HouseNo",
+      key: "houseNo",
       label: "HOUSE NO.",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "Street",
+      key: "street",
       label: "STREET",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "Barangay",
+      key: "barangay",
       label: "BARANGAY",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "Municipality",
+      key: "municipality",
       label: "MUNICIPALITY",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "Province",
+      key: "province",
       label: "PROVINCE",
       sortable: true,
       align: "center" as const,
     },
     {
-      key: "Counts",
+      key: "counts",
       label: "COUNTS",
       sortable: true,
       align: "center" as const,
     },
-    { key: "Jdf", label: "JDF", sortable: true, align: "center" as const },
-    { key: "Sajj", label: "SAJJ", sortable: true, align: "center" as const },
-    { key: "Sajj2", label: "SAJJ 2", sortable: true, align: "center" as const },
-    { key: "MF", label: "MF", sortable: true, align: "center" as const },
-    { key: "STF", label: "STF", sortable: true, align: "center" as const },
-    { key: "LRF", label: "LRF", sortable: true, align: "center" as const },
-    { key: "VCF", label: "VCF", sortable: true, align: "center" as const },
-    { key: "Total", label: "TOTAL", sortable: true, align: "center" as const },
+    { key: "jdf", label: "JDF", sortable: true, align: "center" as const },
+    { key: "sajj", label: "SAJJ", sortable: true, align: "center" as const },
+    { key: "sajj2", label: "SAJJ 2", sortable: true, align: "center" as const },
+    { key: "mf", label: "MF", sortable: true, align: "center" as const },
+    { key: "stf", label: "STF", sortable: true, align: "center" as const },
+    { key: "lrf", label: "LRF", sortable: true, align: "center" as const },
+    { key: "vcf", label: "VCF", sortable: true, align: "center" as const },
+    { key: "total", label: "TOTAL", sortable: true, align: "center" as const },
     {
-      key: "AmountInvolved",
+      key: "amountInvolved",
       label: "AMOUNT INVOLVED",
       sortable: true,
       align: "center" as const,

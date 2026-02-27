@@ -1,5 +1,5 @@
-import StatisticsTester from "./StatisticsTester";
+import FileUploadTester from "./FileUploadTester";
 
 export default function page() {
-  return <StatisticsTester />;
+  return <FileUploadTester />;
 }
