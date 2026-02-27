@@ -1,5 +1,6 @@
 "use client";
 
+import { Petition } from "@/app/generated/prisma/client";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,7 +19,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { ReceiveLog } from "./PetitionRecord";
+import { createPetition, updatePetition } from "./PetitionActions";
 
 export enum ReceiveDrawerType {
   ADD = "ADD",
@@ -288,7 +289,7 @@ const PetitionEntryPage = ({
 }: {
   type: ReceiveDrawerType;
   onClose: () => void;
-  selectedLog?: ReceiveLog | null | any;
+  selectedLog?: Petition | null;
   onCreate?: (log: any) => void;
   onUpdate?: (log: any) => void;
 }) => {
@@ -304,26 +305,14 @@ const PetitionEntryPage = ({
       return [
         {
           ...emptyEntry(uid()),
-          caseNumber: selectedLog.caseNumber ?? selectedLog["Case No"] ?? "",
-          raffledToBranch:
-            selectedLog.RaffledToBranch ??
-            selectedLog["Branch No"] ??
-            selectedLog.branch ??
-            "",
-          dateFiled: selectedLog.dateReceived
-            ? String(selectedLog.dateReceived).slice(0, 10)
+          caseNumber: selectedLog.caseNumber ?? "",
+          raffledToBranch: selectedLog.raffledTo ?? "",
+          dateFiled: selectedLog.date
+            ? new Date(selectedLog.date).toISOString().slice(0, 10)
             : today,
-          petitioners: selectedLog.Petitioners ?? selectedLog.party ?? "",
-          titleNo:
-            selectedLog.TitleNo ??
-            selectedLog.BookAndPages ??
-            selectedLog.receiptNo ??
-            "",
-          nature:
-            selectedLog.Nature ??
-            selectedLog.Content ??
-            selectedLog.documentType ??
-            "",
+          petitioners: selectedLog.petitioner ?? "",
+          titleNo: "",
+          nature: selectedLog.nature ?? "",
         },
       ];
     }
@@ -439,47 +428,40 @@ const PetitionEntryPage = ({
       isEdit ? "Updating petition entry..." : "Creating petition entry(ies)...",
     );
     try {
-      const payloads = entries.map((e) => ({
-        id: isEdit ? (selectedLog?.id ?? 0) : 0,
-        caseNumber: e.caseNumber,
-        branch: e.raffledToBranch,
-        dateReceived: e.dateFiled,
-        party: e.petitioners,
-        receiptNo: e.titleNo,
-        documentType: e.nature,
-        "Case No": e.caseNumber,
-        "Branch No": e.raffledToBranch,
-        BookAndPages: e.titleNo,
-        Content: e.nature,
-        RaffledToBranch: e.raffledToBranch,
-        Petitioners: e.petitioners,
-        TitleNo: e.titleNo,
-        Nature: e.nature,
-      }));
-
-      const resp = await fetch("/api/receive/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloads),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.success)
-        throw new Error(json.error || "Save failed");
-
-      const created: ReceiveLog[] = json.result || [];
-      if (isEdit) {
-        if (created[0]) {
-          onUpdate?.(created[0]);
-          statusPopup.showSuccess("Petition entry updated successfully");
-        } else {
-          statusPopup.showError("Update failed");
+      if (isEdit && selectedLog) {
+        const e = entries[0];
+        const result = await updatePetition(selectedLog.id, {
+          caseNumber: e.caseNumber,
+          raffledTo: e.raffledToBranch,
+          date: e.dateFiled ? new Date(e.dateFiled) : null,
+          petitioner: e.petitioners,
+          nature: e.nature,
+        });
+        if (!result.success) {
+          statusPopup.showError(result.error || "Update failed");
+          return;
         }
+        statusPopup.showSuccess("Petition entry updated successfully");
+        onUpdate?.(result.result as any);
       } else {
-        created.forEach((c) => onCreate?.(c));
+        for (const e of entries) {
+          const result = await createPetition({
+            caseNumber: e.caseNumber,
+            raffledTo: e.raffledToBranch,
+            date: e.dateFiled ? new Date(e.dateFiled) : null,
+            petitioner: e.petitioners,
+            nature: e.nature,
+          });
+          if (!result.success) {
+            statusPopup.showError(result.error || "Create failed");
+            return;
+          }
+          onCreate?.(result.result as any);
+        }
         statusPopup.showSuccess(
-          created.length === 1
+          entries.length === 1
             ? "Petition entry created successfully"
-            : `${created.length} petition entries created successfully`,
+            : `${entries.length} petition entries created successfully`,
         );
       }
       onClose();

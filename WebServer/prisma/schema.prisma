@@ -76,7 +76,7 @@ model Case {
   id              Int       @id @default(autoincrement())
   caseType        CaseType  @default(UNKNOWN)
   branch          String
-  assistantBranch String
+  assistantBranch String?
   caseNumber      String    @unique
   dateFiled       DateTime
   name            String
