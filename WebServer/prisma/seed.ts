@@ -1,3 +1,4 @@
+import { Status } from "@/app/generated/prisma/enums";
 import { auth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 
@@ -23,7 +24,7 @@ async function main() {
 
   await prisma.user.update({
     where: { email: "admin@admin.com" },
-    data: { role: "admin" },
+    data: { role: "admin", status: Status.ACTIVE },
   });
 
   // Create atty user
@@ -45,7 +46,7 @@ async function main() {
 
   await prisma.user.update({
     where: { email: "atty@atty.com" },
-    data: { role: "atty" },
+    data: { role: "atty", status: Status.ACTIVE },
   });
 
   // Create staff user
@@ -56,6 +57,11 @@ async function main() {
         password: "staff12345",
         name: "Staff",
       },
+    });
+
+    await prisma.user.update({
+      where: { email: "staff@staff.com" },
+      data: { status: Status.ACTIVE },
     });
 
     if (staffResult) {
