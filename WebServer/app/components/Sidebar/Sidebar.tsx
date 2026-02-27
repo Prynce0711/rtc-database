@@ -137,7 +137,7 @@ const NavBtn = ({
 
   // ── Expanded ──
   const btnClass = [
-    "relative group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
+    "relative group flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden text-center",
     isActive
       ? "bg-primary text-primary-content shadow-sm"
       : "text-base-content/55 hover:bg-base-300/60 hover:text-base-content",
@@ -153,7 +153,7 @@ const NavBtn = ({
           className={btnClass}
         >
           <span className="text-[17px] shrink-0">{item.icon}</span>
-          <span className="text-[13px] font-semibold flex-1 whitespace-nowrap truncate">
+          <span className="text-[13px] font-semibold flex-1 text-center whitespace-nowrap truncate">
             {item.label}
           </span>
           <motion.span
@@ -187,7 +187,7 @@ const NavBtn = ({
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div className="mt-0.5 ml-4 pl-3 border-l border-base-300 space-y-0.5 py-1">
+            <div className="mt-1 mx-2 border-l border-base-300 space-y-0.5 py-1">
               {item.dropdowns!.map((d) => {
                 const isSubActive =
                   currentSub === d.href || (!d.href && !currentSub && isActive);
@@ -202,7 +202,7 @@ const NavBtn = ({
                         : "hover:bg-base-300/50",
                     ].join(" ")}
                   >
-                    <span className="flex items-center gap-3">
+                    <span className="flex items-center justify-center gap-3 w-full">
                       <span className="h-px w-4 bg-base-content/25 shrink-0" />
                       <span
                         className={[
@@ -280,7 +280,7 @@ const ActionBtn = ({
     <button
       onClick={onClick}
       className={[
-        "relative group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
+        "relative group flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden text-center",
         danger
           ? "text-error hover:bg-error/10"
           : "text-base-content/55 hover:bg-base-300/60 hover:text-base-content",
@@ -316,7 +316,7 @@ const SectionLabel = ({
     return <div className="mx-4 my-2.5 h-px bg-base-300/60" />;
   }
   return (
-    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-base-content/25 px-3 pt-5 pb-1.5 select-none">
+    <p className="text-[12px] font-black uppercase tracking-[0.14em] text-base-content/25 px-3 pt-5 pb-1.5 select-none">
       {label}
     </p>
   );
@@ -491,10 +491,10 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
                 transition={{ duration: 0.18 }}
                 className="text-center mt-3"
               >
-                <p className="text-[14px] font-extrabold text-base-content leading-tight">
+                <p className="text-lg font-extrabold text-base-content leading-tight">
                   Regional Trial Court
                 </p>
-                <p className="text-[11px] font-medium text-base-content/40 mt-0.5">
+                <p className="text-[13px] font-medium text-base-content/40 mt-0.5">
                   Case & Employee System
                 </p>
               </motion.div>
@@ -607,7 +607,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
         </nav>
 
         {/* ── Footer / User ──────────────────────────── */}
-        <div className="border-t border-base-300 p-2 space-y-1">
+        <div className="border-t border-base-300 p-2 space-y-1 text-center">
           {session?.user && (
             <UserCard
               name={session.user.name}

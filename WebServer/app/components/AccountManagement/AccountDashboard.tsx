@@ -100,7 +100,7 @@ const SortTh = ({
   return (
     <th
       onClick={() => onSort(colKey)}
-      className="py-4 px-5 text-[11px] font-bold uppercase tracking-[0.1em] text-base-content/50 text-center cursor-pointer select-none hover:text-base-content/80 transition-colors whitespace-nowrap"
+      className="py-5 px-6 text-[14px] font-black uppercase tracking-[0.14em] text-base-content/70 text-center cursor-pointer select-none hover:text-base-content transition-colors whitespace-nowrap"
     >
       <span className="inline-flex items-center justify-center gap-1">
         {label}
@@ -368,11 +368,11 @@ const AccountDashboard = () => {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto text-xl">
+                <table className="w-full text-xl">
                   {/* HEADER */}
-                  <thead>
-                    <tr className="border-b border-base-200 bg-base-100">
+                  <thead className="text-xl">
+                    <tr className="text-xl border-b border-base-200 bg-base-200 ">
                       <SortTh
                         label="Name"
                         colKey="name"
