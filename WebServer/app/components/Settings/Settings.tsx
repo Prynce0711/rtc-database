@@ -12,12 +12,9 @@ import {
   FiEdit3,
   FiEye,
   FiEyeOff,
-  FiFileText,
   FiGlobe,
   FiInfo,
-  FiMail,
   FiMonitor,
-  FiPhone,
   FiSave,
   FiServer,
   FiShield,
@@ -60,12 +57,7 @@ const TABS: TabConfig[] = [
     icon: <FiMonitor size={18} />,
     roles: [Roles.ADMIN, Roles.ATTY, Roles.USER],
   },
-  {
-    id: "case-config",
-    label: "Case Config",
-    icon: <FiFileText size={18} />,
-    roles: [Roles.ADMIN],
-  },
+
   {
     id: "system",
     label: "System",
@@ -92,19 +84,22 @@ const SettingsCard = ({
   children: React.ReactNode;
 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 8 }}
+    initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.22 }}
-    className="bg-base-100 rounded-xl border border-base-300 overflow-hidden"
-    style={{ boxShadow: "var(--shadow-xs)" }}
+    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+    className="bg-base-100 rounded-2xl border border-base-300/80 overflow-hidden shadow-sm"
   >
-    <div className="px-6 py-5 border-b border-base-300">
-      <h3 className="text-[15px] font-bold text-base-content">{title}</h3>
+    <div className="px-7 py-6 border-b border-base-300/60">
+      <h3 className="text-xl font-bold text-base-content tracking-tight">
+        {title}
+      </h3>
       {description && (
-        <p className="text-[13px] text-base-content/50 mt-0.5">{description}</p>
+        <p className="text-sm text-base-content/45 mt-1 leading-relaxed">
+          {description}
+        </p>
       )}
     </div>
-    <div className="divide-y divide-base-200">{children}</div>
+    <div className="divide-y divide-base-200/60">{children}</div>
   </motion.div>
 );
 
@@ -117,11 +112,11 @@ const SettingsRow = ({
   description?: string;
   children: React.ReactNode;
 }) => (
-  <div className="flex items-center justify-between gap-4 px-6 py-4">
+  <div className="flex items-center justify-between gap-6 px-7 py-5 group hover:bg-base-200/30 transition-colors duration-150">
     <div className="min-w-0 flex-1">
-      <p className="text-[13px] font-semibold text-base-content">{label}</p>
+      <p className="text-sm font-semibold text-base-content">{label}</p>
       {description && (
-        <p className="text-[12px] text-base-content/45 mt-0.5 leading-relaxed">
+        <p className="text-[13px] text-base-content/40 mt-0.5 leading-relaxed">
           {description}
         </p>
       )}
@@ -141,14 +136,14 @@ const Toggle = ({
     type="button"
     onClick={() => onChange(!checked)}
     className={[
-      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-      checked ? "bg-primary" : "bg-base-300",
+      "relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-250 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+      checked ? "bg-primary shadow-sm" : "bg-base-300",
     ].join(" ")}
   >
     <span
       className={[
-        "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
-        checked ? "translate-x-6" : "translate-x-1",
+        "inline-block h-5 w-5 rounded-full bg-white shadow-md transition-all duration-250",
+        checked ? "translate-x-6" : "translate-x-0.5",
       ].join(" ")}
     />
   </button>
@@ -166,7 +161,7 @@ const SelectField = ({
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="select select-bordered select-sm text-[13px] min-w-40 bg-base-100 focus:outline-none focus:border-primary"
+    className="select select-bordered text-sm min-w-48 h-10 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg"
   >
     {options.map((o) => (
       <option key={o.value} value={o.value}>
@@ -195,17 +190,18 @@ const InputField = ({
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
     disabled={disabled}
-    className="input input-bordered input-sm text-[13px] w-full max-w-65 bg-base-100 focus:outline-none focus:border-primary disabled:opacity-50"
+    className="input input-bordered text-sm h-10 w-full max-w-72 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
   />
 );
 
 const SaveButton = ({ onClick }: { onClick?: () => void }) => (
   <motion.button
+    whileHover={{ scale: 1.01 }}
     whileTap={{ scale: 0.97 }}
     onClick={onClick}
-    className="btn btn-primary btn-sm gap-2 text-[13px] font-semibold px-5 mt-6"
+    className="btn btn-primary gap-2.5 text-sm font-semibold px-7 h-11 mt-8 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
   >
-    <FiSave size={14} />
+    <FiSave size={16} />
     Save Changes
   </motion.button>
 );
@@ -219,25 +215,25 @@ const ProfileTab = ({ role }: { role: string }) => {
   const [branch, setBranch] = useState("");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 ">
       <SettingsCard
         title="Personal Information"
         description="Update your profile details visible across the system."
       >
         {/* Avatar */}
-        <div className="px-6 py-5 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold shrink-0">
-            <FiUser size={28} />
+        <div className="px-7 py-6 flex items-center gap-6">
+          <div className="w-20 h-20 rounded-2xl bg-primary/8 flex items-center justify-center text-primary shrink-0 border border-primary/10">
+            <FiUser size={32} />
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-base-content">
+            <p className="text-sm font-semibold text-base-content">
               Profile Photo
             </p>
-            <p className="text-[12px] text-base-content/45 mt-0.5">
+            <p className="text-[13px] text-base-content/40 mt-0.5">
               JPG, PNG or WEBP. Max 2MB.
             </p>
-            <button className="btn btn-ghost btn-xs gap-1.5 mt-2 text-primary hover:bg-primary/10">
-              <FiUpload size={12} /> Upload Photo
+            <button className="btn btn-ghost btn-sm gap-2 mt-3 text-primary hover:bg-primary/8 rounded-lg">
+              <FiUpload size={14} /> Upload Photo
             </button>
           </div>
         </div>
@@ -251,35 +247,6 @@ const ProfileTab = ({ role }: { role: string }) => {
             onChange={setName}
             placeholder="Enter full name"
           />
-        </SettingsRow>
-
-        <SettingsRow
-          label="Email Address"
-          description="Primary email for system notifications."
-        >
-          <div className="flex items-center gap-2">
-            <FiMail size={14} className="text-base-content/30" />
-            <InputField
-              value={email}
-              onChange={setEmail}
-              type="email"
-              placeholder="email@example.com"
-            />
-          </div>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Phone Number"
-          description="Contact number for urgent case matters."
-        >
-          <div className="flex items-center gap-2">
-            <FiPhone size={14} className="text-base-content/30" />
-            <InputField
-              value={phone}
-              onChange={setPhone}
-              placeholder="+63 9XX XXX XXXX"
-            />
-          </div>
         </SettingsRow>
 
         {role === Roles.ATTY && (
@@ -320,17 +287,20 @@ const ProfileTab = ({ role }: { role: string }) => {
           title="Digital Signature"
           description="Upload your signature for orders and decisions."
         >
-          <div className="px-6 py-5">
-            <div className="border-2 border-dashed border-base-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-primary/40 transition-colors cursor-pointer">
-              <FiEdit3 size={28} className="text-base-content/25 mb-3" />
-              <p className="text-[13px] font-semibold text-base-content/60">
+          <div className="px-7 py-6">
+            <div className="border-2 border-dashed border-base-300/70 rounded-2xl p-10 flex flex-col items-center justify-center text-center hover:border-primary/30 transition-colors cursor-pointer group">
+              <FiEdit3
+                size={32}
+                className="text-base-content/20 mb-4 group-hover:text-primary/40 transition-colors"
+              />
+              <p className="text-sm font-semibold text-base-content/55">
                 Drag & drop your signature or click to upload
               </p>
-              <p className="text-[11px] text-base-content/35 mt-1">
+              <p className="text-[12px] text-base-content/30 mt-1.5">
                 Transparent PNG recommended · Max 1MB
               </p>
-              <button className="btn btn-outline btn-primary btn-xs gap-1 mt-4">
-                <FiUpload size={12} /> Choose File
+              <button className="btn btn-outline btn-primary btn-sm gap-2 mt-5 rounded-lg">
+                <FiUpload size={14} /> Choose File
               </button>
             </div>
           </div>
@@ -355,7 +325,7 @@ const SecurityTab = ({ role }: { role: string }) => {
   const isAdmin = role === Roles.ADMIN;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SettingsCard
         title="Password"
         description="Manage your account password and authentication."
@@ -370,9 +340,9 @@ const SecurityTab = ({ role }: { role: string }) => {
             />
             <button
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/25 hover:text-base-content/60 transition-colors"
             >
-              {showPassword ? <FiEyeOff size={14} /> : <FiEye size={14} />}
+              {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
             </button>
           </div>
         </SettingsRow>
@@ -409,20 +379,20 @@ const SecurityTab = ({ role }: { role: string }) => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-6 pb-4"
+            className="px-7 pb-5"
           >
-            <div className="flex items-start gap-3 rounded-lg bg-info/8 border border-info/15 p-4">
-              <FiInfo size={16} className="text-info shrink-0 mt-0.5" />
+            <div className="flex items-start gap-4 rounded-xl bg-info/6 border border-info/12 p-5">
+              <FiInfo size={18} className="text-info shrink-0 mt-0.5" />
               <div>
-                <p className="text-[12px] font-semibold text-info">
+                <p className="text-[13px] font-semibold text-info">
                   Setup Required
                 </p>
-                <p className="text-[11px] text-base-content/50 mt-0.5">
+                <p className="text-[12px] text-base-content/45 mt-1 leading-relaxed">
                   Scan the QR code with Google Authenticator or Authy to
                   complete setup.
                 </p>
-                <button className="btn btn-xs btn-outline btn-info mt-2 gap-1">
-                  <FiShield size={11} /> Generate QR Code
+                <button className="btn btn-sm btn-outline btn-info mt-3 gap-1.5 rounded-lg">
+                  <FiShield size={13} /> Generate QR Code
                 </button>
               </div>
             </div>
@@ -435,21 +405,6 @@ const SecurityTab = ({ role }: { role: string }) => {
           title="Organization Security Policy"
           description="These apply to all users organization-wide."
         >
-          <SettingsRow
-            label="Minimum Password Length"
-            description="Enforce minimum characters for all passwords."
-          >
-            <SelectField
-              value={passwordMinLength}
-              onChange={setPasswordMinLength}
-              options={[
-                { value: "6", label: "6 characters" },
-                { value: "8", label: "8 characters" },
-                { value: "10", label: "10 characters" },
-                { value: "12", label: "12 characters" },
-              ]}
-            />
-          </SettingsRow>
           <SettingsRow
             label="Password Expiration"
             description="Force users to change passwords periodically."
@@ -497,12 +452,6 @@ const SecurityTab = ({ role }: { role: string }) => {
               ]}
             />
           </SettingsRow>
-          <SettingsRow
-            label="Enforce 2FA for All Users"
-            description="Require two-factor authentication for every account."
-          >
-            <Toggle checked={false} onChange={() => {}} />
-          </SettingsRow>
         </SettingsCard>
       )}
 
@@ -528,7 +477,7 @@ const NotificationsTab = ({ role }: { role: string }) => {
   const isAtty = role === Roles.ATTY;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SettingsCard
         title="Email Notifications"
         description="Control which emails you receive."
@@ -647,13 +596,13 @@ const AppearanceTab = () => {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SettingsCard
         title="Theme"
         description="Choose your preferred visual appearance."
       >
-        <div className="px-6 py-5">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="px-7 py-5">
+          <div className="grid grid-cols-2 gap-4">
             {themes.map((t) => (
               <button
                 key={t.value}
@@ -662,23 +611,23 @@ const AppearanceTab = () => {
                   document.documentElement.setAttribute("data-theme", t.value);
                 }}
                 className={[
-                  "relative flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all duration-200",
+                  "relative flex flex-col items-center gap-3 p-7 rounded-2xl border-2 transition-all duration-250",
                   theme === t.value
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-base-300 hover:border-base-content/20 bg-base-100",
+                    ? "border-primary bg-primary/5 shadow-md"
+                    : "border-base-300/70 hover:border-base-content/15 bg-base-100 hover:shadow-sm",
                 ].join(" ")}
               >
-                <span className="text-2xl">{t.icon}</span>
-                <span className="text-[13px] font-bold text-base-content">
+                <span className="text-3xl">{t.icon}</span>
+                <span className="text-sm font-bold text-base-content">
                   {t.label}
                 </span>
-                <span className="text-[11px] text-base-content/40">
+                <span className="text-[12px] text-base-content/35">
                   {t.desc}
                 </span>
                 {theme === t.value && (
                   <motion.div
                     layoutId="theme-check"
-                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+                    className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-sm"
                   >
                     <svg
                       width="10"
@@ -703,155 +652,6 @@ const AppearanceTab = () => {
         </div>
       </SettingsCard>
 
-      <SettingsCard
-        title="Display Preferences"
-        description="Customize tables, dates, and layout density."
-      >
-        <SettingsRow
-          label="Table Rows per Page"
-          description="Default number of rows shown in lists."
-        >
-          <SelectField
-            value={rowsPerPage}
-            onChange={setRowsPerPage}
-            options={[
-              { value: "5", label: "5 rows" },
-              { value: "10", label: "10 rows" },
-              { value: "25", label: "25 rows" },
-              { value: "50", label: "50 rows" },
-            ]}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Date Format"
-          description="How dates appear throughout the system."
-        >
-          <SelectField
-            value={dateFormat}
-            onChange={setDateFormat}
-            options={[
-              { value: "MM/DD/YYYY", label: "MM/DD/YYYY" },
-              { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
-              { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
-              { value: "MMM DD, YYYY", label: "MMM DD, YYYY" },
-            ]}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Compact Mode"
-          description="Reduce spacing for denser information display."
-        >
-          <Toggle checked={compactMode} onChange={setCompactMode} />
-        </SettingsRow>
-        <SettingsRow
-          label="Animations"
-          description="Enable smooth transitions and micro-interactions."
-        >
-          <Toggle checked={animationsEnabled} onChange={setAnimationsEnabled} />
-        </SettingsRow>
-      </SettingsCard>
-
-      <div className="flex justify-end">
-        <SaveButton />
-      </div>
-    </div>
-  );
-};
-
-// ─── Case Configuration Tab (Admin only) ─────────────────────────────────────
-const CaseConfigTab = () => {
-  const [autoNumbering, setAutoNumbering] = useState(true);
-  const [numberFormat, setNumberFormat] = useState("YYYY-XXXXX");
-  const [requireApproval, setRequireApproval] = useState(true);
-  const [enableRaffle, setEnableRaffle] = useState(true);
-  const [archiveAfter, setArchiveAfter] = useState("365");
-  const [defaultBranch, setDefaultBranch] = useState("");
-
-  return (
-    <div className="space-y-5">
-      <SettingsCard
-        title="Case Numbering"
-        description="Configure how new case numbers are generated."
-      >
-        <SettingsRow
-          label="Auto-Generate Case Numbers"
-          description="Automatically assign sequential case numbers."
-        >
-          <Toggle checked={autoNumbering} onChange={setAutoNumbering} />
-        </SettingsRow>
-        {autoNumbering && (
-          <SettingsRow
-            label="Number Format"
-            description="Pattern for new case numbers."
-          >
-            <SelectField
-              value={numberFormat}
-              onChange={setNumberFormat}
-              options={[
-                { value: "YYYY-XXXXX", label: "YYYY-XXXXX" },
-                { value: "BR-YYYY-XXXXX", label: "BR-YYYY-XXXXX" },
-                { value: "XXXXX-YYYY", label: "XXXXX-YYYY" },
-              ]}
-            />
-          </SettingsRow>
-        )}
-      </SettingsCard>
-
-      <SettingsCard
-        title="Workflow Settings"
-        description="Control case processing behavior."
-      >
-        <SettingsRow
-          label="Require Approval for New Cases"
-          description="New case entries must be approved by an admin before filing."
-        >
-          <Toggle checked={requireApproval} onChange={setRequireApproval} />
-        </SettingsRow>
-        <SettingsRow
-          label="Enable Case Raffle"
-          description="Use randomized assignment to distribute cases."
-        >
-          <Toggle checked={enableRaffle} onChange={setEnableRaffle} />
-        </SettingsRow>
-        <SettingsRow
-          label="Default Branch Assignment"
-          description="Automatically assign cases to a branch unless overridden."
-        >
-          <SelectField
-            value={defaultBranch}
-            onChange={setDefaultBranch}
-            options={[
-              { value: "", label: "None (manual)" },
-              { value: "branch-1", label: "Branch 1" },
-              { value: "branch-2", label: "Branch 2" },
-              { value: "branch-3", label: "Branch 3" },
-            ]}
-          />
-        </SettingsRow>
-      </SettingsCard>
-
-      <SettingsCard
-        title="Data Retention"
-        description="Manage case data lifecycle."
-      >
-        <SettingsRow
-          label="Auto-Archive Closed Cases"
-          description="Move resolved cases to archive after a set period."
-        >
-          <SelectField
-            value={archiveAfter}
-            onChange={setArchiveAfter}
-            options={[
-              { value: "0", label: "Never" },
-              { value: "90", label: "After 90 days" },
-              { value: "180", label: "After 180 days" },
-              { value: "365", label: "After 1 year" },
-              { value: "730", label: "After 2 years" },
-            ]}
-          />
-        </SettingsRow>
-      </SettingsCard>
-
       <div className="flex justify-end">
         <SaveButton />
       </div>
@@ -868,7 +668,7 @@ const SystemTab = () => {
   const [announceText, setAnnounceText] = useState("");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SettingsCard
         title="System Status"
         description="Monitor and control system-wide operations."
@@ -883,11 +683,11 @@ const SystemTab = () => {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="px-6 pb-4"
+            className="px-7 pb-5"
           >
-            <div className="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-4">
-              <FiInfo size={16} className="text-warning shrink-0 mt-0.5" />
-              <p className="text-[12px] text-warning leading-relaxed font-medium">
+            <div className="flex items-start gap-4 rounded-xl bg-warning/8 border border-warning/15 p-5">
+              <FiInfo size={18} className="text-warning shrink-0 mt-0.5" />
+              <p className="text-[13px] text-warning leading-relaxed font-medium">
                 Maintenance mode is active. Regular users will see a maintenance
                 page and cannot access the system until this is turned off.
               </p>
@@ -900,15 +700,15 @@ const SystemTab = () => {
         title="System Announcement"
         description="Display a banner message to all users."
       >
-        <div className="px-6 py-4">
+        <div className="px-7 py-5">
           <textarea
             value={announceText}
             onChange={(e) => setAnnounceText(e.target.value)}
             placeholder="Type a system-wide announcement to display on all pages..."
             rows={3}
-            className="textarea textarea-bordered w-full text-[13px] bg-base-100 focus:outline-none focus:border-primary resize-none"
+            className="textarea textarea-bordered w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 resize-none rounded-xl placeholder:text-base-content/25"
           />
-          <p className="text-[11px] text-base-content/35 mt-1.5">
+          <p className="text-[12px] text-base-content/30 mt-2">
             Leave empty to hide the banner.
           </p>
         </div>
@@ -972,12 +772,12 @@ const SystemTab = () => {
             ]}
           />
         </SettingsRow>
-        <div className="px-6 py-4 flex gap-3">
-          <button className="btn btn-outline btn-sm gap-2 text-[13px]">
-            <FiDatabase size={14} /> Backup Now
+        <div className="px-7 py-5 flex gap-3">
+          <button className="btn btn-outline btn-sm gap-2.5 text-sm rounded-lg">
+            <FiDatabase size={15} /> Backup Now
           </button>
-          <button className="btn btn-ghost btn-sm gap-2 text-[13px] text-base-content/50">
-            <FiGlobe size={14} /> Export Audit Logs
+          <button className="btn btn-ghost btn-sm gap-2.5 text-sm text-base-content/40 rounded-lg">
+            <FiGlobe size={15} /> Export Audit Logs
           </button>
         </div>
       </SettingsCard>
@@ -1011,7 +811,7 @@ const CalendarTab = () => {
   const [activeDays, setActiveDays] = useState(workDays);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SettingsCard
         title="Calendar View"
         description="Set your preferred calendar defaults."
@@ -1048,7 +848,7 @@ const CalendarTab = () => {
             type="time"
             value={workStart}
             onChange={(e) => setWorkStart(e.target.value)}
-            className="input input-bordered input-sm text-[13px] bg-base-100 focus:outline-none focus:border-primary"
+            className="input input-bordered text-sm h-10 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg"
           />
         </SettingsRow>
         <SettingsRow label="Work End Time">
@@ -1056,14 +856,14 @@ const CalendarTab = () => {
             type="time"
             value={workEnd}
             onChange={(e) => setWorkEnd(e.target.value)}
-            className="input input-bordered input-sm text-[13px] bg-base-100 focus:outline-none focus:border-primary"
+            className="input input-bordered text-sm h-10 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg"
           />
         </SettingsRow>
-        <div className="px-6 py-4">
-          <p className="text-[13px] font-semibold text-base-content mb-3">
+        <div className="px-7 py-5">
+          <p className="text-sm font-semibold text-base-content mb-4">
             Court Days
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             {activeDays.map((d, i) => (
               <button
                 key={d.day}
@@ -1075,10 +875,10 @@ const CalendarTab = () => {
                   )
                 }
                 className={[
-                  "w-10 h-10 rounded-lg text-[12px] font-bold transition-all duration-200",
+                  "w-12 h-12 rounded-xl text-[13px] font-bold transition-all duration-200",
                   d.active
-                    ? "bg-primary text-primary-content shadow-sm"
-                    : "bg-base-200 text-base-content/35 hover:bg-base-300",
+                    ? "bg-primary text-primary-content shadow-md"
+                    : "bg-base-200 text-base-content/30 hover:bg-base-300 hover:text-base-content/50",
                 ].join(" ")}
               >
                 {d.day}
@@ -1098,14 +898,14 @@ const CalendarTab = () => {
         >
           <div className="flex items-center gap-3">
             {syncGoogle && (
-              <span className="text-[11px] text-success font-semibold">
+              <span className="text-xs text-success font-semibold bg-success/8 px-2.5 py-1 rounded-full">
                 Connected
               </span>
             )}
             <button
               onClick={() => setSyncGoogle(!syncGoogle)}
               className={[
-                "btn btn-sm gap-1 text-[12px]",
+                "btn btn-sm gap-1.5 text-[13px] rounded-lg",
                 syncGoogle ? "btn-error btn-outline" : "btn-outline",
               ].join(" ")}
             >
@@ -1119,14 +919,14 @@ const CalendarTab = () => {
         >
           <div className="flex items-center gap-3">
             {syncOutlook && (
-              <span className="text-[11px] text-success font-semibold">
+              <span className="text-xs text-success font-semibold bg-success/8 px-2.5 py-1 rounded-full">
                 Connected
               </span>
             )}
             <button
               onClick={() => setSyncOutlook(!syncOutlook)}
               className={[
-                "btn btn-sm gap-1 text-[12px]",
+                "btn btn-sm gap-1.5 text-[13px] rounded-lg",
                 syncOutlook ? "btn-error btn-outline" : "btn-outline",
               ].join(" ")}
             >
@@ -1154,8 +954,7 @@ const TabContent = ({ tabId, role }: { tabId: string; role: string }) => {
       return <NotificationsTab role={role} />;
     case "appearance":
       return <AppearanceTab />;
-    case "case-config":
-      return <CaseConfigTab />;
+
     case "system":
       return <SystemTab />;
     case "calendar":
@@ -1177,10 +976,10 @@ const Settings: React.FC = () => {
       title="Settings"
       subtitle="Manage your preferences and system configuration."
     >
-      <div className="flex flex-col lg:flex-row gap-6 mt-2">
+      <div className="flex flex-col lg:flex-row gap-8 mt-4">
         {/* ── Sidebar Nav ─────────────────────────────── */}
-        <div className="lg:w-56 shrink-0">
-          <nav className="bg-base-200 rounded-xl border border-base-300 p-2 space-y-0.5 lg:sticky lg:top-8">
+        <div className="lg:w-64 shrink-0">
+          <nav className="bg-base-200/60 rounded-2xl border border-base-300/60 p-2.5 space-y-1 lg:sticky lg:top-8 backdrop-blur-sm">
             {visibleTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -1188,18 +987,18 @@ const Settings: React.FC = () => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={[
-                    "relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150",
+                    "relative flex items-center gap-3.5 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "bg-primary text-primary-content shadow-sm"
-                      : "text-base-content/55 hover:bg-base-300/60 hover:text-base-content",
+                      ? "bg-primary text-primary-content shadow-md"
+                      : "text-base-content/50 hover:bg-base-300/50 hover:text-base-content",
                   ].join(" ")}
                 >
-                  <span className="shrink-0">{tab.icon}</span>
+                  <span className="shrink-0 text-[18px]">{tab.icon}</span>
                   <span className="truncate">{tab.label}</span>
                   {isActive && (
                     <FiChevronRight
-                      size={14}
-                      className="ml-auto opacity-60 shrink-0"
+                      size={15}
+                      className="ml-auto opacity-50 shrink-0"
                     />
                   )}
                 </button>
@@ -1208,11 +1007,11 @@ const Settings: React.FC = () => {
           </nav>
 
           {/* Role badge */}
-          <div className="mt-4 px-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-base-content/25">
+          <div className="mt-5 px-4 ">
+            <p className="text-[11px] font-bold  uppercase tracking-widest text-base-content/20">
               Signed in as
             </p>
-            <p className="text-[12px] font-semibold text-base-content/70 mt-0.5 capitalize">
+            <p className="text-sm font-semibold text-base-content/65 mt-1 capitalize">
               {role === Roles.ADMIN
                 ? "Administrator"
                 : role === Roles.ATTY
