@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
-import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 import SidebarDropdown, { SidebarDropdownProps } from "./SidebarDropdown";
 
 const SidebarButton = ({
@@ -43,15 +42,11 @@ const SidebarButton = ({
         >
           <span className="text-lg flex-shrink-0">{icon}</span>
 
-          <span className="text-sm font-semibold tracking-wide flex-1">
+          <span className="text-sm font-semibold tracking-wide flex-1 text-left">
             {label}
           </span>
 
-          {open ? (
-            <FiChevronDown className="w-4 h-4 opacity-70 flex-shrink-0" />
-          ) : (
-            <FiChevronRight className="w-4 h-4 opacity-40 flex-shrink-0 group-hover:opacity-70 transition-opacity" />
-          )}
+          {open ? null : null}
         </button>
       ) : (
         <Link

@@ -137,7 +137,7 @@ const NavBtn = ({
 
   // ── Expanded ──
   const btnClass = [
-    "relative group flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden text-center",
+    "relative group flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
     isActive
       ? "bg-primary text-primary-content shadow-sm"
       : "text-base-content/55 hover:bg-base-300/60 hover:text-base-content",
@@ -153,7 +153,7 @@ const NavBtn = ({
           className={btnClass}
         >
           <span className="text-[17px] shrink-0">{item.icon}</span>
-          <span className="text-[13px] font-semibold flex-1 text-center whitespace-nowrap truncate">
+          <span className="text-[13px] font-semibold flex-1 text-left whitespace-nowrap truncate">
             {item.label}
           </span>
           <motion.span
@@ -167,7 +167,7 @@ const NavBtn = ({
       ) : (
         <Link href={`/user/${item.href}`} className={btnClass}>
           <span className="text-[17px] shrink-0">{item.icon}</span>
-          <span className="text-[13px] font-semibold flex-1 whitespace-nowrap truncate">
+          <span className="text-[13px] font-semibold flex-1 text-left whitespace-nowrap truncate">
             {item.label}
           </span>
           {isActive && (
@@ -187,7 +187,7 @@ const NavBtn = ({
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div className="relative mt-0.5 ml-6 py-0.5 space-y-3">
+            <div className="relative mt-0.5 ml-15 py-0.5 space-y-3">
               {/* Vertical connecting line */}
               <div className="absolute left-0 top-1 bottom-1 w-px bg-base-300" />
 
@@ -226,7 +226,15 @@ const NavBtn = ({
                         }}
                       />
                     )}
-                    <span className="text-[12.5px] leading-none">
+                    <span
+                      className={[
+                        "text-[13px] leading-tight tracking-tight",
+                        "transition-all duration-150",
+                        isSubActive
+                          ? "text-primary font-semibold"
+                          : "text-base-content/60 group-hover:text-base-content",
+                      ].join(" ")}
+                    >
                       {d.label}
                     </span>
                   </Link>
@@ -294,7 +302,7 @@ const ActionBtn = ({
     <button
       onClick={onClick}
       className={[
-        "relative group flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden text-center",
+        "relative group flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
         danger
           ? "text-error hover:bg-error/10"
           : "text-base-content/55 hover:bg-base-300/60 hover:text-base-content",
@@ -308,7 +316,7 @@ const ActionBtn = ({
           </span>
         ) : null}
       </span>
-      <span className="text-[13px] font-semibold flex-1 whitespace-nowrap truncate">
+      <span className="text-[13px] font-semibold flex-1 text-left whitespace-nowrap truncate">
         {label}
       </span>
     </button>
