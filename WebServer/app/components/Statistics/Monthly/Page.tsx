@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FiCalendar, FiDownload, FiUpload } from "react-icons/fi";
+import { FiCalendar, FiDownload, FiPlus, FiUpload } from "react-icons/fi";
+import * as XLSX from "xlsx";
 import type { MonthlyRow } from "./types";
 
 import MonthlyKPI from "./MonthlyKPI";
@@ -23,7 +24,10 @@ export default function MonthlyPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const monthlyData = importedData ?? SAMPLE_DATA;
+  const monthlyData = useMemo(() => {
+    const all = importedData ?? SAMPLE_DATA;
+    return all.filter((r) => r.month === selectedMonth);
+  }, [importedData, selectedMonth]);
 
   /* ---------- derived ---------- */
 
@@ -69,8 +73,30 @@ export default function MonthlyPage() {
   /* ---------- helpers ---------- */
 
   const handleExport = () => {
-    // TODO: wire up real export
-    console.log("Exporting to Excel…");
+    if (filteredData.length === 0) return;
+
+    const rows = filteredData.map((r) => ({
+      Category: r.category,
+      Branch: r.branch,
+      Criminal: r.criminal,
+      Civil: r.civil,
+      Total: r.total,
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    // Auto-size columns
+    worksheet["!cols"] = [
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, monthLabel);
+    XLSX.writeFile(workbook, `Monthly-Report-${selectedMonth}.xlsx`);
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,10 +105,24 @@ export default function MonthlyPage() {
 
     setUploading(true);
     try {
-      // TODO: wire up real import action
-      // Example: const result = await uploadMonthlyExcel(file);
-      // if (result.success) setImportedData(result.result);
-      console.log("Importing file:", file.name);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData =
+        XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+
+      const parsed: MonthlyRow[] = rawData.map((row) => ({
+        month: selectedMonth,
+        category: String(row["Category"] ?? ""),
+        branch: String(row["Branch"] ?? ""),
+        criminal: Number(row["Criminal"] ?? 0),
+        civil: Number(row["Civil"] ?? 0),
+        total: Number(row["Total"] ?? 0),
+      }));
+
+      setImportedData((prev) => [...(prev ?? []), ...parsed]);
+    } catch (err) {
+      console.error("Import failed:", err);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -109,35 +149,41 @@ export default function MonthlyPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col items-end gap-3">
               <input
                 type="month"
-                className="input input-bordered input-sm"
+                className="input input-bordered input-md w-auto"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
               />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleImport}
-              />
-              <button
-                className={`btn btn-outline btn-sm gap-2 ${uploading ? "loading" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <FiUpload className="h-4 w-4" />
-                {uploading ? "Importing..." : "Import"}
-              </button>
-              <button
-                className="btn btn-primary btn-sm gap-2"
-                onClick={handleExport}
-              >
-                <FiDownload className="h-4 w-4" />
-                Export
-              </button>
+              <div className="flex items-center gap-2 flex-nowrap">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImport}
+                />
+                <button
+                  className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <FiUpload className="h-5 w-5" />
+                  {uploading ? "Importing..." : "Import"}
+                </button>
+                <button
+                  className="btn btn-outline btn-info btn-md gap-2"
+                  onClick={handleExport}
+                >
+                  <FiDownload className="h-5 w-5" />
+                  Export
+                </button>
+                <button className="btn btn-outline btn-success btn-md gap-2">
+                  <FiPlus className="h-5 w-5" />
+                  Add Report
+                </button>
+              </div>
             </div>
           </div>
         </div>

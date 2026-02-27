@@ -16,7 +16,7 @@ const cards = [
     key: "totalCriminal" as const,
     subtitle: "Total criminal cases",
     icon: Gavel,
-    color: "error",
+    color: "black",
     delay: 0,
   },
   {
@@ -24,7 +24,7 @@ const cards = [
     key: "totalCivil" as const,
     subtitle: "Total civil cases",
     icon: Scale,
-    color: "info",
+    color: "black",
     delay: 100,
   },
   {
@@ -32,7 +32,7 @@ const cards = [
     key: "grandTotal" as const,
     subtitle: "All cases combined",
     icon: BarChart3,
-    color: "primary",
+    color: "black",
     delay: 200,
   },
   {
@@ -40,7 +40,7 @@ const cards = [
     key: "branches" as const,
     subtitle: "Active branches",
     icon: FileText,
-    color: "success",
+    color: "black",
     delay: 300,
   },
 ];
@@ -60,7 +60,7 @@ const MonthlyKPI: React.FC<MonthlyKPIProps> = (props) => {
             </div>
             <div className="relative">
               <div className={`badge badge-${card.color} gap-2 mb-3`}>
-                <span className="font-bold uppercase text-xs">
+                <span className="font-extrabold uppercase text-sm tracking-wide">
                   {card.label}
                 </span>
               </div>
