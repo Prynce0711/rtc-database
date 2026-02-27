@@ -1,5 +1,7 @@
 "use client";
 
+import Judgement from "./Judgement";
+
 export default function JudgementPage() {
   return (
     <div className="space-y-6">
@@ -12,8 +14,7 @@ export default function JudgementPage() {
 
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
-          <h2 className="card-title">Judgment Day Statistics</h2>
-          <p>Judgment day reports content will be displayed here.</p>
+          <Judgement />
         </div>
       </div>
     </div>
