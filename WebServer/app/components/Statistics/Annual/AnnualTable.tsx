@@ -15,27 +15,18 @@ import { AnnualStats, calcStats, sortRecords } from "./AnnualUtils";
 const PAGE_SIZE = 25;
 
 export interface AnnualTableProps<T extends Record<string, unknown>> {
-  /** Display title shown in the header and drawer */
   title: string;
-  /** Optional subtitle below the title */
   subtitle?: string;
-  /** Current array of records (managed by the parent) */
   data: T[];
-  /** Column definition array – supports flat ColumnDef and GroupColumnDef */
   columns: AnyColumnDef[];
-  /** Field configs used to render the drawer form */
   fields: FieldConfig[];
-  /**
-   * Key of the date field used to compute Today / This Month stats.
-   * Must match a property name in T.
-   */
   dateKey: keyof T & string;
-  /** The column key to sort by initially */
   sortDefaultKey: keyof T & string;
-  /** Placeholder text for the search input */
   searchPlaceholder?: string;
-  /** Called whenever data changes (add / edit / delete) */
   onChange: (data: T[]) => void;
+  onAdd?: (record: Record<string, unknown>) => void | Promise<void>;
+  onUpdate?: (record: Record<string, unknown>) => void | Promise<void>;
+  onDelete?: (id: number) => void | Promise<void>;
 }
 
 function AnnualTable<T extends Record<string, unknown>>({
@@ -48,6 +39,9 @@ function AnnualTable<T extends Record<string, unknown>>({
   sortDefaultKey,
   searchPlaceholder,
   onChange,
+  onAdd,
+  onUpdate,
+  onDelete,
 }: AnnualTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -64,8 +58,6 @@ function AnnualTable<T extends Record<string, unknown>>({
     session?.data?.user?.role === Roles.ATTY;
 
   const statusPopup = usePopup();
-
-  // ---------- derived state ----------
 
   const stats: AnnualStats = useMemo(
     () => calcStats(data as Record<string, unknown>[], dateKey),
@@ -95,8 +87,6 @@ function AnnualTable<T extends Record<string, unknown>>({
     return filteredAndSorted.slice(start, start + PAGE_SIZE);
   }, [filteredAndSorted, currentPage]);
 
-  // ---------- handlers ----------
-
   const handleSort = (key: string) => {
     setSortConfig((prev) => ({
       key: key as keyof T,
@@ -111,20 +101,30 @@ function AnnualTable<T extends Record<string, unknown>>({
       ))
     )
       return;
-    onChange(data.filter((r) => r.id !== row.id));
+    if (onDelete) {
+      await onDelete(row.id as number);
+    } else {
+      onChange(data.filter((r) => r.id !== row.id));
+    }
     statusPopup.showSuccess("Entry deleted successfully");
   };
 
-  const handleCreate = (newRecord: Record<string, unknown>) => {
-    const nextId = Math.max(0, ...data.map((r) => (r.id as number) ?? 0)) + 1;
-    onChange([{ ...newRecord, id: nextId } as unknown as T, ...data]);
+  const handleCreate = async (newRecord: Record<string, unknown>) => {
+    if (onAdd) {
+      await onAdd(newRecord);
+    } else {
+      const nextId = Math.max(0, ...data.map((r) => (r.id as number) ?? 0)) + 1;
+      onChange([{ ...newRecord, id: nextId } as unknown as T, ...data]);
+    }
   };
 
-  const handleUpdate = (updated: Record<string, unknown>) => {
-    onChange(data.map((r) => (r.id === updated.id ? (updated as T) : r)));
+  const handleUpdate = async (updated: Record<string, unknown>) => {
+    if (onUpdate) {
+      await onUpdate(updated);
+    } else {
+      onChange(data.map((r) => (r.id === updated.id ? (updated as T) : r)));
+    }
   };
-
-  // ---------- helpers ----------
 
   const hasGroups = columns.some(isGroupColumn);
   const leafColumns = flattenColumns(columns);
@@ -138,12 +138,9 @@ function AnnualTable<T extends Record<string, unknown>>({
     );
   };
 
-  // ---------- render ----------
-
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
-        {/* Header */}
         <div className="mb-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             {title}
@@ -153,7 +150,6 @@ function AnnualTable<T extends Record<string, unknown>>({
           )}
         </div>
 
-        {/* Search + Add */}
         <div className="relative mb-6">
           <div className="flex gap-4">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
@@ -213,11 +209,9 @@ function AnnualTable<T extends Record<string, unknown>>({
           </div>
         </div>
 
-        {/* Table */}
         <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <table className="table table-compact w-full">
             <thead className="bg-base-300 text-base">
-              {/* First header row */}
               <tr>
                 {isAdminOrAtty && (
                   <th

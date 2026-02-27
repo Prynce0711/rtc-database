@@ -1,14 +1,10 @@
-// Column definitions for the generic AnnualTable component
-
 import React from "react";
 import { CourtLog, InventoryLog } from "./AnnualRecord";
 
-// Helper: double-cast through unknown to avoid TS struct-overlap error
 const asCourt = (r: Record<string, unknown>) => r as unknown as CourtLog;
 const asInventory = (r: Record<string, unknown>) =>
   r as unknown as InventoryLog;
 
-/** A single leaf column with its own data cell */
 export interface ColumnDef {
   key: string;
   label: string;
@@ -17,33 +13,29 @@ export interface ColumnDef {
   render: (row: Record<string, unknown>) => React.ReactNode;
 }
 
-/** A group column that renders a colspan header and has child leaf columns */
 export interface GroupColumnDef {
   title: string;
   align?: "left" | "center" | "right";
   children: ColumnDef[];
 }
 
-/** Union of flat and group columns */
 export type AnyColumnDef = ColumnDef | GroupColumnDef;
 
 export function isGroupColumn(col: AnyColumnDef): col is GroupColumnDef {
   return "children" in col;
 }
 
-/** Flatten all leaf columns from a mixed flat/group column array */
 export function flattenColumns(cols: AnyColumnDef[]): ColumnDef[] {
   return cols.flatMap((c) => (isGroupColumn(c) ? c.children : [c]));
 }
 
-// Columns shared by MTC and RTC
 export const courtColumns: ColumnDef[] = [
   {
-    key: "bookAndPages",
+    key: "branch",
     label: "Branch",
     sortable: true,
     align: "center",
-    render: (r) => asCourt(r).bookAndPages || "—",
+    render: (r) => asCourt(r).branch || "—",
   },
   {
     key: "pendingLastYear",
@@ -82,14 +74,13 @@ export const courtColumns: ColumnDef[] = [
   },
 ];
 
-// Columns for Inventory
 export const inventoryColumns: AnyColumnDef[] = [
   {
-    key: "Region",
+    key: "region",
     label: "Region",
     sortable: true,
     align: "center",
-    render: (r) => asInventory(r).Region || "—",
+    render: (r) => asInventory(r).region || "—",
   },
   {
     key: "province",
@@ -99,25 +90,25 @@ export const inventoryColumns: AnyColumnDef[] = [
     render: (r) => asInventory(r).province || "—",
   },
   {
-    key: "Court",
+    key: "court",
     label: "Court",
     sortable: false,
     align: "center",
-    render: (r) => asInventory(r).Court || "—",
+    render: (r) => asInventory(r).court || "—",
   },
   {
-    key: "CityMunicipality",
+    key: "cityMunicipality",
     label: "City/Municipality",
     sortable: true,
     align: "center",
-    render: (r) => asInventory(r).CityMunicipality || "—",
+    render: (r) => asInventory(r).cityMunicipality || "—",
   },
   {
-    key: "Branch",
+    key: "branch",
     label: "Branch",
     sortable: true,
     align: "center",
-    render: (r) => asInventory(r).Branch || "—",
+    render: (r) => asInventory(r).branch || "—",
   },
   {
     title: "CASES FILED",
