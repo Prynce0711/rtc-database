@@ -7,7 +7,6 @@ import { ColumnDef } from "./AnnualColumnDef";
 
 interface AnnualRowProps {
   row: Record<string, unknown>;
-  /** Flat leaf columns only – groups already flattened by AnnualTable */
   leafColumns: ColumnDef[];
   onEdit: (row: Record<string, unknown>) => void;
   onDelete: (row: Record<string, unknown>) => void;
@@ -67,7 +66,6 @@ const AnnualRow = ({ row, leafColumns, onEdit, onDelete }: AnnualRowProps) => {
         </td>
       )}
 
-      {/* Dynamic data cells driven by flat leaf columns */}
       {leafColumns.map((col) => (
         <td
           key={col.key}

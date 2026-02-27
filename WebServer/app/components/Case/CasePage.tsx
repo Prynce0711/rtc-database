@@ -1,9 +1,15 @@
 "use client";
 
 import { useSession } from "@/app/lib/authClient";
-import { useRouter } from "next/navigation";
+// import { } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FiSearch } from "react-icons/fi";
+import {
+  FiBarChart2,
+  FiFileText,
+  FiLock,
+  FiSearch,
+  FiUsers,
+} from "react-icons/fi";
 import type { Case } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
 import {
@@ -424,12 +430,6 @@ const CasePage: React.FC = () => {
     setModalType(type);
   };
 
-  const router = useRouter();
-
-  const handleRowClick = (caseItem: Case) => {
-    router.push(`/user/cases/${caseItem.id}`);
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -571,36 +571,74 @@ const CasePage: React.FC = () => {
           />
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medium text-center">
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">TOTAL CASES</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.totalCases}
-            </div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">DETAINED</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.detainedCases}
-            </div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">
-              PENDING RAFFLE
-            </div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.pendingCases}
-            </div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">
-              RECENTLY FILED
-            </div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.recentlyFiled}
-            </div>
-          </div>
+        {/* Stats Cards (KPI style) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[
+            {
+              label: "Total Cases",
+              value: stats.totalCases ?? 0,
+              subtitle: `${stats.recentlyFiled ?? 0} filed recently`,
+              icon: FiBarChart2,
+              delay: 0,
+            },
+            {
+              label: "In Detention",
+              value: stats.detainedCases ?? 0,
+              subtitle: `${(((stats.detainedCases ?? 0) / Math.max(1, stats.totalCases ?? 1)) * 100).toFixed(1)}% of total`,
+              icon: FiLock,
+              delay: 100,
+            },
+            {
+              label: "Pending Raffle",
+              value: stats.pendingCases ?? 0,
+              subtitle: `Requires raffle assignment`,
+              icon: FiFileText,
+              delay: 200,
+            },
+            {
+              label: "Recently Filed",
+              value: stats.recentlyFiled ?? 0,
+              subtitle: `Last 30 days`,
+              icon: FiUsers,
+              delay: 300,
+            },
+          ].map((card, idx) => {
+            const Icon = card.icon as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >;
+            return (
+              <div
+                key={idx}
+                className={`transform hover:scale-105 card surface-card-hover group`}
+                style={{
+                  transitionDelay: `${card.delay}ms`,
+                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+                }}
+              >
+                <div
+                  className="card-body relative overflow-hidden"
+                  style={{ padding: "var(--space-card-padding)" }}
+                >
+                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                    <Icon className="h-full w-full" />
+                  </div>
+                  <div className="relative text-center">
+                    <div className="mb-3">
+                      <span className="text-sm font-semibold text-muted">
+                        {card.label}
+                      </span>
+                    </div>
+                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                      {card.value}
+                    </p>
+                    <p className="text-sm sm:text-base font-semibold text-muted">
+                      {card.subtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Cases Table */}

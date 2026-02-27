@@ -12,11 +12,15 @@ import {
 import React, { useEffect, useMemo, useState } from "react";
 
 import {
+  FiBarChart2,
   FiDownload,
+  FiFileText,
   FiFilter,
+  FiLock,
   FiPlus,
   FiSearch,
   FiUpload,
+  FiUsers,
 } from "react-icons/fi";
 
 import FilterModal from "@/app/components/Filter/FilterModal";
@@ -29,7 +33,6 @@ import {
 import { usePopup } from "../Popup/PopupProvider";
 import EmployeeDrawer, { EmployeeDrawerType } from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
-import KpiCard from "./KpiCard";
 
 const EmployeeDashboard: React.FC = () => {
   const statusPopup = usePopup();
@@ -449,10 +452,72 @@ const EmployeeDashboard: React.FC = () => {
         <div className="space-y-6">
           {/* KPI CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            <KpiCard title="TOTAL EMPLOYEES" value={analytics.totalEmployees} />
-            <KpiCard title="BRANCHES" value={analytics.totalBranches} />
-            <KpiCard title="COMPLETE PROFILES" value={analytics.withMedical} />
-            <KpiCard title="PENDING" value={analytics.missingEmail} />
+            {[
+              {
+                label: "Total Employees",
+                value: analytics.totalEmployees,
+                subtitle: `${analytics.totalBranches} branches`,
+                icon: FiBarChart2,
+                delay: 0,
+              },
+              {
+                label: "Branches",
+                value: analytics.totalBranches,
+                subtitle: `${analytics.withMedical} with medical`,
+                icon: FiFileText,
+                delay: 100,
+              },
+              {
+                label: "Complete Profiles",
+                value: analytics.withMedical,
+                subtitle: `${analytics.missingEmail} missing email`,
+                icon: FiLock,
+                delay: 200,
+              },
+              {
+                label: "Pending",
+                value: analytics.missingEmail,
+                subtitle: `Profiles pending review`,
+                icon: FiUsers,
+                delay: 300,
+              },
+            ].map((card, idx) => {
+              const Icon = card.icon as React.ComponentType<
+                React.SVGProps<SVGSVGElement>
+              >;
+              return (
+                <div
+                  key={idx}
+                  className={`transform hover:scale-105 card surface-card-hover group`}
+                  style={{
+                    transitionDelay: `${card.delay}ms`,
+                    transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+                  }}
+                >
+                  <div
+                    className="card-body relative overflow-hidden"
+                    style={{ padding: "var(--space-card-padding)" }}
+                  >
+                    <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                      <Icon className="h-full w-full" />
+                    </div>
+                    <div className="relative text-center">
+                      <div className="mb-3">
+                        <span className="text-sm font-semibold text-muted">
+                          {card.label}
+                        </span>
+                      </div>
+                      <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                        {card.value}
+                      </p>
+                      <p className="text-sm sm:text-base font-semibold text-muted">
+                        {card.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* TABLE */}

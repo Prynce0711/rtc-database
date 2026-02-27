@@ -1,5 +1,7 @@
 "use client";
 
+import SummaryChart from "./SummaryChart";
+
 export default function SummaryPage() {
   return (
     <div className="space-y-6">
@@ -13,7 +15,7 @@ export default function SummaryPage() {
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title">Summary Statistics</h2>
-          <p>Summary content will be displayed here.</p>
+          <SummaryChart />
         </div>
       </div>
     </div>

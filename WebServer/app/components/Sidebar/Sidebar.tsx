@@ -184,10 +184,13 @@ const NavBtn = ({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden"
           >
-            <div className="mt-1 mx-2 border-l border-base-300 space-y-0.5 py-1">
+            <div className="relative mt-0.5 ml-6 py-0.5 space-y-3">
+              {/* Vertical connecting line */}
+              <div className="absolute left-0 top-1 bottom-1 w-px bg-base-300" />
+
               {item.dropdowns!.map((d) => {
                 const isSubActive =
                   currentSub === d.href || (!d.href && !currentSub && isActive);
@@ -196,24 +199,35 @@ const NavBtn = ({
                     key={d.href}
                     href={`/user/${item.href}${d.href ? `/${d.href}` : ""}`}
                     className={[
-                      "group flex items-center rounded-lg px-3 py-2 transition-all duration-150",
+                      "group relative flex items-center pl-5 pr-3 py-1.5 rounded-r-lg transition-colors duration-150",
                       isSubActive
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-base-300/50",
+                        ? "text-primary font-semibold"
+                        : "text-base-content/40 hover:text-base-content/70",
                     ].join(" ")}
                   >
-                    <span className="flex items-center justify-center gap-3 w-full">
-                      <span className="h-px w-4 bg-base-content/25 shrink-0" />
-                      <span
-                        className={[
-                          "text-[13px] font-medium transition-colors",
-                          isSubActive
-                            ? "text-primary"
-                            : "text-base-content/60 group-hover:text-base-content/90",
-                        ].join(" ")}
-                      >
-                        {d.label}
-                      </span>
+                    {/* Horizontal branch line */}
+                    <span
+                      className={[
+                        "absolute left-0 top-1/2 w-3 h-px transition-colors duration-150",
+                        isSubActive
+                          ? "bg-primary"
+                          : "bg-base-300 group-hover:bg-base-content/30",
+                      ].join(" ")}
+                    />
+                    {/* Active dot at intersection */}
+                    {isSubActive && (
+                      <motion.span
+                        layoutId={`dot-${item.href}`}
+                        className="absolute left-[-2.5px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary"
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                    <span className="text-[12.5px] leading-none">
+                      {d.label}
                     </span>
                   </Link>
                 );
