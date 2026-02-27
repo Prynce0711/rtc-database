@@ -98,6 +98,35 @@ export const CreateLogData = z
         .or(z.literal(LogAction.EXPORT_EMPLOYEES)),
       details: z.null(),
     }),
+  )
+  .or(
+    z.object({
+      action: z
+        .literal(LogAction.CHANGE_PASSWORD)
+        .or(z.literal(LogAction.SET_INITIAL_PASSWORD))
+        .or(z.literal(LogAction.RESET_PASSWORD)),
+      details: z.object({
+        id: z.string(),
+      }),
+    }),
+  )
+  .or(
+    z.object({
+      action: z.literal(LogAction.SEND_MAGIC_LINK),
+      details: z.object({
+        email: z.string(),
+      }),
+    }),
+  )
+  .or(
+    z.object({
+      action: z
+        .literal(LogAction.UPDATE_PROFILE)
+        .or(z.literal(LogAction.DELETE_USER)),
+      details: z.object({
+        id: z.string(),
+      }),
+    }),
   );
 export type CreateLogData = z.infer<typeof CreateLogData>;
 

@@ -12,6 +12,7 @@ import React, {
 import {
   FiAlertCircle,
   FiArrowLeft,
+  FiBarChart2,
   FiCheck,
   FiChevronLeft,
   FiChevronRight,
@@ -20,6 +21,7 @@ import {
   FiEdit3,
   FiEye,
   FiFileText,
+  FiLock,
   FiMoreHorizontal,
   FiPlus,
   FiSave,
@@ -1579,30 +1581,74 @@ const Proceedings: React.FC = () => {
           />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-l font-medium text-center">
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">TOTAL CASES</div>
-            <div className="text-5xl font-bold text-primary">{stats.total}</div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">THIS MONTH</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.thisMonth}
-            </div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">CASE TYPES</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.natures}
-            </div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">BRANCHES</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.branches}
-            </div>
-          </div>
+        {/* Stats (KPI cards) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[
+            {
+              label: "Total Cases",
+              value: stats.total ?? 0,
+              subtitle: `${stats.thisMonth ?? 0} this month`,
+              icon: FiBarChart2,
+              delay: 0,
+            },
+            {
+              label: "This Month",
+              value: stats.thisMonth ?? 0,
+              subtitle: `Last 30 days`,
+              icon: FiFileText,
+              delay: 100,
+            },
+            {
+              label: "Case Types",
+              value: stats.natures ?? 0,
+              subtitle: `Distinct types`,
+              icon: FiUsers,
+              delay: 200,
+            },
+            {
+              label: "Branches",
+              value: stats.branches ?? 0,
+              subtitle: `Active branches`,
+              icon: FiLock,
+              delay: 300,
+            },
+          ].map((card, idx) => {
+            const Icon = card.icon as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >;
+            return (
+              <div
+                key={idx}
+                className={`transform hover:scale-105 card surface-card-hover group`}
+                style={{
+                  transitionDelay: `${card.delay}ms`,
+                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+                }}
+              >
+                <div
+                  className="card-body relative overflow-hidden"
+                  style={{ padding: "var(--space-card-padding)" }}
+                >
+                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                    <Icon className="h-full w-full" />
+                  </div>
+                  <div className="relative text-center">
+                    <div className="mb-3">
+                      <span className="text-sm font-semibold text-muted">
+                        {card.label}
+                      </span>
+                    </div>
+                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                      {card.value}
+                    </p>
+                    <p className="text-sm sm:text-base font-semibold text-muted">
+                      {card.subtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Table */}
