@@ -5,9 +5,9 @@ import {
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
 import {
-  SpecialProceedingFormEntry,
-  createEmptySpecialProceedingFormEntry,
-  specialProceedingToFormEntry,
+  SpecialProceedingEntry,
+  createEmptyEntry,
+  specialProceedingToEntry,
 } from "@/app/components/Case/SpecialProceedings/schema";
 import {
   createSpecialProceeding,
@@ -22,9 +22,8 @@ export default function SpecialProceedingTester() {
   const [specialProceedings, setSpecialProceedings] = useState<
     SpecialProceeding[]
   >([]);
-  const [formData, setFormData] = useState<SpecialProceedingFormEntry>(
-    createEmptySpecialProceedingFormEntry("new"),
-  );
+  const [formData, setFormData] =
+    useState<SpecialProceedingEntry>(createEmptyEntry());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -102,7 +101,7 @@ export default function SpecialProceedingTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptySpecialProceedingFormEntry("new"));
+        setFormData(createEmptyEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadSpecialProceedings();
@@ -115,17 +114,7 @@ export default function SpecialProceedingTester() {
   };
 
   const handleEdit = (specialProceeding: SpecialProceeding) => {
-    const formEntry = specialProceedingToFormEntry(
-      specialProceeding.id.toString(),
-      {
-        caseNumber: specialProceeding.caseNumber,
-        petitioner: specialProceeding.petitioner,
-        raffledTo: specialProceeding.raffledTo,
-        date: specialProceeding.date,
-        nature: specialProceeding.nature,
-        respondent: specialProceeding.respondent,
-      },
-    );
+    const formEntry = specialProceedingToEntry(specialProceeding);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(specialProceeding.id);
@@ -153,7 +142,7 @@ export default function SpecialProceedingTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptySpecialProceedingFormEntry("new"));
+    setFormData(createEmptyEntry());
     setIsEditing(false);
     setEditingId(null);
   };

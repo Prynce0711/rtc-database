@@ -1,50 +1,45 @@
-// Local type until a Prisma ReceiveLog model is added to schema.prisma
-export interface ReceiveLog {
-  id: number;
-  receiptNo: string;
-  dateReceived: Date | string;
-  timeReceived?: string | null;
-  caseNumber: string;
-  documentType: string;
-  party: string;
-  receivedBy: string;
-  branch: string;
-  remarks?: string | null;
-}
+import { Petition } from "@/app/generated/prisma/client";
 
-export interface ReceiveLogStats {
+export interface PetitionStats {
   total: number;
   today: number;
   thisMonth: number;
-  docTypes: number;
+  branches: number;
 }
 
-export const calculateReceiveLogStats = (
-  logs: ReceiveLog[],
-): ReceiveLogStats => {
+export const calculatePetitionStats = (
+  petitions: Petition[],
+): PetitionStats => {
   const today = new Date().toISOString().slice(0, 10);
   const thisMonth = today.slice(0, 7);
 
-  const toDateStr = (d: Date | string): string =>
-    typeof d === "string" ? d : d.toISOString();
+  const toDateStr = (d: Date | string | null | undefined): string => {
+    if (!d) return "";
+    return typeof d === "string" ? d : d.toISOString();
+  };
 
   return {
-    total: logs.length,
-    today: logs.filter((l) => toDateStr(l.dateReceived).slice(0, 10) === today)
-      .length,
-    thisMonth: logs.filter((l) =>
-      toDateStr(l.dateReceived).startsWith(thisMonth),
-    ).length,
-    docTypes: new Set(logs.map((l) => l.documentType)).size,
+    total: petitions.length,
+    today: petitions.filter((p) => {
+      const dateStr = toDateStr(p.date);
+      return dateStr.slice(0, 10) === today;
+    }).length,
+    thisMonth: petitions.filter((p) => {
+      const dateStr = toDateStr(p.date);
+      return dateStr.startsWith(thisMonth);
+    }).length,
+    branches: new Set(
+      petitions.map((p) => p.raffledTo).filter((b) => b !== null),
+    ).size,
   };
 };
 
-export const sortReceiveLogs = (
-  logs: ReceiveLog[],
-  sortBy: keyof ReceiveLog,
+export const sortPetitions = (
+  petitions: Petition[],
+  sortBy: keyof Petition,
   order: "asc" | "desc",
-): ReceiveLog[] => {
-  return [...logs].sort((a, b) => {
+): Petition[] => {
+  return [...petitions].sort((a, b) => {
     const aVal = a[sortBy];
     const bVal = b[sortBy];
 

@@ -1,9 +1,9 @@
 "use client";
 
+import { Petition } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
-import { ReceiveLog } from "./PetitionRecord";
 
 const ReceiveRow = ({
   log,
@@ -11,41 +11,23 @@ const ReceiveRow = ({
   onDelete,
   onView,
 }: {
-  log: ReceiveLog;
-  onEdit: (log: ReceiveLog) => void;
-  onDelete: (log: ReceiveLog) => void;
-  onView?: (log: ReceiveLog) => void;
+  log: Petition;
+  onEdit: (log: Petition) => void;
+  onDelete: (log: Petition) => void;
+  onView?: (log: Petition) => void;
 }) => {
   const session = useSession();
   const isAdminOrAtty =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.ATTY;
 
-  const dateStr =
-    log.dateReceived instanceof Date
-      ? log.dateReceived.toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : new Date(log.dateReceived).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
-
-  const caseNumber = (log as any)["Case No"] ?? log.caseNumber ?? "—";
-  const raffledToBranch =
-    (log as any).RaffledToBranch ??
-    (log as any)["Branch No"] ??
-    log.branch ??
-    "—";
-  const petitioners = (log as any).Petitioners ?? log.party ?? "—";
-  const titleNo =
-    (log as any).TitleNo ?? (log as any).BookAndPages ?? log.receiptNo ?? "—";
-  const nature =
-    (log as any).Nature ?? (log as any).Content ?? log.documentType ?? "—";
-  const respondent = (log as any).Respondent ?? "—";
+  const dateStr = log.date
+    ? new Date(log.date).toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <tr
@@ -115,14 +97,12 @@ const ReceiveRow = ({
         </td>
       )}
 
-      {/* DATA CELLS — matching Proceedings column order */}
-      <td className="font-semibold text-center">{caseNumber}</td>
-      <td className="text-center">{raffledToBranch}</td>
+      {/* DATA CELLS */}
+      <td className="font-semibold text-center">{log.caseNumber}</td>
+      <td className="text-center">{log.raffledTo ?? "—"}</td>
       <td className="text-center text-base-content/70">{dateStr}</td>
-      <td className="font-medium text-center">{petitioners}</td>
-      <td className="text-center">{titleNo}</td>
-      <td className="text-center">{nature}</td>
-      <td className="text-center">{respondent}</td>
+      <td className="font-medium text-center">{log.petitioner ?? "—"}</td>
+      <td className="text-center">{log.nature ?? "—"}</td>
     </tr>
   );
 };

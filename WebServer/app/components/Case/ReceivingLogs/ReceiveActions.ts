@@ -2,13 +2,13 @@
 
 import { LogAction } from "@/app/generated/prisma/browser";
 import { prisma } from "@/app/lib/prisma";
-import ActionResult from "../ActionResult";
-import { createLog } from "../ActivityLogs/LogActions";
+import ActionResult from "../../ActionResult";
+import { createLog } from "../../ActivityLogs/LogActions";
 import { ReceiveLogSchema } from "./ReceiveSchema";
 
 export async function getReceivingLogs(): Promise<ActionResult<any[]>> {
   try {
-    const logs = await prisma.receivingLog.findMany();
+    const logs = await prisma.recievingLog.findMany();
     return { success: true, result: logs };
   } catch (error) {
     console.error("Error fetching receiving logs:", error);
@@ -25,7 +25,7 @@ export async function createReceivingLog(
       throw new Error(`Invalid receiving log data: ${logData.error.message}`);
     }
 
-    const newLog = await prisma.receivingLog.create({
+    const newLog = await prisma.recievingLog.create({
       data: logData.data,
     });
 
@@ -53,7 +53,15 @@ export async function updateReceivingLog(
       throw new Error(`Invalid receiving log data: ${logData.error.message}`);
     }
 
-    const updatedLog = await prisma.receivingLog.update({
+    const originalLog = await prisma.recievingLog.findUnique({
+      where: { id: logId },
+    });
+
+    if (!originalLog) {
+      throw new Error("Receiving log not found");
+    }
+
+    const updatedLog = await prisma.recievingLog.update({
       where: { id: logId },
       data: logData.data,
     });
@@ -61,8 +69,8 @@ export async function updateReceivingLog(
     await createLog({
       action: LogAction.UPDATE_CASE,
       details: {
-        from: logId,
-        to: updatedLog.id,
+        from: originalLog,
+        to: updatedLog,
       },
     });
 
@@ -77,7 +85,7 @@ export async function deleteReceivingLog(
   logId: number,
 ): Promise<ActionResult<any>> {
   try {
-    const deletedLog = await prisma.receivingLog.delete({
+    const deletedLog = await prisma.recievingLog.delete({
       where: { id: logId },
     });
 

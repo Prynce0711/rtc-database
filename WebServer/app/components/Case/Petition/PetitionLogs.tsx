@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { Petition } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useState } from "react";
@@ -19,31 +20,26 @@ import {
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import Table from "../../Table/Table";
+import { deletePetition, getPetitions } from "./PetitionActions";
 import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
-import {
-  ReceiveLog,
-  calculateReceiveLogStats,
-  sortReceiveLogs,
-} from "./PetitionRecord";
+import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
 
-type ReceiveLogFilterValues = {
-  receiptNo?: string;
+type PetitionFilterValues = {
   caseNumber?: string;
-  documentType?: string;
-  party?: string;
-  receivedBy?: string;
-  branch?: string;
-  dateReceived?: { start?: string; end?: string };
+  petitioner?: string;
+  raffledTo?: string;
+  nature?: string;
+  date?: { start?: string; end?: string };
 };
 
 const ReceiveLogsPage: React.FC = () => {
-  const [logs, setLogs] = useState<ReceiveLog[]>([]);
+  const [logs, setLogs] = useState<Petition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [drawerType, setDrawerType] = useState<ReceiveDrawerType | null>(null);
-  const [selectedLog, setSelectedLog] = useState<ReceiveLog | null>(null);
+  const [selectedLog, setSelectedLog] = useState<Petition | null>(null);
 
   const session = useSession();
   const isAdminOrAtty =
@@ -54,30 +50,25 @@ const ReceiveLogsPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof ReceiveLog;
+    key: keyof Petition;
     order: "asc" | "desc";
-  }>({ key: "dateReceived", order: "desc" });
+  }>({ key: "date", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<ReceiveLogFilterValues>(
+  const [appliedFilters, setAppliedFilters] = useState<PetitionFilterValues>(
     {},
   );
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<ReceiveLog[]>(
-    [],
-  );
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Petition[]>([]);
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
 
-  const receiveFilterOptions: FilterOption[] = [
-    { key: "Book And Pages", label: "Book and pages", type: "text" },
-    { key: "Date Received", label: "Date Received", type: "daterange" },
-    { key: "Abbreviation", label: "Abbreviation", type: "text" },
-    { key: "Case No", label: "Case No.", type: "text" },
-    { key: "Content ", label: "Content", type: "text" },
-    { key: "Branch No", label: "Branch No.", type: "text" },
-    { key: "Time", label: "Time ", type: "text" },
-    { key: " Notes", label: "Notes ", type: "text" },
+  const petitionFilterOptions: FilterOption[] = [
+    { key: "caseNumber", label: "Case Number", type: "text" },
+    { key: "petitioner", label: "Petitioner", type: "text" },
+    { key: "raffledTo", label: "Raffled To", type: "text" },
+    { key: "nature", label: "Nature", type: "text" },
+    { key: "date", label: "Date", type: "daterange" },
   ];
 
   useEffect(() => {
@@ -92,26 +83,24 @@ const ReceiveLogsPage: React.FC = () => {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const resp = await fetch("/api/receive/list");
-      const response = await resp.json();
-      if (!resp.ok || !response.success) {
-        statusPopup.showError(
-          response.error || "Failed to fetch petition logs",
-        );
+      const response = await getPetitions();
+      if (!response.success) {
+        statusPopup.showError(response.error || "Failed to fetch petitions");
+        setError(response.error || "Failed to fetch petitions");
         return;
       }
       setLogs(response.result || []);
       setError(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch petition logs",
+        err instanceof Error ? err.message : "Failed to fetch petitions",
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const stats = useMemo(() => calculateReceiveLogStats(logs), [logs]);
+  const stats = useMemo(() => calculatePetitionStats(logs), [logs]);
 
   const filteredAndSorted = useMemo(() => {
     const baseList =
@@ -125,7 +114,7 @@ const ReceiveLogsPage: React.FC = () => {
         ),
       );
     }
-    return sortReceiveLogs(filtered, sortConfig.key, sortConfig.order);
+    return sortPetitions(filtered, sortConfig.key, sortConfig.order);
   }, [logs, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
   const pageCount = Math.max(
     1,
@@ -136,64 +125,58 @@ const ReceiveLogsPage: React.FC = () => {
     return filteredAndSorted.slice(start, start + PAGE_SIZE);
   }, [filteredAndSorted, currentPage, PAGE_SIZE]);
 
-  const handleSort = (key: keyof ReceiveLog) => {
+  const handleSort = (key: keyof Petition) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
   };
 
-  const applyReceiveFilters = (
-    filters: ReceiveLogFilterValues,
-    items: ReceiveLog[],
+  const applyPetitionFilters = (
+    filters: PetitionFilterValues,
+    items: Petition[],
     exactMap: ExactMatchMap = {},
-  ): ReceiveLog[] => {
-    return items.filter((log) => {
+  ): Petition[] => {
+    return items.filter((petition) => {
       const matchesText = (
-        itemVal: string,
+        itemVal: string | null | undefined,
         filterVal: string,
         key: string,
       ): boolean => {
+        if (!itemVal) return false;
+        const val = itemVal.toString().toLowerCase();
+        const filter = filterVal.toLowerCase();
         const isExact = exactMap[key] ?? true;
-        return isExact
-          ? itemVal.toLowerCase() === filterVal.toLowerCase()
-          : itemVal.toLowerCase().includes(filterVal.toLowerCase());
+        return isExact ? val === filter : val.includes(filter);
       };
 
       if (
-        filters.receiptNo &&
-        !matchesText(log.receiptNo, filters.receiptNo, "receiptNo")
-      )
-        return false;
-      if (
         filters.caseNumber &&
-        !matchesText(log.caseNumber, filters.caseNumber, "caseNumber")
+        !matchesText(petition.caseNumber, filters.caseNumber, "caseNumber")
       )
         return false;
       if (
-        filters.documentType &&
-        !matchesText(log.documentType, filters.documentType, "documentType")
+        filters.petitioner &&
+        !matchesText(petition.petitioner, filters.petitioner, "petitioner")
       )
-        return false;
-      if (filters.party && !matchesText(log.party, filters.party, "party"))
         return false;
       if (
-        filters.receivedBy &&
-        !matchesText(log.receivedBy, filters.receivedBy, "receivedBy")
+        filters.raffledTo &&
+        !matchesText(petition.raffledTo, filters.raffledTo, "raffledTo")
       )
         return false;
-      if (filters.branch && !matchesText(log.branch, filters.branch, "branch"))
+      if (
+        filters.nature &&
+        !matchesText(petition.nature, filters.nature, "nature")
+      )
         return false;
 
-      if (filters.dateReceived) {
-        const d = new Date(log.dateReceived);
-        if (
-          filters.dateReceived.start &&
-          d < new Date(filters.dateReceived.start)
-        )
+      if (filters.date) {
+        const d = petition.date ? new Date(petition.date) : null;
+        if (!d) return false;
+        if (filters.date.start && d < new Date(filters.date.start))
           return false;
-        if (filters.dateReceived.end && d > new Date(filters.dateReceived.end))
-          return false;
+        if (filters.date.end && d > new Date(filters.date.end)) return false;
       }
       return true;
     });
@@ -203,26 +186,17 @@ const ReceiveLogsPage: React.FC = () => {
     filters: FilterValues,
     exactMap: ExactMatchMap,
   ) => {
-    const typed = filters as ReceiveLogFilterValues;
+    const typed = filters as PetitionFilterValues;
     setAppliedFilters(typed);
-    setFilteredByAdvanced(applyReceiveFilters(typed, logs, exactMap));
+    setFilteredByAdvanced(applyPetitionFilters(typed, logs, exactMap));
     setExactMatchMap(exactMap);
   };
 
   const getSuggestions = (key: string, inputValue: string): string[] => {
-    const textFields = [
-      "receiptNo",
-      "caseNumber",
-      "documentType",
-      "party",
-      "receivedBy",
-      "branch",
-    ];
+    const textFields = ["caseNumber", "petitioner", "raffledTo", "nature"];
     if (!textFields.includes(key)) return [];
     const values = logs
-      .map(
-        (l) => (l[key as keyof ReceiveLog] as string | null | undefined) || "",
-      )
+      .map((l) => (l[key as keyof Petition] as string | null | undefined) || "")
       .filter((v) => v.length > 0);
     const unique = Array.from(new Set(values)).sort();
     if (!inputValue) return unique;
@@ -234,19 +208,18 @@ const ReceiveLogsPage: React.FC = () => {
   const handleDeleteLog = async (logId: number) => {
     if (
       !(await statusPopup.showConfirm(
-        "Are you sure you want to delete this entry?",
+        "Are you sure you want to delete this petition?",
       ))
     )
       return;
     try {
-      const resp = await fetch(`/api/receive/${logId}`, { method: "DELETE" });
-      const json = await resp.json();
-      if (!resp.ok || !json.success) {
-        statusPopup.showError(json.error || "Failed to delete");
+      const response = await deletePetition(logId);
+      if (!response.success) {
+        statusPopup.showError(response.error || "Failed to delete petition");
         return;
       }
       setLogs((prev) => prev.filter((l) => l.id !== logId));
-      statusPopup.showSuccess("Entry deleted successfully");
+      statusPopup.showSuccess("Petition deleted successfully");
     } catch (err) {
       statusPopup.showError("Delete failed. See console for details.");
       console.error(err);
@@ -279,27 +252,15 @@ const ReceiveLogsPage: React.FC = () => {
 
       try {
         statusPopup.showLoading("Importing... Please wait.");
-        const fd = new FormData();
-        fd.append("file", file);
-        const resp = await fetch("/api/receive/import", {
-          method: "POST",
-          body: fd,
-        });
-        const json = await resp.json();
-        if (!resp.ok || !json.success) {
-          statusPopup.showError(json.error || "Import failed");
+        const { uploadPetitionExcel } = await import("./ExcelActions");
+        const result = await uploadPetitionExcel(file);
+        if (!result.success) {
+          statusPopup.showError(result.error || "Import failed");
           input.value = "";
           return;
         }
-        const created: ReceiveLog[] = json.result || [];
-        if (created.length === 0) {
-          statusPopup.showSuccess("No rows were imported.");
-        } else {
-          setLogs((prev) => [...created, ...prev]);
-          statusPopup.showSuccess(
-            `${created.length} rows imported successfully`,
-          );
-        }
+        statusPopup.showSuccess("Import successful!");
+        await fetchLogs();
       } catch (err) {
         statusPopup.showError("Import failed. See console for details.");
         console.error(err);
@@ -338,7 +299,7 @@ const ReceiveLogsPage: React.FC = () => {
         }}
         selectedLog={selectedLog}
         onCreate={(newLog) => {
-          const withId: ReceiveLog = {
+          const withId: Petition = {
             ...newLog,
             id: Math.max(0, ...logs.map((l) => l.id)) + 1,
           };
@@ -420,17 +381,20 @@ const ReceiveLogsPage: React.FC = () => {
                   className="btn btn-outline"
                   onClick={async () => {
                     try {
-                      const resp = await fetch("/api/receive/export");
-                      if (!resp.ok) throw new Error("Export failed");
-                      const blob = await resp.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = "petition-logs.csv";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
+                      const { exportPetitionsExcel } =
+                        await import("./ExcelActions");
+                      const result = await exportPetitionsExcel();
+                      if (!result.success) {
+                        statusPopup.showError(result.error || "Export failed");
+                        return;
+                      }
+                      const link = document.createElement("a");
+                      link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
+                      link.download = result.result.fileName;
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      statusPopup.showSuccess("Exported successfully");
                     } catch (err) {
                       statusPopup.showError(
                         err instanceof Error ? err.message : "Export failed",
@@ -469,7 +433,7 @@ const ReceiveLogsPage: React.FC = () => {
           <FilterModal
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
-            options={receiveFilterOptions}
+            options={petitionFilterOptions}
             onApply={handleApplyFilters}
             initialValues={appliedFilters}
             initialExactMatchMap={exactMatchMap}
@@ -502,9 +466,9 @@ const ReceiveLogsPage: React.FC = () => {
               delay: 200,
             },
             {
-              label: "Doc Types",
-              value: stats.docTypes ?? 0,
-              subtitle: `Distinct types`,
+              label: "Branches",
+              value: stats.branches ?? 0,
+              subtitle: `Distinct branches`,
               icon: FiUsers,
               delay: 300,
             },
@@ -549,7 +513,7 @@ const ReceiveLogsPage: React.FC = () => {
 
         {/* Table */}
         <div className="bg-base-100 rounded-lg shadow">
-          <Table
+          <Table<Petition>
             headers={[
               ...(isAdminOrAtty
                 ? [
@@ -561,25 +525,19 @@ const ReceiveLogsPage: React.FC = () => {
                   ]
                 : []),
               { key: "caseNumber", label: "Case Number", sortable: true },
-              { key: "branch", label: "Rafled to Branch", sortable: true },
-              { key: "dateReceived", label: "Date Filled", sortable: true },
-              { key: "party", label: "Petitioners", sortable: true },
-              { key: "receiptNo", label: "Title No", sortable: true },
-              { key: "documentType", label: "Nature", sortable: true },
+              { key: "raffledTo", label: "Raffled to Branch", sortable: true },
+              { key: "date", label: "Date Filed", sortable: true },
+              { key: "petitioner", label: "Petitioners", sortable: true },
+              { key: "nature", label: "Nature", sortable: true },
             ]}
-            data={paginatedLogs as unknown as Record<string, unknown>[]}
-            sortConfig={
-              {
-                key: sortConfig.key,
-                order: sortConfig.order,
-              } as { key: string; order: "asc" | "desc" }
-            }
-            onSort={(k) => handleSort(k as keyof ReceiveLog)}
+            data={paginatedLogs}
+            sortConfig={sortConfig}
+            onSort={handleSort}
             showPagination={false}
             renderRow={(log) => (
               <ReceiveRow
-                key={(log as unknown as ReceiveLog).id}
-                log={log as unknown as ReceiveLog}
+                key={log.id}
+                log={log}
                 onEdit={(l) => {
                   setSelectedLog(l);
                   setDrawerType(ReceiveDrawerType.EDIT);

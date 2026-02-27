@@ -27,7 +27,7 @@ export const formatCaseForDisplay = (caseItem: Case) => {
     raffleDate: caseItem.raffleDate
       ? new Date(caseItem.raffleDate).toLocaleDateString()
       : "Not scheduled",
-    bond: `₱${caseItem.bond.toLocaleString()}`,
+    bond: `₱${caseItem.bond?.toLocaleString() || "0"}`,
     detained: caseItem.detained ? "Yes" : "No",
   };
 };

@@ -11,18 +11,16 @@ import {
   updatePetition,
 } from "@/app/components/Case/Petition/PetitionActions";
 import {
-  PetitionFormEntry,
-  createEmptyPetitionFormEntry,
-  petitionToFormEntry,
+  PetitionEntry,
+  createEmptyEntry,
+  petitionToEntry,
 } from "@/app/components/Case/Petition/schema";
 import { Petition } from "@/app/generated/prisma/client";
 import { useEffect, useState } from "react";
 
 export default function PetitionTester() {
   const [petitions, setPetitions] = useState<Petition[]>([]);
-  const [formData, setFormData] = useState<PetitionFormEntry>(
-    createEmptyPetitionFormEntry("new"),
-  );
+  const [formData, setFormData] = useState<PetitionEntry>(createEmptyEntry());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,7 +91,7 @@ export default function PetitionTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyPetitionFormEntry("new"));
+        setFormData(createEmptyEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadPetitions();
@@ -106,13 +104,7 @@ export default function PetitionTester() {
   };
 
   const handleEdit = (petition: Petition) => {
-    const formEntry = petitionToFormEntry(petition.id.toString(), {
-      caseNumber: petition.caseNumber,
-      petitioner: petition.petitioner,
-      raffledTo: petition.raffledTo,
-      date: petition.date,
-      nature: petition.nature,
-    });
+    const formEntry = petitionToEntry(petition);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(petition.id);
@@ -136,7 +128,7 @@ export default function PetitionTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyPetitionFormEntry("new"));
+    setFormData(createEmptyEntry());
     setIsEditing(false);
     setEditingId(null);
   };
