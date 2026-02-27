@@ -1,5 +1,3 @@
-// Field configuration for the generic AnnualDrawer form
-
 export interface FieldConfig {
   name: string;
   label: string;
@@ -9,10 +7,9 @@ export interface FieldConfig {
   options?: string[];
 }
 
-// Fields shared by MTC and RTC court receiving logs
 export const courtLogFields: FieldConfig[] = [
   {
-    name: "bookAndPages",
+    name: "branch",
     label: "Branch",
     type: "text",
     required: true,
@@ -56,10 +53,9 @@ export const courtLogFields: FieldConfig[] = [
   },
 ];
 
-// Fields for Inventory
 export const inventoryLogFields: FieldConfig[] = [
   {
-    name: "Region",
+    name: "region",
     label: "Region",
     type: "text",
     placeholder: "e.g. Region VII",
@@ -71,19 +67,19 @@ export const inventoryLogFields: FieldConfig[] = [
     placeholder: "e.g. Cebu",
   },
   {
-    name: "Court",
+    name: "court",
     label: "Court",
     type: "text",
     placeholder: "e.g. MTC Branch 1",
   },
   {
-    name: "CityMunicipality",
+    name: "cityMunicipality",
     label: "City/Municipality",
     type: "text",
     placeholder: "e.g. Cebu City",
   },
   {
-    name: "Branch",
+    name: "branch",
     label: "Branch",
     type: "text",
     required: true,

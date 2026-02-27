@@ -1,5 +1,5 @@
-import SpecialProceedingTester from "./SpecialProceedingTester";
+import StatisticsTester from "./StatisticsTester";
 
 export default function page() {
-  return <SpecialProceedingTester />;
+  return <StatisticsTester />;
 }

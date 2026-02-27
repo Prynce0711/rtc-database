@@ -14,13 +14,12 @@ export enum AnnualDrawerType {
 
 interface AnnualDrawerProps {
   type: AnnualDrawerType;
-  /** Human-readable name shown in the drawer header, e.g. "MTC", "Inventory" */
   title: string;
   fields: FieldConfig[];
   onClose: () => void;
   selectedRecord?: Record<string, unknown> | null;
-  onCreate?: (record: Record<string, unknown>) => void;
-  onUpdate?: (record: Record<string, unknown>) => void;
+  onCreate?: (record: Record<string, unknown>) => void | Promise<void>;
+  onUpdate?: (record: Record<string, unknown>) => void | Promise<void>;
 }
 
 const buildEmptyForm = (fields: FieldConfig[]): Record<string, string> =>
@@ -98,10 +97,10 @@ const AnnualDrawer = ({
     setIsSubmitting(true);
     try {
       if (type === AnnualDrawerType.ADD) {
-        onCreate?.({ ...formData });
+        await onCreate?.({ ...formData });
         statusPopup.showSuccess("Entry added successfully");
       } else {
-        onUpdate?.({ ...selectedRecord, ...formData });
+        await onUpdate?.({ ...selectedRecord, ...formData });
         statusPopup.showSuccess("Entry updated successfully");
       }
       onClose();
@@ -154,7 +153,6 @@ const AnnualDrawer = ({
 
   return (
     <AnimatePresence>
-      {/* Backdrop */}
       <motion.div
         key="backdrop"
         className="fixed inset-0 bg-black/40 z-40"
@@ -164,7 +162,6 @@ const AnnualDrawer = ({
         onClick={onClose}
       />
 
-      {/* Drawer panel */}
       <motion.div
         key="drawer"
         className="fixed right-0 top-0 h-full w-full max-w-lg bg-base-100 shadow-2xl z-50 flex flex-col"
@@ -173,7 +170,6 @@ const AnnualDrawer = ({
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-base-200">
           <h2 className="text-xl font-bold text-base-content">
             {type === AnnualDrawerType.ADD
@@ -185,7 +181,6 @@ const AnnualDrawer = ({
           </button>
         </div>
 
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 gap-y-4">
             {fields.map((field) => (
@@ -208,7 +203,6 @@ const AnnualDrawer = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-base-200 flex gap-3 justify-end">
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
