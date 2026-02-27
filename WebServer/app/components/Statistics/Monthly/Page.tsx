@@ -5,9 +5,11 @@ import { FiCalendar, FiDownload, FiPlus, FiUpload } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import type { MonthlyRow } from "./types";
 
+import AddReportPage from "./AddReportPage";
 import MonthlyKPI from "./MonthlyKPI";
 import MonthlyTable from "./MonthlyTable";
 import MonthlyToolbar from "./MonthlyToolbar";
+import ViewReportPage from "./ViewReportPage";
 import { SAMPLE_DATA } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -22,6 +24,8 @@ export default function MonthlyPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showAddPage, setShowAddPage] = useState(false);
+  const [showViewPage, setShowViewPage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const monthlyData = useMemo(() => {
@@ -133,6 +137,29 @@ export default function MonthlyPage() {
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
 
+  if (showAddPage) {
+    return (
+      <AddReportPage
+        month={selectedMonth}
+        onBack={() => setShowAddPage(false)}
+        onSave={(newRows) => {
+          setImportedData((prev) => [...(prev ?? SAMPLE_DATA), ...newRows]);
+          setShowAddPage(false);
+        }}
+      />
+    );
+  }
+
+  if (showViewPage) {
+    return (
+      <ViewReportPage
+        data={filteredData}
+        month={selectedMonth}
+        onBack={() => setShowViewPage(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
@@ -152,7 +179,7 @@ export default function MonthlyPage() {
             <div className="flex flex-col items-end gap-3">
               <input
                 type="month"
-                className="input input-bordered input-md w-auto"
+                className="input input-bordered input-md w-72"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
               />
@@ -179,7 +206,10 @@ export default function MonthlyPage() {
                   <FiDownload className="h-5 w-5" />
                   Export
                 </button>
-                <button className="btn btn-outline btn-success btn-md gap-2">
+                <button
+                  className="btn btn-outline btn-success btn-md gap-2"
+                  onClick={() => setShowAddPage(true)}
+                >
                   <FiPlus className="h-5 w-5" />
                   Add Report
                 </button>
@@ -203,7 +233,10 @@ export default function MonthlyPage() {
       />
 
       {/* ── TABLE ── */}
-      <MonthlyTable data={filteredData} />
+      <MonthlyTable
+        data={filteredData}
+        onViewData={() => setShowViewPage(true)}
+      />
 
       {/* ── FOOTER ── */}
       <p className="text-xs text-base-content/40 text-right">

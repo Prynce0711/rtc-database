@@ -5,6 +5,7 @@ import type { MonthlyRow } from "./types";
 
 interface MonthlyTableProps {
   data: MonthlyRow[];
+  onViewData?: () => void;
 }
 
 const CATEGORY_BADGE: Record<string, { dot: string; bg: string }> = {
@@ -13,7 +14,7 @@ const CATEGORY_BADGE: Record<string, { dot: string; bg: string }> = {
   "Pending Cases": { dot: "bg-warning", bg: "bg-warning/10 text-warning" },
 };
 
-const MonthlyTable: React.FC<MonthlyTableProps> = ({ data }) => {
+const MonthlyTable: React.FC<MonthlyTableProps> = ({ data, onViewData }) => {
   const grouped = useMemo(() => {
     const map = new Map<string, MonthlyRow[]>();
     data.forEach((r) => {
@@ -33,7 +34,11 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({ data }) => {
   );
 
   return (
-    <div className="bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden">
+    <div
+      className={`bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden${onViewData ? " cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all" : ""}`}
+      onClick={onViewData}
+      title={onViewData ? "Click to view detailed report" : undefined}
+    >
       <div className="overflow-x-auto">
         <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
           {/* ── Column widths ── */}
