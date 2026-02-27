@@ -1,5 +1,5 @@
-import SpecialProceedingTester from "./SpecialProceedingTester";
+import FileUploadTester from "./FileUploadTester";
 
 export default function page() {
-  return <SpecialProceedingTester />;
+  return <FileUploadTester />;
 }
