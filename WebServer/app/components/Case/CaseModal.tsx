@@ -47,8 +47,26 @@ const NewCaseModal = ({
         raffleDate: selectedCase.raffleDate
           ? new Date(selectedCase.raffleDate)
           : undefined,
-        committe1: selectedCase.committe1 ?? undefined,
-        committe2: selectedCase.committe2 ?? undefined,
+        committee1: selectedCase.committee1 ?? undefined,
+        committee2: selectedCase.committee2 ?? undefined,
+        judge: selectedCase.judge ?? undefined,
+        ao: selectedCase.ao ?? undefined,
+        complainant: selectedCase.complainant ?? undefined,
+        houseNo: selectedCase.houseNo ?? undefined,
+        street: selectedCase.street ?? undefined,
+        barangay: selectedCase.barangay ?? undefined,
+        municipality: selectedCase.municipality ?? undefined,
+        province: selectedCase.province ?? undefined,
+        counts: selectedCase.counts ?? undefined,
+        jdf: selectedCase.jdf ?? undefined,
+        sajj: selectedCase.sajj ?? undefined,
+        sajj2: selectedCase.sajj2 ?? undefined,
+        mf: selectedCase.mf ?? undefined,
+        stf: selectedCase.stf ?? undefined,
+        lrf: selectedCase.lrf ?? undefined,
+        vcf: selectedCase.vcf ?? undefined,
+        total: selectedCase.total ?? undefined,
+        amountInvolved: selectedCase.amountInvolved ?? undefined,
       });
     } else {
       setFormData(initialCaseFormData);
@@ -430,11 +448,11 @@ const NewCaseModal = ({
               <input
                 type="number"
                 className="input input-bordered"
-                value={formData.committe1 || ""}
+                value={formData.committee1 || ""}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    committe1: e.target.value
+                    committee1: e.target.value
                       ? parseInt(e.target.value)
                       : undefined,
                   })
@@ -450,11 +468,11 @@ const NewCaseModal = ({
               <input
                 type="number"
                 className="input input-bordered"
-                value={formData.committe2 || ""}
+                value={formData.committee2 || ""}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    committe2: e.target.value
+                    committee2: e.target.value
                       ? parseInt(e.target.value)
                       : undefined,
                   })

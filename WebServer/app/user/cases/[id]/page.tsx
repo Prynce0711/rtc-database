@@ -432,9 +432,9 @@ export default function CaseDetailsPage() {
             {/* Parties */}
             <Section label="Parties">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="Judge" value={caseData.Judge} />
-                <Detail label="AO" value={caseData.AO} />
-                <Detail label="Complainant" value={caseData.Complainant} />
+                <Detail label="Judge" value={caseData.judge} />
+                <Detail label="AO" value={caseData.ao} />
+                <Detail label="Complainant" value={caseData.complainant} />
               </div>
             </Section>
 
@@ -444,8 +444,8 @@ export default function CaseDetailsPage() {
             {/* Committee */}
             <Section label="Committee">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Detail label="Committee 1" value={caseData.committe1} />
-                <Detail label="Committee 2" value={caseData.committe2} />
+                <Detail label="Committee 1" value={caseData.committee1} />
+                <Detail label="Committee 2" value={caseData.committee2} />
               </div>
             </Section>
 
@@ -455,11 +455,11 @@ export default function CaseDetailsPage() {
             {/* Address */}
             <Section label="Address">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="House No." value={caseData.HouseNo} />
-                <Detail label="Street" value={caseData.Street} />
-                <Detail label="Barangay" value={caseData.Barangay} />
-                <Detail label="Municipality" value={caseData.Municipality} />
-                <Detail label="Province" value={caseData.Province} />
+                <Detail label="House No." value={caseData.houseNo} />
+                <Detail label="Street" value={caseData.street} />
+                <Detail label="Barangay" value={caseData.barangay} />
+                <Detail label="Municipality" value={caseData.municipality} />
+                <Detail label="Province" value={caseData.province} />
               </div>
             </Section>
 
@@ -469,18 +469,18 @@ export default function CaseDetailsPage() {
             {/* Financial */}
             <Section label="Financial Details">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="Counts" value={caseData.Counts} />
-                <Detail label="JDF" value={caseData.Jdf} mono />
-                <Detail label="SAJJ" value={caseData.Sajj} mono />
-                <Detail label="SAJJ2" value={caseData.Sajj2} mono />
-                <Detail label="MF" value={caseData.MF} mono />
-                <Detail label="STF" value={caseData.STF} mono />
-                <Detail label="LRF" value={caseData.LRF} mono />
-                <Detail label="VCF" value={caseData.VCF} mono />
-                <Detail label="Total" value={caseData.Total} mono />
+                <Detail label="Counts" value={caseData.counts} />
+                <Detail label="JDF" value={caseData.jdf} mono />
+                <Detail label="SAJJ" value={caseData.sajj} mono />
+                <Detail label="SAJJ2" value={caseData.sajj2} mono />
+                <Detail label="MF" value={caseData.mf} mono />
+                <Detail label="STF" value={caseData.stf} mono />
+                <Detail label="LRF" value={caseData.lrf} mono />
+                <Detail label="VCF" value={caseData.vcf} mono />
+                <Detail label="Total" value={caseData.total} mono />
                 <Detail
                   label="Amount Involved"
-                  value={caseData.AmountInvolved}
+                  value={caseData.amountInvolved}
                   mono
                 />
               </div>

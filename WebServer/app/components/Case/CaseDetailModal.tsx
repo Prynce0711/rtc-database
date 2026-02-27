@@ -224,13 +224,13 @@ ${
                   <DetailItem
                     label="Committee 1"
                     value={
-                      (caseData as any).committe1?.toString() || "Not assigned"
+                      (caseData as any).committee1?.toString() || "Not assigned"
                     }
                   />
                   <DetailItem
                     label="Committee 2"
                     value={
-                      (caseData as any).committe2?.toString() || "Not assigned"
+                      (caseData as any).committee2?.toString() || "Not assigned"
                     }
                   />
                 </div>
@@ -303,23 +303,23 @@ ${
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <DetailItem
                     label="House No."
-                    value={(caseData as any).HouseNo || "Not set"}
+                    value={(caseData as any).houseNo || "Not set"}
                   />
                   <DetailItem
                     label="Street"
-                    value={(caseData as any).Street || "Not set"}
+                    value={(caseData as any).street || "Not set"}
                   />
                   <DetailItem
                     label="Barangay"
-                    value={(caseData as any).Barangay || "Not set"}
+                    value={(caseData as any).barangay || "Not set"}
                   />
                   <DetailItem
                     label="Municipality"
-                    value={(caseData as any).Municipality || "Not set"}
+                    value={(caseData as any).municipality || "Not set"}
                   />
                   <DetailItem
                     label="Province"
-                    value={(caseData as any).Province || "Not set"}
+                    value={(caseData as any).province || "Not set"}
                   />
                 </div>
               </div>
@@ -348,44 +348,44 @@ ${
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <DetailItem
                     label="Counts"
-                    value={(caseData as any).Counts?.toString() || "Not set"}
+                    value={(caseData as any).counts?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="JDF"
-                    value={(caseData as any).Jdf?.toString() || "Not set"}
+                    value={(caseData as any).jdf?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="SAJJ"
-                    value={(caseData as any).Sajj?.toString() || "Not set"}
+                    value={(caseData as any).sajj?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="SAJJ2"
-                    value={(caseData as any).Sajj2?.toString() || "Not set"}
+                    value={(caseData as any).sajj2?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="MF"
-                    value={(caseData as any).MF?.toString() || "Not set"}
+                    value={(caseData as any).mf?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="STF"
-                    value={(caseData as any).STF?.toString() || "Not set"}
+                    value={(caseData as any).stf?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="LRF"
-                    value={(caseData as any).LRF?.toString() || "Not set"}
+                    value={(caseData as any).lrf?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="VCF"
-                    value={(caseData as any).VCF?.toString() || "Not set"}
+                    value={(caseData as any).vcf?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="Total"
-                    value={(caseData as any).Total?.toString() || "Not set"}
+                    value={(caseData as any).total?.toString() || "Not set"}
                   />
                   <DetailItem
                     label="Amount Involved"
                     value={
-                      (caseData as any).AmountInvolved?.toString() || "Not set"
+                      (caseData as any).amountInvolved?.toString() || "Not set"
                     }
                   />
                 </div>

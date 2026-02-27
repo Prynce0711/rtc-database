@@ -82,26 +82,26 @@ model Case {
   eqcNumber       Int?
   bond            Float?
   raffleDate      DateTime?
-  committe1       Int?
-  committe2       Int?
-  Judge           String?
-  AO              String?
-  Complainant     String?
-  HouseNo         String?
-  Street          String?
-  Barangay        String?
-  Municipality    String?
-  Province        String?
-  Counts          String?
-  Jdf             Float?
-  Sajj            Float?
-  Sajj2           Float?
-  MF              Float?
-  STF             Float?
-  LRF             Float?
-  VCF             Float?
-  Total           Float?
-  AmountInvolved  Float?
+  committee1       Int?
+  committee2       Int?
+  judge           String?
+  ao              String?
+  complainant     String?
+  houseNo         String?
+  street          String?
+  barangay        String?
+  municipality    String?
+  province        String?
+  counts          String?
+  jdf             Float?
+  sajj            Float?
+  sajj2           Float?
+  mf              Float?
+  stf             Float?
+  lrf             Float?
+  vcf             Float?
+  total           Float?
+  amountInvolved  Float?
   createdAt       DateTime  @default(now())
 }
 
