@@ -69,7 +69,7 @@ const ReceiveRow = ({
 
   const bookAndPages =
     (log as any).BookAndPages ?? (log as any).receiptNo ?? "—";
-  const abbreviation = (log as any).Abbreviation ?? "—";
+  const caseType = (log as any).caseType ?? (log as any).Abbreviation ?? "—";
   const timeVal = (log as any).Time ?? log.timeReceived ?? "—";
   const caseNo = (log as any)["Case No"] ?? log.caseNumber ?? "—";
   const content = (log as any).Content ?? log.documentType ?? "—";
@@ -169,7 +169,7 @@ const ReceiveRow = ({
         <td className="text-center text-base-content/70 whitespace-nowrap">
           {dateStr}
         </td>
-        <td className="text-center whitespace-nowrap">{abbreviation}</td>
+        <td className="text-center whitespace-nowrap">{caseType}</td>
         <td className="text-center whitespace-nowrap">{caseNo}</td>
         <td className="text-center">
           <ExpandableContent text={content} maxChars={220} />
@@ -216,8 +216,8 @@ const ReceiveRow = ({
                 <div className="text-base-content/80">{dateStr}</div>
               </div>
               <div>
-                <div className="font-semibold">Abbreviation</div>
-                <div className="text-base-content/80">{abbreviation}</div>
+                <div className="font-semibold">Case Type</div>
+                <div className="text-base-content/80">{caseType}</div>
               </div>
               <div>
                 <div className="font-semibold">Case Number</div>

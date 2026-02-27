@@ -1,5 +1,6 @@
 "use client";
 
+import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -31,7 +32,7 @@ interface EntryForm {
   id: string;
   BookAndPages: string;
   dateReceived: string;
-  Abbreviation: string;
+  CaseType: string;
   CaseNo: string;
   Content: string;
   BranchNo: string;
@@ -47,7 +48,7 @@ const emptyEntry = (id: string): EntryForm => ({
   id,
   BookAndPages: "",
   dateReceived: today,
-  Abbreviation: "",
+  CaseType: "UNKNOWN",
   CaseNo: "",
   Content: "",
   BranchNo: "",
@@ -65,10 +66,11 @@ type ColDef = {
   key: string;
   label: string;
   placeholder: string;
-  type: "text" | "date" | "time";
+  type: "text" | "date" | "time" | "select";
   width: number;
   required?: boolean;
   mono?: boolean;
+  options?: { value: string; label: string }[];
 };
 
 const FROZEN_COLS: ColDef[] = [
@@ -92,6 +94,24 @@ const FROZEN_COLS: ColDef[] = [
   },
 ];
 
+const CASE_TYPE_LABELS: Record<CaseType, string> = {
+  CRIMINAL: "Criminal",
+  CIVIL: "Civil",
+  LAND_REGISTRATION_CASE: "Land Registration Case",
+  PETITION: "Petition",
+  ELECTION: "Election",
+  SCA: "SCA",
+  UNKNOWN: "Unknown",
+};
+
+const CASE_TYPE_OPTIONS = Object.values(CaseType).map((value) => ({
+  value,
+  label: CASE_TYPE_LABELS[value as CaseType] ?? value,
+}));
+
+const getCaseTypeLabel = (value: string) =>
+  CASE_TYPE_LABELS[value as CaseType] ?? value;
+
 type TabGroup = { id: string; label: string; cols: ColDef[] };
 
 const TAB_GROUPS: TabGroup[] = [
@@ -108,11 +128,12 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "Abbreviation",
-        label: "Abbreviation",
-        placeholder: "e.g. CR",
-        type: "text",
-        width: 140,
+        key: "CaseType",
+        label: "Case Type",
+        placeholder: "",
+        type: "select",
+        width: 180,
+        options: CASE_TYPE_OPTIONS,
       },
       {
         key: "CaseNo",
@@ -171,17 +192,32 @@ const CellInput = ({
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) => (
   <div style={{ display: "flex", flexDirection: "column" }}>
-    <input
-      type={
-        col.type === "date" ? "date" : col.type === "time" ? "time" : "text"
-      }
-      value={value}
-      placeholder={col.placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      title={error || col.label}
-      className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
-    />
+    {col.type === "select" ? (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        title={error || col.label}
+        className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
+      >
+        {(col.options || []).map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        type={
+          col.type === "date" ? "date" : col.type === "time" ? "time" : "text"
+        }
+        value={value}
+        placeholder={col.placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        title={error || col.label}
+        className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
+      />
+    )}
     {error && (
       <span className="xls-cell-err">
         <FiAlertCircle size={10} />
@@ -257,10 +293,12 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
                   <div className="rv-field-value rv-mono">{entry.Time}</div>
                 </div>
               )}
-              {entry.Abbreviation && (
+              {entry.CaseType && (
                 <div className="rv-field">
-                  <div className="rv-field-label">Abbreviation</div>
-                  <div className="rv-field-value">{entry.Abbreviation}</div>
+                  <div className="rv-field-label">Case Type</div>
+                  <div className="rv-field-value">
+                    {getCaseTypeLabel(entry.CaseType)}
+                  </div>
                 </div>
               )}
             </div>
@@ -332,7 +370,7 @@ const ReceiveDrawer = ({
     dateReceived: log.dateReceived
       ? String(log.dateReceived).slice(0, 10)
       : today,
-    Abbreviation: log.Abbreviation ?? "",
+    CaseType: log.caseType ?? log.Abbreviation ?? "UNKNOWN",
     CaseNo: log["Case No"] ?? log.caseNumber ?? "",
     Content: log.Content ?? "",
     BranchNo: log["Branch No"] ?? log.branch ?? "",
@@ -447,7 +485,7 @@ const ReceiveDrawer = ({
   const buildPayload = (e: EntryForm) => ({
     BookAndPages: e.BookAndPages,
     dateReceived: e.dateReceived,
-    Abbreviation: e.Abbreviation || null,
+    caseType: e.CaseType || "UNKNOWN",
     "Case No": e.CaseNo,
     Content: e.Content || null,
     "Branch No": e.BranchNo || null,

@@ -42,6 +42,10 @@ export async function createCase(
       return sessionResult;
     }
 
+    if (data.id) {
+      throw new Error("New case data should not include an id");
+    }
+
     const caseData = CaseSchema.safeParse(data);
     if (!caseData.success) {
       throw new Error(`Invalid case data: ${caseData.error.message}`);
