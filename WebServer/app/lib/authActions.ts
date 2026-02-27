@@ -16,7 +16,6 @@ export async function validateSession(
       headers: await headers(),
     });
 
-    console.log("Session:", session);
     if (
       !session?.user ||
       (role && !role.includes(session.user.role as Roles)) ||

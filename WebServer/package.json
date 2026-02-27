@@ -10,6 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.998.0",
+    "@aws-sdk/s3-request-presigner": "^3.998.0",
     "@prisma/adapter-better-sqlite3": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "@rtc-database/shared": "workspace:*",
