@@ -68,7 +68,7 @@ enum LogAction {
 
 model Case {
   id              Int       @id @default(autoincrement())
-  caseType       CaseType   @default(UNKNOWN)
+  caseType        CaseType  @default(UNKNOWN)
   branch          String
   assistantBranch String
   caseNumber      String    @unique
@@ -102,44 +102,44 @@ model Case {
   VCF             Float?
   Total           Float?
   AmountInvolved  Float?
-  createdAt DateTime @default(now())
+  createdAt       DateTime  @default(now())
 }
 
-model Employee{
-  id          Int     @id @default(autoincrement())
-  employeeName String
-  employeeNumber String? @unique
-  position    String
-  branch     String
-  tinNumber   String?
-  gsisNumber String?
+model Employee {
+  id               Int        @id @default(autoincrement())
+  employeeName     String
+  employeeNumber   String?    @unique
+  position         String
+  branch           String
+  tinNumber        String?
+  gsisNumber       String?
   philHealthNumber String?
-  pagIbigNumber String?
-  birthDate   DateTime
-  bloodType   BloodType?
-  allergies    String?
-  height      Float?
-  weight      Float?
-  contactPerson String
-  contactNumber String?
-  email       String?
-  createdAt DateTime @default(now())
+  pagIbigNumber    String?
+  birthDate        DateTime
+  bloodType        BloodType?
+  allergies        String?
+  height           Float?
+  weight           Float?
+  contactPerson    String
+  contactNumber    String?
+  email            String?
+  createdAt        DateTime   @default(now())
 }
 
 model Log {
-  id          Int       @id @default(autoincrement())
-  action      LogAction
+  id     Int       @id @default(autoincrement())
+  action LogAction
 
   // stores additional details about the log entry
   // id when creating or deleting
   // from and to when updating
-  details     Json?
+  details Json?
 
-  timestamp   DateTime  @default(now())
-  userId      String?
-  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress   String?
-  userAgent   String?
+  timestamp DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
 }
 
@@ -158,10 +158,9 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  status       Status   @default(PENDING)
+  status Status @default(PENDING)
 
-  Logs         Log[]
-
+  Logs Log[]
 
   @@unique([email])
   @@map("user")
@@ -217,35 +216,58 @@ model Verification {
   @@map("verification")
 }
 
-model RecievingLog{
-  id         Int       @id @default(autoincrement())
-  bookAndPage String?
+model RecievingLog {
+  id           Int       @id @default(autoincrement())
+  bookAndPage  String?
   dateRecieved DateTime?
-  caseType     CaseType @default(UNKNOWN)
-  caseNumber String?
-  content String?
+  caseType     CaseType  @default(UNKNOWN)
+  caseNumber   String?
+  content      String?
   branchNumber String?
-  notes String?
-  createdAt DateTime @default(now())
+  notes        String?
+  createdAt    DateTime  @default(now())
 }
 
 model Petition {
-  id              Int       @id @default(autoincrement())
-  caseNumber      String    @unique
-  petitioner  String?
-  raffledTo String?
+  id         Int       @id @default(autoincrement())
+  caseNumber String    @unique
+  petitioner String?
+  raffledTo  String?
   date       DateTime?
-  nature         String?
-  createdAt DateTime @default(now())
+  nature     String?
+  createdAt  DateTime  @default(now())
 }
 
 model SpecialProceeding {
-  id              Int       @id @default(autoincrement())
-  caseNumber      String    @unique
-  petitioner  String?
-  raffledTo String?
+  id         Int       @id @default(autoincrement())
+  caseNumber String    @unique
+  petitioner String?
+  raffledTo  String?
   date       DateTime?
-  nature         String?
+  nature     String?
   respondent String?
+  createdAt  DateTime  @default(now())
+}
+
+model Notarial {
+  id        Int      @id @default(autoincrement())
+  title     String
+  name      String
+  attorney  String
   createdAt DateTime @default(now())
+  date     DateTime
+
+  file           NotarialFile? @relation(fields: [fileId], references: [id])
+  fileId Int?
+}
+
+model NotarialFile {
+  id        Int      @id @default(autoincrement())
+  filename  String
+  path      String
+  size      Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  notarials Notarial[]
 }
