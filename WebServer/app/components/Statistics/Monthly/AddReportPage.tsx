@@ -11,7 +11,8 @@ import {
   FiPlus,
   FiTrash2,
 } from "react-icons/fi";
-import type { MonthlyRow } from "./types";
+import { BRANCH_OPTIONS, CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
+import type { MonthlyRow } from "./Schema";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -35,9 +36,7 @@ export interface AddReportPageProps {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const CATEGORY_OPTIONS = ["New Cases Filed", "Cases Disposed", "Pending Cases"];
-
-const BRANCH_OPTIONS = ["RTC 1", "RTC 2", "RTC 3", "RTC 4", "RTC 5"];
+// category and branch options are defined in MonthlyFieldConfig
 
 const emptyRow = (): EditableRow => ({
   id: crypto.randomUUID(),
@@ -134,7 +133,10 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   /*  Keyboard navigation                                              */
   /* ---------------------------------------------------------------- */
 
-  const COLS = ["category", "branch", "criminal", "civil"] as const;
+  const COLS = useMemo(
+    () => ["category", "branch", "criminal", "civil"] as const,
+    [],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, rowIdx: number, col: string) => {
@@ -191,7 +193,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
       setActiveCell({ rowIdx: nextRow, col: COLS[nextCol] });
     },
-    [rows.length],
+    [rows.length, COLS],
   );
 
   /* ---------------------------------------------------------------- */
@@ -675,7 +677,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                       </td>
 
                       {/* Total (auto) */}
-                      <td className="px-4 py-2 text-center tabular-nums font-bold text-base bg-base-content/[0.03]">
+                      <td className="px-4 py-2 text-center tabular-nums font-bold text-base bg-base-content/3]">
                         <span
                           className={
                             total > 0
@@ -852,7 +854,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               <td className="px-4 py-3 text-center tabular-nums text-base">
                                 {r.civil.toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-center tabular-nums text-base font-semibold bg-base-content/[0.02]">
+                              <td className="px-4 py-3 text-center tabular-nums text-base font-semibold bg-base-content/2">
                                 {r.total.toLocaleString()}
                               </td>
                             </tr>

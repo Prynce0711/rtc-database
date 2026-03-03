@@ -9,7 +9,7 @@ import {
   FiPieChart,
   FiTrendingUp,
 } from "react-icons/fi";
-import type { MonthlyRow } from "./types";
+import type { MonthlyRow } from "./Schema";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -21,30 +21,7 @@ export interface ViewReportPageProps {
   onBack: () => void;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Badge helper                                                       */
-/* ------------------------------------------------------------------ */
-
-const CATEGORY_BADGE: Record<
-  string,
-  { dot: string; bg: string; ring: string }
-> = {
-  "New Cases Filed": {
-    dot: "bg-info",
-    bg: "bg-info/10 text-info",
-    ring: "ring-info/20",
-  },
-  "Cases Disposed": {
-    dot: "bg-success",
-    bg: "bg-success/10 text-success",
-    ring: "ring-success/20",
-  },
-  "Pending Cases": {
-    dot: "bg-warning",
-    bg: "bg-warning/10 text-warning",
-    ring: "ring-warning/20",
-  },
-};
+import { CATEGORY_BADGE } from "./MonthlyUtils";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -539,7 +516,7 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                               <td className="px-4 py-3 text-center tabular-nums text-base">
                                 {r.civil.toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-center tabular-nums text-base font-semibold bg-base-content/[0.02]">
+                              <td className="px-4 py-3 text-center tabular-nums text-base font-semibold bg-base-content/2">
                                 {r.total.toLocaleString()}
                               </td>
                             </tr>
