@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCalendar, FiDownload, FiPlus, FiUpload } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import type { MonthlyRow } from "./types";
+import {
+  getMonthlyStatistics,
+  upsertMonthlyStatistics,
+} from "./MonthlyActions";
+import type { MonthlyRow } from "./Schema";
 
 import AddReportPage from "./AddReportPage";
 import MonthlyKPI from "./MonthlyKPI";
 import MonthlyTable from "./MonthlyTable";
 import MonthlyToolbar from "./MonthlyToolbar";
 import ViewReportPage from "./ViewReportPage";
-import { SAMPLE_DATA } from "./types";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -28,8 +31,15 @@ export default function MonthlyPage() {
   const [showViewPage, setShowViewPage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /* ---- Load from DB whenever selectedMonth changes ---- */
+  useEffect(() => {
+    getMonthlyStatistics(selectedMonth).then((res) => {
+      if (res.success) setImportedData(res.result);
+    });
+  }, [selectedMonth]);
+
   const monthlyData = useMemo(() => {
-    const all = importedData ?? SAMPLE_DATA;
+    const all = importedData ?? [];
     return all.filter((r) => r.month === selectedMonth);
   }, [importedData, selectedMonth]);
 
@@ -124,7 +134,14 @@ export default function MonthlyPage() {
         total: Number(row["Total"] ?? 0),
       }));
 
-      setImportedData((prev) => [...(prev ?? []), ...parsed]);
+      const res = await upsertMonthlyStatistics(parsed);
+      if (res.success) {
+        // Reload from DB to get authoritative data
+        const fresh = await getMonthlyStatistics(selectedMonth);
+        if (fresh.success) setImportedData(fresh.result);
+      } else {
+        console.error("Import failed to save:", res.error);
+      }
     } catch (err) {
       console.error("Import failed:", err);
     } finally {
@@ -142,8 +159,14 @@ export default function MonthlyPage() {
       <AddReportPage
         month={selectedMonth}
         onBack={() => setShowAddPage(false)}
-        onSave={(newRows) => {
-          setImportedData((prev) => [...(prev ?? SAMPLE_DATA), ...newRows]);
+        onSave={async (newRows) => {
+          const res = await upsertMonthlyStatistics(newRows);
+          if (res.success) {
+            const fresh = await getMonthlyStatistics(selectedMonth);
+            if (fresh.success) setImportedData(fresh.result);
+          } else {
+            console.error("Save failed:", res.error);
+          }
           setShowAddPage(false);
         }}
       />

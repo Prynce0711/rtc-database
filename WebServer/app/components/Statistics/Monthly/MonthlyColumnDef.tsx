@@ -1,13 +1,9 @@
 import React from "react";
-import type { MonthlyRow } from "./types";
+import type { MonthlyRow } from "./Schema";
 
 const asMonthly = (r: Record<string, unknown>) => r as unknown as MonthlyRow;
 
-const CATEGORY_BADGE: Record<string, { dot: string; bg: string }> = {
-  "New Cases Filed": { dot: "bg-info", bg: "bg-info/10 text-info" },
-  "Cases Disposed": { dot: "bg-success", bg: "bg-success/10 text-success" },
-  "Pending Cases": { dot: "bg-warning", bg: "bg-warning/10 text-warning" },
-};
+import { CATEGORY_BADGE } from "./MonthlyUtils";
 
 export interface ColumnDef {
   key: string;
