@@ -56,9 +56,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   onBack,
   onSave,
 }) => {
-  const [rows, setRows] = useState<EditableRow[]>(() =>
-    Array.from({ length: 10 }, emptyRow),
-  );
+  const [rows, setRows] = useState<EditableRow[]>(() => [emptyRow()]);
   const [activeCell, setActiveCell] = useState<{
     rowIdx: number;
     col: string;
@@ -97,7 +95,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   };
 
   const clearAll = () => {
-    setRows(Array.from({ length: 10 }, emptyRow));
+    setRows([]);
     setActiveCell(null);
     setSelectedRows(new Set());
   };
@@ -402,58 +400,58 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       {step === "edit" ? (
         <>
           {/* ── TOOLBAR ── */}
-          <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 border-y border-base-300 bg-base-200/40">
+          <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-y border-base-300 bg-base-200/40">
             <button
-              className="btn btn-sm btn-outline btn-success gap-1.5"
+              className="btn btn-outline btn-success gap-2"
               onClick={() => addRows(1)}
             >
-              <FiPlus className="h-4 w-4" />
+              <FiPlus className="h-5 w-5" />
               Add Row
             </button>
             <button
-              className="btn btn-sm btn-outline gap-1.5"
+              className="btn btn-outline gap-2"
               onClick={() => addRows(5)}
             >
-              <FiPlus className="h-4 w-4" />
+              <FiPlus className="h-5 w-5" />
               Add 5 Rows
             </button>
             <button
-              className="btn btn-sm btn-outline gap-1.5"
+              className="btn btn-outline gap-2"
               onClick={() => addRows(10)}
             >
-              <FiPlus className="h-4 w-4" />
+              <FiPlus className="h-5 w-5" />
               Add 10 Rows
             </button>
 
-            <div className="divider divider-horizontal mx-1 h-6" />
+            <div className="divider divider-horizontal mx-1 h-8" />
 
             <button
-              className="btn btn-sm btn-outline btn-info gap-1.5"
+              className="btn btn-outline btn-info gap-2"
               onClick={duplicateSelectedRows}
               disabled={selectedRows.size === 0}
             >
-              <FiCopy className="h-4 w-4" />
+              <FiCopy className="h-5 w-5" />
               Duplicate
             </button>
             <button
-              className="btn btn-sm btn-outline btn-error gap-1.5"
+              className="btn btn-outline btn-error gap-2"
               onClick={deleteSelectedRows}
               disabled={selectedRows.size === 0}
             >
-              <FiTrash2 className="h-4 w-4" />
+              <FiTrash2 className="h-5 w-5" />
               Delete{selectedRows.size > 0 ? ` (${selectedRows.size})` : ""}
             </button>
 
-            <div className="divider divider-horizontal mx-1 h-6" />
+            <div className="divider divider-horizontal mx-1 h-8" />
 
             <button
-              className="btn btn-sm btn-outline btn-warning gap-1.5"
+              className="btn btn-outline btn-warning gap-2"
               onClick={clearAll}
             >
               Clear All
             </button>
 
-            <span className="ml-auto text-xs text-base-content/50 tabular-nums font-medium">
+            <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
               {rows.length} row{rows.length !== 1 && "s"} •{" "}
               <span className="text-success font-semibold">
                 {validCount} valid
@@ -467,7 +465,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             className="flex-1 overflow-auto bg-base-100 border-x border-base-300/50"
             onPaste={handlePaste}
           >
-            <table className="table table-sm w-full border-collapse">
+            <table className="table w-full border-collapse">
               <colgroup>
                 <col className="w-10" />
                 <col className="w-10" />
@@ -480,32 +478,32 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
               <thead className="sticky top-0 z-10">
                 <tr className="bg-base-300 text-base-content text-xs uppercase tracking-widest">
-                  <th className="py-3 px-2 text-center border-r border-base-content/10">
+                  <th className="py-3 px-3 text-center border-r border-base-content/10">
                     <input
                       type="checkbox"
-                      className="checkbox checkbox-xs"
+                      className="checkbox checkbox-sm"
                       checked={
                         rows.length > 0 && selectedRows.size === rows.length
                       }
                       onChange={toggleSelectAll}
                     />
                   </th>
-                  <th className="py-3 px-2 text-center font-extrabold border-r border-base-content/10">
+                  <th className="py-3 px-3 text-center font-extrabold border-r border-base-content/10">
                     #
                   </th>
-                  <th className="py-3 px-3 text-left font-extrabold border-r border-base-content/10">
+                  <th className="py-3 px-4 text-left font-extrabold border-r border-base-content/10">
                     Category
                   </th>
-                  <th className="py-3 px-3 text-left font-extrabold border-r border-base-content/10">
+                  <th className="py-3 px-4 text-left font-extrabold border-r border-base-content/10">
                     Branch
                   </th>
-                  <th className="py-3 px-3 text-center font-extrabold border-r border-base-content/10">
+                  <th className="py-3 px-4 text-center font-extrabold border-r border-base-content/10">
                     Criminal
                   </th>
-                  <th className="py-3 px-3 text-center font-extrabold border-r border-base-content/10">
+                  <th className="py-3 px-4 text-center font-extrabold border-r border-base-content/10">
                     Civil
                   </th>
-                  <th className="py-3 px-3 text-center font-extrabold bg-base-content/5">
+                  <th className="py-3 px-4 text-center font-extrabold bg-base-content/5">
                     Total
                   </th>
                 </tr>
@@ -528,23 +526,23 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                       } hover:bg-primary/5`}
                     >
                       {/* Checkbox */}
-                      <td className="px-2 py-1 text-center border-r border-base-300/40">
+                      <td className="px-3 py-2 text-center border-r border-base-300/40">
                         <input
                           type="checkbox"
-                          className="checkbox checkbox-xs"
+                          className="checkbox checkbox-sm"
                           checked={isSelected}
                           onChange={() => toggleSelectRow(row.id)}
                         />
                       </td>
 
                       {/* Row number */}
-                      <td className="px-2 py-1 text-center text-xs text-base-content/40 font-mono border-r border-base-300/40 select-none">
+                      <td className="px-3 py-2 text-center text-sm text-base-content/40 font-mono border-r border-base-300/40 select-none">
                         {idx + 1}
                       </td>
 
                       {/* Category */}
                       <td
-                        className={`px-1 py-1 border-r border-base-300/40 ${
+                        className={`px-2 py-2 border-r border-base-300/40 ${
                           activeCell?.rowIdx === idx &&
                           activeCell?.col === "category"
                             ? "ring-2 ring-primary ring-inset"
@@ -555,7 +553,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         }
                       >
                         <select
-                          className="select select-ghost select-sm w-full font-medium"
+                          className="select select-ghost w-full font-medium"
                           value={row.category}
                           onChange={(e) =>
                             updateCell(row.id, "category", e.target.value)
@@ -578,7 +576,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
                       {/* Branch */}
                       <td
-                        className={`px-1 py-1 border-r border-base-300/40 ${
+                        className={`px-2 py-2 border-r border-base-300/40 ${
                           activeCell?.rowIdx === idx &&
                           activeCell?.col === "branch"
                             ? "ring-2 ring-primary ring-inset"
@@ -589,7 +587,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         }
                       >
                         <select
-                          className="select select-ghost select-sm w-full font-medium"
+                          className="select select-ghost w-full font-medium"
                           value={row.branch}
                           onChange={(e) =>
                             updateCell(row.id, "branch", e.target.value)
@@ -612,7 +610,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
                       {/* Criminal */}
                       <td
-                        className={`px-1 py-1 border-r border-base-300/40 ${
+                        className={`px-2 py-2 border-r border-base-300/40 ${
                           activeCell?.rowIdx === idx &&
                           activeCell?.col === "criminal"
                             ? "ring-2 ring-primary ring-inset"
@@ -625,7 +623,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         <input
                           type="number"
                           min={0}
-                          className="input input-ghost input-sm w-full text-center tabular-nums font-medium"
+                          className="input input-ghost w-full text-center tabular-nums font-medium"
                           value={row.criminal || ""}
                           placeholder="0"
                           onChange={(e) =>
@@ -645,7 +643,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
                       {/* Civil */}
                       <td
-                        className={`px-1 py-1 border-r border-base-300/40 ${
+                        className={`px-2 py-2 border-r border-base-300/40 ${
                           activeCell?.rowIdx === idx &&
                           activeCell?.col === "civil"
                             ? "ring-2 ring-primary ring-inset"
@@ -658,7 +656,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         <input
                           type="number"
                           min={0}
-                          className="input input-ghost input-sm w-full text-center tabular-nums font-medium"
+                          className="input input-ghost w-full text-center tabular-nums font-medium"
                           value={row.civil || ""}
                           placeholder="0"
                           onChange={(e) =>
@@ -677,7 +675,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                       </td>
 
                       {/* Total (auto) */}
-                      <td className="px-3 py-1 text-center tabular-nums font-bold text-base bg-base-content/[0.03]">
+                      <td className="px-4 py-2 text-center tabular-nums font-bold text-base bg-base-content/[0.03]">
                         <span
                           className={
                             total > 0

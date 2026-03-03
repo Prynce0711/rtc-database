@@ -3,6 +3,14 @@
 import React, { useMemo } from "react";
 import type { MonthlyRow } from "./types";
 
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
+}
+
 interface MonthlyTableProps {
   data: MonthlyRow[];
   onViewData?: () => void;
