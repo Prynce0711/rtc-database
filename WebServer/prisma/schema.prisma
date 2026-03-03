@@ -277,3 +277,40 @@ model NotarialFile {
 
   notarials Notarial[]
 }
+
+
+model RegionalTrialCourt {
+  id                      Int     @id @default(autoincrement())
+  branch                  String
+  pendingLastYear         String?
+  RaffledOrAdded          String?
+  Disposed                String?
+  pendingThisYear         String?
+  percentageOfDisposition String?
+}
+
+
+model MunicipalTrialCourt {
+  id                      Int     @id @default(autoincrement())
+  branch                  String
+  pendingLastYear         String?
+  RaffledOrAdded          String?
+  Disposed                String?
+  pendingThisYear         String?
+  percentageOfDisposition String?
+}
+
+model InventoryDocument {
+  id                       Int      @id @default(autoincrement())
+  region                   String
+  province                 String
+  court                    String
+  cityMunicipality         String
+  branch                   String
+  civilSmallClaimsFiled    String?
+  criminalCasesFiled       String?
+  civilSmallClaimsDisposed String?
+  criminalCasesDisposed    String?
+  dateRecorded             DateTime @default(now())
+}
+
