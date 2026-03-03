@@ -1,21 +1,13 @@
 "use client";
 
+import { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 
-export type SpecialCase = {
-  id: number;
-  spcNo: string;
-  raffledToBranch: string;
-  dateFiled: string;
-  petitioners: string;
-  nature: string;
-  respondent: string;
-  titleNo?: string;
-};
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-PH", {
+const formatDate = (value: Date | string | null | undefined) => {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-PH", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -28,10 +20,10 @@ const SpecialProceedingRow = ({
   onDelete,
   onRowClick,
 }: {
-  caseItem: SpecialCase;
-  onEdit: (c: SpecialCase) => void;
+  caseItem: SpecialProceeding;
+  onEdit: (c: SpecialProceeding) => void;
   onDelete: (id: number) => void;
-  onRowClick: (c: SpecialCase) => void;
+  onRowClick: (c: SpecialProceeding) => void;
 }) => (
   <tr
     className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
@@ -88,12 +80,12 @@ const SpecialProceedingRow = ({
         </div>
       </div>
     </td>
-    <td className="font-semibold text-center">{caseItem.spcNo}</td>
-    <td className="text-center">{caseItem.raffledToBranch}</td>
+    <td className="font-semibold text-center">{caseItem.caseNumber}</td>
+    <td className="text-center">{caseItem.raffledTo}</td>
     <td className="text-center text-base-content/70">
-      {formatDate(caseItem.dateFiled)}
+      {formatDate(caseItem.date)}
     </td>
-    <td className="font-medium text-center">{caseItem.petitioners}</td>
+    <td className="font-medium text-center">{caseItem.petitioner}</td>
     <td className="text-center">{caseItem.nature}</td>
     <td className="text-center">{caseItem.respondent}</td>
   </tr>

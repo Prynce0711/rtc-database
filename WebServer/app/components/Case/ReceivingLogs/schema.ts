@@ -15,7 +15,13 @@ export const ReceivingLogSchema = z.object({
 export type ReceivingLogSchema = z.infer<typeof ReceivingLogSchema>;
 
 /** Form entry used by the grid UI (RecievingLog + UI metadata). */
-export type ReceivingLogEntry = RecievingLog & {
+export type ReceivingLogEntry = Omit<
+  RecievingLog,
+  "id" | "dateRecieved" | "createdAt"
+> & {
+  id: number;
+  dateRecieved: string | Date | null;
+  createdAt?: Date;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;

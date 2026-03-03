@@ -3,22 +3,23 @@ import { CaseType } from "@/app/generated/prisma/enums";
 import { z } from "zod";
 
 export const CaseSchema = z.object({
-  branch: z.string().min(1, "Branch is required"),
-  assistantBranch: z.string().min(1, "Assistant branch is required"),
+  id: z.coerce.number().int().optional(), // Optional for new cases that haven't been saved yet
+  branch: z.string().nullable().optional(),
+  assistantBranch: z.string().nullable().optional(),
   caseNumber: z.string().min(1, "Case number is required"),
-  dateFiled: z.coerce.date(),
+  dateFiled: z.coerce.date().nullable().optional(),
   name: z.string().min(1, "Name is required"),
-  charge: z.string().min(1, "Charge is required"),
-  infoSheet: z.string().min(1, "Info sheet is required"),
-  court: z.string().min(1, "Court is required"),
+  charge: z.string().nullable().optional(),
+  infoSheet: z.string().nullable().optional(),
+  court: z.string().nullable().optional(),
   caseType: z.enum(CaseType),
-  detained: z.coerce.boolean(),
-  consolidation: z.string().min(1, "Consolidation is required"),
+  detained: z.string().nullable().optional(),
+  consolidation: z.string().nullable().optional(),
   eqcNumber: z.coerce.number().int().nullable().optional(),
-  bond: z.coerce.number().nullable().optional(),
+  bond: z.string().nullable().optional(),
   raffleDate: z.coerce.date().nullable().optional(),
-  committee1: z.coerce.number().int().nullable().optional(),
-  committee2: z.coerce.number().int().nullable().optional(),
+  committee1: z.string().nullable().optional(),
+  committee2: z.string().nullable().optional(),
   judge: z.string().nullable().optional(),
   ao: z.string().nullable().optional(),
   complainant: z.string().nullable().optional(),
@@ -28,15 +29,15 @@ export const CaseSchema = z.object({
   municipality: z.string().nullable().optional(),
   province: z.string().nullable().optional(),
   counts: z.string().nullable().optional(),
-  jdf: z.coerce.number().nullable().optional(),
-  sajj: z.coerce.number().nullable().optional(),
-  sajj2: z.coerce.number().nullable().optional(),
-  mf: z.coerce.number().nullable().optional(),
-  stf: z.coerce.number().nullable().optional(),
-  lrf: z.coerce.number().nullable().optional(),
-  vcf: z.coerce.number().nullable().optional(),
-  total: z.coerce.number().nullable().optional(),
-  amountInvolved: z.coerce.number().nullable().optional(),
+  jdf: z.string().nullable().optional(),
+  sajj: z.string().nullable().optional(),
+  sajj2: z.string().nullable().optional(),
+  mf: z.string().nullable().optional(),
+  stf: z.string().nullable().optional(),
+  lrf: z.string().nullable().optional(),
+  vcf: z.string().nullable().optional(),
+  total: z.string().nullable().optional(),
+  amountInvolved: z.string().nullable().optional(),
 });
 export type CaseSchema = z.infer<typeof CaseSchema>;
 
@@ -56,17 +57,17 @@ export const caseToEntry = (c: Case): CaseEntry => ({
 });
 
 export const initialCaseFormData: Omit<Case, "id" | "createdAt"> = {
-  branch: "",
-  assistantBranch: "",
+  branch: null,
+  assistantBranch: null,
   caseNumber: "",
   dateFiled: new Date(),
   caseType: "UNKNOWN",
   name: "",
-  charge: "",
-  infoSheet: "",
-  court: "",
-  detained: false,
-  consolidation: "",
+  charge: null,
+  infoSheet: null,
+  court: null,
+  detained: null,
+  consolidation: null,
   eqcNumber: null,
   bond: null,
   raffleDate: null,
@@ -92,10 +93,17 @@ export const initialCaseFormData: Omit<Case, "id" | "createdAt"> = {
   amountInvolved: null,
 };
 
+let tempIdCounter = 0;
+
+export const createTempId = (): number => {
+  tempIdCounter += 1;
+  return -tempIdCounter;
+};
+
 /** Create an empty entry based on schema defaults. */
 export const createEmptyEntry = (): CaseEntry => ({
   ...initialCaseFormData,
-  id: 0,
+  id: createTempId(),
   createdAt: new Date(),
   errors: {},
   collapsed: false,

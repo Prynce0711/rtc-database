@@ -55,6 +55,19 @@ const FilterModal: React.FC<FilterModalProps> = ({
     setSuggestions([]);
   };
 
+  const fetchSuggestions = (key: string, overrideValue?: string) => {
+    if (!getSuggestions) return;
+    const value = overrideValue ?? (filters[key] as string) ?? "";
+    Promise.resolve(getSuggestions(key, value))
+      .then((sugs) => {
+        if (focusedFilter !== key) return;
+        setSuggestions((sugs || []).slice(0, 8));
+      })
+      .catch(() => {
+        if (focusedFilter === key) setSuggestions([]);
+      });
+  };
+
   const resetFilters = () => {
     setEnabledFilters(new Set());
     setFilters({});
@@ -133,14 +146,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   value={filters[option.key]}
                   onToggle={toggleFilter}
                   onChange={handleFilterChange}
+                  onInputChange={(k, v) => {
+                    setFocusedFilter(k);
+                    fetchSuggestions(k, v);
+                  }}
                   focused={focusedFilter === option.key}
                   onFocus={(k) => {
                     setFocusedFilter(k);
-                    if (getSuggestions) {
-                      const sugs =
-                        getSuggestions(k, (filters[k] as string) || "") || [];
-                      setSuggestions(sugs.slice(0, 8));
-                    }
+                    fetchSuggestions(k);
                   }}
                   onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
                   suggestions={focusedFilter === option.key ? suggestions : []}

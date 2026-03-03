@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -18,73 +19,73 @@ import {
   uploadSpecialProceedingExcel,
 } from "./ExcelActions";
 import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
-import SpecialProceedingRow, { SpecialCase } from "./SpecialProceedingRow";
+import SpecialProceedingRow from "./SpecialProceedingRow";
 import {
   deleteSpecialProceeding,
   getSpecialProceedings,
 } from "./SpecialProceedingsActions";
 
 type SPFilterValues = {
-  spcNo?: string;
-  raffledToBranch?: string;
-  petitioners?: string;
+  caseNumber?: string;
+  raffledTo?: string;
+  petitioner?: string;
   nature?: string;
   respondent?: string;
-  dateFiled?: { start?: string; end?: string };
+  date?: { start?: string; end?: string };
 };
 
-type SortConfig = { key: keyof SpecialCase; order: "asc" | "desc" };
+type SortConfig = { key: keyof SpecialProceeding; order: "asc" | "desc" };
 type DrawerType = "ADD" | "EDIT";
 
 const SP_FILTER_OPTIONS: FilterOption[] = [
-  { key: "spcNo", label: "SPC. No.", type: "text" },
-  { key: "raffledToBranch", label: "Raffled to Branch", type: "text" },
-  { key: "petitioners", label: "Petitioners", type: "text" },
+  { key: "caseNumber", label: "SPC. No.", type: "text" },
+  { key: "raffledTo", label: "Raffled to Branch", type: "text" },
+  { key: "petitioner", label: "Petitioners", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
   { key: "respondent", label: "Respondent", type: "text" },
-  { key: "dateFiled", label: "Date Filed", type: "daterange" },
+  { key: "date", label: "Date Filed", type: "daterange" },
 ];
 
 const PAGE_SIZE = 25;
 
 const applySPFilters = (
   filters: SPFilterValues,
-  items: SpecialCase[],
-): SpecialCase[] =>
+  items: SpecialProceeding[],
+): SpecialProceeding[] =>
   items.filter((c) => {
     if (
-      filters.spcNo &&
-      !c.spcNo.toLowerCase().includes(filters.spcNo.toLowerCase())
+      filters.caseNumber &&
+      !c.caseNumber.toLowerCase().includes(filters.caseNumber.toLowerCase())
     )
       return false;
     if (
-      filters.raffledToBranch &&
-      !c.raffledToBranch
-        .toLowerCase()
-        .includes(filters.raffledToBranch.toLowerCase())
+      filters.raffledTo &&
+      c.raffledTo &&
+      !c.raffledTo.toLowerCase().includes(filters.raffledTo.toLowerCase())
     )
       return false;
     if (
-      filters.petitioners &&
-      !c.petitioners.toLowerCase().includes(filters.petitioners.toLowerCase())
+      filters.petitioner &&
+      c.petitioner &&
+      !c.petitioner.toLowerCase().includes(filters.petitioner.toLowerCase())
     )
       return false;
     if (
       filters.nature &&
+      c.nature &&
       !c.nature.toLowerCase().includes(filters.nature.toLowerCase())
     )
       return false;
     if (
       filters.respondent &&
+      c.respondent &&
       !c.respondent.toLowerCase().includes(filters.respondent.toLowerCase())
     )
       return false;
-    if (filters.dateFiled) {
-      const d = new Date(c.dateFiled);
-      if (filters.dateFiled.start && d < new Date(filters.dateFiled.start))
-        return false;
-      if (filters.dateFiled.end && d > new Date(filters.dateFiled.end))
-        return false;
+    if (filters.date && c.date) {
+      const d = new Date(c.date);
+      if (filters.date.start && d < new Date(filters.date.start)) return false;
+      if (filters.date.end && d > new Date(filters.date.end)) return false;
     }
     return true;
   });
@@ -96,9 +97,9 @@ const SortTh = ({
   onSort,
 }: {
   label: string;
-  colKey: keyof SpecialCase;
+  colKey: keyof SpecialProceeding;
   sortConfig: SortConfig;
-  onSort: (k: keyof SpecialCase) => void;
+  onSort: (k: keyof SpecialProceeding) => void;
 }) => (
   <th
     className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
@@ -241,18 +242,20 @@ const Pagination: React.FC<{
 const Proceedings: React.FC = () => {
   const router = useRouter();
   const popup = usePopup();
-  const [cases, setCases] = useState<SpecialCase[]>([]);
+  const [cases, setCases] = useState<SpecialProceeding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "dateFiled",
+    key: "date",
     order: "desc",
   });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<SPFilterValues>({});
   const [drawerType, setDrawerType] = useState<DrawerType | null>(null);
-  const [selectedCase, setSelectedCase] = useState<SpecialCase | null>(null);
+  const [selectedCase, setSelectedCase] = useState<SpecialProceeding | null>(
+    null,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -270,24 +273,12 @@ const Proceedings: React.FC = () => {
       setError(result.error || "Failed to fetch cases");
       setCases([]);
     } else {
-      setCases(
-        (result.result || []).map((sp) => ({
-          id: sp.id,
-          spcNo: sp.caseNumber || "",
-          raffledToBranch: sp.raffledTo || "",
-          dateFiled: sp.date
-            ? new Date(sp.date).toISOString().split("T")[0]
-            : "",
-          petitioners: sp.petitioner || "",
-          nature: sp.nature || "",
-          respondent: sp.respondent || "",
-        })),
-      );
+      setCases(result.result || []);
     }
     setLoading(false);
   };
 
-  const handleSort = (key: keyof SpecialCase) => {
+  const handleSort = (key: keyof SpecialProceeding) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
@@ -300,10 +291,10 @@ const Proceedings: React.FC = () => {
   };
 
   const getSuggestions = (key: string, partial: string) => {
-    const fieldMap: Record<string, keyof SpecialCase> = {
-      spcNo: "spcNo",
-      raffledToBranch: "raffledToBranch",
-      petitioners: "petitioners",
+    const fieldMap: Record<string, keyof SpecialProceeding> = {
+      caseNumber: "caseNumber",
+      raffledTo: "raffledTo",
+      petitioner: "petitioner",
       nature: "nature",
       respondent: "respondent",
     };
@@ -312,7 +303,7 @@ const Proceedings: React.FC = () => {
     return Array.from(
       new Set(
         cases
-          .map((c) => String(c[field]))
+          .map((c) => String(c[field] ?? ""))
           .filter((v) => v.toLowerCase().includes(partial.toLowerCase())),
       ),
     ).slice(0, 10);
@@ -352,13 +343,15 @@ const Proceedings: React.FC = () => {
     const total = cases.length;
     const now = new Date();
     const thisMonth = cases.filter((c) => {
-      const d = new Date(c.dateFiled);
+      if (!c.date) return false;
+      const d = new Date(c.date);
       return (
         d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
       );
     }).length;
-    const natures = new Set(cases.map((c) => c.nature)).size;
-    const branches = new Set(cases.map((c) => c.raffledToBranch)).size;
+    const natures = new Set(cases.map((c) => c.nature).filter(Boolean)).size;
+    const branches = new Set(cases.map((c) => c.raffledTo).filter(Boolean))
+      .size;
     return { total, thisMonth, natures, branches };
   }, [cases]);
 
@@ -415,35 +408,10 @@ const Proceedings: React.FC = () => {
           setDrawerType(null);
           setSelectedCase(null);
         }}
-        onCreate={(newProc) =>
-          setCases((prev) => [
-            ...prev,
-            {
-              id: newProc.id || 0,
-              spcNo: newProc.spcNo,
-              raffledToBranch: newProc.raffledToBranch,
-              dateFiled: newProc.dateFiled,
-              petitioners: newProc.petitioners,
-              nature: newProc.nature,
-              respondent: newProc.respondent,
-            },
-          ])
-        }
+        onCreate={(newProc) => setCases((prev) => [...prev, newProc])}
         onUpdate={(updatedProc) =>
           setCases((prev) =>
-            prev.map((c) =>
-              c.id === updatedProc.id
-                ? {
-                    id: updatedProc.id,
-                    spcNo: updatedProc.spcNo,
-                    raffledToBranch: updatedProc.raffledToBranch,
-                    dateFiled: updatedProc.dateFiled,
-                    petitioners: updatedProc.petitioners,
-                    nature: updatedProc.nature,
-                    respondent: updatedProc.respondent,
-                  }
-                : c,
-            ),
+            prev.map((c) => (c.id === updatedProc.id ? updatedProc : c)),
           )
         }
       />
@@ -685,25 +653,25 @@ const Proceedings: React.FC = () => {
                 <th>ACTIONS</th>
                 <SortTh
                   label="SPC. NO."
-                  colKey="spcNo"
+                  colKey="caseNumber"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="RAFFLED TO BRANCH"
-                  colKey="raffledToBranch"
+                  colKey="raffledTo"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="DATE FILED"
-                  colKey="dateFiled"
+                  colKey="date"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="PETITIONERS"
-                  colKey="petitioners"
+                  colKey="petitioner"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />

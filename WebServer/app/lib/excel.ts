@@ -15,10 +15,44 @@ export const excelDateToJSDate = (serial: number): Date => {
   );
 };
 
+// Helper to generate variations with periods after words
+const generatePeriodVariations = (text: string): string[] => {
+  const words = text.split(/\s+/);
+  if (words.length === 1) {
+    // Single word: "atty" → ["atty", "atty."]
+    return [text, text + "."];
+  }
+
+  // Multiple words: generate all combinations with periods
+  const variations: string[] = [text];
+  const n = words.length;
+
+  // Generate all combinations using binary representation
+  // For 2 words: 00, 01, 10, 11 (4 combinations)
+  for (let i = 1; i < 1 << n; i++) {
+    const variant = words
+      .map((word, index) => {
+        // Check if this word should have a period
+        const shouldHavePeriod = (i >> index) & 1;
+        return shouldHavePeriod ? word + "." : word;
+      })
+      .join(" ");
+    variations.push(variant);
+  }
+
+  return variations;
+};
+
 // Fuzzy column name matcher
 export const findColumnValue = (row: any, possibleNames: string[]): any => {
-  // First try exact match (case-insensitive)
+  // Generate all variations with periods
+  const allVariations: string[] = [];
   for (const name of possibleNames) {
+    allVariations.push(...generatePeriodVariations(name));
+  }
+
+  // First try exact match (case-insensitive)
+  for (const name of allVariations) {
     for (const key in row) {
       if (key.toLowerCase().trim() === name.toLowerCase().trim()) {
         return row[key];
@@ -27,7 +61,7 @@ export const findColumnValue = (row: any, possibleNames: string[]): any => {
   }
 
   // Then try partial match
-  for (const name of possibleNames) {
+  for (const name of allVariations) {
     for (const key in row) {
       const keyLower = key.toLowerCase().trim();
       const nameLower = name.toLowerCase().trim();

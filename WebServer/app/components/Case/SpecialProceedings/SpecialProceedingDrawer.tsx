@@ -1,5 +1,6 @@
 "use client";
 
+import { SpecialProceeding } from "@/app/generated/prisma/client";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -13,27 +14,14 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { SpecialCase } from "./SpecialProceedingRow";
 import {
   createSpecialProceeding,
   updateSpecialProceeding,
 } from "./SpecialProceedingsActions";
-
-type FormEntry = {
-  id: string;
-  spcNo: string;
-  dateFiled: string;
-  raffledToBranch: string;
-  titleNo: string;
-  petitioners: string;
-  nature: string;
-  respondent: string;
-  errors: Record<string, string>;
-  saved: boolean;
-};
+import { createEmptyEntry, SpecialProceedingEntry } from "./schema";
 
 type ColDef = {
-  key: keyof Omit<FormEntry, "id" | "errors" | "saved">;
+  key: keyof Omit<SpecialProceeding, "id" | "createdAt">;
   label: string;
   placeholder: string;
   type: "text" | "date";
@@ -45,37 +33,9 @@ type ColDef = {
 type ModalType = "ADD" | "EDIT";
 type Step = "entry" | "review";
 
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-const createEmptyEntry = (id: string): FormEntry => ({
-  id,
-  spcNo: "",
-  dateFiled: "",
-  raffledToBranch: "",
-  titleNo: "",
-  petitioners: "",
-  nature: "",
-  respondent: "",
-  errors: {},
-  saved: false,
-});
-
-const caseToEntry = (id: string, c: SpecialCase): FormEntry => ({
-  id,
-  spcNo: c.spcNo,
-  dateFiled: c.dateFiled,
-  raffledToBranch: c.raffledToBranch,
-  titleNo: c.titleNo || "",
-  petitioners: c.petitioners,
-  nature: c.nature,
-  respondent: c.respondent,
-  errors: {},
-  saved: false,
-});
-
 const FROZEN_COLS: ColDef[] = [
   {
-    key: "spcNo",
+    key: "caseNumber",
     label: "Case Number",
     placeholder: "SPC-2026-0001",
     type: "text",
@@ -84,7 +44,7 @@ const FROZEN_COLS: ColDef[] = [
     mono: true,
   },
   {
-    key: "dateFiled",
+    key: "date",
     label: "Date Filed",
     placeholder: "",
     type: "date",
@@ -96,7 +56,7 @@ const FROZEN_COLS: ColDef[] = [
 
 const TAB_GROUP_COLS: ColDef[] = [
   {
-    key: "raffledToBranch",
+    key: "raffledTo",
     label: "Branch",
     placeholder: "Branch 1",
     type: "text",
@@ -104,15 +64,7 @@ const TAB_GROUP_COLS: ColDef[] = [
     required: true,
   },
   {
-    key: "titleNo",
-    label: "Title No",
-    placeholder: "T-12345",
-    type: "text",
-    width: 148,
-    mono: true,
-  },
-  {
-    key: "petitioners",
+    key: "petitioner",
     label: "Petitioners",
     placeholder: "Full name of petitioner(s)",
     type: "text",
@@ -137,17 +89,11 @@ const TAB_GROUP_COLS: ColDef[] = [
   },
 ];
 
-const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
-  [
-    "spcNo",
-    "dateFiled",
-    "raffledToBranch",
-    "petitioners",
-    "nature",
-    "respondent",
-  ];
+const REQUIRED_FIELDS: Array<
+  keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
+> = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
 
-function validateEntry(entry: FormEntry): Record<string, string> {
+function validateEntry(entry: SpecialProceedingEntry): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
     if (!entry[k] || String(entry[k]).trim() === "")
@@ -188,25 +134,35 @@ const CellInput = ({
   </div>
 );
 
-function ReviewCard({ entry }: { entry: FormEntry }) {
-  const fmtDate = (d: string) =>
-    d
-      ? new Date(d).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
+const toInputValue = (value: Date | string | null | undefined): string => {
+  if (!value) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value;
+};
+
+function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
+  const fmtDate = (value: Date | string | null | undefined) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="rv-card">
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.spcNo || <span style={{ opacity: 0.4 }}>No SPC No.</span>}
+            {entry.caseNumber || (
+              <span style={{ opacity: 0.4 }}>No Case Number</span>
+            )}
           </div>
           <div className="rv-hero-name">
-            {entry.petitioners || (
+            {entry.petitioner || (
               <span style={{ opacity: 0.4, fontSize: 18 }}>
                 No petitioner entered
               </span>
@@ -215,10 +171,8 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
           {entry.nature && <div className="rv-hero-charge">{entry.nature}</div>}
         </div>
         <div className="rv-hero-badges">
-          {entry.raffledToBranch && (
-            <span className="rv-badge rv-badge-court">
-              {entry.raffledToBranch}
-            </span>
+          {entry.raffledTo && (
+            <span className="rv-badge rv-badge-court">{entry.raffledTo}</span>
           )}
         </div>
       </div>
@@ -232,31 +186,23 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
             </div>
             <div className="rv-grid rv-grid-3">
               <div className="rv-field">
-                <div className="rv-field-label">SPC No.</div>
+                <div className="rv-field-label">Case Number</div>
                 <div className="rv-field-value rv-mono">
-                  {entry.spcNo || <span className="rv-empty">—</span>}
+                  {entry.caseNumber || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Raffled to Branch</div>
                 <div className="rv-field-value">
-                  {entry.raffledToBranch || <span className="rv-empty">—</span>}
+                  {entry.raffledTo || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Date Filed</div>
                 <div className="rv-field-value rv-mono">
-                  {fmtDate(entry.dateFiled) || (
-                    <span className="rv-empty">—</span>
-                  )}
+                  {fmtDate(entry.date) || <span className="rv-empty">—</span>}
                 </div>
               </div>
-              {entry.titleNo && (
-                <div className="rv-field">
-                  <div className="rv-field-label">Title No.</div>
-                  <div className="rv-field-value rv-mono">{entry.titleNo}</div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -269,7 +215,7 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
               <div className="rv-field">
                 <div className="rv-field-label">Petitioners</div>
                 <div className="rv-field-value">
-                  {entry.petitioners || <span className="rv-empty">—</span>}
+                  {entry.petitioner || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
@@ -300,10 +246,10 @@ const SpecialProceedingDrawer = ({
   onUpdate,
 }: {
   type: ModalType;
-  selectedCase?: SpecialCase | null;
+  selectedCase?: SpecialProceeding | null;
   onClose: () => void;
-  onCreate?: (data: SpecialCase) => void;
-  onUpdate?: (data: SpecialCase) => void;
+  onCreate?: (data: SpecialProceeding) => void;
+  onUpdate?: (data: SpecialProceeding) => void;
 }) => {
   const isEdit = type === "EDIT";
   const popup = usePopup();
@@ -311,20 +257,40 @@ const SpecialProceedingDrawer = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const nextTempIdRef = useRef<number>(-1000);
 
-  const [entries, setEntries] = useState<FormEntry[]>(() => {
-    if (isEdit && selectedCase) return [caseToEntry(uid(), selectedCase)];
-    return [createEmptyEntry(uid())];
+  const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
+    if (isEdit && selectedCase) {
+      return [
+        {
+          ...selectedCase,
+          errors: {},
+          collapsed: false,
+          saved: false,
+        },
+      ];
+    }
+    return [
+      {
+        ...createEmptyEntry(),
+        id: nextTempIdRef.current--,
+      },
+    ];
   });
 
   useEffect(() => {
     if (!isEdit) {
-      setEntries([createEmptyEntry(uid())]);
+      setEntries([
+        {
+          ...createEmptyEntry(),
+          id: nextTempIdRef.current--,
+        },
+      ]);
       setStep("entry");
     }
   }, [type, selectedCase, isEdit]);
 
-  const handleChange = (id: string, field: string, value: string) => {
+  const handleChange = (id: number, field: string, value: string) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -335,7 +301,13 @@ const SpecialProceedingDrawer = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
+    setEntries((prev) => [
+      ...prev,
+      {
+        ...createEmptyEntry(),
+        id: nextTempIdRef.current--,
+      },
+    ]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -344,16 +316,16 @@ const SpecialProceedingDrawer = ({
     }, 60);
   }, []);
 
-  const handleRemove = (id: string) =>
+  const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = (id: number) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: FormEntry = {
+    const dup: SpecialProceedingEntry = {
       ...source,
-      id: uid(),
-      spcNo: "",
+      id: nextTempIdRef.current--,
+      caseNumber: "",
       errors: {},
       saved: false,
     };
@@ -367,7 +339,7 @@ const SpecialProceedingDrawer = ({
 
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: string,
+    entryId: number,
     isLastCol: boolean,
   ) => {
     if (e.key === "Tab" && !e.shiftKey && isLastCol) {
@@ -421,12 +393,12 @@ const SpecialProceedingDrawer = ({
       if (isEdit && selectedCase) {
         const e = entries[0];
         const result = await updateSpecialProceeding(selectedCase.id, {
-          caseNumber: e.spcNo,
-          raffledTo: e.raffledToBranch,
-          date: e.dateFiled ? new Date(e.dateFiled) : null,
-          petitioner: e.petitioners,
+          caseNumber: e.caseNumber,
+          raffledTo: e.raffledTo ?? null,
+          date: e.date ? new Date(e.date) : null,
+          petitioner: e.petitioner ?? null,
           nature: e.nature,
-          respondent: e.respondent,
+          respondent: e.respondent ?? null,
         });
         if (!result.success) {
           popup.showError(result.error || "Update failed");
@@ -437,12 +409,12 @@ const SpecialProceedingDrawer = ({
       } else {
         for (const e of entries) {
           const result = await createSpecialProceeding({
-            caseNumber: e.spcNo,
-            raffledTo: e.raffledToBranch,
-            date: e.dateFiled ? new Date(e.dateFiled) : null,
-            petitioner: e.petitioners,
+            caseNumber: e.caseNumber,
+            raffledTo: e.raffledTo ?? null,
+            date: e.date ? new Date(e.date) : null,
+            petitioner: e.petitioner ?? null,
             nature: e.nature,
-            respondent: e.respondent,
+            respondent: e.respondent ?? null,
           });
           if (!result.success) {
             popup.showError(result.error || "Create failed");
@@ -646,7 +618,9 @@ const SpecialProceedingDrawer = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={entry[col.key] as string}
+                                  value={toInputValue(
+                                    entry[col.key] as Date | string | null,
+                                  )}
                                   error={entry.errors[col.key as string]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key as string, v)
@@ -661,7 +635,9 @@ const SpecialProceedingDrawer = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={entry[col.key] as string}
+                                  value={toInputValue(
+                                    entry[col.key] as Date | string | null,
+                                  )}
                                   error={entry.errors[col.key as string]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key as string, v)
