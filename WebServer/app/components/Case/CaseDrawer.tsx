@@ -22,7 +22,13 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
-import { CaseEntry, CaseSchema, caseToEntry, createEmptyEntry } from "./schema";
+import {
+  CaseEntry,
+  CaseSchema,
+  caseToEntry,
+  createEmptyEntry,
+  createTempId,
+} from "./schema";
 
 export enum CaseModalType {
   ADD = "ADD",
@@ -31,18 +37,7 @@ export enum CaseModalType {
 
 type Step = "entry" | "review";
 
-const REQUIRED_FIELDS = [
-  "branch",
-  "assistantBranch",
-  "caseNumber",
-  "dateFiled",
-  "caseType",
-  "name",
-  "charge",
-  "infoSheet",
-  "court",
-  "consolidation",
-] as const;
+const REQUIRED_FIELDS = ["name", "caseNumber", "caseType"] as const;
 
 type ColDef = {
   key: string;
@@ -92,7 +87,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "Branch 1",
         type: "text",
         width: 115,
-        required: true,
       },
       {
         key: "assistantBranch",
@@ -100,7 +94,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "Branch 2",
         type: "text",
         width: 115,
-        required: true,
       },
       {
         key: "dateFiled",
@@ -108,7 +101,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "",
         type: "date",
         width: 148,
-        required: true,
         mono: true,
       },
       {
@@ -125,7 +117,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "IS-001",
         type: "text",
         width: 115,
-        required: true,
       },
       {
         key: "court",
@@ -133,7 +124,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "RTC Br. 1",
         type: "text",
         width: 125,
-        required: true,
       },
       {
         key: "consolidation",
@@ -141,7 +131,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "N/A",
         type: "text",
         width: 135,
-        required: true,
       },
       {
         key: "caseType",
@@ -171,22 +160,20 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "Charge description",
         type: "text",
         width: 210,
-        required: true,
       },
       {
         key: "detained",
         label: "Detained",
-        placeholder: "",
-        type: "checkbox",
+        placeholder: "Yes/No",
+        type: "text",
         width: 88,
       },
       {
         key: "bond",
-        label: "Bond (₱)",
-        placeholder: "0.00",
-        type: "number",
+        label: "Bond",
+        placeholder: "Enter bond amount",
+        type: "text",
         width: 125,
-        mono: true,
       },
       {
         key: "eqcNumber",
@@ -227,7 +214,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "committee1",
         label: "Committee 1",
         placeholder: "—",
-        type: "number",
+        type: "text",
         width: 108,
         mono: true,
       },
@@ -235,7 +222,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "committee2",
         label: "Committee 2",
         placeholder: "—",
-        type: "number",
+        type: "text",
         width: 108,
         mono: true,
       },
@@ -290,7 +277,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "counts",
         label: "Counts",
         placeholder: "0",
-        type: "number",
+        type: "text",
         width: 84,
         mono: true,
       },
@@ -298,7 +285,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "amountInvolved",
         label: "Amt. Involved",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 138,
         mono: true,
       },
@@ -306,7 +293,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "jdf",
         label: "JDF",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -314,7 +301,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "sajj",
         label: "SAJJ",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -322,7 +309,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "sajj2",
         label: "SAJJ 2",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -330,7 +317,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "mf",
         label: "MF",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -338,7 +325,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "stf",
         label: "STF",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -346,7 +333,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "lrf",
         label: "LRF",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -354,7 +341,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "vcf",
         label: "VCF",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 95,
         mono: true,
       },
@@ -362,7 +349,7 @@ const TAB_GROUPS: TabGroup[] = [
         key: "total",
         label: "Total",
         placeholder: "0.00",
-        type: "number",
+        type: "text",
         width: 115,
         mono: true,
       },
@@ -544,9 +531,11 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
         </div>
         <div className="rv-hero-badges">
           <span
-            className={`rv-badge ${entry.detained ? "rv-badge-detained" : "rv-badge-released"}`}
+            className={`rv-badge ${entry.detained && entry.detained.trim() ? "rv-badge-detained" : "rv-badge-released"}`}
           >
-            {entry.detained ? "Detained" : "Released"}
+            {entry.detained && entry.detained.trim()
+              ? entry.detained
+              : "Released"}
           </span>
           {entry.court && (
             <span className="rv-badge rv-badge-court">{entry.court}</span>
@@ -613,12 +602,7 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
               {entry.bond && (
                 <div className="rv-field">
                   <div className="rv-field-label">Bond</div>
-                  <div className="rv-field-value rv-mono">
-                    ₱{" "}
-                    {entry.bond.toLocaleString("en-PH", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </div>
+                  <div className="rv-field-value rv-mono">{entry.bond}</div>
                 </div>
               )}
             </div>
@@ -767,7 +751,7 @@ const NewCaseModal = ({
     if (!source) return;
     const dup: CaseEntry = {
       ...source,
-      id: 0,
+      id: createTempId(),
       caseNumber: "",
       errors: {},
       saved: false,
@@ -854,7 +838,9 @@ const NewCaseModal = ({
         const payload = parsed.data;
         const response = await updateCase(selectedCase.id, {
           ...payload,
-          dateFiled: new Date(payload.dateFiled).toISOString(),
+          dateFiled: payload.dateFiled
+            ? new Date(payload.dateFiled).toISOString()
+            : null,
           raffleDate: payload.raffleDate
             ? new Date(payload.raffleDate).toISOString()
             : null,
@@ -870,7 +856,9 @@ const NewCaseModal = ({
           const payload = parsed.data;
           const response = await createCase({
             ...payload,
-            dateFiled: new Date(payload.dateFiled).toISOString(),
+            dateFiled: payload.dateFiled
+              ? new Date(payload.dateFiled).toISOString()
+              : null,
             raffleDate: payload.raffleDate
               ? new Date(payload.raffleDate).toISOString()
               : null,

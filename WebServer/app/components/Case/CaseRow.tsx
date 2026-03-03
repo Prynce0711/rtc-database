@@ -110,6 +110,7 @@ const CaseRow = ({
       <td className="text-center text-base-content/70 whitespace-nowrap">
         {formatDate(caseItem.dateFiled)}
       </td>
+      <td className="text-center font-medium">{caseItem.caseType}</td>
       <td className="font-medium text-center">{caseItem.name}</td>
       <td className="text-xs text-center">{caseItem.charge}</td>
       <td className="text-center">{caseItem.infoSheet}</td>
@@ -120,12 +121,14 @@ const CaseRow = ({
         <span
           className={`px-3 py-1 rounded-full border text-xs font-medium transition
             ${
-              caseItem.detained
+              caseItem.detained && caseItem.detained.trim()
                 ? "bg-gray-100 text-gray-500 border-gray-200"
                 : "bg-neutral-800 text-white border-neutral-700"
             }`}
         >
-          {caseItem.detained ? "Detained" : "Free"}
+          {caseItem.detained && caseItem.detained.trim()
+            ? caseItem.detained
+            : "Released"}
         </span>
       </td>
 

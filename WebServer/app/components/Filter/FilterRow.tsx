@@ -10,6 +10,7 @@ interface FilterRowProps {
   value: any;
   onToggle: (key: string) => void;
   onChange: (key: string, value: any) => void;
+  onInputChange?: (key: string, value: string) => void;
   focused: boolean;
   onFocus: (key: string) => void;
   onBlur: () => void;
@@ -25,6 +26,7 @@ const FilterRow: React.FC<FilterRowProps> = ({
   value,
   onToggle,
   onChange,
+  onInputChange,
   focused,
   onFocus,
   onBlur,
@@ -76,7 +78,11 @@ const FilterRow: React.FC<FilterRowProps> = ({
                       placeholder={`Enter ${option.label.toLowerCase()}...`}
                       className="input input-bordered w-full"
                       value={(value as string) || ""}
-                      onChange={(e) => onChange(option.key, e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        onChange(option.key, next);
+                        onInputChange?.(option.key, next);
+                      }}
                       onFocus={() => onFocus(option.key)}
                       onBlur={onBlur}
                     />

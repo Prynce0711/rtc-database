@@ -21,7 +21,15 @@ export interface FilterModalProps {
   options: FilterOption[];
   onApply: (filters: FilterValues, exactMatchMap: ExactMatchMap) => void;
   initialValues?: FilterValues;
-  getSuggestions?: (key: string, inputValue: string) => string[];
+  getSuggestions?: (
+    key: string,
+    inputValue: string,
+  ) => Promise<string[]> | string[];
   requestClose?: () => void;
   initialExactMatchMap?: ExactMatchMap;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
 }

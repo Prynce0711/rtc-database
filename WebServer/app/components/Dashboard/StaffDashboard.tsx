@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import { getCases } from "../Case/CasesActions";
+import { getCaseStats, getCases, type CaseStats } from "../Case/CasesActions";
 import { usePopup } from "../Popup/PopupProvider";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
@@ -22,6 +22,7 @@ interface Props {
 
 const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   const [cases, setCases] = useState<Case[]>([]);
+  const [caseStats, setCaseStats] = useState<CaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const statusPopup = usePopup();
@@ -33,14 +34,28 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   const fetchCases = async () => {
     try {
       setLoading(true);
-      const response = await getCases();
+      const [casesRes, statsRes] = await Promise.all([
+        getCases({
+          page: 1,
+          pageSize: 15,
+          sortKey: "dateFiled",
+          sortOrder: "desc",
+        }),
+        getCaseStats(),
+      ]);
 
-      if (!response.success) {
-        statusPopup.showError(response.error || "Failed to fetch cases");
+      if (!casesRes.success) {
+        statusPopup.showError(casesRes.error || "Failed to fetch cases");
         return;
       }
 
-      setCases(response.result);
+      const result = casesRes.result;
+      setCases(result.items);
+      if (statsRes.success && statsRes.result) {
+        setCaseStats(statsRes.result);
+      } else if (!statsRes.success) {
+        console.error("Failed to fetch case stats", statsRes.error);
+      }
       setTimeout(() => setIsVisible(true), 100);
     } catch (err) {
       console.error("Error fetching cases:", err);
@@ -50,9 +65,16 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   };
 
   const stats = useMemo(() => {
-    const total = cases.length;
-    const detained = cases.filter((c) => c.detained).length;
-    const pending = cases.filter((c) => !c.raffleDate).length;
+    const base: CaseStats = caseStats ?? {
+      totalCases: 0,
+      detainedCases: 0,
+      pendingCases: 0,
+      recentlyFiled: 0,
+    };
+
+    const total = base.totalCases;
+    const detained = base.detainedCases;
+    const pending = base.pendingCases;
 
     return {
       total,
@@ -62,7 +84,7 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
       recent: cases.slice(0, 5),
       detainedPercentage: total > 0 ? (detained / total) * 100 : 0,
     };
-  }, [cases]);
+  }, [caseStats, cases]);
 
   if (loading) {
     return (

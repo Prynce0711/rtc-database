@@ -2,7 +2,8 @@
 
 import { useSession } from "@/app/lib/authClient";
 // import { } from "next/navigation";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { isTextFieldKey } from "@/app/lib/utils";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
   FiFileText,
@@ -10,7 +11,7 @@ import {
   FiSearch,
   FiUsers,
 } from "react-icons/fi";
-import type { Case } from "../../generated/prisma/client";
+import type { Case, CaseType } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
 import {
   ExactMatchMap,
@@ -22,33 +23,30 @@ import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import NewCaseModal, { CaseModalType } from "./CaseDrawer";
 import CaseRow from "./CaseRow";
-import { deleteCase, getCases } from "./CasesActions";
+import {
+  deleteCase,
+  getCases,
+  getCaseStats,
+  type CaseFilters,
+} from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
-import { calculateCaseStats, sortCases } from "./Record";
+import { calculateCaseStats, type CaseStats } from "./Record";
 
-type CaseFilterValues = {
-  branch?: string;
-  assistantBranch?: string;
-  caseNumber?: string;
-  caseType?: string;
-  name?: string;
-  charge?: string;
-  infoSheet?: string;
-  court?: string;
-  detained?: boolean;
-  consolidation?: string;
-  eqcNumber?: number;
-  bond?: { min?: number; max?: number };
-  raffleDate?: { start?: string; end?: string };
-  dateFiled?: { start?: string; end?: string };
-};
+type CaseFilterValues = CaseFilters;
 
 const CasePage: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [stats, setStats] = useState<CaseStats>({
+    totalCases: 0,
+    detainedCases: 0,
+    pendingCases: 0,
+    recentlyFiled: 0,
+  });
 
   const session = useSession();
   const isAdminOrAtty =
@@ -57,6 +55,8 @@ const CasePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [caseTypeForImport, setCaseTypeForImport] =
+    useState<CaseType>("UNKNOWN");
   const statusPopup = usePopup();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,7 +66,6 @@ const CasePage: React.FC = () => {
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Case[]>([]);
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const caseFilterOptions: FilterOption[] = [
@@ -80,12 +79,11 @@ const CasePage: React.FC = () => {
     { key: "court", label: "Court", type: "text" },
     { key: "consolidation", label: "Consolidation", type: "text" },
     { key: "eqcNumber", label: "EQC Number", type: "number" },
-    { key: "detained", label: "Detained", type: "checkbox" },
-    { key: "bond", label: "Bond Amount", type: "range" },
+    { key: "detained", label: "Detained", type: "text" },
     { key: "dateFiled", label: "Date Filed", type: "daterange" },
     { key: "raffleDate", label: "Raffle Date", type: "daterange" },
-    { key: "committee1", label: "Committee 1", type: "number" },
-    { key: "committee2", label: "Committee 2", type: "number" },
+    { key: "committee1", label: "Committee 1", type: "text" },
+    { key: "committee2", label: "Committee 2", type: "text" },
     { key: "judge", label: "Judge", type: "text" },
     { key: "ao", label: "AO", type: "text" },
     { key: "complainant", label: "Complainant", type: "text" },
@@ -107,237 +105,116 @@ const CasePage: React.FC = () => {
   ];
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 25;
+  const pageSize = 15;
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, appliedFilters]);
 
-  useEffect(() => {
-    fetchCases();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const fetchCases = useCallback(
+    async (page = currentPage) => {
+      try {
+        setLoading(true);
+        const [casesRes, statsRes] = await Promise.all([
+          getCases({
+            page,
+            pageSize,
+            searchTerm,
+            filters: appliedFilters,
+            sortKey: sortConfig.key,
+            sortOrder: sortConfig.order,
+            exactMatchMap,
+          }),
+          getCaseStats({
+            searchTerm,
+            filters: appliedFilters,
+            exactMatchMap,
+          }),
+        ]);
 
-  const fetchCases = async () => {
-    try {
-      setLoading(true);
-      const response = await getCases();
+        if (!casesRes.success) {
+          statusPopup.showError(casesRes.error || "Failed to fetch cases");
+          return;
+        }
 
-      if (!response.success) {
-        statusPopup.showError(response.error || "Failed to fetch cases");
-        return;
+        const result = casesRes.result;
+        setCases(result.items);
+        setTotalCount(result.total ?? result.items.length);
+        setStats(calculateCaseStats(result.items));
+
+        if (statsRes.success && statsRes.result) {
+          setStats(statsRes.result);
+        } else if (!statsRes.success) {
+          console.error("Failed to fetch case stats", statsRes.error);
+        }
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch cases");
+        console.error("Error fetching cases:", err);
+      } finally {
+        setLoading(false);
       }
+    },
+    [
+      appliedFilters,
+      currentPage,
+      exactMatchMap,
+      pageSize,
+      searchTerm,
+      sortConfig,
+      statusPopup,
+    ],
+  );
 
-      setCases(response.result);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch cases");
-      console.error("Error fetching cases:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchCases(currentPage);
+  }, [fetchCases, currentPage]);
 
-  const stats = useMemo(() => calculateCaseStats(cases), [cases]);
-
-  const filteredAndSortedCases = useMemo(() => {
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : cases;
-
-    let filtered = baseList;
-
-    if (searchTerm) {
-      filtered = baseList.filter((caseItem) =>
-        Object.values(caseItem).some((value) =>
-          value?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
-      );
-    }
-    return sortCases(filtered, sortConfig.key, sortConfig.order);
-  }, [cases, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
-
-  const totalItems = filteredAndSortedCases.length;
+  const totalItems = totalCount;
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
-
-  const paginatedCases = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredAndSortedCases.slice(startIndex, endIndex);
-  }, [filteredAndSortedCases, currentPage, pageSize]);
 
   const handleSort = (key: keyof Case) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
+    setCurrentPage(1);
   };
 
-  const getCaseSuggestions = (key: string, inputValue: string): string[] => {
-    const textFields = [
-      "branch",
-      "assistantBranch",
-      "caseNumber",
-      "caseType",
-      "name",
-      "charge",
-      "infoSheet",
-      "court",
-      "consolidation",
-      "committee1",
-      "committee2",
-      "judge",
-      "ao",
-      "complainant",
-      "houseNo",
-      "street",
-      "barangay",
-      "municipality",
-      "province",
-      "counts",
-      "jdf",
-      "sajj",
-      "sajj2",
-      "mf",
-      "stf",
-      "lrf",
-      "vcf",
-      "total",
-      "amountInvolved",
-    ];
+  const getCaseSuggestions = async (
+    key: string,
+    inputValue: string,
+  ): Promise<string[]> => {
+    const isTextField = isTextFieldKey(
+      caseFilterOptions.reduce(
+        (acc, opt) => {
+          acc[opt.key] = opt.type;
+          return acc;
+        },
+        {} as Record<string, string>,
+      ),
+      key,
+    );
 
-    if (!textFields.includes(key)) return [];
+    if (!isTextField) return [];
 
-    const values = cases
+    const res = await getCases({
+      page: 1,
+      pageSize: 10,
+      filters: { [key]: inputValue } as CaseFilters,
+      exactMatchMap: { [key]: false },
+    });
+
+    if (!res.success || !res.result) return [];
+    const items = Array.isArray(res.result)
+      ? res.result
+      : (res.result.items as Case[]);
+
+    const values = items
       .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
       .filter((v) => v.length > 0);
 
-    const unique = Array.from(new Set(values)).sort();
-
-    if (!inputValue) return unique;
-
-    const lower = inputValue.toLowerCase();
-    return unique.filter((v) => v.toLowerCase().includes(lower));
-  };
-
-  const applyCaseFilters = (
-    filters: CaseFilterValues,
-    items: Case[],
-    exactMatchMap: ExactMatchMap = {},
-  ): Case[] => {
-    return items.filter((caseItem) => {
-      // Helper function to check text match based on exact/partial setting
-      const matchesText = (
-        itemValue: string,
-        filterValue: string,
-        key: string,
-      ): boolean => {
-        const isExact = exactMatchMap[key] ?? true;
-        const itemLower = itemValue.toLowerCase();
-        const filterLower = filterValue.toLowerCase();
-        return isExact
-          ? itemLower === filterLower
-          : itemLower.includes(filterLower);
-      };
-
-      if (
-        filters.branch &&
-        !matchesText(caseItem.branch, filters.branch, "branch")
-      )
-        return false;
-      if (
-        filters.assistantBranch &&
-        !matchesText(
-          caseItem.assistantBranch,
-          filters.assistantBranch,
-          "assistantBranch",
-        )
-      )
-        return false;
-      if (
-        filters.caseNumber &&
-        !matchesText(caseItem.caseNumber, filters.caseNumber, "caseNumber")
-      )
-        return false;
-      if (filters.name && !matchesText(caseItem.name, filters.name, "name"))
-        return false;
-      if (
-        filters.charge &&
-        !matchesText(caseItem.charge, filters.charge, "charge")
-      )
-        return false;
-      if (
-        filters.infoSheet &&
-        !matchesText(caseItem.infoSheet, filters.infoSheet, "infoSheet")
-      )
-        return false;
-      if (filters.court && !matchesText(caseItem.court, filters.court, "court"))
-        return false;
-      if (
-        filters.caseType &&
-        !matchesText(caseItem.caseType, filters.caseType, "caseType")
-      )
-        return false;
-      if (
-        filters.consolidation &&
-        !matchesText(
-          caseItem.consolidation,
-          filters.consolidation,
-          "consolidation",
-        )
-      )
-        return false;
-      if (
-        filters.eqcNumber !== undefined &&
-        caseItem.eqcNumber !== filters.eqcNumber
-      )
-        return false;
-      if (
-        filters.detained !== undefined &&
-        caseItem.detained !== filters.detained
-      )
-        return false;
-
-      if (filters.bond) {
-        if (
-          filters.bond.min !== undefined &&
-          (caseItem.bond === null || caseItem.bond < filters.bond.min)
-        )
-          return false;
-        if (
-          filters.bond.max !== undefined &&
-          (caseItem.bond === null || caseItem.bond > filters.bond.max)
-        )
-          return false;
-      }
-
-      if (filters.dateFiled) {
-        const caseDate = new Date(caseItem.dateFiled);
-        if (
-          filters.dateFiled.start &&
-          caseDate < new Date(filters.dateFiled.start)
-        )
-          return false;
-        if (filters.dateFiled.end && caseDate > new Date(filters.dateFiled.end))
-          return false;
-      }
-
-      if (filters.raffleDate) {
-        if (caseItem.raffleDate === null) return false;
-        const caseDate = new Date(caseItem.raffleDate);
-        if (
-          filters.raffleDate.start &&
-          caseDate < new Date(filters.raffleDate.start)
-        )
-          return false;
-        if (
-          filters.raffleDate.end &&
-          caseDate > new Date(filters.raffleDate.end)
-        )
-          return false;
-      }
-
-      return true;
-    });
+    return Array.from(new Set(values)).sort().slice(0, 10);
   };
 
   const handleApplyFilters = (
@@ -345,10 +222,9 @@ const CasePage: React.FC = () => {
     exactMatchMapParam: ExactMatchMap,
   ) => {
     const typed = filters as CaseFilterValues;
-    const filtered = applyCaseFilters(typed, cases, exactMatchMapParam);
     setAppliedFilters(typed);
-    setFilteredByAdvanced(filtered);
     setExactMatchMap(exactMatchMapParam);
+    setCurrentPage(1);
   };
 
   const handleDeleteCase = async (caseId: number) => {
@@ -375,12 +251,39 @@ const CasePage: React.FC = () => {
 
     setUploading(true);
     try {
-      const result = await uploadExcel(file);
+      const result = await uploadExcel(file, caseTypeForImport);
       if (!result.success) {
         statusPopup.showError(result.error || "Failed to import cases");
       } else {
         statusPopup.showSuccess("Cases imported successfully");
         await fetchCases();
+      }
+
+      // Download failed rows Excel if available
+      if (result.success && result.result) {
+        const { fileName, base64 } = result.result;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        statusPopup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
       }
     } finally {
       setUploading(false);
@@ -456,17 +359,8 @@ const CasePage: React.FC = () => {
           fetchCases();
         }}
         selectedCase={selectedCase}
-        onCreate={(newCase) => {
-          setCases((prev) => [...prev, newCase]);
-          sortCases(cases, sortConfig.key, sortConfig.order);
-        }}
-        onUpdate={(updatedCase) => {
-          setCases((prev) =>
-            prev.map((c) =>
-              c.caseNumber === updatedCase.caseNumber ? updatedCase : c,
-            ),
-          );
-        }}
+        onCreate={() => fetchCases()}
+        onUpdate={() => fetchCases()}
       />
     );
   }
@@ -520,13 +414,32 @@ const CasePage: React.FC = () => {
             </button>
 
             {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? "Importing..." : "Import Excel"}
-              </button>
+              <>
+                <select
+                  value={caseTypeForImport}
+                  onChange={(e) =>
+                    setCaseTypeForImport(e.target.value as CaseType)
+                  }
+                  className="select select-bordered"
+                >
+                  <option value="CRIMINAL">Criminal</option>
+                  <option value="CIVIL">Civil</option>
+                  <option value="LAND_REGISTRATION_CASE">
+                    Land Registration
+                  </option>
+                  <option value="PETITION">Petition</option>
+                  <option value="ELECTION">Election</option>
+                  <option value="SCA">SCA</option>
+                  <option value="UNKNOWN">Unknown</option>
+                </select>
+                <button
+                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? "Importing..." : "Import Excel"}
+                </button>
+              </>
             )}
             {isAdminOrAtty && (
               <button
@@ -654,13 +567,17 @@ const CasePage: React.FC = () => {
                     },
                   ]
                 : []),
-              { key: "branch", label: "Branch", sortable: true },
+              { key: "caseNumber", label: "Case Number", sortable: true },
+              {
+                key: "branch",
+                label: "Branch",
+                sortable: true,
+              },
               {
                 key: "assistantBranch",
                 label: "Assistant Branch",
                 sortable: true,
               },
-              { key: "caseNumber", label: "Case Number", sortable: true },
               { key: "dateFiled", label: "Date Filed", sortable: true },
               { key: "caseType", label: "Case Type", sortable: true },
               { key: "name", label: "Name", sortable: true },
@@ -702,8 +619,9 @@ const CasePage: React.FC = () => {
                 sortable: true,
               },
             ]}
-            data={paginatedCases}
-            rowsPerPage={10}
+            data={cases}
+            rowsPerPage={pageSize}
+            showPagination={false}
             sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
             onSort={(k) => handleSort(k)}
             renderRow={(caseItem) => (

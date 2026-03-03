@@ -75,21 +75,21 @@ enum LogAction {
 model Case {
   id              Int       @id @default(autoincrement())
   caseType        CaseType  @default(UNKNOWN)
-  branch          String
-  assistantBranch String
-  caseNumber      String    @unique
-  dateFiled       DateTime
+  branch          String?   
+  assistantBranch String?
+  caseNumber      String  @unique
+  dateFiled       DateTime?
   name            String
-  charge          String
-  infoSheet       String
-  court           String
-  detained        Boolean
-  consolidation   String
+  charge          String?
+  infoSheet       String?
+  court           String?
+  detained        String?
+  consolidation   String?
   eqcNumber       Int?
-  bond            Float?
+  bond            String?
   raffleDate      DateTime?
-  committee1      Int?
-  committee2      Int?
+  committee1       String?
+  committee2       String?
   judge           String?
   ao              String?
   complainant     String?
@@ -99,15 +99,15 @@ model Case {
   municipality    String?
   province        String?
   counts          String?
-  jdf             Float?
-  sajj            Float?
-  sajj2           Float?
-  mf              Float?
-  stf             Float?
-  lrf             Float?
-  vcf             Float?
-  total           Float?
-  amountInvolved  Float?
+  jdf             String?
+  sajj            String?
+  sajj2           String?
+  mf              String?
+  stf             String?
+  lrf             String?
+  vcf             String?
+  total           String?
+  amountInvolved  String?
   createdAt       DateTime  @default(now())
 }
 

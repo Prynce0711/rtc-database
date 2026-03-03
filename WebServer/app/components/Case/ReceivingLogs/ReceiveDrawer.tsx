@@ -20,6 +20,7 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import { ReceiveLog } from "./ReceiveRecord";
+import { ReceivingLogEntry } from "./schema";
 
 export enum ReceiveDrawerType {
   ADD = "ADD",
@@ -28,39 +29,23 @@ export enum ReceiveDrawerType {
 
 type Step = "entry" | "review";
 
-interface EntryForm {
-  id: string;
-  BookAndPages: string;
-  dateReceived: string;
-  CaseType: string;
-  CaseNo: string;
-  Content: string;
-  BranchNo: string;
-  Time: string;
-  Notes: string;
-  errors: Record<string, string>;
-  saved: boolean;
-}
-
 const today = new Date().toISOString().slice(0, 10);
 
-const emptyEntry = (id: string): EntryForm => ({
+const emptyEntry = (id: number): ReceivingLogEntry => ({
   id,
-  BookAndPages: "",
-  dateReceived: today,
-  CaseType: "UNKNOWN",
-  CaseNo: "",
-  Content: "",
-  BranchNo: "",
-  Time: "",
-  Notes: "",
+  bookAndPage: "",
+  dateRecieved: today,
+  caseType: "UNKNOWN",
+  caseNumber: "",
+  content: "",
+  branchNumber: "",
+  notes: "",
   errors: {},
+  collapsed: false,
   saved: false,
 });
 
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-const REQUIRED_FIELDS = ["BookAndPages", "CaseNo", "dateReceived"] as const;
+const REQUIRED_FIELDS = ["bookAndPage", "caseNumber", "dateRecieved"] as const;
 
 type ColDef = {
   key: string;
@@ -75,7 +60,7 @@ type ColDef = {
 
 const FROZEN_COLS: ColDef[] = [
   {
-    key: "BookAndPages",
+    key: "bookAndPage",
     label: "Book & Pages",
     placeholder: "OR-2026-00001",
     type: "text",
@@ -84,7 +69,7 @@ const FROZEN_COLS: ColDef[] = [
     mono: true,
   },
   {
-    key: "dateReceived",
+    key: "dateRecieved",
     label: "Date Received",
     placeholder: "",
     type: "date",
@@ -120,15 +105,7 @@ const TAB_GROUPS: TabGroup[] = [
     label: "Document Info",
     cols: [
       {
-        key: "Time",
-        label: "Time",
-        placeholder: "",
-        type: "time",
-        width: 120,
-        mono: true,
-      },
-      {
-        key: "CaseType",
+        key: "caseType",
         label: "Case Type",
         placeholder: "",
         type: "select",
@@ -136,7 +113,7 @@ const TAB_GROUPS: TabGroup[] = [
         options: CASE_TYPE_OPTIONS,
       },
       {
-        key: "CaseNo",
+        key: "caseNumber",
         label: "Case No",
         placeholder: "Crim-2026-0001",
         type: "text",
@@ -145,21 +122,21 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
-        key: "BranchNo",
+        key: "branchNumber",
         label: "Branch No",
         placeholder: "Branch 1",
         type: "text",
         width: 140,
       },
       {
-        key: "Content",
+        key: "content",
         label: "Content",
         placeholder: "Short description",
         type: "text",
         width: 260,
       },
       {
-        key: "Notes",
+        key: "notes",
         label: "Notes",
         placeholder: "Optional notes",
         type: "text",
@@ -169,7 +146,7 @@ const TAB_GROUPS: TabGroup[] = [
   },
 ];
 
-function validateEntry(entry: EntryForm): Record<string, string> {
+function validateEntry(entry: ReceivingLogEntry): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
     if (!entry[k] || String(entry[k]).trim() === "") errs[k] = "Required";
@@ -228,8 +205,8 @@ const CellInput = ({
 );
 
 /* ─── Review Card ────────────────────────────────────────────── */
-function ReviewCard({ entry }: { entry: EntryForm }) {
-  const fmtDate = (d: string) =>
+function ReviewCard({ entry }: { entry: ReceivingLogEntry }) {
+  const fmtDate = (d: Date | string | null) =>
     d
       ? new Date(d).toLocaleDateString("en-PH", {
           year: "numeric",
@@ -243,24 +220,26 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.BookAndPages || (
+            {entry.bookAndPage || (
               <span style={{ opacity: 0.4 }}>No Book & Pages</span>
             )}
           </div>
           <div className="rv-hero-name">
-            {entry.CaseNo || (
+            {entry.caseNumber || (
               <span style={{ opacity: 0.4, fontSize: 18 }}>
                 No case no. entered
               </span>
             )}
           </div>
-          {entry.Content && (
-            <div className="rv-hero-charge">{entry.Content}</div>
+          {entry.content && (
+            <div className="rv-hero-charge">{entry.content}</div>
           )}
         </div>
         <div className="rv-hero-badges">
-          {entry.BranchNo && (
-            <span className="rv-badge rv-badge-court">{entry.BranchNo}</span>
+          {entry.branchNumber && (
+            <span className="rv-badge rv-badge-court">
+              {entry.branchNumber}
+            </span>
           )}
         </div>
       </div>
@@ -276,28 +255,22 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
               <div className="rv-field">
                 <div className="rv-field-label">Book & Pages</div>
                 <div className="rv-field-value rv-mono">
-                  {entry.BookAndPages || <span className="rv-empty">—</span>}
+                  {entry.bookAndPage || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Date Received</div>
                 <div className="rv-field-value rv-mono">
-                  {fmtDate(entry.dateReceived) || (
+                  {fmtDate(entry.dateRecieved) || (
                     <span className="rv-empty">—</span>
                   )}
                 </div>
               </div>
-              {entry.Time && (
+              {entry.caseType && (
                 <div className="rv-field">
-                  <div className="rv-field-label">Time</div>
-                  <div className="rv-field-value rv-mono">{entry.Time}</div>
-                </div>
-              )}
-              {entry.CaseType && (
-                <div className="rv-field">
-                  <div className="rv-field-label">Case Type</div>
+                  <div className="rv-label">Case Type</div>
                   <div className="rv-field-value">
-                    {getCaseTypeLabel(entry.CaseType)}
+                    {getCaseTypeLabel(entry.caseType)}
                   </div>
                 </div>
               )}
@@ -313,25 +286,25 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
               <div className="rv-field">
                 <div className="rv-field-label">Case No</div>
                 <div className="rv-field-value rv-mono">
-                  {entry.CaseNo || <span className="rv-empty">—</span>}
+                  {entry.caseNumber || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
                 <div className="rv-field-label">Branch No</div>
                 <div className="rv-field-value">
-                  {entry.BranchNo || <span className="rv-empty">—</span>}
+                  {entry.branchNumber || <span className="rv-empty">—</span>}
                 </div>
               </div>
-              {entry.Content && (
+              {entry.content && (
                 <div className="rv-field">
-                  <div className="rv-field-label">Content</div>
-                  <div className="rv-field-value">{entry.Content}</div>
+                  <div className="rv-label">Content</div>
+                  <div className="rv-field-value">{entry.content}</div>
                 </div>
               )}
-              {entry.Notes && (
+              {entry.notes && (
                 <div className="rv-field">
-                  <div className="rv-field-label">Notes</div>
-                  <div className="rv-field-value">{entry.Notes}</div>
+                  <div className="rv-label">Notes</div>
+                  <div className="rv-field-value">{entry.notes}</div>
                 </div>
               )}
             </div>
@@ -363,39 +336,41 @@ const ReceiveDrawer = ({
   const [activeTab, setActiveTab] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const nextTempIdRef = useRef<number>(-1000);
 
-  const makeFromLog = (log: any): EntryForm => ({
-    id: uid(),
-    BookAndPages: log.BookAndPages ?? log.receiptNo ?? "",
-    dateReceived: log.dateReceived
-      ? String(log.dateReceived).slice(0, 10)
-      : today,
-    CaseType: log.caseType ?? log.Abbreviation ?? "UNKNOWN",
-    CaseNo: log["Case No"] ?? log.caseNumber ?? "",
-    Content: log.Content ?? "",
-    BranchNo: log["Branch No"] ?? log.branch ?? "",
-    Time: log.Time ?? log.timeReceived ?? "",
-    Notes: log.Notes ?? log.remarks ?? "",
+  const makeFromLog = (log: any): ReceivingLogEntry => ({
+    id: log.id ?? nextTempIdRef.current--,
+    bookAndPage: log.bookAndPage ?? log.BookAndPages ?? log.receiptNo ?? "",
+    dateRecieved:
+      (log.dateRecieved ?? log.dateReceived)
+        ? String(log.dateRecieved ?? log.dateReceived).slice(0, 10)
+        : today,
+    caseType: log.caseType ?? log.CaseType ?? log.Abbreviation ?? "UNKNOWN",
+    caseNumber: log.caseNumber ?? log["Case No"] ?? "",
+    content: log.content ?? log.Content ?? "",
+    branchNumber: log.branchNumber ?? log["Branch No"] ?? log.branch ?? "",
+    notes: log.notes ?? log.Notes ?? log.remarks ?? "",
     errors: {},
+    collapsed: false,
     saved: false,
   });
 
-  const [entries, setEntries] = useState<EntryForm[]>(() => {
+  const [entries, setEntries] = useState<ReceivingLogEntry[]>(() => {
     if (isEdit && selectedLog) return [makeFromLog(selectedLog)];
-    return [emptyEntry(uid())];
+    return [emptyEntry(nextTempIdRef.current--)];
   });
 
   useEffect(() => {
     if (isEdit && selectedLog) {
       setEntries([makeFromLog(selectedLog)]);
     } else if (!isEdit) {
-      setEntries([emptyEntry(uid())]);
+      setEntries([emptyEntry(nextTempIdRef.current--)]);
     }
     setStep("entry");
     setActiveTab(0);
   }, [type, selectedLog]);
 
-  const handleChange = (id: string, field: string, value: string) => {
+  const handleChange = (id: number, field: string, value: string) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -406,7 +381,7 @@ const ReceiveDrawer = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, emptyEntry(uid())]);
+    setEntries((prev) => [...prev, emptyEntry(nextTempIdRef.current--)]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -415,16 +390,16 @@ const ReceiveDrawer = ({
     }, 60);
   }, []);
 
-  const handleRemove = (id: string) =>
+  const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = (id: number) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: EntryForm = {
+    const dup: ReceivingLogEntry = {
       ...source,
-      id: uid(),
-      BookAndPages: "",
+      id: nextTempIdRef.current--,
+      bookAndPage: "",
       errors: {},
       saved: false,
     };
@@ -438,7 +413,7 @@ const ReceiveDrawer = ({
 
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: string,
+    entryId: number,
     isLastColOfTab: boolean,
   ) => {
     if (e.key === "Tab" && !e.shiftKey && isLastColOfTab) {
@@ -482,15 +457,14 @@ const ReceiveDrawer = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (e: EntryForm) => ({
-    BookAndPages: e.BookAndPages,
-    dateReceived: e.dateReceived,
-    caseType: e.CaseType || "UNKNOWN",
-    "Case No": e.CaseNo,
-    Content: e.Content || null,
-    "Branch No": e.BranchNo || null,
-    Time: e.Time || null,
-    Notes: e.Notes || null,
+  const buildPayload = (e: ReceivingLogEntry) => ({
+    bookAndPage: e.bookAndPage,
+    dateRecieved: e.dateRecieved,
+    caseType: e.caseType || "UNKNOWN",
+    caseNumber: e.caseNumber,
+    content: e.content || null,
+    branchNumber: e.branchNumber || null,
+    notes: e.notes || null,
   });
 
   const handleSubmit = async () => {
@@ -885,10 +859,10 @@ const ReceiveDrawer = ({
                         <span className="rv-sidebar-num">{idx + 1}</span>
                         <div className="rv-sidebar-info">
                           <div className="rv-sidebar-casenum">
-                            {entry.BookAndPages || "No book & pages"}
+                            {entry.bookAndPage || "No book & pages"}
                           </div>
                           <div className="rv-sidebar-name">
-                            {entry.CaseNo || "No case no."}
+                            {entry.caseNumber || "No case no."}
                           </div>
                         </div>
                       </button>

@@ -19,8 +19,8 @@ function ExpandableContent({
   const isLong = text.length > maxChars;
   const short = isLong ? text.slice(0, maxChars).trimEnd() + "…" : text;
   return (
-    <div className="max-w-[180px] mx-auto text-sm">
-      <div className="break-words" title={text} aria-expanded={expanded}>
+    <div className="max-w-45 mx-auto text-sm">
+      <div className="wrap-break-word" title={text} aria-expanded={expanded}>
         {expanded ? text : short}
       </div>
       {isLong && (
@@ -225,7 +225,7 @@ const ReceiveRow = ({
               </div>
               <div className="col-span-2">
                 <div className="font-semibold">Content</div>
-                <div className="whitespace-pre-line break-words text-base-content/90 mt-1">
+                <div className="whitespace-pre-line wrap-break-word text-base-content/90 mt-1">
                   {content}
                 </div>
               </div>
@@ -239,7 +239,7 @@ const ReceiveRow = ({
               </div>
               <div className="col-span-2">
                 <div className="font-semibold">Notes</div>
-                <div className="whitespace-pre-line break-words text-base-content/90 mt-1">
+                <div className="whitespace-pre-line wrap-break-word text-base-content/90 mt-1">
                   {notes}
                 </div>
               </div>

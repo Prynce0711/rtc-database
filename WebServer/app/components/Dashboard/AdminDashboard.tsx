@@ -1,7 +1,11 @@
 "use client";
 
 import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
-import { getCases } from "@/app/components/Case/CasesActions";
+import {
+  getCaseStats,
+  getCases,
+  type CaseStats,
+} from "@/app/components/Case/CasesActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
@@ -68,6 +72,7 @@ interface AuditLog {
 const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<Case[]>([]);
+  const [caseStats, setCaseStats] = useState<CaseStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
@@ -81,12 +86,23 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   useEffect(() => {
     async function fetchAll() {
       try {
-        const [c, e, a] = await Promise.all([
-          getCases(),
+        const [c, s, e, a] = await Promise.all([
+          getCases({
+            page: 1,
+            pageSize: 20,
+            sortKey: "dateFiled",
+            sortOrder: "desc",
+          }),
+          getCaseStats(),
           getEmployees(),
           getAccounts(),
         ]);
-        if (c.success) setCases(c.result);
+
+        if (c.success) {
+          const result = c.result;
+          setCases(result.items);
+        }
+        if (s.success && s.result) setCaseStats(s.result);
         if (e.success) setEmployees(e.result);
         if (a.success) setAccounts(a.result);
         setTimeout(() => setIsVisible(true), 100);
@@ -98,37 +114,29 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   const stats = useMemo(() => {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const totalCases = cases.length;
-    const detained = cases.filter((c) => c.detained).length;
-    const pendingRaffle = cases.filter((c) => !c.raffleDate).length;
-    const casesThisMonth = cases.filter(
-      (c) => new Date(c.dateFiled) >= thirtyDaysAgo,
-    ).length;
-    const casesLastMonth = cases.filter((c) => {
-      const date = new Date(c.dateFiled);
-      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-      return date >= sixtyDaysAgo && date < thirtyDaysAgo;
-    }).length;
+    const base: CaseStats = caseStats ?? {
+      totalCases: 0,
+      detainedCases: 0,
+      pendingCases: 0,
+      recentlyFiled: 0,
+    };
+
+    const totalCases = base.totalCases;
+    const detained = base.detainedCases;
+    const pendingRaffle = base.pendingCases;
+    const casesThisMonth = base.recentlyFiled;
+    const caseGrowth = 0; // Not available from aggregated stats; keeping neutral.
 
     const activeAccounts = accounts.filter((a) => a.status === "ACTIVE").length;
     const inactiveAccounts = accounts.filter(
       (a) => a.status === "INACTIVE",
     ).length;
-    const caseGrowth =
-      casesLastMonth > 0
-        ? ((casesThisMonth - casesLastMonth) / casesLastMonth) * 100
-        : 0;
 
     return {
       totalCases,
       detained,
       pendingRaffle,
-      activeCases:
-        totalCases -
-        cases.filter((c) => c.raffleDate && new Date(c.raffleDate) < now)
-          .length,
+      activeCases: totalCases - pendingRaffle,
       employees: employees.length,
       employeesMissing: employees.filter(
         (e) => !e.bloodType || !e.contactPerson,
@@ -140,7 +148,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       caseGrowth,
       detainedPercentage: totalCases > 0 ? (detained / totalCases) * 100 : 0,
     };
-  }, [cases, employees, accounts]);
+  }, [accounts, caseStats, employees]);
 
   const alerts = useMemo((): Alert[] => {
     const alertList: Alert[] = [];
@@ -175,7 +183,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         action: "Case Created",
         user: "Admin User",
         details: `Case ${c.caseNumber} filed`,
-        timestamp: new Date(c.dateFiled),
+        timestamp: new Date(c.dateFiled || Date.now()),
         type: "create",
       });
     });
@@ -218,10 +226,13 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       monthMap[key] = { cases: 0 };
     }
     cases.forEach((c) => {
-      const key = new Date(c.dateFiled).toLocaleString("default", {
-        month: "short",
-        year: "2-digit",
-      });
+      const key = new Date(c.dateFiled || Date.now()).toLocaleString(
+        "default",
+        {
+          month: "short",
+          year: "2-digit",
+        },
+      );
       if (monthMap[key]) monthMap[key].cases++;
     });
     return Object.entries(monthMap).map(([month, data]) => ({
@@ -257,9 +268,9 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   }, [currentDate]);
 
   const dataQuality = useMemo(() => {
-    const totalRecords = cases.length + employees.length + accounts.length;
+    const totalRecords = stats.totalCases + employees.length + accounts.length;
     const incompleteRecords =
-      cases.filter((c) => !c.branch || !c.raffleDate).length +
+      stats.pendingRaffle +
       stats.employeesMissing +
       accounts.filter((a) => !a.email).length;
     return {

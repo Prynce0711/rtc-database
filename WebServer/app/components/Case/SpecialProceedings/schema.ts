@@ -13,7 +13,12 @@ export const SpecialProceedingSchema = z.object({
 export type SpecialProceedingSchema = z.infer<typeof SpecialProceedingSchema>;
 
 /** Form entry used by the grid UI (SpecialProceeding + UI metadata). */
-export type SpecialProceedingEntry = SpecialProceeding & {
+export type SpecialProceedingEntry = Omit<
+  SpecialProceeding,
+  "date" | "createdAt"
+> & {
+  date: string | Date | null;
+  createdAt?: Date;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
