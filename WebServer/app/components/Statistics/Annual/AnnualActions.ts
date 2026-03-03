@@ -127,16 +127,16 @@ export async function createLog(
   }
 }
 
-// ─── AnnualTrialCourt (CaseSchema) ───────────────────────────────────────────
+// ─── RegionalTrialCourt (RTC) ───────────────────────────────────────────────
 
-export async function getAnnualTrialCourts(): Promise<
+export async function getRegionalTrialCourts(): Promise<
   ActionResult<CaseSchema[]>
 > {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const records = await prisma.annualTrialCourt.findMany();
+    const records = await prisma.regionalTrialCourt.findMany();
     return {
       success: true,
       result: records.map((r) => ({
@@ -149,12 +149,12 @@ export async function getAnnualTrialCourts(): Promise<
       })) as CaseSchema[],
     };
   } catch (error) {
-    console.error("Error fetching annual trial courts:", error);
-    return { success: false, error: "Failed to fetch annual trial courts" };
+    console.error("Error fetching regional trial courts:", error);
+    return { success: false, error: "Failed to fetch regional trial courts" };
   }
 }
 
-export async function createAnnualTrialCourt(
+export async function createRegionalTrialCourt(
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
   try {
@@ -166,7 +166,7 @@ export async function createAnnualTrialCourt(
       throw new Error("Invalid data: " + prettifyError(validation.error));
     }
 
-    const record = await prisma.annualTrialCourt.create({
+    const record = await prisma.regionalTrialCourt.create({
       data: {
         branch: validation.data.branch,
         pendingLastYear: validation.data.pendingLastYear?.toString(),
@@ -189,12 +189,12 @@ export async function createAnnualTrialCourt(
       } as CaseSchema,
     };
   } catch (error) {
-    console.error("Error creating annual trial court:", error);
-    return { success: false, error: "Failed to create annual trial court" };
+    console.error("Error creating regional trial court:", error);
+    return { success: false, error: "Failed to create regional trial court" };
   }
 }
 
-export async function updateAnnualTrialCourt(
+export async function updateRegionalTrialCourt(
   id: number,
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
@@ -207,7 +207,7 @@ export async function updateAnnualTrialCourt(
       throw new Error("Invalid data: " + prettifyError(validation.error));
     }
 
-    const record = await prisma.annualTrialCourt.update({
+    const record = await prisma.regionalTrialCourt.update({
       where: { id },
       data: {
         branch: validation.data.branch,
@@ -231,23 +231,147 @@ export async function updateAnnualTrialCourt(
       } as CaseSchema,
     };
   } catch (error) {
-    console.error("Error updating annual trial court:", error);
-    return { success: false, error: "Failed to update annual trial court" };
+    console.error("Error updating regional trial court:", error);
+    return { success: false, error: "Failed to update regional trial court" };
   }
 }
 
-export async function deleteAnnualTrialCourt(
+export async function deleteRegionalTrialCourt(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    await prisma.annualTrialCourt.delete({ where: { id } });
+    await prisma.regionalTrialCourt.delete({ where: { id } });
     return { success: true, result: undefined };
   } catch (error) {
-    console.error("Error deleting annual trial court:", error);
-    return { success: false, error: "Failed to delete annual trial court" };
+    console.error("Error deleting regional trial court:", error);
+    return { success: false, error: "Failed to delete regional trial court" };
+  }
+}
+
+// ─── MunicipalTrialCourt (MTC) ──────────────────────────────────────────────
+
+export async function getMunicipalTrialCourts(): Promise<
+  ActionResult<CaseSchema[]>
+> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) return sessionValidation;
+
+    const records = await prisma.municipalTrialCourt.findMany();
+    return {
+      success: true,
+      result: records.map((r) => ({
+        ...r,
+        pendingLastYear: r.pendingLastYear ?? undefined,
+        RaffledOrAdded: r.RaffledOrAdded ?? undefined,
+        Disposed: r.Disposed ?? undefined,
+        pendingThisYear: r.pendingThisYear ?? undefined,
+        percentageOfDisposition: r.percentageOfDisposition ?? undefined,
+      })) as CaseSchema[],
+    };
+  } catch (error) {
+    console.error("Error fetching municipal trial courts:", error);
+    return { success: false, error: "Failed to fetch municipal trial courts" };
+  }
+}
+
+export async function createMunicipalTrialCourt(
+  data: CaseSchema,
+): Promise<ActionResult<CaseSchema>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) return sessionValidation;
+
+    const validation = CaseSchema.safeParse(data);
+    if (!validation.success) {
+      throw new Error("Invalid data: " + prettifyError(validation.error));
+    }
+
+    const record = await prisma.municipalTrialCourt.create({
+      data: {
+        branch: validation.data.branch,
+        pendingLastYear: validation.data.pendingLastYear?.toString(),
+        RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
+        Disposed: validation.data.Disposed?.toString(),
+        pendingThisYear: validation.data.pendingThisYear?.toString(),
+        percentageOfDisposition:
+          validation.data.percentageOfDisposition?.toString(),
+      },
+    });
+    return {
+      success: true,
+      result: {
+        ...record,
+        pendingLastYear: record.pendingLastYear ?? undefined,
+        RaffledOrAdded: record.RaffledOrAdded ?? undefined,
+        Disposed: record.Disposed ?? undefined,
+        pendingThisYear: record.pendingThisYear ?? undefined,
+        percentageOfDisposition: record.percentageOfDisposition ?? undefined,
+      } as CaseSchema,
+    };
+  } catch (error) {
+    console.error("Error creating municipal trial court:", error);
+    return { success: false, error: "Failed to create municipal trial court" };
+  }
+}
+
+export async function updateMunicipalTrialCourt(
+  id: number,
+  data: CaseSchema,
+): Promise<ActionResult<CaseSchema>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) return sessionValidation;
+
+    const validation = CaseSchema.safeParse(data);
+    if (!validation.success) {
+      throw new Error("Invalid data: " + prettifyError(validation.error));
+    }
+
+    const record = await prisma.municipalTrialCourt.update({
+      where: { id },
+      data: {
+        branch: validation.data.branch,
+        pendingLastYear: validation.data.pendingLastYear?.toString(),
+        RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
+        Disposed: validation.data.Disposed?.toString(),
+        pendingThisYear: validation.data.pendingThisYear?.toString(),
+        percentageOfDisposition:
+          validation.data.percentageOfDisposition?.toString(),
+      },
+    });
+    return {
+      success: true,
+      result: {
+        ...record,
+        pendingLastYear: record.pendingLastYear ?? undefined,
+        RaffledOrAdded: record.RaffledOrAdded ?? undefined,
+        Disposed: record.Disposed ?? undefined,
+        pendingThisYear: record.pendingThisYear ?? undefined,
+        percentageOfDisposition: record.percentageOfDisposition ?? undefined,
+      } as CaseSchema,
+    };
+  } catch (error) {
+    console.error("Error updating municipal trial court:", error);
+    return { success: false, error: "Failed to update municipal trial court" };
+  }
+}
+
+export async function deleteMunicipalTrialCourt(
+  id: number,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) return sessionValidation;
+
+    await prisma.municipalTrialCourt.delete({ where: { id } });
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error deleting municipal trial court:", error);
+    return { success: false, error: "Failed to delete municipal trial court" };
   }
 }
 
