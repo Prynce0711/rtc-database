@@ -261,9 +261,9 @@ model Notarial {
   name      String
   attorney  String
   createdAt DateTime @default(now())
-  date     DateTime
+  date      DateTime
 
-  file           NotarialFile? @relation(fields: [fileId], references: [id])
+  file   NotarialFile? @relation(fields: [fileId], references: [id])
   fileId Int?
 }
 
@@ -276,4 +276,50 @@ model NotarialFile {
   createdAt DateTime @default(now())
 
   notarials Notarial[]
+}
+
+model RegionalTrialCourt {
+  id                      Int     @id @default(autoincrement())
+  branch                  String
+  pendingLastYear         String?
+  RaffledOrAdded          String?
+  Disposed                String?
+  pendingThisYear         String?
+  percentageOfDisposition String?
+}
+
+model MunicipalTrialCourt {
+  id                      Int     @id @default(autoincrement())
+  branch                  String
+  pendingLastYear         String?
+  RaffledOrAdded          String?
+  Disposed                String?
+  pendingThisYear         String?
+  percentageOfDisposition String?
+}
+
+model InventoryDocument {
+  id                       Int      @id @default(autoincrement())
+  region                   String
+  province                 String
+  court                    String
+  cityMunicipality         String
+  branch                   String
+  civilSmallClaimsFiled    String?
+  criminalCasesFiled       String?
+  civilSmallClaimsDisposed String?
+  criminalCasesDisposed    String?
+  dateRecorded             DateTime @default(now())
+}
+
+model monthlyStatistics {
+  id       Int    @id @default(autoincrement())
+  month    String // YYYY-MM
+  category String
+  branch   String
+  criminal Int    @default(0)
+  civil    Int    @default(0)
+  total    Int    @default(0)
+
+  @@unique([month, category, branch])
 }

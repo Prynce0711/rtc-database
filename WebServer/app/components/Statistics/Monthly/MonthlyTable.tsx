@@ -1,19 +1,18 @@
 "use client";
 
 import React, { useMemo } from "react";
-import type { MonthlyRow } from "./types";
+import type { MonthlyRow } from "./Schema";
+
+// (No JSX global augmentation needed here.)
 
 interface MonthlyTableProps {
   data: MonthlyRow[];
+  onViewData?: () => void;
 }
 
-const CATEGORY_BADGE: Record<string, { dot: string; bg: string }> = {
-  "New Cases Filed": { dot: "bg-info", bg: "bg-info/10 text-info" },
-  "Cases Disposed": { dot: "bg-success", bg: "bg-success/10 text-success" },
-  "Pending Cases": { dot: "bg-warning", bg: "bg-warning/10 text-warning" },
-};
+import { CATEGORY_BADGE } from "./MonthlyUtils";
 
-const MonthlyTable: React.FC<MonthlyTableProps> = ({ data }) => {
+const MonthlyTable: React.FC<MonthlyTableProps> = ({ data, onViewData }) => {
   const grouped = useMemo(() => {
     const map = new Map<string, MonthlyRow[]>();
     data.forEach((r) => {
@@ -33,7 +32,11 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({ data }) => {
   );
 
   return (
-    <div className="bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden">
+    <div
+      className={`bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden${onViewData ? " cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all" : ""}`}
+      onClick={onViewData}
+      title={onViewData ? "Click to view detailed report" : undefined}
+    >
       <div className="overflow-x-auto">
         <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
           {/* ── Column widths ── */}
@@ -112,7 +115,7 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({ data }) => {
                           <td className="px-5 py-3 text-center tabular-nums text-base">
                             {row.civil.toLocaleString()}
                           </td>
-                          <td className="px-5 py-3 text-center tabular-nums text-base font-semibold bg-base-content/[0.02]">
+                          <td className="px-5 py-3 text-center tabular-nums text-base font-semibold bg-base-content/2">
                             {row.total.toLocaleString()}
                           </td>
                         </tr>

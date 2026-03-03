@@ -1,10 +1,10 @@
 "use client";
 
 import {
-    createAnnualTrialCourt,
-    deleteAnnualTrialCourt,
-    getAnnualTrialCourts,
-    updateAnnualTrialCourt,
+    createMunicipalTrialCourt,
+    deleteMunicipalTrialCourt,
+    getMunicipalTrialCourts,
+    updateMunicipalTrialCourt,
 } from "@/app/components/Statistics/Annual/AnnualActions";
 import { CaseSchema } from "@/app/components/Statistics/Annual/Schema";
 import { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ const MTC = () => {
   const [records, setRecords] = useState<CourtLog[]>([]);
 
   async function loadRecords() {
-    const result = await getAnnualTrialCourts();
+    const result = await getMunicipalTrialCourts();
     if (result.success) setRecords(result.result as unknown as CourtLog[]);
   }
 
@@ -30,17 +30,17 @@ const MTC = () => {
   }, []);
 
   const handleAdd = async (record: Record<string, unknown>) => {
-    await createAnnualTrialCourt(record as CaseSchema);
+    await createMunicipalTrialCourt(record as CaseSchema);
     await loadRecords();
   };
 
   const handleUpdate = async (record: Record<string, unknown>) => {
-    await updateAnnualTrialCourt(record.id as number, record as CaseSchema);
+    await updateMunicipalTrialCourt(record.id as number, record as CaseSchema);
     await loadRecords();
   };
 
   const handleDelete = async (id: number) => {
-    await deleteAnnualTrialCourt(id);
+    await deleteMunicipalTrialCourt(id);
     await loadRecords();
   };
 

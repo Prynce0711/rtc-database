@@ -31,6 +31,15 @@ export const CaseSchema = z.object({
 });
 export type CaseSchema = z.infer<typeof CaseSchema>;
 
+// Backwards-compatible named schemas for separated models
+export const RegionalTrialCourtSchema = CaseSchema;
+export type RegionalTrialCourtSchema = z.infer<typeof RegionalTrialCourtSchema>;
+
+export const MunicipalTrialCourtSchema = CaseSchema;
+export type MunicipalTrialCourtSchema = z.infer<
+  typeof MunicipalTrialCourtSchema
+>;
+
 export const InventoryDocumentSchema = z.object({
   id: z.number().int().optional(),
   region: z.string().min(1, "Region is required"),

@@ -1,18 +1,18 @@
 ﻿"use client";
 
 import {
-    createAnnualTrialCourt,
-    createInventoryDocument,
-    deleteAnnualTrialCourt,
-    deleteInventoryDocument,
-    getAnnualTrialCourts,
-    getInventoryDocuments,
-    updateAnnualTrialCourt,
-    updateInventoryDocument,
+  createInventoryDocument,
+  createRegionalTrialCourt,
+  deleteInventoryDocument,
+  deleteRegionalTrialCourt,
+  getInventoryDocuments,
+  getRegionalTrialCourts,
+  updateInventoryDocument,
+  updateRegionalTrialCourt,
 } from "@/app/components/Statistics/Annual/AnnualActions";
 import {
-    CaseSchema,
-    InventoryDocumentSchema,
+  CaseSchema,
+  InventoryDocumentSchema,
 } from "@/app/components/Statistics/Annual/Schema";
 import { useEffect, useState } from "react";
 
@@ -65,7 +65,7 @@ export default function StatisticsTester() {
   // ── Loaders ──────────────────────────────────────────────────────────────
   async function loadAnnualRecords() {
     setLoading(true);
-    const result = await getAnnualTrialCourts();
+    const result = await getRegionalTrialCourts();
     if (result.success) {
       setAnnualRecords(result.result);
       setMessage({
@@ -116,7 +116,7 @@ export default function StatisticsTester() {
     try {
       let result;
       if (isEditingAnnual && editingAnnualId) {
-        result = await updateAnnualTrialCourt(editingAnnualId, annualForm);
+        result = await updateRegionalTrialCourt(editingAnnualId, annualForm);
         if (result.success) {
           setMessage({
             type: "success",
@@ -124,7 +124,7 @@ export default function StatisticsTester() {
           });
         }
       } else {
-        result = await createAnnualTrialCourt(annualForm);
+        result = await createRegionalTrialCourt(annualForm);
         if (result.success) {
           setMessage({
             type: "success",
@@ -171,7 +171,7 @@ export default function StatisticsTester() {
   const handleAnnualDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
     setLoading(true);
-    const result = await deleteAnnualTrialCourt(id);
+    const result = await deleteRegionalTrialCourt(id);
     if (result.success) {
       setMessage({ type: "success", text: "Record deleted successfully" });
       await loadAnnualRecords();
