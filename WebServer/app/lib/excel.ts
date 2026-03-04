@@ -1,3 +1,7 @@
+import * as XLSX from "xlsx";
+import z, { prettifyError } from "zod";
+import ActionResult from "../components/ActionResult";
+
 export type ExportExcelData = {
   fileName: string;
   base64: string;
@@ -13,6 +17,31 @@ export const excelDateToJSDate = (serial: number): Date => {
     dateInfo.getMonth(),
     dateInfo.getDate(),
   );
+};
+
+// Helper function to validate that a date is reasonable (between 1900 and 2100)
+export function isValidDate(date: Date): boolean {
+  const year = date.getFullYear();
+  return year >= 1900 && year <= 2100;
+}
+
+export const hasContent = (val: unknown) => {
+  if (val === undefined || val === null) return false;
+  if (typeof val === "string") return val.trim() !== "";
+  return true;
+};
+
+export const isMappedRowEmpty = <
+  T extends Record<string, unknown>,
+  K extends keyof T = keyof T,
+>(
+  cells: T,
+  ignoreKeys: K[] = [],
+): boolean => {
+  const values = Object.entries(cells)
+    .filter(([key]) => !ignoreKeys.includes(key as K))
+    .map(([, value]) => value);
+  return !values.some(hasContent);
 };
 
 // Helper to generate variations with periods after words
@@ -44,7 +73,10 @@ const generatePeriodVariations = (text: string): string[] => {
 };
 
 // Fuzzy column name matcher
-export const findColumnValue = (row: any, possibleNames: string[]): any => {
+export const findColumnValue = (
+  row: Record<string, unknown>,
+  possibleNames: string[],
+): unknown => {
   // Generate all variations with periods
   const allVariations: string[] = [];
   for (const name of possibleNames) {
@@ -53,7 +85,7 @@ export const findColumnValue = (row: any, possibleNames: string[]): any => {
 
   // First try exact match (case-insensitive)
   for (const name of allVariations) {
-    for (const key in row) {
+    for (const key of Object.keys(row)) {
       if (key.toLowerCase().trim() === name.toLowerCase().trim()) {
         return row[key];
       }
@@ -62,7 +94,7 @@ export const findColumnValue = (row: any, possibleNames: string[]): any => {
 
   // Then try partial match
   for (const name of allVariations) {
-    for (const key in row) {
+    for (const key of Object.keys(row)) {
       const keyLower = key.toLowerCase().trim();
       const nameLower = name.toLowerCase().trim();
       if (keyLower.includes(nameLower) || nameLower.includes(keyLower)) {
@@ -118,4 +150,379 @@ export async function isExcel(file: File): Promise<boolean> {
   } catch (error) {
     return false;
   }
+}
+
+export const normalizeHeader = (val: string) =>
+  val.toLowerCase().replace(/[\s.]/g, "").trim();
+
+export const getHeaderRow = (worksheet: XLSX.WorkSheet): string[] =>
+  (
+    (XLSX.utils.sheet_to_json<string[]>(worksheet, {
+      header: 1,
+      range: 0,
+      blankrows: false,
+    })[0] as string[] | undefined) || []
+  ).map((cell) => cell ?? "");
+
+export const hasRequiredHeaders = (
+  requiredHeaders: Record<string, string[]>,
+  worksheet: XLSX.WorkSheet,
+): { success: true } | { success: false; missingHeaders: string[] } => {
+  const headerRow = getHeaderRow(worksheet);
+
+  const missingHeaders: string[] = [];
+
+  for (const key in requiredHeaders) {
+    const targets = requiredHeaders[key].map(normalizeHeader);
+    const found = headerRow.some((cell) => {
+      if (typeof cell !== "string") return false;
+      const normalized = normalizeHeader(cell);
+      return targets.some(
+        (target) =>
+          normalized === target ||
+          normalized.includes(target) ||
+          target.includes(normalized),
+      );
+    });
+
+    if (!found) {
+      missingHeaders.push(key);
+    }
+  }
+
+  return missingHeaders.length === 0
+    ? { success: true }
+    : { success: false, missingHeaders };
+};
+
+export const formatDateCell = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") {
+    const parsed = excelDateToJSDate(value);
+    if (parsed && isValidDate(parsed)) {
+      return parsed.toLocaleDateString("en-PH");
+    }
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return isValidDate(value) ? value.toLocaleDateString("en-PH") : undefined;
+  }
+  if (typeof value === "string") {
+    const asDate = new Date(value);
+    if (!Number.isNaN(asDate.getTime()) && isValidDate(asDate)) {
+      return asDate.toLocaleDateString("en-PH");
+    }
+  }
+  return undefined;
+};
+
+type ValidationErrorDetail = z.ZodError | { message: string };
+type FailedRow = Record<string, unknown>;
+
+export type ProcessExcelMeta = {
+  importedIds: number[];
+  importedCount: number;
+  errorCount: number;
+  sheetSummary: Array<{
+    sheet: string;
+    rows: number;
+    valid: number;
+    failed: number;
+  }>;
+  totalRows: number;
+  validRows: number;
+};
+
+type SkipRowsConfig<TCells extends Record<string, unknown>> = {
+  getCells: (row: Record<string, unknown>) => TCells;
+  ignoreKeys?: Array<keyof TCells>;
+};
+
+type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
+  file: File;
+  requiredHeaders: Record<string, string[]>;
+  schema: z.ZodType<T>;
+  skipRowsWithoutCell?: SkipRowsConfig<TCells>;
+  extractUniqueKey?: (row: Record<string, unknown>) => string | undefined;
+  checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
+  uniqueKeyLabel?: string;
+  mapRow: (row: Record<string, unknown>) => {
+    mapped?: T;
+    skip?: boolean;
+    errorMessage?: string;
+    uniqueKey?: string;
+  };
+  onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
+};
+
+export type UploadExcelResult = {
+  failedExcel?: ExportExcelData;
+  meta: ProcessExcelMeta;
+};
+
+export async function processExcelUpload<
+  T,
+  TCells extends Record<string, unknown> = Record<string, unknown>,
+>(
+  options: ProcessExcelOptions<T, TCells>,
+): Promise<ActionResult<UploadExcelResult>> {
+  const {
+    file,
+    requiredHeaders,
+    schema,
+    skipRowsWithoutCell: skipRows,
+    extractUniqueKey,
+    checkExistingUniqueKeys,
+    uniqueKeyLabel = "Unique value",
+    mapRow,
+    onBatchInsert,
+  } = options;
+
+  if ((await isExcel(file)) === false) {
+    return { success: false, error: "File is not a valid Excel document" };
+  }
+
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+
+  const validationResults = {
+    total: 0,
+    valid: 0,
+    imported: 0,
+    importedIds: [] as number[],
+    errors: [] as Array<{
+      row: number;
+      sheet: string;
+      errors: ValidationErrorDetail;
+    }>,
+    sheetSummary: [] as Array<{
+      sheet: string;
+      rows: number;
+      valid: number;
+      failed: number;
+    }>,
+  };
+
+  const failedRowsBySheet = new Map<string, FailedRow[]>();
+  const globalUniqueKeys = new Set<string>();
+
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName];
+    const rawSheetData = XLSX.utils.sheet_to_json<FailedRow>(worksheet);
+    const sheetData = skipRows
+      ? rawSheetData.filter(
+          (row) =>
+            !isMappedRowEmpty(
+              skipRows.getCells(row),
+              skipRows.ignoreKeys ?? [],
+            ),
+        )
+      : rawSheetData;
+
+    console.log(
+      `\n📋 Processing sheet "${sheetName}": ${sheetData.length} rows`,
+    );
+
+    const headerCheck = hasRequiredHeaders(requiredHeaders, worksheet);
+    if (headerCheck.success === false) {
+      const errorReason = `Sheet "${sheetName}" is missing required column(s): ${headerCheck.missingHeaders.join(", ")}.`;
+      const failedRows =
+        sheetData.length > 0
+          ? sheetData.map((row) => ({ ...row, __error: errorReason }))
+          : [{ __error: errorReason }];
+
+      validationResults.total += sheetData.length;
+      validationResults.errors.push(
+        ...failedRows.map((_, idx) => ({
+          row: idx + 2,
+          sheet: sheetName,
+          errors: { message: errorReason },
+        })),
+      );
+      if (failedRows.length > 0) {
+        failedRowsBySheet.set(sheetName, failedRows);
+      }
+      validationResults.sheetSummary.push({
+        sheet: sheetName,
+        rows: sheetData.length,
+        valid: 0,
+        failed: failedRows.length,
+      });
+      continue;
+    }
+
+    console.log(
+      `✓ Sheet "${sheetName}": required columns found, processing rows...`,
+    );
+
+    let sheetValid = 0;
+    let sheetFailed = 0;
+    const sheetFailedRows: FailedRow[] = [];
+    const sheetValidRows: T[] = [];
+    const sheetUniqueKeys = new Set<string>();
+
+    // Pre-check existing unique keys in DB if provided
+    let existingUniqueKeys = new Set<string>();
+    if (extractUniqueKey && checkExistingUniqueKeys) {
+      const keys = sheetData
+        .map((row) => extractUniqueKey(row))
+        .filter((val): val is string => !!val);
+      if (keys.length > 0) {
+        existingUniqueKeys = await checkExistingUniqueKeys(keys);
+      }
+    }
+
+    for (let index = 0; index < sheetData.length; index++) {
+      const row = sheetData[index];
+
+      const mapResult = mapRow(row);
+      if (mapResult.skip) {
+        continue;
+      }
+
+      const uniqueKey = mapResult.uniqueKey ?? extractUniqueKey?.(row);
+      if (uniqueKey) {
+        if (
+          existingUniqueKeys.has(uniqueKey) ||
+          globalUniqueKeys.has(uniqueKey)
+        ) {
+          sheetFailed++;
+          sheetFailedRows.push({
+            ...row,
+            __error: `${uniqueKeyLabel} already exists`,
+          });
+          validationResults.errors.push({
+            row: index + 2,
+            sheet: sheetName,
+            errors: { message: `${uniqueKeyLabel} already exists` },
+          });
+          continue;
+        }
+
+        if (sheetUniqueKeys.has(uniqueKey)) {
+          sheetFailed++;
+          sheetFailedRows.push({
+            ...row,
+            __error: `${uniqueKeyLabel} duplicated in this file`,
+          });
+          validationResults.errors.push({
+            row: index + 2,
+            sheet: sheetName,
+            errors: { message: `${uniqueKeyLabel} duplicated in this file` },
+          });
+          continue;
+        }
+      }
+
+      if (mapResult.errorMessage) {
+        sheetFailed++;
+        sheetFailedRows.push({ ...row, __error: mapResult.errorMessage });
+        validationResults.errors.push({
+          row: index + 2,
+          sheet: sheetName,
+          errors: { message: mapResult.errorMessage },
+        });
+        continue;
+      }
+
+      const mappedRow = mapResult.mapped;
+      const validated = schema.safeParse(mappedRow);
+      validationResults.total++;
+
+      if (validated.success) {
+        if (uniqueKey) {
+          sheetUniqueKeys.add(uniqueKey);
+          globalUniqueKeys.add(uniqueKey);
+        }
+        sheetValidRows.push(validated.data);
+        validationResults.valid++;
+        sheetValid++;
+      } else {
+        const errorReason =
+          prettifyError(validated.error) || "Validation failed";
+        sheetFailed++;
+        sheetFailedRows.push({ ...row, __error: errorReason });
+        validationResults.errors.push({
+          row: index + 2,
+          sheet: sheetName,
+          errors: validated.error,
+        });
+      }
+    }
+
+    if (sheetValidRows.length > 0) {
+      try {
+        console.log(
+          `✓ Sheet "${sheetName}": importing ${sheetValidRows.length} valid row(s) to database...`,
+        );
+        const insertResult = await onBatchInsert(sheetValidRows);
+        const ids = insertResult.ids ?? [];
+        validationResults.imported += insertResult.count ?? ids.length;
+        validationResults.importedIds.push(...ids);
+        console.log(
+          `✓ Sheet "${sheetName}": imported ${insertResult.count ?? ids.length} row(s)`,
+        );
+      } catch (error: unknown) {
+        return {
+          success: false,
+          error: `Database import failed: ${(error as Error)?.message || "Unknown error"}`,
+        };
+      }
+    }
+
+    if (sheetFailedRows.length > 0) {
+      failedRowsBySheet.set(sheetName, sheetFailedRows);
+    }
+
+    validationResults.sheetSummary.push({
+      sheet: sheetName,
+      rows: sheetData.length,
+      valid: sheetValid,
+      failed: sheetFailed,
+    });
+
+    console.log(
+      `  📊 Sheet "${sheetName}": ${sheetValid}/${sheetData.length} valid, ${sheetFailed} failed`,
+    );
+  }
+
+  let failedExcelData: ExportExcelData | undefined;
+  if (failedRowsBySheet.size > 0) {
+    const failedWorkbook = XLSX.utils.book_new();
+    failedRowsBySheet.forEach((failedRows, sheetName) => {
+      const failedWorksheet = XLSX.utils.json_to_sheet(failedRows);
+      XLSX.utils.book_append_sheet(failedWorkbook, failedWorksheet, sheetName);
+    });
+
+    const base64 = XLSX.write(failedWorkbook, {
+      type: "base64",
+      bookType: "xlsx",
+    });
+    failedExcelData = { fileName: `failed-rows-${Date.now()}.xlsx`, base64 };
+  }
+
+  if (validationResults.valid === 0) {
+    return failedExcelData
+      ? {
+          success: false,
+          error:
+            "No valid rows to import. Download failed rows file to review errors.",
+        }
+      : { success: false, error: "No valid rows to import" };
+  }
+
+  return {
+    success: true,
+    result: {
+      failedExcel: failedExcelData,
+      meta: {
+        importedIds: validationResults.importedIds,
+        importedCount: validationResults.imported,
+        errorCount: validationResults.errors.length,
+        sheetSummary: validationResults.sheetSummary,
+        totalRows: validationResults.total,
+        validRows: validationResults.valid,
+      },
+    },
+  };
 }

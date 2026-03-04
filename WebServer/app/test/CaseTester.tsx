@@ -60,7 +60,10 @@ export default function CaseTester() {
     setLoading(false);
   };
 
-  const handleInputChange = (field: keyof CaseEntry, value: any) => {
+  const handleInputChange = <K extends keyof CaseEntry>(
+    field: K,
+    value: CaseEntry[K],
+  ) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -208,8 +211,8 @@ export default function CaseTester() {
     }
 
     // Download failed rows Excel if available
-    if (result.success && result.result) {
-      const { fileName, base64 } = result.result;
+    if (result.success && result.result?.failedExcel) {
+      const { fileName, base64 } = result.result.failedExcel;
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -289,7 +292,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Branch *</label>
                   <input
                     type="text"
-                    value={formData.branch}
+                    value={(formData.branch ?? "") as string}
                     onChange={(e) =>
                       handleInputChange("branch", e.target.value)
                     }
@@ -303,7 +306,7 @@ export default function CaseTester() {
                   </label>
                   <input
                     type="text"
-                    value={formData.assistantBranch || ""}
+                    value={formData.assistantBranch ?? ""}
                     onChange={(e) =>
                       handleInputChange("assistantBranch", e.target.value)
                     }
@@ -337,7 +340,7 @@ export default function CaseTester() {
                     onChange={(e) =>
                       handleInputChange(
                         "dateFiled",
-                        new Date(e.target.value) || null,
+                        e.target.value ? new Date(e.target.value) : null,
                       )
                     }
                     className="w-full border rounded px-2 py-1"
@@ -347,9 +350,12 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Name</label>
                   <input
                     type="text"
-                    value={formData.name || ""}
+                    value={formData.name ?? ""}
                     onChange={(e) =>
-                      handleInputChange("name", e.target.value || null)
+                      handleInputChange(
+                        "name",
+                        e.target.value as CaseEntry["name"],
+                      )
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -358,7 +364,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Charge</label>
                   <input
                     type="text"
-                    value={formData.charge || ""}
+                    value={formData.charge ?? ""}
                     onChange={(e) =>
                       handleInputChange("charge", e.target.value || null)
                     }
@@ -369,7 +375,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Info Sheet</label>
                   <input
                     type="text"
-                    value={formData.infoSheet || ""}
+                    value={formData.infoSheet ?? ""}
                     onChange={(e) =>
                       handleInputChange("infoSheet", e.target.value || null)
                     }
@@ -380,7 +386,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Court</label>
                   <input
                     type="text"
-                    value={formData.court || ""}
+                    value={formData.court ?? ""}
                     onChange={(e) =>
                       handleInputChange("court", e.target.value || null)
                     }
@@ -392,7 +398,10 @@ export default function CaseTester() {
                   <select
                     value={formData.caseType}
                     onChange={(e) =>
-                      handleInputChange("caseType", e.target.value)
+                      handleInputChange<"caseType">(
+                        "caseType",
+                        e.target.value as CaseType,
+                      )
                     }
                     className="w-full border rounded px-2 py-1"
                   >
@@ -407,7 +416,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Detained</label>
                   <input
                     type="text"
-                    value={formData.detained || ""}
+                    value={formData.detained ?? ""}
                     onChange={(e) =>
                       handleInputChange("detained", e.target.value || null)
                     }
@@ -421,7 +430,7 @@ export default function CaseTester() {
                   </label>
                   <input
                     type="text"
-                    value={formData.consolidation || ""}
+                    value={formData.consolidation ?? ""}
                     onChange={(e) =>
                       handleInputChange("consolidation", e.target.value || null)
                     }
@@ -434,7 +443,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">EQC Number</label>
                   <input
                     type="number"
-                    value={formData.eqcNumber || ""}
+                    value={formData.eqcNumber ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "eqcNumber",
@@ -448,7 +457,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Bond</label>
                   <input
                     type="text"
-                    value={formData.bond || ""}
+                    value={formData.bond ?? ""}
                     onChange={(e) =>
                       handleInputChange("bond", e.target.value || null)
                     }
@@ -476,13 +485,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">Committee 1</label>
                   <input
-                    type="number"
-                    value={formData.committee1 || ""}
+                    type="text"
+                    value={formData.committee1 ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "committee1",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("committee1", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -490,13 +496,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">Committee 2</label>
                   <input
-                    type="number"
-                    value={formData.committee2 || ""}
+                    type="text"
+                    value={formData.committee2 ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "committee2",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("committee2", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -505,7 +508,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Judge</label>
                   <input
                     type="text"
-                    value={formData.judge || ""}
+                    value={formData.judge ?? ""}
                     onChange={(e) => handleInputChange("judge", e.target.value)}
                     className="w-full border rounded px-2 py-1"
                   />
@@ -514,7 +517,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">AO</label>
                   <input
                     type="text"
-                    value={formData.ao || ""}
+                    value={formData.ao ?? ""}
                     onChange={(e) => handleInputChange("ao", e.target.value)}
                     className="w-full border rounded px-2 py-1"
                   />
@@ -523,7 +526,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Complainant</label>
                   <input
                     type="text"
-                    value={formData.complainant || ""}
+                    value={formData.complainant ?? ""}
                     onChange={(e) =>
                       handleInputChange("complainant", e.target.value)
                     }
@@ -534,7 +537,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">House No</label>
                   <input
                     type="text"
-                    value={formData.houseNo || ""}
+                    value={formData.houseNo ?? ""}
                     onChange={(e) =>
                       handleInputChange("houseNo", e.target.value)
                     }
@@ -545,7 +548,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Street</label>
                   <input
                     type="text"
-                    value={formData.street || ""}
+                    value={formData.street ?? ""}
                     onChange={(e) =>
                       handleInputChange("street", e.target.value)
                     }
@@ -556,7 +559,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Barangay</label>
                   <input
                     type="text"
-                    value={formData.barangay || ""}
+                    value={formData.barangay ?? ""}
                     onChange={(e) =>
                       handleInputChange("barangay", e.target.value)
                     }
@@ -567,7 +570,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Municipality</label>
                   <input
                     type="text"
-                    value={formData.municipality || ""}
+                    value={formData.municipality ?? ""}
                     onChange={(e) =>
                       handleInputChange("municipality", e.target.value)
                     }
@@ -578,7 +581,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Province</label>
                   <input
                     type="text"
-                    value={formData.province || ""}
+                    value={formData.province ?? ""}
                     onChange={(e) =>
                       handleInputChange("province", e.target.value)
                     }
@@ -589,7 +592,7 @@ export default function CaseTester() {
                   <label className="block font-medium mb-1">Counts</label>
                   <input
                     type="text"
-                    value={formData.counts || ""}
+                    value={formData.counts ?? ""}
                     onChange={(e) =>
                       handleInputChange("counts", e.target.value)
                     }
@@ -599,13 +602,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">JDF</label>
                   <input
-                    type="number"
-                    value={formData.jdf || ""}
+                    type="text"
+                    value={formData.jdf ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "jdf",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("jdf", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -613,13 +613,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">SAJJ</label>
                   <input
-                    type="number"
-                    value={formData.sajj || ""}
+                    type="text"
+                    value={formData.sajj ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "sajj",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("sajj", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -627,13 +624,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">SAJJ 2</label>
                   <input
-                    type="number"
-                    value={formData.sajj2 || ""}
+                    type="text"
+                    value={formData.sajj2 ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "sajj2",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("sajj2", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -641,13 +635,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">MF</label>
                   <input
-                    type="number"
-                    value={formData.mf || ""}
+                    type="text"
+                    value={formData.mf ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "mf",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("mf", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -655,13 +646,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">STF</label>
                   <input
-                    type="number"
-                    value={formData.stf || ""}
+                    type="text"
+                    value={formData.stf ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "stf",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("stf", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -669,13 +657,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">LRF</label>
                   <input
-                    type="number"
-                    value={formData.lrf || ""}
+                    type="text"
+                    value={formData.lrf ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "lrf",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("lrf", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -683,13 +668,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">VCF</label>
                   <input
-                    type="number"
-                    value={formData.vcf || ""}
+                    type="text"
+                    value={formData.vcf ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "vcf",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("vcf", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -697,13 +679,10 @@ export default function CaseTester() {
                 <div>
                   <label className="block font-medium mb-1">Total</label>
                   <input
-                    type="number"
-                    value={formData.total || ""}
+                    type="text"
+                    value={formData.total ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "total",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("total", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -713,12 +692,12 @@ export default function CaseTester() {
                     Amount Involved
                   </label>
                   <input
-                    type="number"
-                    value={formData.amountInvolved || ""}
+                    type="text"
+                    value={formData.amountInvolved ?? ""}
                     onChange={(e) =>
                       handleInputChange(
                         "amountInvolved",
-                        e.target.value ? Number(e.target.value) : null,
+                        e.target.value || null,
                       )
                     }
                     className="w-full border rounded px-2 py-1"
