@@ -16,6 +16,12 @@ enum Roles {
   atty
 }
 
+enum EmploymentType {
+  PERMANENT
+  CONTRACTUAL
+  CASUAL
+}
+
 enum CaseType {
   CRIMINAL
   CIVIL
@@ -117,18 +123,11 @@ model Employee {
   employeeNumber   String?    @unique
   position         String
   branch           String
-  tinNumber        String?
-  gsisNumber       String?
-  philHealthNumber String?
-  pagIbigNumber    String?
   birthDate        DateTime
-  bloodType        BloodType?
-  allergies        String?
-  height           Float?
-  weight           Float?
-  contactPerson    String
-  contactNumber    String?
-  email            String?
+  dateHired         DateTime
+  employmentType EmploymentType
+  contactNumber    String?    @unique
+  email            String?    @unique
   createdAt        DateTime   @default(now())
 }
 

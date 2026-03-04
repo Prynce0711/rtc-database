@@ -1,5 +1,7 @@
 "use client";
 
+import { EmploymentType } from "@/app/generated/prisma/enums";
+import { enumToText } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -12,7 +14,6 @@ import {
   FiCopy,
   FiEdit3,
   FiEye,
-  FiHeart,
   FiPlus,
   FiSave,
   FiTrash2,
@@ -35,19 +36,10 @@ interface EntryForm {
   position: string;
   branch: string;
   birthDate: string;
-  contactPerson: string;
+  dateHired: string;
+  employmentType: EmploymentType | "";
   contactNumber: string;
   email: string;
-  // IDs
-  tinNumber: string;
-  gsisNumber: string;
-  philHealthNumber: string;
-  pagIbigNumber: string;
-  // Health
-  height: string;
-  weight: string;
-  bloodType: string;
-  allergies: string;
   errors: Record<string, string>;
 }
 
@@ -61,17 +53,10 @@ const emptyEntry = (id: string): EntryForm => ({
   position: "",
   branch: "",
   birthDate: today,
-  contactPerson: "",
+  dateHired: today,
+  employmentType: "",
   contactNumber: "",
   email: "",
-  tinNumber: "",
-  gsisNumber: "",
-  philHealthNumber: "",
-  pagIbigNumber: "",
-  height: "",
-  weight: "",
-  bloodType: "",
-  allergies: "",
   errors: {},
 });
 
@@ -80,7 +65,8 @@ const REQUIRED_FIELDS = [
   "position",
   "branch",
   "birthDate",
-  "contactPerson",
+  "dateHired",
+  "employmentType",
 ] as const;
 
 /* ─── Column Definitions ─────────────────────────────────────── */
@@ -94,7 +80,6 @@ type ColDef = {
   mono?: boolean;
   numbersOnly?: boolean;
 };
-
 const FROZEN_COLS: ColDef[] = [
   {
     key: "employeeName",
@@ -142,12 +127,21 @@ const PERSONAL_COLS: ColDef[] = [
     mono: true,
   },
   {
-    key: "contactPerson",
-    label: "Contact Person",
-    placeholder: "Full name",
+    key: "employmentType",
+    label: "Employment Type",
+    placeholder: "",
     type: "text",
     width: 180,
     required: true,
+  },
+  {
+    key: "dateHired",
+    label: "Date Hired",
+    placeholder: "",
+    type: "date",
+    width: 150,
+    required: true,
+    mono: true,
   },
   {
     key: "contactNumber",
@@ -166,79 +160,7 @@ const PERSONAL_COLS: ColDef[] = [
   },
 ];
 
-const IDS_COLS: ColDef[] = [
-  {
-    key: "tinNumber",
-    label: "TIN",
-    placeholder: "000-000-000",
-    type: "text",
-    width: 140,
-    mono: true,
-    numbersOnly: true,
-  },
-  {
-    key: "gsisNumber",
-    label: "GSIS",
-    placeholder: "000000000000",
-    type: "text",
-    width: 150,
-    mono: true,
-    numbersOnly: true,
-  },
-  {
-    key: "philHealthNumber",
-    label: "PhilHealth",
-    placeholder: "000000000000",
-    type: "text",
-    width: 150,
-    mono: true,
-    numbersOnly: true,
-  },
-  {
-    key: "pagIbigNumber",
-    label: "Pag-IBIG",
-    placeholder: "000000000000",
-    type: "text",
-    width: 150,
-    mono: true,
-    numbersOnly: true,
-  },
-];
-
-const HEALTH_COLS: ColDef[] = [
-  {
-    key: "height",
-    label: "Height (cm)",
-    placeholder: "170",
-    type: "number",
-    width: 120,
-    mono: true,
-  },
-  {
-    key: "weight",
-    label: "Weight (kg)",
-    placeholder: "65",
-    type: "number",
-    width: 120,
-    mono: true,
-  },
-  {
-    key: "bloodType",
-    label: "Blood Type",
-    placeholder: "O+",
-    type: "text",
-    width: 120,
-  },
-  {
-    key: "allergies",
-    label: "Allergies",
-    placeholder: "None",
-    type: "text",
-    width: 200,
-  },
-];
-
-type TabKey = "personal" | "ids" | "health";
+type TabKey = "personal";
 const TABS: {
   key: TabKey;
   label: string;
@@ -251,30 +173,9 @@ const TABS: {
     icon: <FiUser size={13} />,
     cols: PERSONAL_COLS,
   },
-  {
-    key: "ids",
-    label: "IDs & Benefits",
-    icon: <FiBriefcase size={13} />,
-    cols: IDS_COLS,
-  },
-  {
-    key: "health",
-    label: "Health",
-    icon: <FiHeart size={13} />,
-    cols: HEALTH_COLS,
-  },
 ];
 
-const BLOOD_TYPE_MAP: Record<string, string> = {
-  A_Positive: "A+",
-  A_Negative: "A-",
-  B_Positive: "B+",
-  B_Negative: "B-",
-  AB_Positive: "AB+",
-  AB_Negative: "AB-",
-  O_Positive: "O+",
-  O_Negative: "O-",
-};
+const EMPLOYMENT_TYPE_OPTIONS = Object.values(EmploymentType);
 
 /* ─── Validation ─────────────────────────────────────────────── */
 function validateEntry(entry: EntryForm): Record<string, string> {
@@ -305,7 +206,9 @@ const CellInput = ({
   value: string;
   error?: string;
   onChange: (v: string) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyDown?: (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => void;
 }) => {
   const handleChange = (v: string) => {
     if (col.numbersOnly) v = v.replace(/\D/g, "");
@@ -349,8 +252,6 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
         })
       : null;
 
-  const bloodLabel = BLOOD_TYPE_MAP[entry.bloodType] || entry.bloodType || null;
-
   return (
     <div className="rv-card">
       <div className="rv-hero">
@@ -377,12 +278,9 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
           {entry.branch && (
             <span className="rv-badge rv-badge-court">{entry.branch}</span>
           )}
-          {bloodLabel && (
-            <span
-              className="rv-badge rv-badge-court"
-              style={{ background: "var(--color-error)", color: "#fff" }}
-            >
-              {bloodLabel}
+          {entry.employmentType && (
+            <span className="rv-badge rv-badge-court">
+              {enumToText(entry.employmentType)}
             </span>
           )}
         </div>
@@ -410,8 +308,12 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
                   value: fmtDate(entry.birthDate),
                   mono: true,
                 },
+                {
+                  label: "Date Hired",
+                  value: fmtDate(entry.dateHired),
+                  mono: true,
+                },
                 { label: "Email", value: entry.email, mono: true },
-                { label: "Contact Person", value: entry.contactPerson },
                 {
                   label: "Contact Number",
                   value: entry.contactNumber,
@@ -431,63 +333,24 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
           <div className="rv-section">
             <div className="rv-section-header">
               <FiBriefcase size={13} />
-              <span>IDs & Benefits</span>
+              <span>Employment</span>
             </div>
             <div className="rv-grid rv-grid-3">
               {[
-                { label: "TIN", value: entry.tinNumber },
-                { label: "GSIS", value: entry.gsisNumber },
-                { label: "PhilHealth", value: entry.philHealthNumber },
-                { label: "Pag-IBIG", value: entry.pagIbigNumber },
+                {
+                  label: "Employment Type",
+                  value: entry.employmentType
+                    ? enumToText(entry.employmentType)
+                    : "",
+                },
               ].map(({ label, value }) => (
                 <div className="rv-field" key={label}>
                   <div className="rv-field-label">{label}</div>
-                  <div className="rv-field-value rv-mono">
+                  <div className="rv-field-value">
                     {value || <span className="rv-empty">—</span>}
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="rv-section">
-            <div className="rv-section-header">
-              <FiHeart size={13} />
-              <span>Health</span>
-            </div>
-            <div className="rv-grid rv-grid-3">
-              <div className="rv-field">
-                <div className="rv-field-label">Height</div>
-                <div className="rv-field-value rv-mono">
-                  {entry.height ? (
-                    `${entry.height} cm`
-                  ) : (
-                    <span className="rv-empty">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Weight</div>
-                <div className="rv-field-value rv-mono">
-                  {entry.weight ? (
-                    `${entry.weight} kg`
-                  ) : (
-                    <span className="rv-empty">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Blood Type</div>
-                <div className="rv-field-value">
-                  {bloodLabel || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Allergies</div>
-                <div className="rv-field-value">
-                  {entry.allergies || <span className="rv-empty">—</span>}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -529,17 +392,10 @@ const EmployeeDrawer = ({
           position: e.position ?? "",
           branch: e.branch ?? "",
           birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
-          contactPerson: e.contactPerson ?? "",
+          dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
+          employmentType: e.employmentType ?? "",
           contactNumber: e.contactNumber ?? "",
           email: e.email ?? "",
-          tinNumber: e.tinNumber ?? "",
-          gsisNumber: e.gsisNumber ?? "",
-          philHealthNumber: e.philHealthNumber ?? "",
-          pagIbigNumber: e.pagIbigNumber ?? "",
-          height: e.height != null ? String(e.height) : "",
-          weight: e.weight != null ? String(e.weight) : "",
-          bloodType: e.bloodType ?? "",
-          allergies: e.allergies ?? "",
         },
       ];
     }
@@ -592,7 +448,7 @@ const EmployeeDrawer = ({
   const isLastTab = currentTabIdx === TABS.length - 1;
 
   const handleCellKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
     entryId: string,
     isLastCol: boolean,
     isLastTabFlag: boolean,
@@ -660,20 +516,10 @@ const EmployeeDrawer = ({
         position: e.position,
         branch: e.branch,
         birthDate: e.birthDate,
-        contactPerson: e.contactPerson,
+        dateHired: e.dateHired,
+        employmentType: e.employmentType || undefined,
         contactNumber: e.contactNumber || undefined,
         email: e.email?.trim() || undefined,
-        tinNumber: e.tinNumber || undefined,
-        gsisNumber: e.gsisNumber || undefined,
-        philHealthNumber: e.philHealthNumber || undefined,
-        pagIbigNumber: e.pagIbigNumber || undefined,
-        height: e.height ? Number(e.height) : undefined,
-        weight: e.weight ? Number(e.weight) : undefined,
-        bloodType: e.bloodType || undefined,
-        allergies:
-          e.allergies?.trim() === "" || e.allergies?.toLowerCase() === "n/a"
-            ? undefined
-            : e.allergies || undefined,
       }));
 
       const resp = await fetch("/api/employees/create", {
@@ -928,22 +774,65 @@ const EmployeeDrawer = ({
 
                             {activeCols.map((col, colIdx) => (
                               <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={(entry as any)[col.key] ?? ""}
-                                  error={entry.errors[col.key]}
-                                  onChange={(v) =>
-                                    handleChange(entry.id, col.key, v)
-                                  }
-                                  onKeyDown={(e) =>
-                                    handleCellKeyDown(
-                                      e,
-                                      entry.id,
-                                      colIdx === lastColIdx,
-                                      isLastTab,
-                                    )
-                                  }
-                                />
+                                {col.key === "employmentType" ? (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                    }}
+                                  >
+                                    <select
+                                      value={(entry as any)[col.key] ?? ""}
+                                      onChange={(e) =>
+                                        handleChange(
+                                          entry.id,
+                                          col.key,
+                                          e.target.value,
+                                        )
+                                      }
+                                      onKeyDown={(e) =>
+                                        handleCellKeyDown(
+                                          e,
+                                          entry.id,
+                                          colIdx === lastColIdx,
+                                          isLastTab,
+                                        )
+                                      }
+                                      title={entry.errors[col.key] || col.label}
+                                      className={`xls-input${entry.errors[col.key] ? " xls-input-err" : ""}`}
+                                    >
+                                      <option value="">Select type</option>
+                                      {EMPLOYMENT_TYPE_OPTIONS.map((opt) => (
+                                        <option key={opt} value={opt}>
+                                          {enumToText(opt)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {entry.errors[col.key] && (
+                                      <span className="xls-cell-err">
+                                        <FiAlertCircle size={10} />
+                                        {entry.errors[col.key]}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <CellInput
+                                    col={col}
+                                    value={(entry as any)[col.key] ?? ""}
+                                    error={entry.errors[col.key]}
+                                    onChange={(v) =>
+                                      handleChange(entry.id, col.key, v)
+                                    }
+                                    onKeyDown={(e) =>
+                                      handleCellKeyDown(
+                                        e,
+                                        entry.id,
+                                        colIdx === lastColIdx,
+                                        isLastTab,
+                                      )
+                                    }
+                                  />
+                                )}
                               </td>
                             ))}
 
