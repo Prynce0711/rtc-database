@@ -1443,7 +1443,7 @@ const NotarialPage: React.FC = () => {
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Notarial Records
           </h2>
-          <p className="text-xl text-base-content/70">
+          <p className="text-xl text-base-content/50 mt-2">
             Manage notarial reports and filings
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
@@ -1533,7 +1533,7 @@ const NotarialPage: React.FC = () => {
             )}
             {isAdminOrAtty && (
               <button
-                className="btn btn-success"
+                className="btn btn-primary"
                 onClick={() => {
                   setSelectedRecord(null);
                   setModalType("ADD");
@@ -1637,9 +1637,9 @@ const NotarialPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-base-300 rounded-lg shadow overflow-x-auto">
+        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <table className="table table-zebra w-full text-center">
-            <thead>
+            <thead className="bg-base-300">
               <tr className="text-center">
                 {isAdminOrAtty && <th>ACTIONS</th>}
                 <SortTh
@@ -1672,11 +1672,18 @@ const NotarialPage: React.FC = () => {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-12 text-base-content/50"
-                  >
-                    No records found.
+                  <td colSpan={6}>
+                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
+                      <div className=" flex items-center justify-center mb-4">
+                        <FiFileText className="w-15 h-15 opacity-50" />
+                      </div>
+                      <p className="text-lg uppercase font-semibold text-base-content/50">
+                        No records found
+                      </p>
+                      <p className="text-sm mt-1 uppercase text-base-content/35">
+                        No notarial records match your current filters.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

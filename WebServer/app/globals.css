@@ -413,6 +413,77 @@
   }
 }
 
+/* ─── Sidebar animated gradient ───────────────────────────────────────── */
+@keyframes sidebarGradientShift {
+  0% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+  75% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.sidebar-gradient {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f3f4f6 12%,
+    #e5e7eb 25%,
+    #f9fafb 38%,
+    #d1d5db 50%,
+    #f3f4f6 62%,
+    #e5e7eb 75%,
+    #f9fafb 88%,
+    #ffffff 100%
+  );
+  background-size: 300% 300%;
+  animation: sidebarGradientShift 16s ease-in-out infinite;
+}
+
+[data-theme="dim"] .sidebar-gradient {
+  background: linear-gradient(
+    135deg,
+    #1a1d23 0%,
+    #22252b 12%,
+    #2a2e36 25%,
+    #1e2127 38%,
+    #313640 50%,
+    #262a32 62%,
+    #2a2e36 75%,
+    #1e2127 88%,
+    #1a1d23 100%
+  );
+  background-size: 300% 300%;
+  animation: sidebarGradientShift 16s ease-in-out infinite;
+}
+
+/* Sidebar nav item stagger entrance */
+@keyframes sidebarItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+
+.sidebar-stagger {
+  animation: sidebarItemIn 0.35s ease-out both;
+}
+
 /* ==========================================================================
    Component: CaseDrawer (xls-*) styles extracted from inline component CSS
    ========================================================================== */

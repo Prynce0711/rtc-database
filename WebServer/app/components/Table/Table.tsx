@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { FiInbox } from "react-icons/fi";
 
 type Header<T extends Record<string, unknown>> = {
   key: string;
@@ -74,10 +75,10 @@ function Table<T extends Record<string, unknown>>({
   }, [page, totalPages]);
 
   return (
-    <div className={className}>
+    <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
       <div className="overflow-x-auto overflow-y-visible">
         <table className="table table-compact uppercase table-zebra w-full text-center">
-          <thead className="text-sm bg-base-300 rounded-lg shadow text-sm">
+          <thead className="text-sm bg-[#e6eef5] text-sm">
             <tr>
               {headers.map((h) => {
                 const alignClass =
@@ -121,8 +122,26 @@ function Table<T extends Record<string, unknown>>({
 
           {/* BODY */}
           <tbody className="text-sm [&_td]:py-2 [&_td]:text-sm">
-            {paginated.map((d, i) =>
-              renderRow(d, (page - 1) * rowsPerPage + i),
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={headers.length}>
+                  <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
+                    <div className="flex items-center justify-center mb-4">
+                      <FiInbox className="w-15 h-15 opacity-50" />
+                    </div>
+                    <p className="text-lg font-semibold text-base-content/50">
+                      No records found
+                    </p>
+                    <p className="text-sm mt-1 text-base-content/35">
+                      There are no entries to display yet.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              paginated.map((d, i) =>
+                renderRow(d, (page - 1) * rowsPerPage + i),
+              )
             )}
           </tbody>
         </table>

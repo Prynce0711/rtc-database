@@ -392,7 +392,9 @@ const CasePage: React.FC = () => {
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Case Management
           </h2>
-          <p className="text-xl text-base-content/70">Manage all court cases</p>
+          <p className="text-xl text-base-content/50 mt-2">
+            Manage all court cases
+          </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -485,7 +487,7 @@ const CasePage: React.FC = () => {
             )}
             {isAdminOrAtty && (
               <button
-                className="btn btn-success"
+                className="btn btn-primary"
                 onClick={() => showModal(CaseModalType.ADD)}
               >
                 <svg

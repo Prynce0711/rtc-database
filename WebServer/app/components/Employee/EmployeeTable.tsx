@@ -3,7 +3,13 @@
 import type { Employee } from "@/app/generated/prisma/browser";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
-import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import {
+  FiEdit,
+  FiEye,
+  FiMoreHorizontal,
+  FiTrash2,
+  FiUsers,
+} from "react-icons/fi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -46,7 +52,7 @@ const SortTh = ({
     <th
       onClick={() => onSort(colKey)}
       className={[
-        "py-4 px-5 text-[13px] font-bold tracking-[0.05em] text-base-content/70 uppercase bg-base-200",
+        "py-4 px-5 text-[13px] font-bold tracking-[0.05em] text-base-content/70 uppercase",
         "cursor-pointer select-none hover:text-base-content/80 transition-colors whitespace-nowrap",
         "text-center",
       ].join(" ")}
@@ -126,9 +132,9 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
         <table className="w-full text-sm">
           {/* HEADER */}
           <thead className="text-sm">
-            <tr className="border-b border-base-200 bg-base-100 text-center">
+            <tr className="border-b border-base-200 bg-[#e6eef5] text-center">
               {/* Actions col — no sort */}
-              <th className="py-4 px-5 font-bold uppercase text-[13px] text-base-content/70 text-center w-16 bg-base-200">
+              <th className="py-4 px-5 font-bold uppercase text-[13px] text-base-content/70 text-center w-16">
                 Actions
               </th>
               <SortTh
@@ -182,11 +188,18 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td
-                  colSpan={7}
-                  className="text-center py-16 text-base-content/30 text-sm font-medium"
-                >
-                  No employees found.
+                <td colSpan={7}>
+                  <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
+                    <div className="flex items-center justify-center mb-4">
+                      <FiUsers size={60} className="text-base-content/40" />
+                    </div>
+                    <p className="text-lg uppercase font-semibold text-base-content/50">
+                      No employees found
+                    </p>
+                    <p className="text-sm uppercase mt-1 text-base-content/35">
+                      There are no entries to display yet.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (

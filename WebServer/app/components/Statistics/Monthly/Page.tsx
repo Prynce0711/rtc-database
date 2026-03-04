@@ -186,11 +186,11 @@ export default function MonthlyPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
-      <header className="card bg-base-100 shadow-xl">
+      <header className="card bg-base-100 ">
         <div className="card-body p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+              <h1 className="text-5xl font-black tracking-tight text-base-content">
                 Monthly Reports
               </h1>
               <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">

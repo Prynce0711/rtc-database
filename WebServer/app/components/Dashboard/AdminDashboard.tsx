@@ -287,13 +287,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     return (
-      <div
-        className="surface-card p-4 animate-scale-in"
-        style={{
-          boxShadow: "var(--shadow-elevated)",
-          borderColor: "var(--surface-border-strong)",
-        }}
-      >
+      <div className="surface-card p-4 animate-scale-in">
         <p className="font-bold text-base-content mb-2 text-base">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center justify-between gap-6">
@@ -346,7 +340,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         <div className="mx-auto w-full">
           <div className="space-y-6">
             {/* HEADER */}
-            <header className="surface-card animate-fade-in">
+            <header className="surface-card animate-fade-in border-none shadow-none">
               <div
                 className="card-body"
                 style={{ padding: "var(--space-card-padding)" }}
@@ -371,10 +365,6 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     </p>
 
                     {/* Hover instruction note */}
-                    <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-                      <Info size={14} className="shrink-0" />
-                      <span>Hover over table cells to see full details</span>
-                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">

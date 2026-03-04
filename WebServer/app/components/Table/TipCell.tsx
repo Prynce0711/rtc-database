@@ -41,7 +41,7 @@ const TipCell = ({
 
   return (
     <td
-      className={`relative text-center whitespace-nowrap group/tip ${truncate ? "max-w-40" : ""} ${className}`}
+      className={`relative  text-center whitespace-nowrap group/tip ${truncate ? "max-w-40" : ""} ${className}`}
     >
       {truncate ? <span className="block truncate">{display}</span> : display}
       {showTip && (
