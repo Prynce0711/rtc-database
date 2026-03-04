@@ -131,7 +131,7 @@ const CaseRow = ({
       <TipCell label="Court" value={caseItem.court} />
 
       {/* DETENTION STATUS */}
-      <td className="text-center whitespace-nowrap relative group/tip">
+      <td className="text-center whitespace-nowrap relative group/tip ">
         <span
           className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition
             ${
@@ -375,6 +375,7 @@ export const CaseTable = ({
       data={sorted}
       sortConfig={sortConfig}
       onSort={handleSort}
+      rowHoverHint="Click to view case details"
       renderRow={(item) => (
         <CaseRow
           key={item.id}

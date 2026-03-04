@@ -11,7 +11,8 @@ import {
   FiBarChart2,
   FiBell,
   FiChevronDown,
-  FiChevronLeft,
+  FiChevronsLeft,
+  FiChevronsRight,
   FiFileText,
   FiHome,
   FiLogOut,
@@ -323,7 +324,7 @@ const ActionBtn = ({
   );
 };
 
-// ─── Section label (expanded) / thin divider (collapsed) ──────────────────────
+// ─── Section label (expanded) / spacing (collapsed) ──────────────────────────
 const SectionLabel = ({
   label,
   isExpanded,
@@ -335,10 +336,10 @@ const SectionLabel = ({
 }) => {
   if (!isExpanded) {
     if (isFirst) return null;
-    return <div className="mx-4 my-2.5 h-px bg-base-300/60" />;
+    return <div className="my-2" />;
   }
   return (
-    <p className="text-[12px] font-black uppercase tracking-[0.14em] text-base-content/25 px-3 pt-5 pb-1.5 select-none">
+    <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-base-content/30 px-3 pt-5 pb-1 select-none">
       {label}
     </p>
   );
@@ -473,163 +474,231 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     <div className="flex min-h-screen bg-base-100">
       {/* ════════════════════ SIDEBAR ════════════════════ */}
       <motion.aside
-        animate={{ width: isExpanded ? 272 : 72 }}
-        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-        className="relative flex flex-col bg-base-200 border-r border-base-300 min-h-screen shrink-0 z-30"
+        animate={{ width: isExpanded ? 264 : 72 }}
+        transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+        className="relative flex flex-col min-h-screen shrink-0 z-30 overflow-hidden sidebar-gradient"
       >
+        {/* Animated accent glow at top */}
+        <div className="absolute top-0 left-0 right-0 h-40 bg-linear-to-b from-primary/6 to-transparent z-0 pointer-events-none" />
+        {/* Subtle right edge */}
+        <div className="absolute right-0 top-0 bottom-0 w-px bg-linear-to-b from-base-300/20 via-base-300/50 to-base-300/20 z-20" />
+
         {/* ── Header ──────────────────────────────────── */}
         <div
           className={[
-            "border-b border-base-300 flex flex-col items-center transition-all duration-200 relative",
-            isExpanded ? "px-5 py-6" : "px-0 py-5",
+            "flex flex-col items-center transition-all duration-300 relative z-10",
+            isExpanded ? "px-5 pt-6 pb-5" : "px-0 pt-5 pb-4",
           ].join(" ")}
         >
           {/* Logo — centered & large in both states */}
           <motion.div
             animate={{
-              width: isExpanded ? 80 : 60,
-              height: isExpanded ? 80 : 60,
+              width: isExpanded ? 72 : 44,
+              height: isExpanded ? 72 : 44,
             }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
             className="shrink-0 flex items-center justify-center"
           >
             <Image
               src="/SupremeCourtLogo.webp"
               alt="Supreme Court"
-              width={80}
-              height={80}
-              className="object-contain"
+              width={72}
+              height={72}
+              className="object-contain drop-shadow-md"
             />
           </motion.div>
 
           {/* Brand text — below logo when expanded */}
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {isExpanded && (
               <motion.div
                 key="brand"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18 }}
+                initial={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
                 className="text-center mt-3"
               >
-                <p className="text-lg font-extrabold text-base-content leading-tight">
+                <p className="text-[20px] font-extrabold text-base-content/85 leading-tight tracking-tight">
                   Regional Trial Court
                 </p>
-                <p className="text-[13px] font-medium text-base-content/40 mt-0.5">
+                <p className="text-[13px] font-medium text-base-content/35 mt-0.5 tracking-wide">
                   Case & Employee System
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Collapse toggle — floats on the sidebar edge */}
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-50 w-7 h-7 rounded-full flex items-center justify-center bg-base-100 border border-base-300 shadow-md text-base-content/40 hover:text-base-content hover:bg-base-200 hover:shadow-lg transition-all duration-200"
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <motion.span
-              animate={{ rotate: collapsed ? 180 : 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex items-center justify-center"
-            >
-              <FiChevronLeft size={14} />
-            </motion.span>
-          </button>
         </div>
 
         {/* ── Nav ─────────────────────────────────────── */}
         <nav
           className={[
-            "flex-1 overflow-y-auto",
+            "flex-1 overflow-y-auto relative z-10",
             isExpanded
-              ? "px-2 py-2 space-y-0.5 overflow-x-hidden"
-              : "px-1.5 py-3 space-y-1 overflow-x-visible",
+              ? "px-2.5 py-1 space-y-0.5 overflow-x-hidden"
+              : "px-1.5 py-2 space-y-1 overflow-x-visible",
           ].join(" ")}
         >
           {/* Main */}
-          <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
-          <NavBtn
-            item={{
-              icon: <FiHome />,
-              href: "dashboard",
-              label: "Dashboard",
-            }}
-            isExpanded={isExpanded}
-            activeView={activeView}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-            onExpandSidebar={() => setCollapsed(false)}
-          />
-
-          {/* Cases */}
-          <SectionLabel label="Cases" isExpanded={isExpanded} />
-          {caseNavItems.map((item) => (
+          <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
+            <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
+          </div>
+          <div className="sidebar-stagger" style={{ animationDelay: "30ms" }}>
             <NavBtn
-              key={item.href}
-              item={item}
+              item={{
+                icon: <FiHome />,
+                href: "dashboard",
+                label: "Dashboard",
+              }}
               isExpanded={isExpanded}
               activeView={activeView}
               openDropdown={openDropdown}
               setOpenDropdown={setOpenDropdown}
               onExpandSidebar={() => setCollapsed(false)}
             />
+          </div>
+
+          {/* Cases */}
+          <div className="sidebar-stagger" style={{ animationDelay: "60ms" }}>
+            <SectionLabel label="Cases" isExpanded={isExpanded} />
+          </div>
+          {caseNavItems.map((item, i) => (
+            <div
+              key={item.href}
+              className="sidebar-stagger"
+              style={{ animationDelay: `${90 + i * 30}ms` }}
+            >
+              <NavBtn
+                item={item}
+                isExpanded={isExpanded}
+                activeView={activeView}
+                openDropdown={openDropdown}
+                setOpenDropdown={setOpenDropdown}
+                onExpandSidebar={() => setCollapsed(false)}
+              />
+            </div>
           ))}
 
           {/* Admin */}
           {isAdmin && (
             <>
-              <SectionLabel label="Admin" isExpanded={isExpanded} />
-              {adminNavItems.map((item) => (
-                <NavBtn
+              <div
+                className="sidebar-stagger"
+                style={{ animationDelay: "150ms" }}
+              >
+                <SectionLabel label="Admin" isExpanded={isExpanded} />
+              </div>
+              {adminNavItems.map((item, i) => (
+                <div
                   key={item.href}
-                  item={item}
-                  isExpanded={isExpanded}
-                  activeView={activeView}
-                  openDropdown={openDropdown}
-                  setOpenDropdown={setOpenDropdown}
-                  onExpandSidebar={() => setCollapsed(false)}
-                />
+                  className="sidebar-stagger"
+                  style={{ animationDelay: `${180 + i * 30}ms` }}
+                >
+                  <NavBtn
+                    item={item}
+                    isExpanded={isExpanded}
+                    activeView={activeView}
+                    openDropdown={openDropdown}
+                    setOpenDropdown={setOpenDropdown}
+                    onExpandSidebar={() => setCollapsed(false)}
+                  />
+                </div>
               ))}
             </>
           )}
 
           {/* Communication */}
-          <SectionLabel label="Communication" isExpanded={isExpanded} />
-          <ActionBtn
-            icon={<FiMessageSquare />}
-            label="Messages"
-            badge={3}
-            isExpanded={isExpanded}
-            onClick={() => router.push("/user/messages")}
-          />
-          <ActionBtn
-            icon={<FiBell />}
-            label="Notifications"
-            badge={5}
-            isExpanded={isExpanded}
-            onClick={() => router.push("/user/notifications")}
-          />
+          <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+            <SectionLabel label="Communication" isExpanded={isExpanded} />
+          </div>
+          <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+            <ActionBtn
+              icon={<FiMessageSquare />}
+              label="Messages"
+              badge={3}
+              isExpanded={isExpanded}
+              onClick={() => router.push("/user/messages")}
+            />
+          </div>
+          <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+            <ActionBtn
+              icon={<FiBell />}
+              label="Notifications"
+              badge={5}
+              isExpanded={isExpanded}
+              onClick={() => router.push("/user/notifications")}
+            />
+          </div>
 
           {/* Settings */}
-          <SectionLabel label="Settings" isExpanded={isExpanded} />
-          <ActionBtn
-            icon={<FiSettings />}
-            label="Settings"
-            isExpanded={isExpanded}
-            onClick={() => router.push("/user/settings")}
-          />
-          <ActionBtn
-            icon={theme === "winter" ? <FiMoon /> : <FiSun />}
-            label={theme === "winter" ? "Dark Mode" : "Light Mode"}
-            isExpanded={isExpanded}
-            onClick={() => setTheme((t) => (t === "winter" ? "dim" : "winter"))}
-          />
+          <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+            <SectionLabel label="Settings" isExpanded={isExpanded} />
+          </div>
+          <div className="sidebar-stagger" style={{ animationDelay: "390ms" }}>
+            <ActionBtn
+              icon={<FiSettings />}
+              label="Settings"
+              isExpanded={isExpanded}
+              onClick={() => router.push("/user/settings")}
+            />
+          </div>
+          <div className="sidebar-stagger" style={{ animationDelay: "420ms" }}>
+            <ActionBtn
+              icon={theme === "winter" ? <FiMoon /> : <FiSun />}
+              label={theme === "winter" ? "Dark Mode" : "Light Mode"}
+              isExpanded={isExpanded}
+              onClick={() =>
+                setTheme((t) => (t === "winter" ? "dim" : "winter"))
+              }
+            />
+          </div>
         </nav>
 
+        {/* ── Collapse toggle ────────────────────────── */}
+        <div className="px-2.5 pb-2 relative z-10">
+          <motion.button
+            onClick={() => setCollapsed((c) => !c)}
+            whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.06)" }}
+            whileTap={{ scale: 0.96 }}
+            className={[
+              "flex items-center w-full rounded-xl transition-all duration-200 group",
+              "bg-base-content/3 hover:bg-base-content/7",
+              isExpanded ? "gap-2.5 px-3 py-2" : "justify-center py-2",
+            ].join(" ")}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <motion.span
+              animate={{ rotate: collapsed ? 0 : 0 }}
+              className="text-base-content/35 group-hover:text-primary/70 transition-colors duration-200"
+            >
+              {collapsed ? (
+                <FiChevronsRight size={16} />
+              ) : (
+                <FiChevronsLeft size={16} />
+              )}
+            </motion.span>
+            <AnimatePresence mode="wait">
+              {isExpanded && (
+                <motion.span
+                  key="collapse-label"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="text-[11px] font-semibold text-base-content/35 group-hover:text-primary/70 whitespace-nowrap overflow-hidden transition-colors duration-200"
+                >
+                  Collapse
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        </div>
+
         {/* ── Footer / User ──────────────────────────── */}
-        <div className="border-t border-base-300 p-2 space-y-1 text-center">
+        <div
+          className="p-2 space-y-1 text-left relative z-10"
+          style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}
+        >
           {session?.user && (
             <UserCard
               name={session.user.name}

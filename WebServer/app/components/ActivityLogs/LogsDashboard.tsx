@@ -1,18 +1,9 @@
 "use client";
 import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
+import { Activity, CalendarCheck, Users, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  FiActivity,
-  FiCalendar,
-  FiCopy,
-  FiDownload,
-  FiFilter,
-  FiSearch,
-  FiTrendingUp,
-  FiUsers,
-  FiX,
-} from "react-icons/fi";
+import { FiCopy, FiDownload, FiFilter, FiSearch, FiX } from "react-icons/fi";
 import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCases } from "../Case/CasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
@@ -123,34 +114,6 @@ function matchesCategory(action: string, category: ActionCategory): boolean {
       return true;
   }
 }
-
-// ─── Stat Card ─────────────────────────────────────────────────────────────────
-
-const StatCard = ({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  color: string;
-}) => (
-  <div className="bg-base-100 rounded-2xl border border-base-200 p-5 flex items-center gap-4 min-w-0">
-    <div
-      className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center shrink-0`}
-    >
-      {icon}
-    </div>
-    <div className="min-w-0">
-      <p className="text-[11px] font-medium text-base-content/50 uppercase tracking-wider">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-base-content truncate">{value}</p>
-    </div>
-  </div>
-);
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
@@ -378,44 +341,85 @@ const LogsDashboard: React.FC = () => {
     <div className="space-y-6 w-full">
       {/* ─── Header ──────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Activity Reports
-        </h1>
-        <p className="text-sm md:text-base text-base-content/50 mt-1">
+        <h1 className="text-5xl font-bold tracking-tight">Activity Reports</h1>
+        <p className="text-lg text-base-content/50 mt-2">
           Track and review all user activities and system changes.
         </p>
       </div>
 
       {/* ─── Stats ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<FiActivity className="w-5 h-5 text-primary" />}
-          label="Total Activities"
-          value={stats.total.toLocaleString()}
-          color="bg-primary/10"
-        />
-        <StatCard
-          icon={<FiCalendar className="w-5 h-5 text-success" />}
-          label="Today"
-          value={stats.today.toLocaleString()}
-          color="bg-success/10"
-        />
-        <StatCard
-          icon={<FiUsers className="w-5 h-5 text-info" />}
-          label="Active Users"
-          value={stats.uniqueUsers}
-          color="bg-info/10"
-        />
-        <StatCard
-          icon={<FiTrendingUp className="w-5 h-5 text-warning" />}
-          label="Top Action"
-          value={stats.topAction}
-          color="bg-warning/10"
-        />
-      </div>
+      <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
+        {[
+          {
+            label: "Total Activities",
+            value: stats.total.toLocaleString(),
+            subtitle: `${stats.today.toLocaleString()} logged today`,
+            icon: Activity,
+            delay: 0,
+          },
+          {
+            label: "Today's Actions",
+            value: stats.today.toLocaleString(),
+            subtitle: "Activities recorded today",
+            icon: CalendarCheck,
+            delay: 100,
+          },
+          {
+            label: "Active Users",
+            value: stats.uniqueUsers.toLocaleString(),
+            subtitle: "Unique users with logs",
+            icon: Users,
+            delay: 200,
+          },
+          {
+            label: "Top Action",
+            value: stats.topAction,
+            subtitle: "Most frequent activity",
+            icon: Zap,
+            delay: 300,
+          },
+        ].map((card, idx) => (
+          <div
+            key={idx}
+            className="transform hover:scale-105 card surface-card-hover group"
+            style={{
+              transitionDelay: `${card.delay}ms`,
+              transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            <div
+              className="card-body relative overflow-hidden"
+              style={{ padding: "var(--space-card-padding)" }}
+            >
+              <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                <card.icon className="h-full w-full" />
+              </div>
+              <div className="relative">
+                <div className="badge-primary gap-2 mb-3">
+                  <span className="font-bold uppercase text-lg">
+                    {card.label}
+                  </span>
+                </div>
+                <p
+                  className={`font-black text-base-content mb-2 ${
+                    card.label === "Top Action"
+                      ? "text-xl sm:text-2xl"
+                      : "text-4xl sm:text-5xl"
+                  }`}
+                >
+                  {card.value}
+                </p>
+                <p className="text-sm sm:text-base font-semibold text-muted">
+                  {card.subtitle}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
 
       {/* ─── Filters ─────────────────────────────────────────────────────── */}
-      <div className="bg-base-100 rounded-2xl border border-base-200 p-4 space-y-3">
+      <div className="bg-base-100 rounded-2xl  p-4 space-y-3">
         {/* Row 1: Search + Export */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="flex-1 relative">

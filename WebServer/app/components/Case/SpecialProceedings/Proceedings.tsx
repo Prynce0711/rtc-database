@@ -470,7 +470,7 @@ const Proceedings: React.FC = () => {
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Special Proceedings Cases
           </h2>
-          <p className="text-xl text-base-content/70">
+          <p className="text-xl text-base-content/50 mt-2">
             Manage all special proceedings
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
@@ -575,7 +575,7 @@ const Proceedings: React.FC = () => {
               )}
             </button>
             <button
-              className="btn btn-success"
+              className="btn btn-primary"
               onClick={() => {
                 setSelectedCase(null);
                 setDrawerType("ADD");
@@ -678,9 +678,9 @@ const Proceedings: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-base-300 rounded-lg shadow overflow-x-auto">
+        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <table className="table table-zebra w-full text-center">
-            <thead>
+            <thead className=" bg-base-300">
               <tr className="text-center">
                 <th>ACTIONS</th>
                 <SortTh
@@ -724,11 +724,18 @@ const Proceedings: React.FC = () => {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="text-center py-12 text-base-content/50"
-                  >
-                    No cases found.
+                  <td colSpan={7}>
+                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
+                      <div className="flex items-center justify-center mb-4">
+                        <FiFileText className="w-15 h-15 opacity-50" />
+                      </div>
+                      <p className="text-lg font-semibold text-base-content/50">
+                        NO CASES FOUND
+                      </p>
+                      <p className="text-sm uppercase mt-1 text-base-content/35">
+                        No special proceedings match your current filters.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

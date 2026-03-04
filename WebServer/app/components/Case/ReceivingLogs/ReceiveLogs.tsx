@@ -432,7 +432,7 @@ const ReceiveLogsPage: React.FC = () => {
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
             Receiving Logs
           </h2>
-          <p className="text-xl text-base-content/70">
+          <p className="text-xl text-base-content/50 mt-2">
             Track all received documents and case filings
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
@@ -569,7 +569,7 @@ const ReceiveLogsPage: React.FC = () => {
                 </button>
 
                 <button
-                  className="btn btn-success"
+                  className="btn btn-primary"
                   onClick={() => {
                     setSelectedLog(null);
                     setDrawerType(ReceiveDrawerType.ADD);
@@ -675,7 +675,7 @@ const ReceiveLogsPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-base-300 rounded-lg shadow overflow-x-auto">
+        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <Table
             headers={[
               {
