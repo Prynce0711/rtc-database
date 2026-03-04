@@ -1,5 +1,6 @@
 "use client";
 
+import TipCell from "@/app/components/Table/TipCell";
 import { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 
@@ -26,7 +27,7 @@ const SpecialProceedingRow = ({
   onRowClick: (c: SpecialProceeding) => void;
 }) => (
   <tr
-    className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+    className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
     onClick={() => onRowClick(caseItem)}
   >
     <td onClick={(e) => e.stopPropagation()} className="relative text-center">
@@ -80,14 +81,25 @@ const SpecialProceedingRow = ({
         </div>
       </div>
     </td>
-    <td className="font-semibold text-center">{caseItem.caseNumber}</td>
-    <td className="text-center">{caseItem.raffledTo}</td>
-    <td className="text-center text-base-content/70">
-      {formatDate(caseItem.date)}
-    </td>
-    <td className="font-medium text-center">{caseItem.petitioner}</td>
-    <td className="text-center">{caseItem.nature}</td>
-    <td className="text-center">{caseItem.respondent}</td>
+    <TipCell
+      label="SPC. No."
+      value={caseItem.caseNumber}
+      className="font-semibold"
+    />
+    <TipCell label="Raffled To" value={caseItem.raffledTo} />
+    <TipCell
+      label="Date Filed"
+      value={formatDate(caseItem.date)}
+      className="text-base-content/70"
+    />
+    <TipCell
+      label="Petitioner"
+      value={caseItem.petitioner}
+      truncate
+      className="font-medium"
+    />
+    <TipCell label="Nature" value={caseItem.nature} truncate />
+    <TipCell label="Respondent" value={caseItem.respondent} truncate />
   </tr>
 );
 

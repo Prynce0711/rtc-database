@@ -7,10 +7,15 @@ import {
   FiAlertCircle,
   FiArrowLeft,
   FiCheck,
+  FiChevronLeft,
   FiChevronRight,
+  FiCopy,
   FiEdit3,
   FiEye,
   FiFileText,
+  FiPlus,
+  FiSave,
+  FiTrash2,
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
@@ -373,7 +378,7 @@ const SpecialProceedingDrawer = ({
     });
     setEntries(validated);
     if (anyError) {
-      alert("Please fill in all required fields before reviewing.");
+      popup.showError("Please fill in all required fields before reviewing.");
       return;
     }
     setReviewIdx(0);
@@ -387,8 +392,9 @@ const SpecialProceedingDrawer = ({
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
-    if (!confirm(label)) return;
+    if (!(await popup.showConfirm(label))) return;
     setIsSubmitting(true);
+    popup.showLoading(isEdit ? "Updating case..." : "Creating case(s)...");
     try {
       if (isEdit && selectedCase) {
         const e = entries[0];
@@ -428,10 +434,13 @@ const SpecialProceedingDrawer = ({
       }
       onClose();
     } catch (error) {
-      popup.showError("An error occurred");
+      popup.showError(
+        error instanceof Error ? error.message : "An error occurred",
+      );
       console.error(error);
     } finally {
       setIsSubmitting(false);
+      popup.hidePopup();
     }
   };
 
@@ -653,21 +662,23 @@ const SpecialProceedingDrawer = ({
                               </td>
                             ))}
                             <td className="td-actions">
-                              <div className="flex gap-2 justify-center">
+                              <div className="xls-row-actions">
                                 <button
-                                  className="xls-action-btn"
-                                  title="Duplicate row"
+                                  type="button"
+                                  className="xls-row-btn"
                                   onClick={() => handleDuplicate(entry.id)}
+                                  title="Duplicate row"
                                 >
-                                  📋
+                                  <FiCopy size={13} />
                                 </button>
-                                {!isEdit && entries.length > 1 && (
+                                {entries.length > 1 && (
                                   <button
-                                    className="xls-action-btn"
-                                    title="Delete row"
+                                    type="button"
+                                    className="xls-row-btn del"
                                     onClick={() => handleRemove(entry.id)}
+                                    title="Remove row"
                                   >
-                                    ✕
+                                    <FiTrash2 size={13} />
                                   </button>
                                 )}
                               </div>
@@ -680,97 +691,182 @@ const SpecialProceedingDrawer = ({
                 </table>
               </div>
               {!isEdit && (
-                <div className="xls-sheet-footer">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={handleAddEntry}
-                  >
-                    + Add Row
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="xls-add-row"
+                  onClick={handleAddEntry}
+                >
+                  <FiPlus size={14} strokeWidth={2.5} />
+                  Add Row
+                </button>
               )}
             </div>
-            <div className="xls-bottom-actions">
-              <button className="btn btn-outline" onClick={onClose}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleGoToReview}
-                disabled={completedCount === 0}
-              >
-                Review {completedCount > 0 && `(${completedCount})`} →
-              </button>
+
+            <div className="xls-footer">
+              <div className="xls-footer-meta">
+                {!isEdit && entries.length > 1 && (
+                  <span>
+                    <strong>{completedCount}</strong> of{" "}
+                    <strong>{entries.length}</strong> rows ready
+                  </span>
+                )}
+                <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
+                  Fields marked{" "}
+                  <span style={{ color: "var(--color-error)" }}>*</span> are
+                  required
+                </span>
+              </div>
+              <div className="xls-footer-right">
+                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="xls-btn xls-btn-primary"
+                  onClick={handleGoToReview}
+                >
+                  <FiEye size={15} />
+                  Review
+                  {!isEdit && entries.length > 1 ? ` (${entries.length})` : ""}
+                </button>
+              </div>
             </div>
           </motion.div>
         ) : (
           <motion.div
             key="review"
-            className="bg-base-100 xls-main xls-review"
-            initial={{ opacity: 0, y: 6 }}
+            className="xls-main"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
           >
-            <AnimatePresence mode="wait">
-              {entries[reviewIdx] && (
-                <motion.div
-                  key={reviewIdx}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.12 }}
-                >
-                  <ReviewCard entry={entries[reviewIdx]} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <div className="xls-review-nav">
-              {entries.length > 1 && (
-                <>
-                  <span className="xls-review-counter">
-                    {reviewIdx + 1} of {entries.length}
-                  </span>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => setReviewIdx(Math.max(0, reviewIdx - 1))}
-                    disabled={reviewIdx === 0}
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() =>
-                      setReviewIdx(Math.min(entries.length - 1, reviewIdx + 1))
-                    }
-                    disabled={reviewIdx === entries.length - 1}
-                  >
-                    Next →
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="xls-bottom-actions">
+            <div className="rv-summary">
+              <div className="rv-summary-left">
+                <div className="rv-summary-icon">
+                  <FiCheck size={17} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <p className="rv-summary-title">
+                    {isEdit
+                      ? "Review your edits"
+                      : entries.length === 1
+                        ? "Review before saving"
+                        : `Review ${entries.length} cases before saving`}
+                  </p>
+                  <p className="rv-summary-sub">
+                    {isEdit
+                      ? "Check the details below, then confirm your changes."
+                      : "All fields validated. Confirm the details are correct."}
+                  </p>
+                </div>
+              </div>
               <button
-                className="btn btn-outline"
+                className="xls-btn xls-btn-outline"
                 onClick={() => setStep("entry")}
               >
-                ← Back to Edit
+                <FiEdit3 size={14} />
+                Go Back & Edit
               </button>
+            </div>
+
+            <div className="rv-layout">
+              {entries.length > 1 && (
+                <div className="rv-sidebar">
+                  <div className="rv-sidebar-head">{entries.length} Cases</div>
+                  <div className="rv-sidebar-list">
+                    {entries.map((entry, idx) => (
+                      <button
+                        key={entry.id}
+                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
+                        onClick={() => setReviewIdx(idx)}
+                      >
+                        <span className="rv-sidebar-num">{idx + 1}</span>
+                        <div className="rv-sidebar-info">
+                          <div className="rv-sidebar-casenum">
+                            {entry.caseNumber || "No case no."}
+                          </div>
+                          <div className="rv-sidebar-name">
+                            {entry.petitioner || "No petitioner"}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="rv-panel">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={reviewIdx}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.12 }}
+                  >
+                    <ReviewCard entry={entries[reviewIdx]} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="xls-footer">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  className="xls-btn xls-btn-ghost"
+                  onClick={() => setStep("entry")}
+                >
+                  <FiArrowLeft size={14} />
+                  Back to Edit
+                </button>
+                {entries.length > 1 && (
+                  <div className="rv-pager">
+                    <button
+                      className="xls-btn-icon"
+                      onClick={() => setReviewIdx((i) => Math.max(0, i - 1))}
+                      disabled={reviewIdx === 0}
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <span className="rv-pager-info">
+                      {reviewIdx + 1} / {entries.length}
+                    </span>
+                    <button
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setReviewIdx((i) => Math.min(entries.length - 1, i + 1))
+                      }
+                      disabled={reviewIdx === entries.length - 1}
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
-                className="btn btn-primary"
+                className="xls-btn xls-btn-success"
+                style={{
+                  height: 50,
+                  paddingLeft: 30,
+                  paddingRight: 30,
+                  fontSize: 16,
+                }}
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <span className="loading loading-spinner loading-sm" />
+                    <span className="xls-spinner" />
                     Saving...
                   </>
-                ) : isEdit ? (
-                  "Save Changes"
                 ) : (
-                  `Create ${entries.length} ${entries.length === 1 ? "Case" : "Cases"}`
+                  <>
+                    <FiSave size={17} />
+                    {isEdit
+                      ? "Save Changes"
+                      : entries.length === 1
+                        ? "Confirm & Save"
+                        : `Save All ${entries.length} Cases`}
+                  </>
                 )}
               </button>
             </div>

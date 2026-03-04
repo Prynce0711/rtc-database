@@ -502,14 +502,17 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
           : r.value,
     }));
 
-  const fmtDate = (d: Date | null | undefined) =>
-    d
-      ? d.toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    // Accept Date objects or ISO/string values from server
+    const date = d instanceof Date ? d : new Date(String(d));
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="rv-card">

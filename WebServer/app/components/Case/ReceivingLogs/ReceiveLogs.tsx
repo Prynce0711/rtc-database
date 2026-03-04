@@ -22,6 +22,7 @@ import {
 } from "../../Filter/FilterTypes";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable.tsx";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
@@ -377,11 +378,7 @@ const ReceiveLogsPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    );
+    return <PageListSkeleton statCards={4} tableColumns={8} tableRows={8} />;
   }
 
   if (error) {
@@ -438,6 +435,25 @@ const ReceiveLogsPage: React.FC = () => {
           <p className="text-xl text-base-content/70">
             Track all received documents and case filings
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>Hover over table cells to see full details</span>
+          </div>
         </div>
 
         {/* Search + Filter + Add */}
@@ -553,7 +569,7 @@ const ReceiveLogsPage: React.FC = () => {
                 </button>
 
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-success"
                   onClick={() => {
                     setSelectedLog(null);
                     setDrawerType(ReceiveDrawerType.ADD);
@@ -593,28 +609,28 @@ const ReceiveLogsPage: React.FC = () => {
           {[
             {
               label: "Total Entries",
-              value: stats.total ?? 0,
-              subtitle: `${stats.thisMonth ?? 0} this month`,
+              value: (stats.total ?? 0).toLocaleString(),
+              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
               icon: FiBarChart2,
               delay: 0,
             },
             {
               label: "Today",
-              value: stats.today ?? 0,
+              value: (stats.today ?? 0).toLocaleString(),
               subtitle: `Today`,
               icon: FiFileText,
               delay: 100,
             },
             {
               label: "This Month",
-              value: stats.thisMonth ?? 0,
+              value: (stats.thisMonth ?? 0).toLocaleString(),
               subtitle: `Last 30 days`,
               icon: FiLock,
               delay: 200,
             },
             {
               label: "Doc Types",
-              value: stats.docTypes ?? 0,
+              value: (stats.docTypes ?? 0).toLocaleString(),
               subtitle: `Distinct types`,
               icon: FiUsers,
               delay: 300,

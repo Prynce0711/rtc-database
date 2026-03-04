@@ -369,6 +369,12 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                         Last sync: {new Date().toLocaleTimeString()}
                       </span>
                     </p>
+
+                    {/* Hover instruction note */}
+                    <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+                      <Info size={14} className="shrink-0" />
+                      <span>Hover over table cells to see full details</span>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -513,8 +519,8 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   {[
                     {
                       label: "Total Cases",
-                      value: stats.totalCases,
-                      subtitle: `${stats.casesThisMonth} filed this month`,
+                      value: stats.totalCases.toLocaleString(),
+                      subtitle: `${stats.casesThisMonth.toLocaleString()} filed this month`,
                       icon: Scale,
                       color: "primary",
                       trend: stats.caseGrowth,
@@ -522,15 +528,15 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     },
                     {
                       label: "Active Cases",
-                      value: stats.activeCases,
-                      subtitle: `${stats.pendingRaffle} pending raffle`,
+                      value: stats.activeCases.toLocaleString(),
+                      subtitle: `${stats.pendingRaffle.toLocaleString()} pending raffle`,
                       icon: FileText,
                       color: "primary",
                       delay: 100,
                     },
                     {
                       label: "In Detention",
-                      value: stats.detained,
+                      value: stats.detained.toLocaleString(),
                       subtitle: `${stats.detainedPercentage.toFixed(1)}% of total`,
                       icon: Lock,
                       color: "primary",
@@ -538,8 +544,8 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     },
                     {
                       label: "Active Users",
-                      value: stats.activeAccounts,
-                      subtitle: `${stats.inactiveAccounts} inactive`,
+                      value: stats.activeAccounts.toLocaleString(),
+                      subtitle: `${stats.inactiveAccounts.toLocaleString()} inactive`,
                       icon: Shield,
                       color: "primary",
                       delay: 300,

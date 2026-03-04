@@ -75,7 +75,7 @@ function Table<T extends Record<string, unknown>>({
 
   return (
     <div className={className}>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-visible">
         <table className="table table-compact uppercase table-zebra w-full text-center">
           <thead className="text-sm bg-base-300 rounded-lg shadow text-sm">
             <tr>

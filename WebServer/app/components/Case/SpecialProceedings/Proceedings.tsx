@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiBarChart2,
+  FiDownload,
   FiFileText,
   FiLock,
   FiSearch,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
 import { FilterOption } from "../../Filter/FilterTypes";
 import { usePopup } from "../../Popup/PopupProvider";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable.tsx";
 import {
   exportSpecialProceedingsExcel,
   uploadSpecialProceedingExcel,
@@ -26,24 +29,31 @@ import {
 } from "./SpecialProceedingsActions";
 
 type SPFilterValues = {
-  caseNumber?: string;
-  raffledTo?: string;
-  petitioner?: string;
+  spcNo?: string;
+  raffledToBranch?: string;
+  petitioners?: string;
   nature?: string;
   respondent?: string;
-  date?: { start?: string; end?: string };
+  dateFiled?: { start?: string; end?: string };
 };
 
-type SortConfig = { key: keyof SpecialProceeding; order: "asc" | "desc" };
+type SortableSPKey =
+  | "caseNumber"
+  | "raffledTo"
+  | "date"
+  | "petitioner"
+  | "nature"
+  | "respondent";
+type SortConfig = { key: SortableSPKey; order: "asc" | "desc" };
 type DrawerType = "ADD" | "EDIT";
 
 const SP_FILTER_OPTIONS: FilterOption[] = [
-  { key: "caseNumber", label: "SPC. No.", type: "text" },
-  { key: "raffledTo", label: "Raffled to Branch", type: "text" },
-  { key: "petitioner", label: "Petitioners", type: "text" },
+  { key: "spcNo", label: "SPC. No.", type: "text" },
+  { key: "raffledToBranch", label: "Raffled to Branch", type: "text" },
+  { key: "petitioners", label: "Petitioners", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
   { key: "respondent", label: "Respondent", type: "text" },
-  { key: "date", label: "Date Filed", type: "daterange" },
+  { key: "dateFiled", label: "Date Filed", type: "daterange" },
 ];
 
 const PAGE_SIZE = 25;
@@ -54,38 +64,42 @@ const applySPFilters = (
 ): SpecialProceeding[] =>
   items.filter((c) => {
     if (
-      filters.caseNumber &&
-      !c.caseNumber.toLowerCase().includes(filters.caseNumber.toLowerCase())
+      filters.spcNo &&
+      !(c.caseNumber || "").toLowerCase().includes(filters.spcNo.toLowerCase())
     )
       return false;
     if (
-      filters.raffledTo &&
-      c.raffledTo &&
-      !c.raffledTo.toLowerCase().includes(filters.raffledTo.toLowerCase())
+      filters.raffledToBranch &&
+      !(c.raffledTo || "")
+        .toLowerCase()
+        .includes(filters.raffledToBranch.toLowerCase())
     )
       return false;
     if (
-      filters.petitioner &&
-      c.petitioner &&
-      !c.petitioner.toLowerCase().includes(filters.petitioner.toLowerCase())
+      filters.petitioners &&
+      !(c.petitioner || "")
+        .toLowerCase()
+        .includes(filters.petitioners.toLowerCase())
     )
       return false;
     if (
       filters.nature &&
-      c.nature &&
-      !c.nature.toLowerCase().includes(filters.nature.toLowerCase())
+      !(c.nature || "").toLowerCase().includes(filters.nature.toLowerCase())
     )
       return false;
     if (
       filters.respondent &&
-      c.respondent &&
-      !c.respondent.toLowerCase().includes(filters.respondent.toLowerCase())
+      !(c.respondent || "")
+        .toLowerCase()
+        .includes(filters.respondent.toLowerCase())
     )
       return false;
-    if (filters.date && c.date) {
+    if (filters.dateFiled && c.date) {
       const d = new Date(c.date);
-      if (filters.date.start && d < new Date(filters.date.start)) return false;
-      if (filters.date.end && d > new Date(filters.date.end)) return false;
+      if (filters.dateFiled.start && d < new Date(filters.dateFiled.start))
+        return false;
+      if (filters.dateFiled.end && d > new Date(filters.dateFiled.end))
+        return false;
     }
     return true;
   });
@@ -97,24 +111,41 @@ const SortTh = ({
   onSort,
 }: {
   label: string;
-  colKey: keyof SpecialProceeding;
+  colKey: SortableSPKey;
   sortConfig: SortConfig;
-  onSort: (k: keyof SpecialProceeding) => void;
-}) => (
-  <th
-    className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
-    onClick={() => onSort(colKey)}
-  >
-    {label}
-    {sortConfig.key === colKey ? (
-      <span className="ml-1 text-primary">
-        {sortConfig.order === "asc" ? "â†‘" : "â†“"}
-      </span>
-    ) : (
-      <span className="opacity-30 ml-1">â†•</span>
-    )}
-  </th>
-);
+  onSort: (k: SortableSPKey) => void;
+}) => {
+  const active = sortConfig.key === colKey;
+  const ariaLabel = active
+    ? `Sorted ${sortConfig.order === "asc" ? "ascending" : "descending"}`
+    : "Not sorted";
+
+  return (
+    <th
+      className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
+      onClick={() => onSort(colKey)}
+      aria-sort={
+        active
+          ? sortConfig.order === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+      aria-label={`${label}: ${ariaLabel}`}
+    >
+      {label}
+      {active ? (
+        <span className="ml-1 text-primary" aria-hidden>
+          {sortConfig.order === "asc" ? "↑" : "↓"}
+        </span>
+      ) : (
+        <span className="opacity-30 ml-1" aria-hidden>
+          ↕
+        </span>
+      )}
+    </th>
+  );
+};
 
 function PageButton({
   isActive,
@@ -278,7 +309,7 @@ const Proceedings: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSort = (key: keyof SpecialProceeding) => {
+  const handleSort = (key: SortableSPKey) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
@@ -292,9 +323,9 @@ const Proceedings: React.FC = () => {
 
   const getSuggestions = (key: string, partial: string) => {
     const fieldMap: Record<string, keyof SpecialProceeding> = {
-      caseNumber: "caseNumber",
-      raffledTo: "raffledTo",
-      petitioner: "petitioner",
+      spcNo: "caseNumber",
+      raffledToBranch: "raffledTo",
+      petitioners: "petitioner",
       nature: "nature",
       respondent: "respondent",
     };
@@ -320,12 +351,14 @@ const Proceedings: React.FC = () => {
     );
 
     return [...filtered].sort((a, b) => {
-      const aVal = a[sortConfig.key];
-      const bVal = b[sortConfig.key];
+      const aVal = a[sortConfig.key as keyof SpecialProceeding];
+      const bVal = b[sortConfig.key as keyof SpecialProceeding];
 
       if (aVal == null || bVal == null) return 0;
-      if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
+      const aStr = aVal instanceof Date ? aVal.getTime() : String(aVal);
+      const bStr = bVal instanceof Date ? bVal.getTime() : String(bVal);
+      if (aStr < bStr) return sortConfig.order === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortConfig.order === "asc" ? 1 : -1;
       return 0;
     });
   }, [cases, searchTerm, sortConfig, appliedFilters]);
@@ -349,9 +382,8 @@ const Proceedings: React.FC = () => {
         d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
       );
     }).length;
-    const natures = new Set(cases.map((c) => c.nature).filter(Boolean)).size;
-    const branches = new Set(cases.map((c) => c.raffledTo).filter(Boolean))
-      .size;
+    const natures = new Set(cases.map((c) => c.nature)).size;
+    const branches = new Set(cases.map((c) => c.raffledTo)).size;
     return { total, thisMonth, natures, branches };
   }, [cases]);
 
@@ -419,11 +451,7 @@ const Proceedings: React.FC = () => {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    );
+    return <PageListSkeleton statCards={4} tableColumns={7} tableRows={8} />;
   }
 
   if (error) {
@@ -445,6 +473,25 @@ const Proceedings: React.FC = () => {
           <p className="text-xl text-base-content/70">
             Manage all special proceedings
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>Hover over table cells to see full details</span>
+          </div>
         </div>
 
         {/* Search and Actions */}
@@ -486,28 +533,6 @@ const Proceedings: React.FC = () => {
             </button>
 
             <button
-              className="btn btn-primary"
-              onClick={() => {
-                setSelectedCase(null);
-                setDrawerType("ADD");
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Add Case
-            </button>
-
-            <button
               className="btn btn-outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
@@ -519,14 +544,7 @@ const Proceedings: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                  </svg>
+                  <FiUpload className="h-5 w-5 mr-2" />
                   Import
                 </>
               )}
@@ -551,17 +569,31 @@ const Proceedings: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                  </svg>
+                  <FiDownload className="h-5 w-5 mr-2" />
                   Export
                 </>
               )}
+            </button>
+            <button
+              className="btn btn-success"
+              onClick={() => {
+                setSelectedCase(null);
+                setDrawerType("ADD");
+              }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Add Case
             </button>
           </div>
 
@@ -581,7 +613,7 @@ const Proceedings: React.FC = () => {
             {
               label: "Total Cases",
               value: stats.total ?? 0,
-              subtitle: `${stats.thisMonth ?? 0} this month`,
+              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
               icon: FiBarChart2,
               delay: 0,
             },
@@ -633,7 +665,7 @@ const Proceedings: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
+                      {card.value.toLocaleString()}
                     </p>
                     <p className="text-sm sm:text-base font-semibold text-muted">
                       {card.subtitle}
