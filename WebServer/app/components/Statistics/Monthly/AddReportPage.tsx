@@ -28,6 +28,7 @@ interface EditableRow {
 
 export interface AddReportPageProps {
   month: string;
+  initialData?: MonthlyRow[];
   onBack: () => void;
   onSave: (rows: MonthlyRow[]) => void;
 }
@@ -52,10 +53,22 @@ const emptyRow = (): EditableRow => ({
 
 const AddReportPage: React.FC<AddReportPageProps> = ({
   month,
+  initialData,
   onBack,
   onSave,
 }) => {
-  const [rows, setRows] = useState<EditableRow[]>(() => [emptyRow()]);
+  const [rows, setRows] = useState<EditableRow[]>(() => {
+    if (initialData && initialData.length > 0) {
+      return initialData.map((r) => ({
+        id: crypto.randomUUID(),
+        category: r.category,
+        branch: r.branch,
+        criminal: r.criminal,
+        civil: r.civil,
+      }));
+    }
+    return [emptyRow()];
+  });
   const [activeCell, setActiveCell] = useState<{
     rowIdx: number;
     col: string;

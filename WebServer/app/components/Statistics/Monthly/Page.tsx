@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCalendar, FiDownload, FiPlus, FiUpload } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import {
+  deleteMonthlyStatistic,
   getMonthlyStatistics,
   upsertMonthlyStatistics,
 } from "./MonthlyActions";
@@ -29,7 +30,63 @@ export default function MonthlyPage() {
   const [uploading, setUploading] = useState(false);
   const [showAddPage, setShowAddPage] = useState(false);
   const [showViewPage, setShowViewPage] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    const allIds = filteredData.filter((r) => r.id != null).map((r) => r.id!);
+    setSelectedIds((prev) => {
+      const allSelected = allIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(allIds);
+    });
+  };
+
+  const cancelSelection = () => {
+    setSelectionMode(null);
+    setSelectedIds(new Set());
+  };
+
+  const confirmSelection = async () => {
+    if (selectedIds.size === 0) return;
+
+    if (selectionMode === "delete") {
+      const confirmed = window.confirm(
+        `Delete ${selectedIds.size} selected row(s)?`,
+      );
+      if (!confirmed) return;
+      await Promise.all(
+        Array.from(selectedIds).map((id) => deleteMonthlyStatistic(id)),
+      );
+      const fresh = await getMonthlyStatistics(selectedMonth);
+      if (fresh.success) setImportedData(fresh.result);
+    } else if (selectionMode === "edit") {
+      const selected = filteredData.filter(
+        (r) => r.id != null && selectedIds.has(r.id),
+      );
+      setEditMode(true);
+      setShowAddPage(true);
+      // Store selected data for AddReportPage — done via editMode + initialData filtering
+      setImportedData((prev) => {
+        // Keep only selected rows for edit context
+        return selected;
+      });
+    }
+
+    cancelSelection();
+  };
 
   /* ---- Load from DB whenever selectedMonth changes ---- */
   useEffect(() => {
@@ -158,7 +215,11 @@ export default function MonthlyPage() {
     return (
       <AddReportPage
         month={selectedMonth}
-        onBack={() => setShowAddPage(false)}
+        initialData={editMode ? monthlyData : undefined}
+        onBack={() => {
+          setShowAddPage(false);
+          setEditMode(false);
+        }}
         onSave={async (newRows) => {
           const res = await upsertMonthlyStatistics(newRows);
           if (res.success) {
@@ -168,6 +229,7 @@ export default function MonthlyPage() {
             console.error("Save failed:", res.error);
           }
           setShowAddPage(false);
+          setEditMode(false);
         }}
       />
     );
@@ -230,7 +292,7 @@ export default function MonthlyPage() {
                   Export
                 </button>
                 <button
-                  className="btn btn-outline btn-success btn-md gap-2"
+                  className="btn btn-success btn-md gap-2"
                   onClick={() => setShowAddPage(true)}
                 >
                   <FiPlus className="h-5 w-5" />
@@ -253,12 +315,32 @@ export default function MonthlyPage() {
         onCategoryFilterChange={setCategoryFilter}
         categories={categories}
         rowCount={filteredData.length}
+        selectionMode={selectionMode}
+        selectedCount={selectedIds.size}
+        onStartEdit={() => {
+          if (filteredData.length > 0) {
+            setSelectionMode("edit");
+            setSelectedIds(new Set());
+          }
+        }}
+        onStartDelete={() => {
+          if (filteredData.length > 0) {
+            setSelectionMode("delete");
+            setSelectedIds(new Set());
+          }
+        }}
+        onConfirmSelection={confirmSelection}
+        onCancelSelection={cancelSelection}
       />
 
       {/* ── TABLE ── */}
       <MonthlyTable
         data={filteredData}
-        onViewData={() => setShowViewPage(true)}
+        onViewData={selectionMode ? undefined : () => setShowViewPage(true)}
+        selectionMode={selectionMode}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onToggleAll={toggleAll}
       />
 
       {/* ── FOOTER ── */}

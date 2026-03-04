@@ -2,16 +2,16 @@
 
 import React from "react";
 import { FiCheck, FiEdit2, FiSearch, FiTrash2, FiX } from "react-icons/fi";
-import type { SelectionMode } from "./MonthlyTable";
 
-interface MonthlyToolbarProps {
+export type AnnualSelectionMode = "edit" | "delete" | null;
+
+interface AnnualToolbarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  categoryFilter: string;
-  onCategoryFilterChange: (value: string) => void;
-  categories: string[];
   rowCount: number;
-  selectionMode?: SelectionMode;
+  placeholder?: string;
+  children?: React.ReactNode;
+  selectionMode?: AnnualSelectionMode;
   selectedCount?: number;
   onStartEdit?: () => void;
   onStartDelete?: () => void;
@@ -19,13 +19,12 @@ interface MonthlyToolbarProps {
   onCancelSelection?: () => void;
 }
 
-const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
+const AnnualToolbar: React.FC<AnnualToolbarProps> = ({
   search,
   onSearchChange,
-  categoryFilter,
-  onCategoryFilterChange,
-  categories,
   rowCount,
+  placeholder,
+  children,
   selectionMode,
   selectedCount = 0,
   onStartEdit,
@@ -41,7 +40,7 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40" />
         <input
           type="text"
-          placeholder="Search branch, category…"
+          placeholder={placeholder ?? "Search branch, category…"}
           className="input input-bordered w-full pl-11"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -49,21 +48,7 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         />
       </div>
 
-      <select
-        className="select select-bordered"
-        value={categoryFilter}
-        onChange={(e) => onCategoryFilterChange(e.target.value)}
-        disabled={isSelecting}
-      >
-        <option value="all">All Categories</option>
-        {categories.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
-
-      {/* Edit / Delete / Confirm / Cancel — right next to filters */}
+      {/* Edit / Delete / Confirm / Cancel — right next to search */}
       {isSelecting ? (
         <>
           <span className="text-sm font-semibold text-base-content/70">
@@ -110,11 +95,14 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         </>
       )}
 
-      <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-        {rowCount} row{rowCount !== 1 && "s"}
-      </span>
+      <div className="ml-auto flex items-center gap-3">
+        {children}
+        <span className="text-sm text-base-content/50 tabular-nums font-medium">
+          {rowCount} row{rowCount !== 1 && "s"}
+        </span>
+      </div>
     </div>
   );
 };
 
-export default MonthlyToolbar;
+export default AnnualToolbar;
