@@ -11,6 +11,7 @@ export interface ColumnDef {
   sortable?: boolean;
   align?: "left" | "center" | "right";
   render: (row: Record<string, unknown>) => React.ReactNode;
+  computeValue?: (row: Record<string, unknown>) => number;
 }
 
 export interface GroupColumnDef {
@@ -71,6 +72,30 @@ export const courtColumns: ColumnDef[] = [
     sortable: true,
     align: "center",
     render: (r) => asCourt(r).percentageOfDisposition || "—",
+  },
+  {
+    key: "_total",
+    label: "Total",
+    sortable: true,
+    align: "center",
+    computeValue: (r) => {
+      const row = asCourt(r);
+      return (
+        (Number(row.pendingLastYear) || 0) +
+        (Number(row.RaffledOrAdded) || 0) +
+        (Number(row.Disposed) || 0) +
+        (Number(row.pendingThisYear) || 0)
+      );
+    },
+    render: (r) => {
+      const row = asCourt(r);
+      const sum =
+        (Number(row.pendingLastYear) || 0) +
+        (Number(row.RaffledOrAdded) || 0) +
+        (Number(row.Disposed) || 0) +
+        (Number(row.pendingThisYear) || 0);
+      return <span className="font-semibold">{sum.toLocaleString()}</span>;
+    },
   },
 ];
 
@@ -149,5 +174,29 @@ export const inventoryColumns: AnyColumnDef[] = [
         render: (r) => asInventory(r).criminalCasesDisposed ?? "—",
       },
     ],
+  },
+  {
+    key: "_total",
+    label: "Total",
+    sortable: true,
+    align: "center",
+    computeValue: (r) => {
+      const row = asInventory(r);
+      return (
+        (Number(row.civilSmallClaimsFiled) || 0) +
+        (Number(row.criminalCasesFiled) || 0) +
+        (Number(row.civilSmallClaimsDisposed) || 0) +
+        (Number(row.criminalCasesDisposed) || 0)
+      );
+    },
+    render: (r) => {
+      const row = asInventory(r);
+      const sum =
+        (Number(row.civilSmallClaimsFiled) || 0) +
+        (Number(row.criminalCasesFiled) || 0) +
+        (Number(row.civilSmallClaimsDisposed) || 0) +
+        (Number(row.criminalCasesDisposed) || 0);
+      return <span className="font-semibold">{sum.toLocaleString()}</span>;
+    },
   },
 ];

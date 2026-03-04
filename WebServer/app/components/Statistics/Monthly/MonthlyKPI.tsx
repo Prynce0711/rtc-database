@@ -59,11 +59,9 @@ const MonthlyKPI: React.FC<MonthlyKPIProps> = (props) => {
               <card.icon className="h-full w-full" />
             </div>
             <div className="relative">
-              <div className={`badge badge-${card.color} gap-2 mb-3`}>
-                <span className="font-extrabold uppercase text-sm tracking-wide">
-                  {card.label}
-                </span>
-              </div>
+              <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                {card.label}
+              </p>
               <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
                 {props[card.key].toLocaleString()}
               </p>
