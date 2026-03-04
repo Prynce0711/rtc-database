@@ -51,23 +51,29 @@ const MonthlyKPI: React.FC<MonthlyKPIProps> = (props) => {
       {cards.map((card, idx) => (
         <div
           key={idx}
-          className="card shadow-xl hover:shadow-2xl hover:scale-[1.03] transition-all duration-300 group"
-          style={{ transitionDelay: `${card.delay}ms` }}
+          className="transform hover:scale-105 card surface-card-hover group"
+          style={{
+            transitionDelay: `${card.delay}ms`,
+            transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+          }}
         >
-          <div className="card-body p-4 sm:p-6 relative overflow-hidden">
-            <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+          <div
+            className="card-body relative overflow-hidden"
+            style={{ padding: "var(--space-card-padding)" }}
+          >
+            <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
               <card.icon className="h-full w-full" />
             </div>
-            <div className="relative">
-              <div className={`badge badge-${card.color} gap-2 mb-3`}>
-                <span className="font-extrabold uppercase text-sm tracking-wide">
+            <div className="relative text-center">
+              <div className="mb-3">
+                <span className="text-sm font-semibold text-muted">
                   {card.label}
                 </span>
               </div>
               <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
                 {props[card.key].toLocaleString()}
               </p>
-              <p className="text-sm sm:text-base font-semibold text-base-content/60">
+              <p className="text-sm sm:text-base font-semibold text-muted">
                 {card.subtitle}
               </p>
             </div>
