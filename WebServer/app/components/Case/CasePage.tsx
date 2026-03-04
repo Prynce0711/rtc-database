@@ -20,6 +20,7 @@ import {
 } from "../Filter/FilterTypes";
 import Pagination from "../Pagination/Pagination";
 import { usePopup } from "../Popup/PopupProvider";
+import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import Table from "../Table/Table";
 import NewCaseModal, { CaseModalType } from "./CaseDrawer";
 import CaseRow from "./CaseRow";
@@ -55,8 +56,7 @@ const CasePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [caseTypeForImport, setCaseTypeForImport] =
-    useState<CaseType>("UNKNOWN");
+  const [caseTypeFilter, setCaseTypeFilter] = useState<string>("ALL");
   const statusPopup = usePopup();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -110,6 +110,26 @@ const CasePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, appliedFilters]);
+
+  // Sync caseTypeFilter → appliedFilters.caseType
+  useEffect(() => {
+    setAppliedFilters((prev) => {
+      const next = { ...prev };
+      if (caseTypeFilter === "ALL") {
+        delete next.caseType;
+      } else {
+        next.caseType = caseTypeFilter;
+      }
+      return next;
+    });
+    setExactMatchMap((prev) => {
+      if (caseTypeFilter === "ALL") {
+        const { caseType: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, caseType: true };
+    });
+  }, [caseTypeFilter]);
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
@@ -253,7 +273,10 @@ const CasePage: React.FC = () => {
 
     setUploading(true);
     try {
-      const result = await uploadExcel(file, caseTypeForImport);
+      const result = await uploadExcel(
+        file,
+        (caseTypeFilter !== "ALL" ? caseTypeFilter : "UNKNOWN") as CaseType,
+      );
       if (!result.success) {
         statusPopup.showError(result.error || "Failed to import cases");
       } else {
@@ -336,11 +359,7 @@ const CasePage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg"></span>
-      </div>
-    );
+    return <PageListSkeleton statCards={4} tableColumns={10} tableRows={8} />;
   }
 
   if (error) {
@@ -376,6 +395,25 @@ const CasePage: React.FC = () => {
             Case Management
           </h2>
           <p className="text-xl text-base-content/70">Manage all court cases</p>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>Hover over table cells to see full details</span>
+          </div>
         </div>
 
         {/* ✅ OUTER relative wrapper — FilterModal mag-sstetch dito */}
@@ -396,6 +434,20 @@ const CasePage: React.FC = () => {
               className="hidden"
               onChange={handleImportExcel}
             />
+            <select
+              value={caseTypeFilter}
+              onChange={(e) => setCaseTypeFilter(e.target.value)}
+              className="select select-bordered"
+            >
+              <option value="ALL">All Types</option>
+              <option value="CRIMINAL">Criminal</option>
+              <option value="CIVIL">Civil</option>
+              <option value="LAND_REGISTRATION_CASE">Land Registration</option>
+              <option value="PETITION">Petition</option>
+              <option value="ELECTION">Election</option>
+              <option value="SCA">SCA</option>
+              <option value="UNKNOWN">Unknown</option>
+            </select>
             <button
               className="btn btn-outline flex items-center gap-2"
               onClick={() => setFilterModalOpen((prev) => !prev)}
@@ -416,32 +468,13 @@ const CasePage: React.FC = () => {
             </button>
 
             {isAdminOrAtty && (
-              <>
-                <select
-                  value={caseTypeForImport}
-                  onChange={(e) =>
-                    setCaseTypeForImport(e.target.value as CaseType)
-                  }
-                  className="select select-bordered"
-                >
-                  <option value="CRIMINAL">Criminal</option>
-                  <option value="CIVIL">Civil</option>
-                  <option value="LAND_REGISTRATION_CASE">
-                    Land Registration
-                  </option>
-                  <option value="PETITION">Petition</option>
-                  <option value="ELECTION">Election</option>
-                  <option value="SCA">SCA</option>
-                  <option value="UNKNOWN">Unknown</option>
-                </select>
-                <button
-                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? "Importing..." : "Import Excel"}
-                </button>
-              </>
+              <button
+                className={`btn btn-outline ${uploading ? "loading" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? "Importing..." : "Import Excel"}
+              </button>
             )}
             {isAdminOrAtty && (
               <button
@@ -454,7 +487,7 @@ const CasePage: React.FC = () => {
             )}
             {isAdminOrAtty && (
               <button
-                className="btn btn-primary"
+                className="btn btn-success"
                 onClick={() => showModal(CaseModalType.ADD)}
               >
                 <svg
@@ -492,7 +525,7 @@ const CasePage: React.FC = () => {
             {
               label: "Total Cases",
               value: stats.totalCases ?? 0,
-              subtitle: `${stats.recentlyFiled ?? 0} filed recently`,
+              subtitle: `${(stats.recentlyFiled ?? 0).toLocaleString()} filed recently`,
               icon: FiBarChart2,
               delay: 0,
             },
@@ -544,7 +577,7 @@ const CasePage: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
+                      {card.value.toLocaleString()}
                     </p>
                     <p className="text-sm sm:text-base font-semibold text-muted">
                       {card.subtitle}

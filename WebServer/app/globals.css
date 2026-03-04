@@ -205,6 +205,12 @@
   --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ═══ Register custom animations with Tailwind v4 ═══════════════════════ */
+@theme {
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  --animate-skeleton-fade-in: skeletonFadeIn 0.4s ease-out both;
+}
+
 /* ==========================================================================
    TYPOGRAPHY — Professional Type Scale
    ========================================================================== */
@@ -355,6 +361,26 @@
   }
   .animate-scale-in {
     animation: scaleIn var(--transition-spring) both;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes skeletonFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1353,5 +1379,87 @@
     font-size: 13px;
     color: var(--color-muted);
     margin: 0 2px;
+  }
+}
+
+/* ==========================================================================
+   Component: Cell Tooltip (cell-tip) — hover guide for table cells
+   ========================================================================== */
+
+.cell-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 140px;
+  max-width: 320px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: oklch(0.2 0.02 260);
+  color: #f5f5f5;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  text-transform: none;
+  line-height: 1.45;
+  animation: cellTipIn 0.15s ease-out;
+}
+
+.cell-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: oklch(0.2 0.02 260);
+}
+
+/* Keep thead below body-row tooltips */
+thead {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lift the hovered row so its tooltip sits above adjacent rows AND the header */
+tbody tr:hover {
+  position: relative;
+  z-index: 20;
+}
+
+.group\/tip:hover > .cell-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cell-tip-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: oklch(0.72 0.12 250);
+}
+
+.cell-tip-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+}
+
+@keyframes cellTipIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }

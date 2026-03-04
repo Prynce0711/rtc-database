@@ -1,5 +1,6 @@
 "use client";
 
+import TipCell from "@/app/components/Table/TipCell";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
@@ -163,21 +164,43 @@ const ReceiveRow = ({
         </td>
 
         {/* DATA CELLS */}
-        <td className="font-semibold text-center whitespace-nowrap">
-          {bookAndPages}
-        </td>
-        <td className="text-center text-base-content/70 whitespace-nowrap">
-          {dateStr}
-        </td>
-        <td className="text-center whitespace-nowrap">{caseType}</td>
-        <td className="text-center whitespace-nowrap">{caseNo}</td>
-        <td className="text-center">
+        <TipCell
+          label="Book & Pages"
+          value={bookAndPages}
+          className="font-semibold"
+        />
+        <TipCell
+          label="Date Received"
+          value={dateStr}
+          className="text-base-content/70"
+        />
+        <TipCell label="Case Type" value={caseType} />
+        <TipCell label="Case No." value={caseNo} />
+        <td className="text-center relative group/tip">
           <ExpandableContent text={content} maxChars={220} />
+          {content && content !== "—" && (
+            <div className="cell-tip">
+              <span className="cell-tip-label">Content</span>
+              <span className="cell-tip-value">
+                {String(content).slice(0, 200)}
+                {String(content).length > 200 ? "…" : ""}
+              </span>
+            </div>
+          )}
         </td>
-        <td className="text-center whitespace-nowrap">{branchNo}</td>
-        <td className="text-center whitespace-nowrap">{timeVal}</td>
-        <td className="text-center">
+        <TipCell label="Branch No." value={branchNo} />
+        <TipCell label="Time" value={timeVal} />
+        <td className="text-center relative group/tip">
           <ExpandableContent text={notes} maxChars={140} />
+          {notes && notes !== "—" && (
+            <div className="cell-tip">
+              <span className="cell-tip-label">Notes</span>
+              <span className="cell-tip-value">
+                {String(notes).slice(0, 200)}
+                {String(notes).length > 200 ? "…" : ""}
+              </span>
+            </div>
+          )}
         </td>
       </tr>
 

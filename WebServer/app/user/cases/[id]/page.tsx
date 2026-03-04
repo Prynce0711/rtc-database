@@ -144,7 +144,7 @@ const Section = ({
   children: React.ReactNode;
 }) => (
   <div className="space-y-5">
-    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-base-content/30">
+    <p className="text-[15px] font-bold uppercase tracking-[0.14em] text-base-content">
       {label}
     </p>
     {children}

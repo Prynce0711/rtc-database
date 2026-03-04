@@ -1,5 +1,6 @@
 "use client";
 
+import TipCell from "@/app/components/Table/TipCell";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, {
@@ -1125,15 +1126,23 @@ const NotarialRow = ({
         </div>
       </div>
     </td>
-    <td className="font-semibold text-center max-w-[220px]">
-      <span className="line-clamp-2">{record.title}</span>
-    </td>
-    <td className="text-center">{record.name}</td>
-    <td className="text-center">{record.atty}</td>
-    <td className="text-center text-base-content/70">
-      {formatDate(record.date)}
-    </td>
-    <td className="text-center" onClick={(e) => e.stopPropagation()}>
+    <TipCell
+      label="Title"
+      value={record.title}
+      truncate
+      className="font-semibold"
+    />
+    <TipCell label="Name" value={record.name} truncate />
+    <TipCell label="Attorney" value={record.atty} truncate />
+    <TipCell
+      label="Date"
+      value={formatDate(record.date)}
+      className="text-base-content/70"
+    />
+    <td
+      className="text-center relative group/tip"
+      onClick={(e) => e.stopPropagation()}
+    >
       {record.link ? (
         <a
           href="#"
@@ -1145,6 +1154,12 @@ const NotarialRow = ({
         </a>
       ) : (
         <span className="text-base-content/30">—</span>
+      )}
+      {record.link && (
+        <div className="cell-tip">
+          <span className="cell-tip-label">File / Link</span>
+          <span className="cell-tip-value">{record.link}</span>
+        </div>
       )}
     </td>
   </tr>
@@ -1431,6 +1446,25 @@ const NotarialPage: React.FC = () => {
           <p className="text-xl text-base-content/70">
             Manage notarial reports and filings
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>Hover over table cells to see full details</span>
+          </div>
         </div>
 
         {/* Search and Actions */}
@@ -1499,7 +1533,7 @@ const NotarialPage: React.FC = () => {
             )}
             {isAdminOrAtty && (
               <button
-                className="btn btn-primary"
+                className="btn btn-success"
                 onClick={() => {
                   setSelectedRecord(null);
                   setModalType("ADD");
@@ -1537,28 +1571,28 @@ const NotarialPage: React.FC = () => {
           {[
             {
               label: "Total Records",
-              value: stats.total ?? 0,
-              subtitle: `${stats.noDate ?? 0} missing dates`,
+              value: (stats.total ?? 0).toLocaleString(),
+              subtitle: `${(stats.noDate ?? 0).toLocaleString()} missing dates`,
               icon: FiBarChart2,
               delay: 0,
             },
             {
               label: "This Month",
-              value: stats.thisMonth ?? 0,
-              subtitle: `${stats.thisMonth ?? 0} entries this month`,
+              value: (stats.thisMonth ?? 0).toLocaleString(),
+              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} entries this month`,
               icon: FiFileText,
               delay: 100,
             },
             {
               label: "Unique Attorneys",
-              value: stats.attorneys ?? 0,
-              subtitle: `${stats.attorneys ?? 0} attorneys`,
+              value: (stats.attorneys ?? 0).toLocaleString(),
+              subtitle: `${(stats.attorneys ?? 0).toLocaleString()} attorneys`,
               icon: FiUsers,
               delay: 200,
             },
             {
               label: "No Date",
-              value: stats.noDate ?? 0,
+              value: (stats.noDate ?? 0).toLocaleString(),
               subtitle: `Records without date`,
               icon: FiLock,
               delay: 300,

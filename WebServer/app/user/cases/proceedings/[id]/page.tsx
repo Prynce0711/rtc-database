@@ -1,101 +1,13 @@
 "use client";
 
+import {
+  getSpecialProceedingById,
+  getSpecialProceedings,
+} from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
+import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable.tsx";
+import type { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const MOCK_CASES = [
-  {
-    id: 1,
-    spcNo: "SPC-2024-0001",
-    raffledToBranch: "Branch 1",
-    dateFiled: "2024-01-15",
-    petitioners: "Juan Dela Cruz",
-    nature: "Petition for Adoption",
-    respondent: "Republic of the Philippines",
-  },
-  {
-    id: 2,
-    spcNo: "SPC-2024-0002",
-    raffledToBranch: "Branch 3",
-    dateFiled: "2024-02-20",
-    petitioners: "Maria Santos",
-    nature: "Petition for Guardianship",
-    respondent: "Pedro Santos",
-  },
-  {
-    id: 3,
-    spcNo: "SPC-2024-0003",
-    raffledToBranch: "Branch 2",
-    dateFiled: "2024-03-05",
-    petitioners: "Jose Reyes",
-    nature: "Petition for Change of Name",
-    respondent: "Republic of the Philippines",
-  },
-  {
-    id: 4,
-    spcNo: "SPC-2024-0004",
-    raffledToBranch: "Branch 5",
-    dateFiled: "2024-03-18",
-    petitioners: "Ana Lim",
-    nature: "Petition for Annulment",
-    respondent: "Carlos Lim",
-  },
-  {
-    id: 5,
-    spcNo: "SPC-2024-0005",
-    raffledToBranch: "Branch 1",
-    dateFiled: "2024-04-01",
-    petitioners: "Roberto Garcia",
-    nature: "Petition for Habeas Corpus",
-    respondent: "Bureau of Corrections",
-  },
-  {
-    id: 6,
-    spcNo: "SPC-2024-0006",
-    raffledToBranch: "Branch 4",
-    dateFiled: "2024-04-22",
-    petitioners: "Elena Cruz",
-    nature: "Petition for Declaration of Nullity",
-    respondent: "Rodrigo Cruz",
-  },
-  {
-    id: 7,
-    spcNo: "SPC-2024-0007",
-    raffledToBranch: "Branch 2",
-    dateFiled: "2024-05-10",
-    petitioners: "Marco Villanueva",
-    nature: "Petition for Adoption",
-    respondent: "Republic of the Philippines",
-  },
-  {
-    id: 8,
-    spcNo: "SPC-2024-0008",
-    raffledToBranch: "Branch 3",
-    dateFiled: "2024-05-28",
-    petitioners: "Lourdes Fernandez",
-    nature: "Petition for Legal Separation",
-    respondent: "Ernesto Fernandez",
-  },
-  {
-    id: 9,
-    spcNo: "SPC-2024-0009",
-    raffledToBranch: "Branch 1",
-    dateFiled: "2024-06-03",
-    petitioners: "Dante Morales",
-    nature: "Petition for Guardianship",
-    respondent: "City Social Welfare",
-  },
-  {
-    id: 10,
-    spcNo: "SPC-2024-0010",
-    raffledToBranch: "Branch 5",
-    dateFiled: "2024-06-15",
-    petitioners: "Carmen Bautista",
-    nature: "Petition for Change of Name",
-    respondent: "Republic of the Philippines",
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (dateStr: string | Date | null | undefined) => {
@@ -149,7 +61,7 @@ const Section = ({
   children: React.ReactNode;
 }) => (
   <div className="space-y-5">
-    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-base-content/30">
+    <p className="text-[15px] font-bold uppercase tracking-[0.14em] text-base-content">
       {label}
     </p>
     {children}
@@ -235,39 +147,44 @@ export default function ProceedingDetailsPage() {
   const router = useRouter();
   const params = useParams();
 
-  const [caseData, setCaseData] = useState<(typeof MOCK_CASES)[0] | null>(null);
-  const [prevCase, setPrevCase] = useState<(typeof MOCK_CASES)[0] | null>(null);
-  const [nextCase, setNextCase] = useState<(typeof MOCK_CASES)[0] | null>(null);
+  const [caseData, setCaseData] = useState<SpecialProceeding | null>(null);
+  const [prevCase, setPrevCase] = useState<SpecialProceeding | null>(null);
+  const [nextCase, setNextCase] = useState<SpecialProceeding | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"details" | "parties">("details");
 
   useEffect(() => {
-    const numId = Number(params.id);
-    const currentIndex = MOCK_CASES.findIndex((c) => c.id === numId);
-    const found = currentIndex !== -1 ? MOCK_CASES[currentIndex] : null;
+    const load = async () => {
+      setLoading(true);
+      const numId = Number(params.id);
 
-    setCaseData(found);
-    setPrevCase(currentIndex > 0 ? MOCK_CASES[currentIndex - 1] : null);
-    setNextCase(
-      currentIndex < MOCK_CASES.length - 1
-        ? MOCK_CASES[currentIndex + 1]
-        : null,
-    );
-    setLoading(false);
+      // Fetch the current record
+      const res = await getSpecialProceedingById(numId);
+      if (!res.success || !res.result) {
+        setCaseData(null);
+        setPrevCase(null);
+        setNextCase(null);
+        setLoading(false);
+        return;
+      }
+      setCaseData(res.result);
+
+      // Fetch all for prev/next navigation
+      const allRes = await getSpecialProceedings();
+      if (allRes.success && allRes.result) {
+        const all = allRes.result;
+        const idx = all.findIndex((c) => c.id === numId);
+        setPrevCase(idx > 0 ? all[idx - 1] : null);
+        setNextCase(idx < all.length - 1 ? all[idx + 1] : null);
+      }
+      setLoading(false);
+    };
+    load();
   }, [params.id]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <span className="loading loading-spinner loading-md text-primary/40" />
-          <p className="text-[12px] font-bold uppercase tracking-widest text-base-content/25 select-none">
-            Loading record…
-          </p>
-        </div>
-      </div>
-    );
+    return <PageDetailSkeleton />;
   }
 
   // ── Not found ──────────────────────────────────────────────────────────────
@@ -327,7 +244,7 @@ export default function ProceedingDetailsPage() {
             <span>Special Proceedings</span>
             <span className="opacity-40">/</span>
             <span className="text-base-content/55 font-bold">
-              {caseData.spcNo}
+              {caseData.caseNumber}
             </span>
           </div>
 
@@ -340,7 +257,9 @@ export default function ProceedingDetailsPage() {
               }
               disabled={!prevCase}
               title={
-                prevCase ? `Previous: ${prevCase.spcNo}` : "No previous record"
+                prevCase
+                  ? `Previous: ${prevCase.caseNumber}`
+                  : "No previous record"
               }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
             >
@@ -372,7 +291,9 @@ export default function ProceedingDetailsPage() {
                 router.push(`/user/cases/proceedings/${nextCase.id}`)
               }
               disabled={!nextCase}
-              title={nextCase ? `Next: ${nextCase.spcNo}` : "No next record"}
+              title={
+                nextCase ? `Next: ${nextCase.caseNumber}` : "No next record"
+              }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
             >
               <svg
@@ -405,15 +326,15 @@ export default function ProceedingDetailsPage() {
             Special Proceeding
           </p>
           <h1 className="text-[34px] font-bold text-base-content tracking-tight leading-tight">
-            {caseData.spcNo}
+            {caseData.caseNumber}
           </h1>
           <div className="flex items-center gap-4 flex-wrap">
             <p className="text-[15px] text-base-content/45 font-medium">
-              Filed {formatDate(caseData.dateFiled)}
+              Filed {formatDate(caseData.date)}
             </p>
-            {caseData.raffledToBranch && (
+            {caseData.raffledTo && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-base-200 text-base-content/50 border border-base-200">
-                {caseData.raffledToBranch}
+                {caseData.raffledTo}
               </span>
             )}
           </div>
@@ -447,15 +368,9 @@ export default function ProceedingDetailsPage() {
           <div className="space-y-10 animate-slide-up">
             <Section label="Case Information">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="SPC No." value={caseData.spcNo} />
-                <Detail
-                  label="Raffled to Branch"
-                  value={caseData.raffledToBranch}
-                />
-                <Detail
-                  label="Date Filed"
-                  value={formatDate(caseData.dateFiled)}
-                />
+                <Detail label="SPC No." value={caseData.caseNumber} />
+                <Detail label="Raffled to Branch" value={caseData.raffledTo} />
+                <Detail label="Date Filed" value={formatDate(caseData.date)} />
                 <div className="md:col-span-2 lg:col-span-3">
                   <Detail label="Nature of Petition" value={caseData.nature} />
                 </div>
@@ -471,7 +386,7 @@ export default function ProceedingDetailsPage() {
           <div className="space-y-10 animate-slide-up">
             <Section label="Parties Involved">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <Detail label="Petitioners" value={caseData.petitioners} />
+                <Detail label="Petitioners" value={caseData.petitioner} />
                 <Detail label="Respondent" value={caseData.respondent} />
               </div>
             </Section>
@@ -491,8 +406,8 @@ export default function ProceedingDetailsPage() {
         <div className="flex items-stretch gap-3">
           <NavButton
             direction="prev"
-            label={prevCase?.spcNo ?? "—"}
-            sublabel={prevCase?.petitioners ?? undefined}
+            label={prevCase?.caseNumber ?? "—"}
+            sublabel={prevCase?.petitioner ?? undefined}
             onClick={() =>
               prevCase && router.push(`/user/cases/proceedings/${prevCase.id}`)
             }
@@ -500,8 +415,8 @@ export default function ProceedingDetailsPage() {
           />
           <NavButton
             direction="next"
-            label={nextCase?.spcNo ?? "—"}
-            sublabel={nextCase?.petitioners ?? undefined}
+            label={nextCase?.caseNumber ?? "—"}
+            sublabel={nextCase?.petitioner ?? undefined}
             onClick={() =>
               nextCase && router.push(`/user/cases/proceedings/${nextCase.id}`)
             }
@@ -516,7 +431,7 @@ export default function ProceedingDetailsPage() {
             Special Proceedings System
           </p>
           <p className="text-[11px] text-base-content/20 font-semibold select-none">
-            Filed {formatDate(caseData.dateFiled)}
+            Filed {formatDate(caseData.date)}
           </p>
         </div>
       </main>

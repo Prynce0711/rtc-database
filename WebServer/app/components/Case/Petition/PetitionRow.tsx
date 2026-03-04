@@ -1,5 +1,6 @@
 "use client";
 
+import TipCell from "@/app/components/Table/TipCell";
 import { Petition } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
@@ -98,11 +99,20 @@ const ReceiveRow = ({
       )}
 
       {/* DATA CELLS */}
-      <td className="font-semibold text-center">{log.caseNumber}</td>
-      <td className="text-center">{log.raffledTo ?? "—"}</td>
-      <td className="text-center text-base-content/70">{dateStr}</td>
-      <td className="font-medium text-center">{log.petitioner ?? "—"}</td>
-      <td className="text-center">{log.nature ?? "—"}</td>
+      <TipCell
+        label="Case No."
+        value={log.caseNumber}
+        className="font-semibold"
+      />
+      <TipCell label="Raffled To" value={log.raffledTo ?? "—"} />
+      <TipCell label="Date" value={dateStr} className="text-base-content/70" />
+      <TipCell
+        label="Petitioner"
+        value={log.petitioner ?? "—"}
+        truncate
+        className="font-medium"
+      />
+      <TipCell label="Nature" value={log.nature ?? "—"} truncate />
     </tr>
   );
 };
