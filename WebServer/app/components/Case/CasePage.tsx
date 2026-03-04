@@ -260,8 +260,8 @@ const CasePage: React.FC = () => {
       }
 
       // Download failed rows Excel if available
-      if (result.success && result.result) {
-        const { fileName, base64 } = result.result;
+      if (result.success && result.result.failedExcel) {
+        const { fileName, base64 } = result.result.failedExcel;
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
