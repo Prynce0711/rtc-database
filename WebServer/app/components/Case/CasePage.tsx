@@ -203,6 +203,8 @@ const CasePage: React.FC = () => {
       pageSize: 10,
       filters: { [key]: inputValue } as CaseFilters,
       exactMatchMap: { [key]: false },
+      sortKey: key as keyof Case,
+      sortOrder: "asc",
     });
 
     if (!res.success || !res.result) return [];
