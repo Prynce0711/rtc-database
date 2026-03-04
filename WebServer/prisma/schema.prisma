@@ -81,9 +81,9 @@ enum LogAction {
 model Case {
   id              Int       @id @default(autoincrement())
   caseType        CaseType  @default(UNKNOWN)
-  branch          String?   
+  branch          String?
   assistantBranch String?
-  caseNumber      String  @unique
+  caseNumber      String    @unique
   dateFiled       DateTime?
   name            String
   charge          String?
@@ -94,8 +94,8 @@ model Case {
   eqcNumber       Int?
   bond            String?
   raffleDate      DateTime?
-  committee1       String?
-  committee2       String?
+  committee1      String?
+  committee2      String?
   judge           String?
   ao              String?
   complainant     String?
@@ -321,4 +321,65 @@ model monthlyStatistics {
   total    Int    @default(0)
 
   @@unique([month, category, branch])
+}
+
+model JudgementMunicipal {
+  id              Int     @id @default(autoincrement())
+  branchNo        String?
+  civilV          Int
+  civilInc        Int
+  criminalV       Int
+  criminalInc     Int
+  totalHeard      Int     @default(0)
+  disposedCivil   Int     @default(0)
+  disposedCrim    Int     @default(0)
+  totalDisposed   Int     @default(0)
+  pdlM            Int     @default(0)
+  pdlF            Int     @default(0)
+  pdlTotal        Int     @default(0)
+  pdlV            Int     @default(0)
+  pdlI            Int     @default(0)
+  pdlBail         Int     @default(0)
+  pdlRecognizance Int     @default(0)
+  pdlMinRor       Int     @default(0)
+  pdlMaxSentence  Int     @default(0)
+  pdlDismissal    Int     @default(0)
+  pdlAcquittal    Int     @default(0)
+  pdlMinSentence  Int     @default(0)
+  pdlOthers       Int     @default(0)
+  total           Int     @default(0)
+}
+
+model JudgementRegional {
+  id              Int     @id @default(autoincrement())
+  branchNo        String?
+  civilV          Int
+  civilInc        Int
+  criminalV       Int
+  criminalInc     Int
+  totalHeard      Int     @default(0)
+  disposedCivil   Int     @default(0)
+  disposedCrim    Int     @default(0)
+  summaryProc     Int     @default(0)
+  casesDisposed   Int     @default(0)
+  pdlM            Int     @default(0)
+  pdlF            Int     @default(0)
+  pdlCICL         Int     @default(0)
+  pdlTotal        Int     @default(0)
+  pdlV            Int     @default(0)
+  pdlInc          Int     @default(0)
+  pdlBail         Int     @default(0)
+  pdlRecognizance Int     @default(0)
+  pdlMinRor       Int     @default(0)
+  pdlMaxSentence  Int     @default(0)
+  pdlDismissal    Int     @default(0)
+  pdlAcquittal    Int     @default(0)
+  pdlMinSentence  Int     @default(0)
+  pdlProbation    Int     @default(0)
+  ciclM           Int     @default(0)
+  ciclF           Int     @default(0)
+  ciclV           Int     @default(0)
+  ciclInc         Int     @default(0)
+  fine            Int     @default(0)
+  total           Int     @default(0)
 }

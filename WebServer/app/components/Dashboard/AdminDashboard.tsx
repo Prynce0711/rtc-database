@@ -285,13 +285,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     return (
-      <div
-        className="surface-card p-4 animate-scale-in"
-        style={{
-          boxShadow: "var(--shadow-elevated)",
-          borderColor: "var(--surface-border-strong)",
-        }}
-      >
+      <div className="surface-card p-4 animate-scale-in">
         <p className="font-bold text-base-content mb-2 text-base">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center justify-between gap-6">
@@ -344,7 +338,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         <div className="mx-auto w-full">
           <div className="space-y-6">
             {/* HEADER */}
-            <header className="surface-card animate-fade-in">
+            <header className="surface-card animate-fade-in border-none shadow-none">
               <div
                 className="card-body"
                 style={{ padding: "var(--space-card-padding)" }}
@@ -367,6 +361,8 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                         Last sync: {new Date().toLocaleTimeString()}
                       </span>
                     </p>
+
+                    {/* Hover instruction note */}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -511,8 +507,8 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   {[
                     {
                       label: "Total Cases",
-                      value: stats.totalCases,
-                      subtitle: `${stats.casesThisMonth} filed this month`,
+                      value: stats.totalCases.toLocaleString(),
+                      subtitle: `${stats.casesThisMonth.toLocaleString()} filed this month`,
                       icon: Scale,
                       color: "primary",
                       trend: stats.caseGrowth,
@@ -520,15 +516,15 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     },
                     {
                       label: "Active Cases",
-                      value: stats.activeCases,
-                      subtitle: `${stats.pendingRaffle} pending raffle`,
+                      value: stats.activeCases.toLocaleString(),
+                      subtitle: `${stats.pendingRaffle.toLocaleString()} pending raffle`,
                       icon: FileText,
                       color: "primary",
                       delay: 100,
                     },
                     {
                       label: "In Detention",
-                      value: stats.detained,
+                      value: stats.detained.toLocaleString(),
                       subtitle: `${stats.detainedPercentage.toFixed(1)}% of total`,
                       icon: Lock,
                       color: "primary",
@@ -536,8 +532,8 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     },
                     {
                       label: "Active Users",
-                      value: stats.activeAccounts,
-                      subtitle: `${stats.inactiveAccounts} inactive`,
+                      value: stats.activeAccounts.toLocaleString(),
+                      subtitle: `${stats.inactiveAccounts.toLocaleString()} inactive`,
                       icon: Shield,
                       color: "primary",
                       delay: 300,

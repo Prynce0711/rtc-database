@@ -2,46 +2,70 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { useMemo, useState } from "react";
-import { FiChevronDown, FiChevronUp, FiSearch } from "react-icons/fi";
+import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
+import AnnualAddReportPage from "./AnnualAddReportPage";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
-import AnnualDrawer, { AnnualDrawerType } from "./AnnualDrawer";
 import { FieldConfig } from "./AnnualFieldConfig";
 import AnnualRow from "./AnnualRow";
-import { AnnualStats, calcStats, sortRecords } from "./AnnualUtils";
+import AnnualToolbar from "./AnnualToolbar";
+import { sortRecords } from "./AnnualUtils";
+import AnnualViewPage from "./AnnualViewPage";
 
 const PAGE_SIZE = 25;
 
+export type AnnualVariant = "court" | "inventory";
+
+type AnnualKPICardLocal = {
+  label: string;
+  value: number;
+  subtitle: string;
+  icon: React.ElementType;
+  delay: number;
+};
 export interface AnnualTableProps<T extends Record<string, unknown>> {
   title: string;
   subtitle?: string;
+  variant: AnnualVariant;
   data: T[];
   columns: AnyColumnDef[];
   fields: FieldConfig[];
   dateKey: keyof T & string;
   sortDefaultKey: keyof T & string;
   searchPlaceholder?: string;
+  selectedYear?: string;
+  requestAdd?: number;
   onChange: (data: T[]) => void;
   onAdd?: (record: Record<string, unknown>) => void | Promise<void>;
   onUpdate?: (record: Record<string, unknown>) => void | Promise<void>;
   onDelete?: (id: number) => void | Promise<void>;
+  onActivePageChange?: (active: boolean) => void;
+  activeView?: string;
+  onSwitchView?: (view: string) => void;
 }
 
 function AnnualTable<T extends Record<string, unknown>>({
   title,
   subtitle,
+  variant,
   data,
   columns,
   fields,
   dateKey,
   sortDefaultKey,
   searchPlaceholder,
+  selectedYear,
+  requestAdd,
   onChange,
   onAdd,
   onUpdate,
   onDelete,
+  onActivePageChange,
+  activeView,
+  onSwitchView,
 }: AnnualTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -49,8 +73,17 @@ function AnnualTable<T extends Record<string, unknown>>({
     order: "asc" | "desc";
   }>({ key: sortDefaultKey, order: "desc" });
   const [currentPage, setCurrentPage] = useState(1);
-  const [drawerType, setDrawerType] = useState<AnnualDrawerType | null>(null);
-  const [selectedRecord, setSelectedRecord] = useState<T | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showViewPage, setShowViewPage] = useState(false);
+  const [showAddPage, setShowAddPage] = useState(false);
+  const [editInitialData, setEditInitialData] = useState<
+    Record<string, unknown>[] | undefined
+  >(undefined);
+
+  const isSelecting = selectionMode != null;
 
   const session = useSession();
   const isAdminOrAtty =
@@ -59,23 +92,202 @@ function AnnualTable<T extends Record<string, unknown>>({
 
   const statusPopup = usePopup();
 
-  const stats: AnnualStats = useMemo(
-    () => calcStats(data as Record<string, unknown>[], dateKey),
-    [data, dateKey],
-  );
+  // ── Selection helpers ──
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    const allIds = paginated
+      .filter((r) => (r as Record<string, unknown>).id != null)
+      .map((r) => (r as Record<string, unknown>).id as number);
+    setSelectedIds((prev) => {
+      const allSelected = allIds.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(allIds);
+    });
+  };
+
+  const cancelSelection = () => {
+    setSelectionMode(null);
+    setSelectedIds(new Set());
+  };
+
+  const confirmSelection = async () => {
+    if (selectedIds.size === 0) return;
+
+    if (selectionMode === "delete") {
+      if (
+        !(await statusPopup.showConfirm(
+          `Delete ${selectedIds.size} selected row(s)?`,
+        ))
+      )
+        return;
+      if (onDelete) {
+        await Promise.all(Array.from(selectedIds).map((id) => onDelete(id)));
+      } else {
+        onChange(
+          data.filter(
+            (r) =>
+              !selectedIds.has((r as Record<string, unknown>).id as number),
+          ),
+        );
+      }
+      statusPopup.showSuccess(
+        `${selectedIds.size} entry(s) deleted successfully`,
+      );
+    } else if (selectionMode === "edit") {
+      // Edit selected rows via the add/edit page
+      const selectedData = data.filter((r) =>
+        selectedIds.has((r as Record<string, unknown>).id as number),
+      );
+      if (selectedData.length > 0) {
+        setEditInitialData(
+          selectedData as unknown as Record<string, unknown>[],
+        );
+        setShowAddPage(true);
+        onActivePageChange?.(true);
+      }
+    }
+
+    cancelSelection();
+  };
+
+  // Open add page when parent requests it
+  const prevRequestAdd = useRef(requestAdd);
+  useEffect(() => {
+    if (requestAdd != null && requestAdd !== prevRequestAdd.current) {
+      prevRequestAdd.current = requestAdd;
+      if (isAdminOrAtty) {
+        setEditInitialData(undefined);
+        setShowAddPage(true);
+        onActivePageChange?.(true);
+      }
+    }
+  }, [requestAdd, isAdminOrAtty]);
+
+  // Filter by year if provided
+  const yearFilteredData = useMemo(() => {
+    if (!selectedYear) return data;
+    return data.filter((row) => {
+      const d = row[dateKey];
+      if (d == null) return true; // include rows without a date field
+      return String(d).startsWith(selectedYear);
+    });
+  }, [data, selectedYear, dateKey]);
+
+  // Compute KPI cards based on variant
+  const kpiCards: AnnualKPICardLocal[] = useMemo(() => {
+    const rows = yearFilteredData as Record<string, unknown>[];
+    if (variant === "court") {
+      let pending = 0;
+      let disposed = 0;
+      let grandTotal = 0;
+      const branchSet = new Set<string>();
+      for (const r of rows) {
+        const p = Number(r.pendingLastYear) || 0;
+        const ra = Number(r.RaffledOrAdded) || 0;
+        const d = Number(r.Disposed) || 0;
+        const pt = Number(r.pendingThisYear) || 0;
+        pending += p + pt;
+        disposed += d;
+        grandTotal += p + ra + d + pt;
+        if (r.branch) branchSet.add(String(r.branch));
+      }
+      return [
+        {
+          label: "Pending",
+          value: pending,
+          subtitle: "Total pending cases",
+          icon: Scale,
+          delay: 0,
+        },
+        {
+          label: "Disposed",
+          value: disposed,
+          subtitle: "Total disposed cases",
+          icon: Gavel,
+          delay: 100,
+        },
+        {
+          label: "Grand Total",
+          value: grandTotal,
+          subtitle: "All cases combined",
+          icon: BarChart3,
+          delay: 200,
+        },
+        {
+          label: "Branches",
+          value: branchSet.size,
+          subtitle: "Active branches",
+          icon: FileText,
+          delay: 300,
+        },
+      ];
+    }
+    // inventory
+    let filed = 0;
+    let disposed = 0;
+    let grandTotal = 0;
+    const branchSet = new Set<string>();
+    for (const r of rows) {
+      const cf = Number(r.civilSmallClaimsFiled) || 0;
+      const crf = Number(r.criminalCasesFiled) || 0;
+      const cd = Number(r.civilSmallClaimsDisposed) || 0;
+      const crd = Number(r.criminalCasesDisposed) || 0;
+      filed += cf + crf;
+      disposed += cd + crd;
+      grandTotal += cf + crf + cd + crd;
+      if (r.branch) branchSet.add(String(r.branch));
+    }
+    return [
+      {
+        label: "Cases Filed",
+        value: filed,
+        subtitle: "Total cases filed",
+        icon: Scale,
+        delay: 0,
+      },
+      {
+        label: "Cases Disposed",
+        value: disposed,
+        subtitle: "Total cases disposed",
+        icon: Gavel,
+        delay: 100,
+      },
+      {
+        label: "Grand Total",
+        value: grandTotal,
+        subtitle: "All cases combined",
+        icon: BarChart3,
+        delay: 200,
+      },
+      {
+        label: "Branches",
+        value: branchSet.size,
+        subtitle: "Active branches",
+        icon: FileText,
+        delay: 300,
+      },
+    ];
+  }, [yearFilteredData, variant]);
 
   const filteredAndSorted = useMemo(() => {
-    let filtered: T[] = data;
+    let filtered: T[] = yearFilteredData;
     if (searchTerm.trim()) {
       const lowered = searchTerm.toLowerCase();
-      filtered = data.filter((row) =>
+      filtered = yearFilteredData.filter((row) =>
         Object.values(row).some((v) =>
           v?.toString().toLowerCase().includes(lowered),
         ),
       );
     }
     return sortRecords(filtered, sortConfig.key, sortConfig.order);
-  }, [data, searchTerm, sortConfig]);
+  }, [yearFilteredData, searchTerm, sortConfig]);
 
   const pageCount = Math.max(
     1,
@@ -104,7 +316,7 @@ function AnnualTable<T extends Record<string, unknown>>({
     if (onDelete) {
       await onDelete(row.id as number);
     } else {
-      onChange(data.filter((r) => r.id !== row.id));
+      onChange(yearFilteredData.filter((r) => r.id !== row.id));
     }
     statusPopup.showSuccess("Entry deleted successfully");
   };
@@ -129,6 +341,34 @@ function AnnualTable<T extends Record<string, unknown>>({
   const hasGroups = columns.some(isGroupColumn);
   const leafColumns = flattenColumns(columns);
 
+  // Compute per-column totals for numeric columns
+  const columnTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const col of leafColumns) {
+      // For virtual columns with computeValue, sum the computed values
+      if (col.computeValue) {
+        let sum = 0;
+        for (const row of filteredAndSorted) {
+          sum += col.computeValue(row as Record<string, unknown>);
+        }
+        totals[col.key] = sum;
+        continue;
+      }
+      let sum = 0;
+      let hasNumeric = false;
+      for (const row of filteredAndSorted) {
+        const raw = (row as Record<string, unknown>)[col.key];
+        const num = Number(raw);
+        if (raw != null && raw !== "" && !isNaN(num)) {
+          sum += num;
+          hasNumeric = true;
+        }
+      }
+      if (hasNumeric) totals[col.key] = sum;
+    }
+    return totals;
+  }, [filteredAndSorted, leafColumns]);
+
   const sortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
     return sortConfig.order === "asc" ? (
@@ -138,87 +378,172 @@ function AnnualTable<T extends Record<string, unknown>>({
     );
   };
 
+  if (showAddPage) {
+    return (
+      <AnnualAddReportPage
+        title={title}
+        fields={fields}
+        columns={columns}
+        selectedYear={selectedYear}
+        initialData={editInitialData}
+        activeView={activeView}
+        onSwitchView={onSwitchView}
+        onBack={() => {
+          setShowAddPage(false);
+          setEditInitialData(undefined);
+          onActivePageChange?.(false);
+        }}
+        onSave={async (rows) => {
+          if (editInitialData && editInitialData.length > 0) {
+            // Edit mode – update existing records
+            for (const record of rows) {
+              await handleUpdate(record);
+            }
+            statusPopup.showSuccess(
+              `${rows.length} entry(s) updated successfully`,
+            );
+          } else {
+            // Add mode – create new records
+            for (const record of rows) {
+              await handleCreate(record);
+            }
+            statusPopup.showSuccess(
+              `${rows.length} entry(s) added successfully`,
+            );
+          }
+          setShowAddPage(false);
+          setEditInitialData(undefined);
+          onActivePageChange?.(false);
+        }}
+      />
+    );
+  }
+
+  if (showViewPage) {
+    return (
+      <AnnualViewPage
+        title={title}
+        subtitle={subtitle}
+        variant={variant}
+        data={filteredAndSorted as unknown as Record<string, unknown>[]}
+        columns={columns}
+        selectedYear={selectedYear}
+        onBack={() => {
+          setShowViewPage(false);
+          onActivePageChange?.(false);
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-base-100">
-      <main className="w-full">
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-xl text-base-content/70">{subtitle}</p>
-          )}
-        </div>
-
-        <div className="relative mb-6">
-          <div className="flex gap-4">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-            <input
-              type="text"
-              placeholder={searchPlaceholder ?? `Search ${title}…`}
-              className="input input-bordered input-lg w-full pl-12 text-base"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-            {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setSelectedRecord(null);
-                  setDrawerType(AnnualDrawerType.ADD);
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Entry
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Stats strip */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-l font-medium text-center">
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">
-              TOTAL ENTRIES
-            </div>
-            <div className="text-5xl font-bold text-primary">{stats.total}</div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">TODAY</div>
-            <div className="text-5xl font-bold text-primary">{stats.today}</div>
-          </div>
-          <div className="stat bg-base-300 rounded-lg shadow">
-            <div className="text-base-content font-bold mb-5">THIS MONTH</div>
-            <div className="text-5xl font-bold text-primary">
-              {stats.thisMonth}
+    <div className="space-y-6 sm:space-y-8">
+      {/* ── SUBTITLE HEADER ── */}{" "}
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-base-content">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="mt-1 text-sm text-base-content/60">{subtitle}</p>
+        )}
+      </div>
+      {/* ── KPI CARDS ── */}
+      <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
+        {kpiCards.map((card, idx) => (
+          <div
+            key={idx}
+            className="card shadow-xl hover:shadow-2xl hover:scale-[1.03] transition-all duration-300 group"
+            style={{ transitionDelay: `${card.delay}ms` }}
+          >
+            <div className="card-body p-4 sm:p-6 relative overflow-hidden">
+              <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                <card.icon className="h-full w-full" />
+              </div>
+              <div className="relative">
+                <div className="badge border-base-100 gap-2 mb-3">
+                  <span className="font-extrabold uppercase text-sm tracking-wide">
+                    {card.label}
+                  </span>
+                </div>
+                <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                  {card.value.toLocaleString()}
+                </p>
+                <p className="text-sm sm:text-base font-semibold text-base-content/60">
+                  {card.subtitle}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
-          <table className="table table-compact w-full">
-            <thead className="bg-base-300 text-base">
-              <tr>
-                {isAdminOrAtty && (
+        ))}
+      </section>
+      {/* ── TOOLBAR ── */}
+      <AnnualToolbar
+        search={searchTerm}
+        onSearchChange={(v: string) => {
+          setSearchTerm(v);
+          setCurrentPage(1);
+        }}
+        rowCount={filteredAndSorted.length}
+        placeholder={searchPlaceholder ?? `Search ${title}…`}
+        selectionMode={selectionMode}
+        selectedCount={selectedIds.size}
+        onStartEdit={() => {
+          if (filteredAndSorted.length > 0) {
+            setSelectionMode("edit");
+            setSelectedIds(new Set());
+          }
+        }}
+        onStartDelete={() => {
+          if (filteredAndSorted.length > 0) {
+            setSelectionMode("delete");
+            setSelectedIds(new Set());
+          }
+        }}
+        onConfirmSelection={confirmSelection}
+        onCancelSelection={cancelSelection}
+      />
+      {/* ── EXCEL-STYLE TABLE ── */}
+      <div
+        className={`bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden${
+          isSelecting
+            ? selectionMode === "delete"
+              ? " ring-2 ring-error/30"
+              : " ring-2 ring-info/30"
+            : " cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+        }`}
+        onClick={
+          isSelecting
+            ? undefined
+            : () => {
+                setShowViewPage(true);
+                onActivePageChange?.(true);
+              }
+        }
+        title={isSelecting ? undefined : "Click to view detailed report"}
+      >
+        <div className="overflow-x-auto">
+          <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
+            <thead>
+              {/* Primary header row */}
+              <tr className="bg-base-300 text-base-content text-sm uppercase tracking-widest">
+                {isSelecting && (
                   <th
                     rowSpan={hasGroups ? 2 : 1}
-                    className="text-center align-middle"
+                    className="py-4 px-2 text-center align-middle"
                   >
-                    Actions
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={
+                        paginated.length > 0 &&
+                        paginated.every((r) =>
+                          selectedIds.has(
+                            (r as Record<string, unknown>).id as number,
+                          ),
+                        )
+                      }
+                      onChange={toggleAll}
+                    />
                   </th>
                 )}
                 {columns.map((col, i) => {
@@ -227,7 +552,7 @@ function AnnualTable<T extends Record<string, unknown>>({
                       <th
                         key={col.title + i}
                         colSpan={col.children.length}
-                        className="text-center border-b border-base-200 bg-base-200"
+                        className="py-4 px-5 text-center font-extrabold border-b border-base-200 bg-base-content/5"
                       >
                         {col.title}
                       </th>
@@ -237,13 +562,13 @@ function AnnualTable<T extends Record<string, unknown>>({
                     <th
                       key={col.key}
                       rowSpan={hasGroups ? 2 : 1}
-                      className={`align-middle ${
+                      className={`py-4 px-5 font-extrabold align-middle ${
                         col.align === "center"
                           ? "text-center"
                           : col.align === "right"
                             ? "text-right"
-                            : ""
-                      } ${col.sortable ? "cursor-pointer hover:bg-base-200 select-none" : ""}`}
+                            : "text-left"
+                      } ${col.sortable ? "cursor-pointer hover:bg-base-200/60 select-none transition-colors" : ""}`}
                       onClick={
                         col.sortable ? () => handleSort(col.key) : undefined
                       }
@@ -257,19 +582,19 @@ function AnnualTable<T extends Record<string, unknown>>({
 
               {/* Second header row – group children only */}
               {hasGroups && (
-                <tr>
+                <tr className="bg-base-300/80 text-base-content text-xs uppercase tracking-widest">
                   {columns.flatMap((col, gi) => {
                     if (!isGroupColumn(col)) return [];
                     return col.children.map((child) => (
                       <th
                         key={child.key + gi}
-                        className={`${
+                        className={`py-3 px-5 font-extrabold ${
                           child.align === "center"
                             ? "text-center"
                             : child.align === "right"
                               ? "text-right"
-                              : ""
-                        } ${child.sortable ? "cursor-pointer hover:bg-base-200 select-none" : ""}`}
+                              : "text-left"
+                        } ${child.sortable ? "cursor-pointer hover:bg-base-200/60 select-none transition-colors" : ""}`}
                         onClick={
                           child.sortable
                             ? () => handleSort(child.key)
@@ -285,51 +610,93 @@ function AnnualTable<T extends Record<string, unknown>>({
               )}
             </thead>
 
-            <tbody>
-              {paginated.map((row) => (
-                <AnnualRow
-                  key={(row as Record<string, unknown> & { id: number }).id}
-                  row={row as Record<string, unknown>}
-                  leafColumns={leafColumns}
-                  onEdit={(r) => {
-                    setSelectedRecord(r as T);
-                    setDrawerType(AnnualDrawerType.EDIT);
-                  }}
-                  onDelete={handleDelete}
-                />
-              ))}
+            <tbody className="divide-y divide-base-200">
+              {paginated.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={leafColumns.length + (isSelecting ? 1 : 0)}
+                    className="py-16 text-center text-base-content/40 text-base italic"
+                  >
+                    No rows match your search.
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((row, idx) => (
+                  <AnnualRow
+                    key={(row as Record<string, unknown> & { id: number }).id}
+                    row={row as Record<string, unknown>}
+                    leafColumns={leafColumns}
+                    onEdit={(r) => {
+                      setEditInitialData([r]);
+                      setShowAddPage(true);
+                      onActivePageChange?.(true);
+                    }}
+                    onDelete={handleDelete}
+                    even={idx % 2 === 0}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(
+                      (row as Record<string, unknown>).id as number,
+                    )}
+                    onToggleSelect={() =>
+                      toggleSelect(
+                        (row as Record<string, unknown>).id as number,
+                      )
+                    }
+                  />
+                ))
+              )}
+
+              {/* ── Grand total row ── */}
+              {filteredAndSorted.length > 0 && (
+                <tr className="bg-primary text-primary-content">
+                  {isSelecting && <td />}
+                  {leafColumns.map((col) => {
+                    const total = columnTotals[col.key];
+                    const isFirstCol = col === leafColumns[0];
+                    return (
+                      <td
+                        key={col.key}
+                        className={`px-5 py-4 font-black tabular-nums text-base ${
+                          col.align === "center"
+                            ? "text-center"
+                            : col.align === "right"
+                              ? "text-right"
+                              : "text-left"
+                        }`}
+                      >
+                        {isFirstCol ? (
+                          <span className="text-sm uppercase tracking-widest">
+                            Grand Total
+                          </span>
+                        ) : total != null ? (
+                          total.toLocaleString()
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        {/* Pagination */}
-        <div className="mt-4 flex justify-end">
-          <Pagination
-            pageCount={pageCount}
-            currentPage={currentPage}
-            onPageChange={(page) => {
-              setCurrentPage(page);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
-        </div>
-
-        {/* Add / Edit drawer */}
-        {drawerType && (
-          <AnnualDrawer
-            type={drawerType}
-            title={title}
-            fields={fields}
-            onClose={() => {
-              setDrawerType(null);
-              setSelectedRecord(null);
-            }}
-            selectedRecord={selectedRecord as Record<string, unknown> | null}
-            onCreate={handleCreate}
-            onUpdate={handleUpdate}
-          />
-        )}
-      </main>
+      </div>
+      {/* ── PAGINATION ── */}
+      <div className="flex justify-end">
+        <Pagination
+          pageCount={pageCount}
+          currentPage={currentPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </div>
+      {/* ── FOOTER ── */}
+      <p className="text-xs text-base-content/40 text-right">
+        Showing page {currentPage} of {pageCount}
+      </p>
     </div>
   );
 }

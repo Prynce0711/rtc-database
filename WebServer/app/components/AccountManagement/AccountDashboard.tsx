@@ -46,6 +46,19 @@ const getStatusLabel = (status: Status | "ALL") => {
   return status;
 };
 
+const roleToText = (role: Roles) => {
+  switch (role) {
+    case Roles.ADMIN:
+      return "Admin";
+    case Roles.ATTY:
+      return "Attorney";
+    case Roles.USER:
+      return "Staff";
+    default:
+      return role;
+  }
+};
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }: { status: Status }) => {
   const config: Record<string, { cls: string; dot?: string }> = {
@@ -252,7 +265,7 @@ const AccountDashboard = () => {
             <h2 className="text-5xl font-black tracking-tight">
               Account Management
             </h2>
-            <p className="text-lg opacity-60 mt-2">
+            <p className="text-lg text-base-content/50 mt-2">
               Manage user accounts and permissions
             </p>
           </div>
@@ -265,7 +278,6 @@ const AccountDashboard = () => {
             </button>
           )}
         </div>
-
         {/* ── STATUS TABS ──────────────────────────────────── */}
         <div className="relative flex p-1.5 rounded-full bg-base-200 border border-base-200 w-fit mb-8">
           <div
@@ -290,7 +302,7 @@ const AccountDashboard = () => {
                   setCurrentPage(1);
                 }}
                 className={[
-                  "relative z-10 px-5 py-2 rounded-full text-[13px] font-bold transition-colors duration-150 flex items-center gap-2",
+                  "relative z-10 px-6 py-2.5 rounded-full text-[14px] font-bold transition-colors duration-150 flex items-center gap-2",
                   isActive
                     ? "text-primary"
                     : "text-base-content/40 hover:text-base-content/70",
@@ -311,7 +323,6 @@ const AccountDashboard = () => {
             );
           })}
         </div>
-
         {/* ── SEARCH + FILTER ──────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           <div className="relative flex-1 max-w-md">
@@ -342,7 +353,6 @@ const AccountDashboard = () => {
             <option value={Roles.ATTY}>Attorney</option>
           </select>
         </div>
-
         {/* ── TABLE ────────────────────────────────────────── */}
         <div className="bg-base-100 rounded-xl border border-base-200 overflow-hidden">
           {paginated.length === 0 ? (
@@ -372,7 +382,7 @@ const AccountDashboard = () => {
                 <table className="w-full text-xl">
                   {/* HEADER */}
                   <thead className="text-xl">
-                    <tr className="text-xl border-b border-base-200 bg-base-200 ">
+                    <tr className="text-xl border-b border-base-200 bg-[#e6eef5] ">
                       <SortTh
                         label="Name"
                         colKey="name"
@@ -445,7 +455,7 @@ const AccountDashboard = () => {
                           {user.role === Roles.ADMIN ||
                           user.status === Status.PENDING ? (
                             <span className="text-[13px] font-semibold text-base-content/50">
-                              {user.role}
+                              {roleToText(user.role)}
                             </span>
                           ) : (
                             <select
@@ -498,32 +508,15 @@ const AccountDashboard = () => {
               </div>
 
               {/* ── Pagination ──────────────────────────────── */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-base-200">
-                <p className="text-[13px] text-base-content/40 font-medium">
-                  Showing{" "}
-                  <span className="font-semibold text-base-content/60">
-                    {Math.min(
-                      (currentPage - 1) * pageSize + 1,
-                      processedUsers.length,
-                    )}
-                  </span>{" "}
-                  –{" "}
-                  <span className="font-semibold text-base-content/60">
-                    {Math.min(currentPage * pageSize, processedUsers.length)}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-semibold text-base-content/60">
-                    {processedUsers.length}
-                  </span>
-                </p>
-                <Pagination
-                  currentPage={currentPage}
-                  pageCount={Math.ceil(processedUsers.length / pageSize)}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
             </>
-          )}
+          )}{" "}
+        </div>{" "}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-base-200">
+          <Pagination
+            currentPage={currentPage}
+            pageCount={Math.ceil(processedUsers.length / pageSize)}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </main>
     </div>

@@ -21,7 +21,6 @@ type Tab = "annual" | "inventory";
 export default function StatisticsTester() {
   const [activeTab, setActiveTab] = useState<Tab>("annual");
 
-  // ── Annual Trial Courts ──────────────────────────────────────────────────
   const [annualRecords, setAnnualRecords] = useState<CaseSchema[]>([]);
   const [annualForm, setAnnualForm] = useState<CaseSchema>({
     branch: "",
@@ -34,7 +33,6 @@ export default function StatisticsTester() {
   const [isEditingAnnual, setIsEditingAnnual] = useState(false);
   const [editingAnnualId, setEditingAnnualId] = useState<number | null>(null);
 
-  // ── Inventory Documents ──────────────────────────────────────────────────
   const [inventoryRecords, setInventoryRecords] = useState<
     InventoryDocumentSchema[]
   >([]);
