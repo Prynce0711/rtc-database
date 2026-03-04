@@ -1,43 +1,184 @@
 import { Case } from "@/app/generated/prisma/browser";
 import { CaseType } from "@/app/generated/prisma/enums";
+import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 
 export const CaseSchema = z.object({
   id: z.coerce.number().int().optional(), // Optional for new cases that haven't been saved yet
-  branch: z.string().nullable().optional(),
-  assistantBranch: z.string().nullable().optional(),
-  caseNumber: z.string().min(1, "Case number is required"),
-  dateFiled: z.coerce.date().nullable().optional(),
-  name: z.string().min(1, "Name is required"),
-  charge: z.string().nullable().optional(),
-  infoSheet: z.string().nullable().optional(),
-  court: z.string().nullable().optional(),
+  branch: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders(["Branch", "Branch/Station", "Branch Station", "BR"]),
+    ),
+  assistantBranch: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Assistant Branch", "Asst Branch"])),
+  caseNumber: z
+    .string()
+    .min(1, "Case number is required")
+    .describe(
+      excelHeaders([
+        "Case No",
+        "Case Number",
+        "Criminal Case No",
+        "Criminal Case Number",
+      ]),
+    ),
+  dateFiled: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Date Filed", "Filing Date"])),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .describe(excelHeaders(["Name", "Accused", "Accused Name"])),
+  charge: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Charge", "Offense"])),
+  infoSheet: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Info Sheet", "Information Sheet", "IS", "I.S"])),
+  court: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Court"])),
   caseType: z.enum(CaseType),
-  detained: z.string().nullable().optional(),
-  consolidation: z.string().nullable().optional(),
-  eqcNumber: z.coerce.number().int().nullable().optional(),
-  bond: z.string().nullable().optional(),
-  raffleDate: z.coerce.date().nullable().optional(),
-  committee1: z.string().nullable().optional(),
-  committee2: z.string().nullable().optional(),
-  judge: z.string().nullable().optional(),
-  ao: z.string().nullable().optional(),
-  complainant: z.string().nullable().optional(),
-  houseNo: z.string().nullable().optional(),
-  street: z.string().nullable().optional(),
-  barangay: z.string().nullable().optional(),
-  municipality: z.string().nullable().optional(),
-  province: z.string().nullable().optional(),
-  counts: z.string().nullable().optional(),
-  jdf: z.string().nullable().optional(),
-  sajj: z.string().nullable().optional(),
-  sajj2: z.string().nullable().optional(),
-  mf: z.string().nullable().optional(),
-  stf: z.string().nullable().optional(),
-  lrf: z.string().nullable().optional(),
-  vcf: z.string().nullable().optional(),
-  total: z.string().nullable().optional(),
-  amountInvolved: z.string().nullable().optional(),
+  detained: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Detained", "Detention", "Status"])),
+  consolidation: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Consolidation"])),
+  eqcNumber: z.coerce
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["EQC No", "EQ Number"])),
+  bond: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Bond", "BOND"])),
+  raffleDate: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Raffle Date", "Raffled Date"])),
+  committee1: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Committee 1", "Commitee 1"])),
+  committee2: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Committee 2", "Commitee 2"])),
+  judge: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Judge", "JUDGE"])),
+  ao: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["AO", "A.O.", "A.O"])),
+  complainant: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Complainant", "COMPLAINANT"])),
+  houseNo: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["House No", "HOUSE NO", "House Number"])),
+  street: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Street"])),
+  barangay: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Barangay"])),
+  municipality: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Municipality"])),
+  province: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Province"])),
+  counts: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Counts"])),
+  jdf: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["JDF"])),
+  sajj: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["SAJJ", "sajj"])),
+  sajj2: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["SAJJ2", "sajj2", "SAJJ 2"])),
+  mf: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["MF", "mf"])),
+  stf: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["STF", "stf"])),
+  lrf: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["LRF", "lrf"])),
+  vcf: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["VCF", "vcf"])),
+  total: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Total", "TOTAL"])),
+  amountInvolved: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Amount Involved", "AMOUNT INVOLVED"])),
 });
 export type CaseSchema = z.infer<typeof CaseSchema>;
 

@@ -2,21 +2,15 @@
 
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee } from "@/app/generated/prisma/browser";
+import {
+  enumToText,
+  getAgeFromDate,
+  isRetirementEligible,
+} from "@/app/lib/utils";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const bloodTypeMap: Record<string, string> = {
-  A_Positive: "A+",
-  A_Negative: "A-",
-  B_Positive: "B+",
-  B_Negative: "B-",
-  AB_Positive: "AB+",
-  AB_Negative: "AB-",
-  O_Positive: "O+",
-  O_Negative: "O-",
-};
-
 const formatDate = (date: Date | string | null | undefined) => {
   if (!date) return "—";
   return new Date(date).toLocaleDateString("en-PH", {
@@ -396,7 +390,7 @@ export default function EmployeeDetailsPage() {
                   : "border-transparent text-base-content/30 hover:text-base-content/55",
               ].join(" ")}
             >
-              {tab === "details" ? "Employee Details" : "Additional Info"}
+              {tab === "details" ? "Employee Details" : "Employment"}
             </button>
           ))}
         </div>
@@ -420,21 +414,15 @@ export default function EmployeeDetailsPage() {
                   label="Birthday"
                   value={formatDate(employee.birthDate)}
                 />
-              </div>
-            </Section>
-
-            <div className="h-px bg-base-200" />
-
-            <Section label="Government IDs">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="TIN" value={employee.tinNumber} mono />
-                <Detail label="GSIS" value={employee.gsisNumber} mono />
                 <Detail
-                  label="PhilHealth"
-                  value={employee.philHealthNumber}
+                  label="Age"
+                  value={getAgeFromDate(employee.birthDate) ?? "—"}
                   mono
                 />
-                <Detail label="Pag-IBIG" value={employee.pagIbigNumber} mono />
+                <Detail
+                  label="Date Hired"
+                  value={formatDate(employee.dateHired)}
+                />
               </div>
             </Section>
 
@@ -443,7 +431,6 @@ export default function EmployeeDetailsPage() {
             <Section label="Contact Information">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <Detail label="Email" value={employee.email} />
-                <Detail label="Contact Person" value={employee.contactPerson} />
                 <Detail
                   label="Contact Number"
                   value={employee.contactNumber}
@@ -459,26 +446,22 @@ export default function EmployeeDetailsPage() {
         ══════════════════════════════════════════ */}
         {activeTab === "additional" && (
           <div className="space-y-10 animate-slide-up">
-            <Section label="Physical Information">
+            <Section label="Employment Details">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <Detail
-                  label="Blood Type"
+                  label="Employment Type"
                   value={
-                    employee.bloodType
-                      ? (bloodTypeMap[employee.bloodType] ?? employee.bloodType)
+                    employee.employmentType
+                      ? enumToText(employee.employmentType)
                       : null
                   }
                 />
-                <Detail label="Height (cm)" value={employee.height ?? null} />
-                <Detail label="Weight (kg)" value={employee.weight ?? null} />
-              </div>
-            </Section>
-
-            <div className="h-px bg-base-200" />
-
-            <Section label="Medical Notes">
-              <div className="grid grid-cols-1 gap-5">
-                <Detail label="Allergies" value={employee.allergies} />
+                <Detail
+                  label="Retirement Eligible"
+                  value={
+                    isRetirementEligible(employee.birthDate) ? "Yes" : "No"
+                  }
+                />
               </div>
             </Section>
           </div>

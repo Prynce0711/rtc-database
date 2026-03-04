@@ -2,6 +2,185 @@ import * as XLSX from "xlsx";
 import z, { prettifyError } from "zod";
 import ActionResult from "../components/ActionResult";
 
+const EXCEL_HEADERS_PREFIX = "excelHeaders:";
+
+export const excelHeaders = (headers: string[]): string =>
+  `${EXCEL_HEADERS_PREFIX}${JSON.stringify(headers)}`;
+
+const parseExcelHeaders = (description?: string): string[] | undefined => {
+  if (!description || !description.startsWith(EXCEL_HEADERS_PREFIX)) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(
+      description.slice(EXCEL_HEADERS_PREFIX.length),
+    ) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((value) => typeof value === "string")
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const getExcelHeaderMap = <T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+): Partial<Record<keyof T, string[]>> => {
+  const shape = schema.shape;
+  const headers: Partial<Record<keyof T, string[]>> = {};
+
+  for (const key of Object.keys(shape) as Array<keyof T>) {
+    const description = (shape[key] as unknown as z.ZodTypeAny).description;
+    const parsed = parseExcelHeaders(description);
+    if (parsed && parsed.length > 0) {
+      headers[key] = parsed;
+    }
+  }
+
+  return headers;
+};
+
+export const getRowValuesBySchema = <T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+  row: Record<string, unknown>,
+): Partial<Record<keyof T, unknown>> => {
+  const headers = getExcelHeaderMap(schema);
+  const values: Partial<Record<keyof T, unknown>> = {};
+
+  for (const key of Object.keys(headers) as Array<keyof T>) {
+    const aliases = headers[key] ?? [];
+    values[key] = findColumnValue(row, aliases);
+  }
+
+  return values;
+};
+
+const unwrapSchema = (schema: unknown): unknown => {
+  let current: unknown = schema;
+
+  while (true) {
+    if (current instanceof z.ZodOptional || current instanceof z.ZodNullable) {
+      current = (current as unknown as { unwrap: () => unknown }).unwrap();
+      continue;
+    }
+    const removeDefault = (
+      current as unknown as { removeDefault?: () => unknown }
+    ).removeDefault;
+    if (removeDefault) {
+      current = removeDefault();
+      continue;
+    }
+    const innerType = (current as unknown as { innerType?: () => unknown })
+      .innerType;
+    if (innerType) {
+      current = innerType();
+      continue;
+    }
+    return current;
+  }
+};
+
+const normalizeEnumValue = (
+  value: unknown,
+  allowedValues: Array<string | number>,
+): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  const raw = String(value).trim();
+  if (raw === "") return undefined;
+  const normalized = raw.replace(/\s+/g, "_").toUpperCase();
+  const normalizedAllowed = allowedValues.map((option) =>
+    String(option).trim(),
+  );
+  if (normalizedAllowed.includes(normalized)) {
+    return normalized;
+  }
+  const match = normalizedAllowed.find(
+    (option) => option.toLowerCase() === raw.toLowerCase(),
+  );
+  return match;
+};
+
+const normalizeBooleanValue = (value: unknown): boolean | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  const raw = String(value).trim().toLowerCase();
+  if (raw === "") return undefined;
+  if (["yes", "true", "1", "y"].includes(raw)) return true;
+  if (["no", "false", "0", "n"].includes(raw)) return false;
+  return undefined;
+};
+
+const normalizeDateValue = (value: unknown): Date | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (value instanceof Date) {
+    return isValidDate(value) ? value : undefined;
+  }
+  if (typeof value === "number") {
+    const parsed = excelDateToJSDate(value);
+    return parsed && isValidDate(parsed) ? parsed : undefined;
+  }
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return !Number.isNaN(parsed.getTime()) && isValidDate(parsed)
+      ? parsed
+      : undefined;
+  }
+  return undefined;
+};
+
+const normalizeValueBySchema = (value: unknown, schema: unknown): unknown => {
+  const unwrapped = unwrapSchema(schema);
+
+  if (unwrapped instanceof z.ZodDate) {
+    return normalizeDateValue(value);
+  }
+
+  if (unwrapped instanceof z.ZodEnum) {
+    return normalizeEnumValue(value, unwrapped.options);
+  }
+
+  const nativeEnum = (unwrapped as { enum?: unknown }).enum;
+  if (
+    nativeEnum &&
+    typeof nativeEnum === "object" &&
+    !Array.isArray(nativeEnum)
+  ) {
+    const allowed = Object.values(nativeEnum).filter(
+      (option): option is string => typeof option === "string",
+    );
+    return normalizeEnumValue(value, allowed);
+  }
+
+  if (unwrapped instanceof z.ZodBoolean) {
+    return normalizeBooleanValue(value);
+  }
+
+  if (unwrapped instanceof z.ZodString) {
+    if (value === undefined || value === null) return value;
+    return typeof value === "string" ? value : String(value);
+  }
+
+  return value;
+};
+
+export const normalizeRowBySchema = <T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+  row: Record<string, unknown>,
+): Partial<Record<keyof T, unknown>> => {
+  const headers = getExcelHeaderMap(schema);
+  const values: Partial<Record<keyof T, unknown>> = {};
+  const shape = schema.shape;
+
+  for (const key of Object.keys(headers) as Array<keyof T>) {
+    const aliases = headers[key] ?? [];
+    const rawValue = findColumnValue(row, aliases);
+    values[key] = normalizeValueBySchema(rawValue, shape[key] as unknown);
+  }
+
+  return values;
+};
+
 export type ExportExcelData = {
   fileName: string;
   base64: string;
@@ -244,17 +423,17 @@ export type ProcessExcelMeta = {
   validRows: number;
 };
 
-type SkipRowsConfig<TCells extends Record<string, unknown>> = {
+type CellsConfig<TCells extends Record<string, unknown>> = {
   getCells: (row: Record<string, unknown>) => TCells;
-  ignoreKeys?: Array<keyof TCells>;
+  keys?: Array<keyof TCells>;
 };
 
 type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   file: File;
   requiredHeaders: Record<string, string[]>;
   schema: z.ZodType<T>;
-  skipRowsWithoutCell?: SkipRowsConfig<TCells>;
-  extractUniqueKey?: (row: Record<string, unknown>) => string | undefined;
+  skipRowsWithoutCell?: CellsConfig<TCells>;
+  uniqueKeys?: CellsConfig<TCells>;
   checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
   uniqueKeyLabel?: string;
   mapRow: (row: Record<string, unknown>) => {
@@ -265,6 +444,23 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   };
   onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
 };
+
+function extractUniqueKeyFromRow<TCells extends Record<string, unknown>>(
+  row: Record<string, unknown>,
+  config: CellsConfig<TCells>,
+): string | undefined {
+  const cells = config.getCells(row);
+  const keys = config.keys ?? [];
+  const values = keys
+    .map((key) => cells[key])
+    .filter((value) => hasContent(value));
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  return values.map((value) => String(value).trim()).join(" ");
+}
 
 export type UploadExcelResult = {
   failedExcel?: ExportExcelData;
@@ -282,7 +478,7 @@ export async function processExcelUpload<
     requiredHeaders,
     schema,
     skipRowsWithoutCell: skipRows,
-    extractUniqueKey,
+    uniqueKeys,
     checkExistingUniqueKeys,
     uniqueKeyLabel = "Unique value",
     mapRow,
@@ -323,10 +519,7 @@ export async function processExcelUpload<
     const sheetData = skipRows
       ? rawSheetData.filter(
           (row) =>
-            !isMappedRowEmpty(
-              skipRows.getCells(row),
-              skipRows.ignoreKeys ?? [],
-            ),
+            !isMappedRowEmpty(skipRows.getCells(row), skipRows.keys ?? []),
         )
       : rawSheetData;
 
@@ -374,9 +567,9 @@ export async function processExcelUpload<
 
     // Pre-check existing unique keys in DB if provided
     let existingUniqueKeys = new Set<string>();
-    if (extractUniqueKey && checkExistingUniqueKeys) {
+    if (uniqueKeys && checkExistingUniqueKeys) {
       const keys = sheetData
-        .map((row) => extractUniqueKey(row))
+        .map((row) => extractUniqueKeyFromRow(row, uniqueKeys))
         .filter((val): val is string => !!val);
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
@@ -391,7 +584,9 @@ export async function processExcelUpload<
         continue;
       }
 
-      const uniqueKey = mapResult.uniqueKey ?? extractUniqueKey?.(row);
+      const uniqueKey =
+        mapResult.uniqueKey ??
+        (uniqueKeys ? extractUniqueKeyFromRow(row, uniqueKeys) : undefined);
       if (uniqueKey) {
         if (
           existingUniqueKeys.has(uniqueKey) ||

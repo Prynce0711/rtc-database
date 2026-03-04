@@ -45,3 +45,27 @@ export function isTextFieldKey<T extends Record<string, unknown>>(
     key.toString().toLowerCase().includes(prefix.toLowerCase())
   );
 }
+
+export function enumToText(value: string): string {
+  const normalized = value.replace(/_/g, " ").toLowerCase();
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function getAgeFromDate(date?: Date | string | null): number | null {
+  if (!date) return null;
+  const birthDate = new Date(date);
+  if (Number.isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() &&
+      today.getDate() >= birthDate.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age;
+}
+
+export function isRetirementEligible(date?: Date | string | null): boolean {
+  const age = getAgeFromDate(date);
+  return age !== null && age >= 60;
+}

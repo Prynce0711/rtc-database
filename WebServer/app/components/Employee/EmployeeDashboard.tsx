@@ -25,6 +25,7 @@ import {
 
 import FilterModal from "@/app/components/Filter/FilterModal";
 import type { Employee } from "@/app/generated/prisma/browser";
+import { isRetirementEligible } from "@/app/lib/utils";
 import {
   ExactMatchMap,
   FilterOption,
@@ -51,17 +52,6 @@ const EmployeeDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-
-  const bloodTypeMap: Record<string, string> = {
-    A_Positive: "A+",
-    A_Negative: "A-",
-    B_Positive: "B+",
-    B_Negative: "B-",
-    AB_Positive: "AB+",
-    AB_Negative: "AB-",
-    O_Positive: "O+",
-    O_Negative: "O-",
-  };
 
   useEffect(() => {
     fetchEmployees();
@@ -163,15 +153,16 @@ const EmployeeDashboard: React.FC = () => {
   const analytics = useMemo(() => {
     const totalEmployees = employees.length;
     const totalBranches = new Set(employees.map((e) => e.branch)).size;
-    const withMedical = employees.filter(
-      (e) =>
-        e.bloodType ||
-        (e.allergies &&
-          e.allergies.trim() !== "" &&
-          e.allergies.toLowerCase() !== "n/a"),
-    ).length;
     const missingEmail = employees.filter((e) => !e.email).length;
-    return { totalEmployees, totalBranches, withMedical, missingEmail };
+    const retirementEligible = employees.filter((e) =>
+      isRetirementEligible(e.birthDate),
+    ).length;
+    return {
+      totalEmployees,
+      totalBranches,
+      missingEmail,
+      retirementEligible,
+    };
   }, [employees]);
 
   const employeeFilterOptions: FilterOption[] = [
@@ -179,11 +170,12 @@ const EmployeeDashboard: React.FC = () => {
     { key: "employeeNumber", label: "Employee Number", type: "text" },
     { key: "position", label: "Position", type: "text" },
     { key: "branch", label: "Branch/Station", type: "text" },
-    { key: "tinNumber", label: "TIN", type: "text" },
-    { key: "gsisNumber", label: "GSIS", type: "text" },
-    { key: "philHealthNumber", label: "PHILHEALTH", type: "text" },
-    { key: "pagIbigNumber", label: "PAG-IBIG", type: "text" },
-    { key: "hasMedicalInfo", label: "Has Medical Info", type: "checkbox" },
+    { key: "employmentType", label: "Employment Type", type: "text" },
+    {
+      key: "retirementEligible",
+      label: "Retirement Eligible",
+      type: "checkbox",
+    },
     { key: "hasEmail", label: "Has Email", type: "checkbox" },
   ];
 
@@ -230,40 +222,14 @@ const EmployeeDashboard: React.FC = () => {
       )
         return false;
       if (
-        typeof filters.tinNumber === "string" &&
-        filters.tinNumber.trim() !== "" &&
-        !matchesText(e.tinNumber, filters.tinNumber, "tinNumber")
+        typeof filters.employmentType === "string" &&
+        filters.employmentType.trim() !== "" &&
+        !matchesText(e.employmentType, filters.employmentType, "employmentType")
       )
         return false;
-      if (
-        typeof filters.gsisNumber === "string" &&
-        filters.gsisNumber.trim() !== "" &&
-        !matchesText(e.gsisNumber, filters.gsisNumber, "gsisNumber")
-      )
-        return false;
-      if (
-        typeof filters.philHealthNumber === "string" &&
-        filters.philHealthNumber.trim() !== "" &&
-        !matchesText(
-          e.philHealthNumber,
-          filters.philHealthNumber,
-          "philHealthNumber",
-        )
-      )
-        return false;
-      if (
-        typeof filters.pagIbigNumber === "string" &&
-        filters.pagIbigNumber.trim() !== "" &&
-        !matchesText(e.pagIbigNumber, filters.pagIbigNumber, "pagIbigNumber")
-      )
-        return false;
-      if (typeof filters.hasMedicalInfo === "boolean") {
-        const hasMedical =
-          !!e.bloodType ||
-          (!!e.allergies &&
-            e.allergies.trim() !== "" &&
-            e.allergies.toLowerCase() !== "n/a");
-        if (filters.hasMedicalInfo !== hasMedical) return false;
+      if (typeof filters.retirementEligible === "boolean") {
+        const eligible = isRetirementEligible(e.birthDate);
+        if (filters.retirementEligible !== eligible) return false;
       }
       if (typeof filters.hasEmail === "boolean") {
         const hasEmail = !!e.email && e.email.trim() !== "";
@@ -293,10 +259,7 @@ const EmployeeDashboard: React.FC = () => {
       "employeeNumber",
       "position",
       "branch",
-      "tinNumber",
-      "gsisNumber",
-      "philHealthNumber",
-      "pagIbigNumber",
+      "employmentType",
     ];
     if (!textFields.includes(key)) return [];
     const values = employees
@@ -315,16 +278,7 @@ const EmployeeDashboard: React.FC = () => {
     if (!search.trim()) return baseList;
     const q = search.toLowerCase();
     return baseList.filter((e) =>
-      [
-        e.employeeName,
-        e.employeeNumber,
-        e.position,
-        e.branch,
-        e.tinNumber,
-        e.gsisNumber,
-        e.philHealthNumber,
-        e.pagIbigNumber,
-      ]
+      [e.employeeName, e.employeeNumber, e.position, e.branch, e.employmentType]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q)),
     );
@@ -463,21 +417,21 @@ const EmployeeDashboard: React.FC = () => {
               {
                 label: "Branches",
                 value: analytics.totalBranches,
-                subtitle: `${analytics.withMedical} with medical`,
+                subtitle: `${analytics.retirementEligible} retirement eligible`,
                 icon: FiFileText,
                 delay: 100,
               },
               {
-                label: "Complete Profiles",
-                value: analytics.withMedical,
+                label: "Retirement Eligible",
+                value: analytics.retirementEligible,
                 subtitle: `${analytics.missingEmail} missing email`,
                 icon: FiLock,
                 delay: 200,
               },
               {
-                label: "Pending",
+                label: "Missing Emails",
                 value: analytics.missingEmail,
-                subtitle: `Profiles pending review`,
+                subtitle: `Profiles missing email`,
                 icon: FiUsers,
                 delay: 300,
               },
@@ -524,7 +478,6 @@ const EmployeeDashboard: React.FC = () => {
           <div className="rounded-2xl shadow-lg border border-base-100 overflow-visible">
             <EmployeeTable
               employees={filtered}
-              bloodTypeMap={bloodTypeMap}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />

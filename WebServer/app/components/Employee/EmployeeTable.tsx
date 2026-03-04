@@ -1,6 +1,7 @@
 "use client";
 
 import type { Employee } from "@/app/generated/prisma/browser";
+import { enumToText, getAgeFromDate } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
@@ -8,20 +9,22 @@ import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
   employees: Employee[];
-  bloodTypeMap: Record<string, string>;
   onEdit: (emp: Employee) => void;
   onDelete: (id: number) => void;
 }
 
-type SortKey = keyof Pick<
-  Employee,
-  | "employeeName"
-  | "employeeNumber"
-  | "position"
-  | "branch"
-  | "contactNumber"
-  | "email"
->;
+type SortKey =
+  | keyof Pick<
+      Employee,
+      | "employeeName"
+      | "employeeNumber"
+      | "position"
+      | "branch"
+      | "employmentType"
+      | "contactNumber"
+      | "email"
+    >
+  | "age";
 
 type SortOrder = "asc" | "desc";
 
@@ -86,6 +89,11 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
 
   const sorted = useMemo(() => {
     return [...employees].sort((a, b) => {
+      if (sortKey === "age") {
+        const aVal = getAgeFromDate(a.birthDate) ?? -1;
+        const bVal = getAgeFromDate(b.birthDate) ?? -1;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      }
       const aVal = (a[sortKey] ?? "") as string;
       const bVal = (b[sortKey] ?? "") as string;
       return sortOrder === "asc"
@@ -161,6 +169,21 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                 onSort={handleSort}
               />
               <SortTh
+                label="Age"
+                colKey="age"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+                align="center"
+              />
+              <SortTh
+                label="Employment Type"
+                colKey="employmentType"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+              />
+              <SortTh
                 label="Contact No"
                 colKey="contactNumber"
                 sortKey={sortKey}
@@ -183,7 +206,7 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
             {paginated.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={9}
                   className="text-center py-16 text-base-content/30 text-sm font-medium"
                 >
                   No employees found.
@@ -267,6 +290,12 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                   </td>
                   <td className="py-4 px-5 text-base-content/80">
                     {emp.branch || "—"}
+                  </td>
+                  <td className="py-4 px-5 text-center text-base-content/70">
+                    {getAgeFromDate(emp.birthDate) ?? "—"}
+                  </td>
+                  <td className="py-4 px-5 text-base-content/80">
+                    {emp.employmentType ? enumToText(emp.employmentType) : "—"}
                   </td>
                   <td className="py-4 px-5 text-center text-base-content/70">
                     {emp.contactNumber || "—"}

@@ -1,6 +1,8 @@
 "use client";
 
 import type { Employee } from "@/app/generated/prisma/browser";
+import { EmploymentType } from "@/app/generated/prisma/enums";
+import { enumToText } from "@/app/lib/utils";
 import React from "react";
 
 interface Props {
@@ -8,7 +10,6 @@ interface Props {
   isEdit: boolean;
   form: Partial<Employee>;
   errors: Record<string, string>;
-  bloodTypeMap: Record<string, string>;
   setForm: (form: Partial<Employee>) => void;
   setShowModal: (val: boolean) => void;
   handleSave: (e: React.FormEvent) => void;
@@ -19,7 +20,6 @@ const EmployeeModal: React.FC<Props> = ({
   isEdit,
   form,
   errors,
-  bloodTypeMap,
   setForm,
   setShowModal,
   handleSave,
@@ -102,66 +102,6 @@ const EmployeeModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* TIN */}
-          <div>
-            <label className="label-text font-medium">TIN</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.tinNumber || ""}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  tinNumber: e.target.value.replace(/\D/g, ""),
-                })
-              }
-            />
-          </div>
-
-          {/* GSIS */}
-          <div>
-            <label className="label-text font-medium">GSIS</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.gsisNumber || ""}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  gsisNumber: e.target.value.replace(/\D/g, ""),
-                })
-              }
-            />
-          </div>
-
-          {/* PhilHealth */}
-          <div>
-            <label className="label-text font-medium">PhilHealth</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.philHealthNumber || ""}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  philHealthNumber: e.target.value.replace(/\D/g, ""),
-                })
-              }
-            />
-          </div>
-
-          {/* Pag-IBIG */}
-          <div>
-            <label className="label-text font-medium">Pag-IBIG</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.pagIbigNumber || ""}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  pagIbigNumber: e.target.value.replace(/\D/g, ""),
-                })
-              }
-            />
-          </div>
-
           {/* Birthday */}
           <div>
             <label className="label-text font-medium">Birthday *</label>
@@ -187,93 +127,56 @@ const EmployeeModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Blood Type */}
+          {/* Date Hired */}
           <div>
-            <label className="label-text font-medium">Blood Type</label>
-            <select
-              className="select select-bordered w-full"
-              value={form.bloodType || ""}
+            <label className="label-text font-medium">Date Hired *</label>
+            <input
+              type="date"
+              className={`input input-bordered w-full ${
+                errors.dateHired && "input-error"
+              }`}
+              value={
+                form.dateHired
+                  ? new Date(form.dateHired).toISOString().split("T")[0]
+                  : ""
+              }
               onChange={(e) =>
-                setForm({ ...form, bloodType: e.target.value as any })
+                setForm({
+                  ...form,
+                  dateHired: new Date(e.target.value + "T00:00:00"),
+                })
+              }
+            />
+            {errors.dateHired && (
+              <p className="text-error text-sm mt-1">{errors.dateHired}</p>
+            )}
+          </div>
+
+          {/* Employment Type */}
+          <div>
+            <label className="label-text font-medium">Employment Type *</label>
+            <select
+              className={`select select-bordered w-full ${
+                errors.employmentType && "input-error"
+              }`}
+              value={form.employmentType || ""}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  employmentType: e.target.value as EmploymentType,
+                })
               }
             >
-              <option value="">Select Blood Type</option>
-              {Object.entries(bloodTypeMap).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
+              <option value="">Select employment type</option>
+              {Object.values(EmploymentType).map((opt) => (
+                <option key={opt} value={opt}>
+                  {enumToText(opt)}
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* Allergies */}
-          <div>
-            <label className="label-text font-medium">Allergies</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.allergies || ""}
-              onChange={(e) => setForm({ ...form, allergies: e.target.value })}
-            />
-          </div>
-
-          {/* Height */}
-          <div>
-            <label className="label-text font-medium">Height</label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                step="0.01"
-                className="input input-bordered w-full"
-                value={form.height ?? ""}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    height: e.target.value ? Number(e.target.value) : undefined,
-                  })
-                }
-              />
-
-              <select className="select select-bordered">
-                <option>cm</option>
-                <option>ft</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Weight */}
-          <div>
-            <label className="label-text font-medium">Weight</label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                step="0.01"
-                className="input input-bordered w-full"
-                value={form.weight ?? ""}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    weight: e.target.value ? Number(e.target.value) : undefined,
-                  })
-                }
-              />
-
-              <select className="select select-bordered">
-                <option>kg</option>
-                <option>lbs</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Contact Person */}
-          <div>
-            <label className="label-text font-medium">Contact Person *</label>
-            <input
-              className="input input-bordered w-full"
-              value={form.contactPerson || ""}
-              onChange={(e) =>
-                setForm({ ...form, contactPerson: e.target.value })
-              }
-            />
+            {errors.employmentType && (
+              <p className="text-error text-sm mt-1">{errors.employmentType}</p>
+            )}
           </div>
 
           {/* Contact Number */}

@@ -138,9 +138,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       pendingRaffle,
       activeCases: totalCases - pendingRaffle,
       employees: employees.length,
-      employeesMissing: employees.filter(
-        (e) => !e.bloodType || !e.contactPerson,
-      ).length,
+      employeesMissing: 0,
       accounts: accounts.length,
       activeAccounts,
       inactiveAccounts,

@@ -5,11 +5,10 @@ import { CaseSchema } from "@/app/components/Case/schema";
 import { CaseType, LogAction, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
-  excelDateToJSDate,
   ExportExcelData,
-  findColumnValue,
+  getExcelHeaderMap,
   isMappedRowEmpty,
-  isValidDate,
+  normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
   UploadExcelResult,
@@ -17,6 +16,7 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
+import { prettifyError } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
 
 export async function uploadExcel(
@@ -42,116 +42,14 @@ export async function uploadExcel(
       console.warn("⚠ Unable to preview workbook for logging:", peekError);
     }
 
-    const branchHeaders = ["Branch", "Branch/Station", "Branch Station", "BR"];
-
-    const caseNumberHeaders = [
-      "Case No",
-      "Case Number",
-      "Criminal Case No",
-      "Criminal Case Number",
-    ];
+    const headerMap = getExcelHeaderMap(CaseSchema);
+    const branchHeaders = headerMap.branch ?? ["Branch"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const branchCell = findColumnValue(row, branchHeaders);
-      const assistantBranchCell = findColumnValue(row, [
-        "Assistant Branch",
-        "Asst Branch",
-      ]);
-      const caseNumberCell = findColumnValue(row, caseNumberHeaders);
-      const dateFiledCell = findColumnValue(row, ["Date Filed", "Filing Date"]);
-      const nameCell = findColumnValue(row, [
-        "Name",
-        "Accused",
-        "Accused Name",
-      ]);
-      const chargeCell = findColumnValue(row, ["Charge", "Offense"]);
-      const infoSheetCell = findColumnValue(row, [
-        "Info Sheet",
-        "Information Sheet",
-        "IS",
-        "I.S",
-      ]);
-      const courtCell = findColumnValue(row, ["Court"]);
-      const detainedCell = findColumnValue(row, [
-        "Detained",
-        "Detention",
-        "Status",
-      ]);
-      const consolidationCell = findColumnValue(row, ["Consolidation"]);
-      const eqcNumberCell = findColumnValue(row, ["EQC No", "EQ Number"]);
-      const bondCell = findColumnValue(row, ["Bond", "BOND"]);
-      const raffleCell = findColumnValue(row, ["Raffle Date", "Raffled Date"]);
-      const committee1Cell = findColumnValue(row, [
-        "Committee 1",
-        "Commitee 1",
-      ]);
-      const committee2Cell = findColumnValue(row, [
-        "Committee 2",
-        "Commitee 2",
-      ]);
-      const judgeCell = findColumnValue(row, ["Judge", "JUDGE"]);
-      const aoCell = findColumnValue(row, ["AO", "A.O.", "A.O"]);
-      const complainantCell = findColumnValue(row, [
-        "Complainant",
-        "COMPLAINANT",
-      ]);
-      const houseNoCell = findColumnValue(row, [
-        "House No",
-        "HOUSE NO",
-        "House Number",
-      ]);
-      const streetCell = findColumnValue(row, ["Street"]);
-      const barangayCell = findColumnValue(row, ["Barangay"]);
-      const municipalityCell = findColumnValue(row, ["Municipality"]);
-      const provinceCell = findColumnValue(row, ["Province"]);
-      const countsCell = findColumnValue(row, ["Counts"]);
-      const jdfCell = findColumnValue(row, ["JDF"]);
-      const sajjCell = findColumnValue(row, ["SAJJ", "sajj"]);
-      const sajj2Cell = findColumnValue(row, ["SAJJ2", "sajj2", "SAJJ 2"]);
-      const mfCell = findColumnValue(row, ["MF", "mf"]);
-      const stfCell = findColumnValue(row, ["STF", "stf"]);
-      const lrfCell = findColumnValue(row, ["LRF", "lrf"]);
-      const vcfCell = findColumnValue(row, ["VCF", "vcf"]);
-      const totalCell = findColumnValue(row, ["Total", "TOTAL"]);
-      const amountInvolvedCell = findColumnValue(row, [
-        "Amount Involved",
-        "AMOUNT INVOLVED",
-      ]);
+      const values = normalizeRowBySchema(CaseSchema, row);
 
       return {
-        branchCell,
-        assistantBranchCell,
-        caseNumberCell,
-        dateFiledCell,
-        nameCell,
-        chargeCell,
-        infoSheetCell,
-        courtCell,
-        detainedCell,
-        consolidationCell,
-        eqcNumberCell,
-        bondCell,
-        raffleCell,
-        committee1Cell,
-        committee2Cell,
-        judgeCell,
-        aoCell,
-        complainantCell,
-        houseNoCell,
-        streetCell,
-        barangayCell,
-        municipalityCell,
-        provinceCell,
-        countsCell,
-        jdfCell,
-        sajjCell,
-        sajj2Cell,
-        mfCell,
-        stfCell,
-        lrfCell,
-        vcfCell,
-        totalCell,
-        amountInvolvedCell,
+        ...values,
       };
     };
 
@@ -164,11 +62,13 @@ export async function uploadExcel(
       schema: CaseSchema,
       skipRowsWithoutCell: {
         getCells: getMappedCells,
-        ignoreKeys: ["caseNumberCell"],
+        keys: ["caseNumber"],
+      },
+      uniqueKeys: {
+        getCells: getMappedCells,
+        keys: ["caseNumber"],
       },
       uniqueKeyLabel: "Case number",
-      extractUniqueKey: (row) =>
-        findColumnValue(row, caseNumberHeaders)?.toString().trim(),
       checkExistingUniqueKeys: async (keys) => {
         const existing = await prisma.case.findMany({
           where: { caseNumber: { in: keys } },
@@ -178,83 +78,39 @@ export async function uploadExcel(
       },
       mapRow: (row) => {
         const cells = getMappedCells(row);
-        const { caseNumberCell } = cells;
 
         // Skip rows that have no mapped content beyond the case number (or are entirely empty)
-        if (isMappedRowEmpty(cells, ["caseNumberCell"])) {
+        if (isMappedRowEmpty(cells, ["caseNumber"])) {
           return { skip: true };
         }
 
-        let dateFiled: Date | undefined;
-        if (typeof cells.dateFiledCell === "number") {
-          const parsed = excelDateToJSDate(cells.dateFiledCell);
-          if (parsed && isValidDate(parsed)) {
-            dateFiled = parsed;
-          }
-        } else if (typeof cells.dateFiledCell === "string") {
-          const parsed = new Date(cells.dateFiledCell);
-          if (!isNaN(parsed.getTime()) && isValidDate(parsed)) {
-            dateFiled = parsed;
-          }
-        }
+        const hydrated = {
+          ...cells,
+          caseType,
+        };
 
-        let raffleDate: Date | undefined;
-        if (typeof cells.raffleCell === "number") {
-          const parsed = excelDateToJSDate(cells.raffleCell);
-          if (parsed && isValidDate(parsed)) {
-            raffleDate = parsed;
-          }
-        } else if (typeof cells.raffleCell === "string") {
-          const parsed = new Date(cells.raffleCell);
-          if (!isNaN(parsed.getTime()) && isValidDate(parsed)) {
-            raffleDate = parsed;
-          }
+        const validation = CaseSchema.safeParse(hydrated);
+        if (!validation.success) {
+          // console.warn(
+          //   "Employee row validation failed:",
+          //   prettifyError(validation.error),
+          //   { row: cells },
+          // );
+          return {
+            errorMessage: prettifyError(validation.error),
+          };
         }
 
         const mappedRow: Prisma.CaseCreateManyInput = {
-          branch: cells.branchCell?.toString(),
+          ...validation.data,
           assistantBranch:
-            cells.assistantBranchCell?.toString() ||
-            cells.branchCell?.toString(),
-          caseNumber: cells.caseNumberCell?.toString() ?? "",
-          dateFiled,
-          name: cells.nameCell?.toString() ?? "",
-          charge: cells.chargeCell?.toString(),
-          infoSheet: cells.infoSheetCell?.toString(),
-          court: cells.courtCell?.toString(),
-          detained: cells.detainedCell?.toString() || null,
-          consolidation: cells.consolidationCell?.toString() || null,
-          eqcNumber: cells.eqcNumberCell
-            ? Number(cells.eqcNumberCell)
-            : undefined,
-          bond: cells.bondCell?.toString(),
-          raffleDate,
-          committee1: cells.committee1Cell?.toString() || null,
-          committee2: cells.committee2Cell?.toString() || null,
+            validation.data.assistantBranch ?? validation.data.branch ?? null,
           caseType,
-          judge: cells.judgeCell?.toString(),
-          ao: cells.aoCell?.toString(),
-          complainant: cells.complainantCell?.toString(),
-          houseNo: cells.houseNoCell?.toString(),
-          street: cells.streetCell?.toString(),
-          barangay: cells.barangayCell?.toString(),
-          municipality: cells.municipalityCell?.toString(),
-          province: cells.provinceCell?.toString(),
-          counts: cells.countsCell?.toString(),
-          jdf: cells.jdfCell?.toString(),
-          sajj: cells.sajjCell?.toString(),
-          sajj2: cells.sajj2Cell?.toString(),
-          mf: cells.mfCell?.toString(),
-          stf: cells.stfCell?.toString(),
-          lrf: cells.lrfCell?.toString(),
-          vcf: cells.vcfCell?.toString(),
-          total: cells.totalCell?.toString(),
-          amountInvolved: cells.amountInvolvedCell?.toString(),
         };
 
         return {
           mapped: mappedRow,
-          uniqueKey: caseNumberCell?.toString().trim(),
+          uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
