@@ -219,6 +219,17 @@ export const formatDateCell = (value: unknown): string | undefined => {
 type ValidationErrorDetail = z.ZodError | { message: string };
 type FailedRow = Record<string, unknown>;
 
+const moveErrorColumnLast = (row: FailedRow): FailedRow => {
+  if (!Object.prototype.hasOwnProperty.call(row, "__error")) {
+    return row;
+  }
+
+  const entries = Object.entries(row).filter(([key]) => key !== "__error");
+  const reordered: FailedRow = Object.fromEntries(entries);
+  reordered.__error = row.__error;
+  return reordered;
+};
+
 export type ProcessExcelMeta = {
   importedIds: number[];
   importedCount: number;
@@ -490,7 +501,8 @@ export async function processExcelUpload<
   if (failedRowsBySheet.size > 0) {
     const failedWorkbook = XLSX.utils.book_new();
     failedRowsBySheet.forEach((failedRows, sheetName) => {
-      const failedWorksheet = XLSX.utils.json_to_sheet(failedRows);
+      const orderedRows = failedRows.map(moveErrorColumnLast);
+      const failedWorksheet = XLSX.utils.json_to_sheet(orderedRows);
       XLSX.utils.book_append_sheet(failedWorkbook, failedWorksheet, sheetName);
     });
 
