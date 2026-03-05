@@ -373,7 +373,6 @@ const CasePage: React.FC = () => {
   if (modalType) {
     return (
       <NewCaseModal
-        type={modalType}
         onClose={() => {
           setModalType(null);
           setSelectedCase(null);

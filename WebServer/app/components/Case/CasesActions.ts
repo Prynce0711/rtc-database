@@ -412,10 +412,22 @@ export async function deleteCase(caseId: number): Promise<ActionResult<void>> {
     return { success: false, error: "Error deleting case" };
   }
 }
-export async function getCaseById(id: number) {
+
+export async function getCaseById(
+  id: string | number,
+): Promise<ActionResult<Case>> {
   try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    if (isNaN(Number(id))) {
+      return { success: false, error: "Invalid case ID" };
+    }
+
     const result = await prisma.case.findUnique({
-      where: { id },
+      where: { id: Number(id) },
     });
 
     if (!result) {

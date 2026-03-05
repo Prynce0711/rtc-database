@@ -2,6 +2,7 @@
 
 import { Case } from "@/app/generated/prisma/browser";
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
@@ -691,25 +692,26 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 
 /* ─── Main Component ─────────────────────────────────────────── */
 const NewCaseModal = ({
-  type,
   onClose,
   selectedCase = null,
   onCreate,
   onUpdate,
 }: {
-  type: CaseModalType;
-  onClose: () => void;
+  onClose?: () => void;
   selectedCase?: Case | null;
   onCreate?: (caseData: Case) => void;
   onUpdate?: (caseData: Case) => void;
 }) => {
-  const isEdit = type === CaseModalType.EDIT;
+  const isEdit = selectedCase !== null;
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  console.log(isEdit, selectedCase);
 
   const makeFromCase = (sc: Case): CaseEntry => caseToEntry(sc);
 
@@ -724,7 +726,7 @@ const NewCaseModal = ({
       setStep("entry");
       setActiveTab(0);
     }
-  }, [type, selectedCase, isEdit]);
+  }, [selectedCase, isEdit]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -876,7 +878,8 @@ const NewCaseModal = ({
             : `${entries.length} cases created successfully`,
         );
       }
-      onClose();
+
+      handleClose();
     } catch (err) {
       statusPopup.showError(
         err instanceof Error ? err.message : "Failed to save case",
@@ -886,6 +889,14 @@ const NewCaseModal = ({
       statusPopup.hidePopup();
     }
   };
+
+  function handleClose() {
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+  }
 
   const currentTabCols = TAB_GROUPS[activeTab].cols;
   const tabHasErrors = (tabIdx: number) =>
@@ -902,7 +913,7 @@ const NewCaseModal = ({
           <div className="xls-topbar-left">
             <button
               className="xls-back-btn"
-              onClick={step === "review" ? () => setStep("entry") : onClose}
+              onClick={step === "review" ? () => setStep("entry") : handleClose}
               title="Back"
             >
               <FiArrowLeft size={16} />
@@ -1176,7 +1187,10 @@ const NewCaseModal = ({
                   </span>
                 </div>
                 <div className="xls-footer-right">
-                  <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  <button
+                    className="xls-btn xls-btn-ghost"
+                    onClick={handleClose}
+                  >
                     Cancel
                   </button>
                   <button

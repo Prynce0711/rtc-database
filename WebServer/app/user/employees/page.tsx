@@ -1,10 +1,7 @@
-import React from "react";
-import Link from "next/link";
-import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
-import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
+import EmployeeDashboard from "@/app/components/Employee/EmployeeDashboard";
 import { auth } from "@/app/lib/auth";
 import { headers } from "next/headers";
-import EmployeeDashboard from "@/app/components/Employee/EmployeeDashboard";
+import Link from "next/link";
 
 const page = async () => {
   const session = await auth.api.getSession({

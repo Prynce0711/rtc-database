@@ -34,6 +34,7 @@ import {
 import { usePopup } from "../Popup/PopupProvider";
 import EmployeeDrawer, { EmployeeDrawerType } from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
+import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 
 const EmployeeDashboard: React.FC = () => {
   const statusPopup = usePopup();
@@ -286,11 +287,7 @@ const EmployeeDashboard: React.FC = () => {
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    );
+    return <PageListSkeleton statCards={4} tableColumns={9} tableRows={8} />;
   }
 
   if (error) {

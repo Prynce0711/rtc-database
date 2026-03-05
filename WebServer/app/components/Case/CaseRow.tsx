@@ -77,7 +77,7 @@ const CaseRow = ({
                     className="flex items-center gap-3 text-warning"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/user/casesmanage/${caseItem.id}/edit`);
+                      router.push(`/user/cases/${caseItem.id}/edit`);
                     }}
                   >
                     <FiEdit size={16} />
@@ -375,7 +375,6 @@ export const CaseTable = ({
       data={sorted}
       sortConfig={sortConfig}
       onSort={handleSort}
-      rowHoverHint="Click to view case details"
       renderRow={(item) => (
         <CaseRow
           key={item.id}
