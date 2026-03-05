@@ -64,18 +64,17 @@ const MonthlyKPI: React.FC<MonthlyKPIProps> = (props) => {
             <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
               <card.icon className="h-full w-full" />
             </div>
-              <div className="relative">
-                <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
-                  {card.label}
-                </p>
-              </div>
-              <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                {props[card.key].toLocaleString()}
-              </p>
-              <p className="text-sm sm:text-base font-semibold text-muted">
-                {card.subtitle}
+            <div className="relative">
+              <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                {card.label}
               </p>
             </div>
+            <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+              {props[card.key].toLocaleString()}
+            </p>
+            <p className="text-sm sm:text-base font-semibold text-muted">
+              {card.subtitle}
+            </p>
           </div>
         </div>
       ))}
