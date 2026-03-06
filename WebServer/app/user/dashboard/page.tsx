@@ -1,6 +1,7 @@
 import AttorneyDashboard from "@/app/components/Attorney/AttorneyDashboard";
 import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
 import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
+import StatisticsDashboard from "@/app/components/Dashboard/StatisticsDashboard";
 import { auth } from "@/app/lib/auth";
 import Roles from "@/app/lib/Roles";
 import { headers } from "next/headers";
@@ -50,6 +51,8 @@ const page = async () => {
     return <AdminDashboard />;
   } else if (session.user.role === Roles.ATTY) {
     return <AttorneyDashboard />;
+  } else if (session.user.role === Roles.STATISTICS) {
+    return <StatisticsDashboard />;
   } else {
     return <StaffDashboard staffId={session.user.id} />;
   }
