@@ -18,6 +18,7 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiCopy,
+  FiDownload,
   FiEdit,
   FiEdit3,
   FiExternalLink,
@@ -30,6 +31,7 @@ import {
   FiSave,
   FiSearch,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
@@ -1519,6 +1521,8 @@ const NotarialPage: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
+                {" "}
+                <FiUpload className="h-5 w-5" />
                 {uploading ? "Importing..." : "Import Excel"}
               </button>
             )}
@@ -1528,6 +1532,8 @@ const NotarialPage: React.FC = () => {
                 onClick={handleExport}
                 disabled={exporting}
               >
+                {" "}
+                <FiDownload className="h-5 w-5" />
                 {exporting ? "Exporting..." : "Export Excel"}
               </button>
             )}

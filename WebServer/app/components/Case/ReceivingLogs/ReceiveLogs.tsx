@@ -6,12 +6,14 @@ import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiBarChart2,
+  FiDownload,
   FiEdit,
   FiFileText,
   FiLock,
   FiMoreHorizontal,
   FiSearch,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import FilterModal from "../../Filter/FilterModal";
@@ -520,6 +522,8 @@ const ReceiveLogsPage: React.FC = () => {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
+                  {" "}
+                  <FiUpload className="h-5 w-5" />
                   {uploading ? "Importing..." : "Import Excel"}
                 </button>
                 <button
@@ -565,6 +569,8 @@ const ReceiveLogsPage: React.FC = () => {
                   }}
                   disabled={exporting}
                 >
+                  {" "}
+                  <FiDownload className="h-5 w-5 mr-2" />
                   {exporting ? "Exporting..." : "Export Excel"}
                 </button>
 

@@ -6,9 +6,11 @@ import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiBarChart2,
+  FiDownload,
   FiFileText,
   FiLock,
   FiSearch,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import FilterModal from "../../Filter/FilterModal";
@@ -390,6 +392,8 @@ const ReceiveLogsPage: React.FC = () => {
                     el?.click();
                   }}
                 >
+                  {" "}
+                  <FiUpload className="h-5 w-5" />
                   Import Excel
                 </button>
 
@@ -418,6 +422,8 @@ const ReceiveLogsPage: React.FC = () => {
                     }
                   }}
                 >
+                  {" "}
+                  <FiDownload className="h-5 w-5" />
                   Export Excel
                 </button>
 
