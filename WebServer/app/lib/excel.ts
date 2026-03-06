@@ -434,6 +434,7 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   schema: z.ZodType<T>;
   skipRowsWithoutCell?: CellsConfig<TCells>;
   uniqueKeys?: CellsConfig<TCells>;
+  extractUniqueKey?: (row: Record<string, unknown>) => string | undefined;
   checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
   uniqueKeyLabel?: string;
   mapRow: (row: Record<string, unknown>) => {
@@ -479,6 +480,7 @@ export async function processExcelUpload<
     schema,
     skipRowsWithoutCell: skipRows,
     uniqueKeys,
+    extractUniqueKey,
     checkExistingUniqueKeys,
     uniqueKeyLabel = "Unique value",
     mapRow,
@@ -567,9 +569,15 @@ export async function processExcelUpload<
 
     // Pre-check existing unique keys in DB if provided
     let existingUniqueKeys = new Set<string>();
-    if (uniqueKeys && checkExistingUniqueKeys) {
+    if ((uniqueKeys || extractUniqueKey) && checkExistingUniqueKeys) {
       const keys = sheetData
-        .map((row) => extractUniqueKeyFromRow(row, uniqueKeys))
+        .map((row) =>
+          extractUniqueKey
+            ? extractUniqueKey(row)
+            : uniqueKeys
+              ? extractUniqueKeyFromRow(row, uniqueKeys)
+              : undefined,
+        )
         .filter((val): val is string => !!val);
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
@@ -586,7 +594,11 @@ export async function processExcelUpload<
 
       const uniqueKey =
         mapResult.uniqueKey ??
-        (uniqueKeys ? extractUniqueKeyFromRow(row, uniqueKeys) : undefined);
+        (extractUniqueKey
+          ? extractUniqueKey(row)
+          : uniqueKeys
+            ? extractUniqueKeyFromRow(row, uniqueKeys)
+            : undefined);
       if (uniqueKey) {
         if (
           existingUniqueKeys.has(uniqueKey) ||
