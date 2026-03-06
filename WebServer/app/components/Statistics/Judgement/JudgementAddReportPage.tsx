@@ -5,11 +5,8 @@ import { usePopup } from "../../Popup/PopupProvider";
 import AnnualAddReportPage, {
   AnnualAddReportPageProps,
 } from "../Annual/AnnualAddReportPage";
-import {
-  rtcJudgementFields,
-  mtcJudgementFields,
-} from "./JudgementFieldConfig";
-import { rtcColumns, mtcColumns } from "./JudgementColumnDef";
+import { rtcColumns } from "./JudgementColumnDef";
+import { rtcJudgementFields } from "./JudgementFieldConfig";
 
 type JudgementAddProps = Omit<AnnualAddReportPageProps, "onSave"> & {
   onAdd?: (record: Record<string, unknown>) => void | Promise<void>;
