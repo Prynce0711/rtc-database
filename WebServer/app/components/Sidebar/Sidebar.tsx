@@ -375,6 +375,10 @@ const caseNavItems: NavItem[] = [
   },
 ];
 
+// Backwards-compatible aliases used across the file
+const caseManagementNavItem: NavItem = caseNavItems[0];
+const statisticsNavItem: NavItem = caseNavItems[1];
+
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
   { icon: <FaUserCog />, href: "account", label: "Account" },
