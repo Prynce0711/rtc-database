@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FiArrowLeft,
   FiCalendar,
@@ -33,6 +39,8 @@ export interface AnnualAddReportPageProps {
   initialData?: Record<string, unknown>[];
   activeView?: string;
   onSwitchView?: (view: string) => void;
+  /** If provided, only show these view buttons in the toolbar (e.g. ["MTC","RTC"]) */
+  allowedViews?: string[];
   onBack: () => void;
   onSave: (rows: Record<string, unknown>[]) => void;
 }
@@ -72,6 +80,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   initialData,
   activeView,
   onSwitchView,
+  allowedViews,
   onBack,
   onSave,
 }) => {
@@ -113,6 +122,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     if (!isCompact) return null;
 
     const textFields = editableFields.filter((f) => !isNumericField(f.name));
+    const numericFields = editableFields.filter((f) => isNumericField(f.name));
     const filedFields = editableFields.filter((f) =>
       f.name.toLowerCase().includes("filed"),
     );
@@ -120,22 +130,119 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       f.name.toLowerCase().includes("disposed"),
     );
 
+    // Preserve the default annual workflow split.
     if (filedFields.length > 0 && disposedFields.length > 0) {
-      return [
+      const remainingNumeric = numericFields.filter(
+        (f) =>
+          !f.name.toLowerCase().includes("filed") &&
+          !f.name.toLowerCase().includes("disposed"),
+      );
+
+      const tabs = [
         { label: "Location", fields: textFields },
         { label: "Cases Filed", fields: filedFields },
         { label: "Cases Disposed", fields: disposedFields },
       ];
+
+      if (remainingNumeric.length > 0) {
+        tabs.push({ label: "Other Metrics", fields: remainingNumeric });
+      }
+
+      return tabs.filter((tab) => tab.fields.length > 0);
     }
 
-    const numericFields = editableFields.filter((f) => isNumericField(f.name));
-    return [
+    const hasKeyword = (name: string, keywords: string[]) =>
+      keywords.some((keyword) => name.includes(keyword));
+
+    const isCaseMetricName = (name: string) =>
+      hasKeyword(name, [
+        "civil",
+        "criminal",
+        "heard",
+        "case",
+        "summary",
+        "pending",
+        "raffled",
+        "filed",
+        "disposed",
+      ]);
+
+    const isPdlReleaseFlowName = (name: string) =>
+      name.startsWith("pdl") &&
+      (hasKeyword(name, ["bail", "recognizance", "minror", "fine", "others"]) ||
+        name === "pdlv" ||
+        name === "pdli" ||
+        name === "pdlinc");
+
+    const isPdlReleaseOutcomeName = (name: string) =>
+      name.startsWith("pdl") &&
+      hasKeyword(name, ["sentence", "dismissal", "acquittal", "probation"]);
+
+    const isPdlReleaseName = (name: string) =>
+      isPdlReleaseFlowName(name) || isPdlReleaseOutcomeName(name);
+
+    const isCiclMetricName = (name: string) =>
+      name.includes("cicl") && !name.startsWith("pdl");
+
+    const used = new Set<string>();
+    const pick = (predicate: (name: string) => boolean) => {
+      return numericFields.filter((f) => {
+        const normalized = f.name.toLowerCase();
+        if (used.has(f.name)) return false;
+        if (!predicate(normalized)) return false;
+        used.add(f.name);
+        return true;
+      });
+    };
+
+    const caseMetrics = pick(isCaseMetricName);
+    const pdlSnapshot = pick(
+      (name) =>
+        name.startsWith("pdl") &&
+        !isPdlReleaseName(name) &&
+        !name.includes("total"),
+    );
+    const pdlReleaseFlow = pick(isPdlReleaseFlowName);
+    const pdlReleaseOutcomes = pick(isPdlReleaseOutcomeName);
+    const ciclMetrics = pick(isCiclMetricName);
+    const totalsAndRates = pick(
+      (name) => name.includes("total") || name.includes("percentage"),
+    );
+    const remainingNumeric = numericFields.filter((f) => !used.has(f.name));
+
+    const compactTabs = [
       { label: "Details", fields: textFields },
-      { label: "Numeric Data", fields: numericFields },
-    ];
+      { label: "Case Metrics", fields: caseMetrics },
+      { label: "PDL Snapshot", fields: pdlSnapshot },
+      { label: "PDL Release Flow", fields: pdlReleaseFlow },
+      { label: "PDL Release Outcomes", fields: pdlReleaseOutcomes },
+      { label: "CICL Metrics", fields: ciclMetrics },
+      { label: "Totals & Rates", fields: totalsAndRates },
+      { label: "Other Numeric", fields: remainingNumeric },
+    ].filter((tab) => tab.fields.length > 0);
+
+    // Fallback to the original two-tab experience if grouping is too sparse.
+    if (compactTabs.length <= 2) {
+      return [
+        { label: "Details", fields: textFields },
+        { label: "Numeric Data", fields: numericFields },
+      ].filter((tab) => tab.fields.length > 0);
+    }
+
+    return compactTabs;
   }, [isCompact, editableFields, isNumericField]);
 
   const [activeFieldTab, setActiveFieldTab] = useState(0);
+
+  useEffect(() => {
+    if (!fieldTabs) {
+      if (activeFieldTab !== 0) setActiveFieldTab(0);
+      return;
+    }
+    if (activeFieldTab >= fieldTabs.length) {
+      setActiveFieldTab(0);
+    }
+  }, [fieldTabs, activeFieldTab]);
 
   const visibleFields = useMemo(() => {
     if (!fieldTabs) return editableFields;
@@ -575,23 +682,27 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 <div className="divider divider-horizontal mx-3 h-8" />
 
                 <div className="inline-flex bg-base-300/50 rounded-xl p-1 gap-1">
-                  {viewButtons.map(({ label, value, icon: Icon }) => {
-                    const isCurrent = activeView === value;
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => onSwitchView(value)}
-                        className={`btn btn-sm gap-1.5 rounded-lg transition-all ${
-                          isCurrent
-                            ? "btn-primary shadow-sm"
-                            : "btn-ghost text-base-content/60 hover:text-base-content"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {label}
-                      </button>
-                    );
-                  })}
+                  {viewButtons
+                    .filter(
+                      (b) => !allowedViews || allowedViews.includes(b.value),
+                    )
+                    .map(({ label, value, icon: Icon }) => {
+                      const isCurrent = activeView === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => onSwitchView(value)}
+                          className={`btn btn-md gap-3 rounded-lg transition-all ${
+                            isCurrent
+                              ? "btn-primary shadow-lg"
+                              : "btn-ghost text-base-content/60 hover:text-base-content"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          {label}
+                        </button>
+                      );
+                    })}
                 </div>
               </>
             )}

@@ -1,55 +1,235 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import {
+  FiCalendar,
+  FiDownload,
+  FiFileText,
+  FiPlus,
+  FiUpload,
+} from "react-icons/fi";
+import * as XLSX from "xlsx";
 import JudgementMTC from "./JudgementMTC";
 import JudgementRTC from "./JudgementRTC";
 
 type JudgementView = "MTC" | "RTC";
 
-const views: { label: string; value: JudgementView; description: string }[] = [
-  { label: "MTC", value: "MTC", description: "Municipal Trial Court" },
-  { label: "RTC", value: "RTC", description: "Regional Trial Court" },
+const views: {
+  label: string;
+  value: JudgementView;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    label: "MTC",
+    value: "MTC",
+    description: "Municipal Trial Court",
+    icon: FiFileText,
+  },
+  {
+    label: "RTC",
+    value: "RTC",
+    description: "Regional Trial Court",
+    icon: FiFileText,
+  },
 ];
 
 export default function Judgement() {
   const [activeView, setActiveView] = useState<JudgementView>("MTC");
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString(),
+  );
+  const [uploading, setUploading] = useState(false);
+  const [requestAdd, setRequestAdd] = useState(0);
+  const [isChildActive, setIsChildActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSwitchView = (view: string) => {
+    setActiveView(view as JudgementView);
+    setTimeout(() => setRequestAdd((c) => c + 1), 0);
+  };
+
+  const exportDataRef = useRef<Record<string, unknown>[]>([]);
+  const yearLabel = selectedYear;
+
+  const handleExport = () => {
+    const data = exportDataRef.current;
+    if (!data || data.length === 0) return;
+
+    const rows = data.map((r) => {
+      const row: Record<string, string | number> = {};
+      for (const [key, value] of Object.entries(r)) {
+        if (key !== "id") row[key] = String(value ?? "");
+      }
+      return row;
+    });
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      `${activeView} ${yearLabel}`,
+    );
+    XLSX.writeFile(
+      workbook,
+      `Judgement-${activeView}-Report-${yearLabel}.xlsx`,
+    );
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData =
+        XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+      console.log("Imported data:", rawData);
+    } catch (err) {
+      console.error("Import failed:", err);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 13 }, (_, i) =>
+    (currentYear - 10 + i).toString(),
+  );
 
   return (
-    <div className="space-y-6">
-      {/* View selector */}
-      <div className="card bg-base-100 shadow border border-base-200">
-        <div className="card-body py-4">
-          <div className="flex flex-wrap gap-6">
-            {views.map(({ label, value, description }) => (
-              <label
-                key={value}
-                className="flex items-center gap-3 cursor-pointer select-none group"
-              >
-                <input
-                  type="radio"
-                  name="judgementView"
-                  className="radio radio-primary"
-                  value={value}
-                  checked={activeView === value}
-                  onChange={() => setActiveView(value)}
-                />
-                <div>
-                  <span
-                    className={`font-semibold ${activeView === value ? "text-primary" : "text-base-content"}`}
-                  >
-                    {label}
+    <div className="space-y-6 sm:space-y-8">
+      {/* ── HEADER ── */}
+      {!isChildActive && (
+        <header className="card bg-base-100 shadow-xl">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+                  Judgment Day
+                </h1>
+                <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
+                  <FiCalendar className="shrink-0" />
+                  <span>
+                    Judgment day statistics and reports for {yearLabel}
                   </span>
-                  <p className="text-xs text-base-content/50">{description}</p>
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end gap-3">
+                <select
+                  className="select select-bordered select-md w-72"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2 flex-nowrap">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImport}
+                  />
+                  <button
+                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <FiUpload className="h-5 w-5" />
+                    {uploading ? "Importing..." : "Import"}
+                  </button>
+                  <button
+                    className="btn btn-outline btn-info btn-md gap-2"
+                    onClick={handleExport}
+                  >
+                    <FiDownload className="h-5 w-5" />
+                    Export
+                  </button>
+                  <button
+                    className="btn btn-success btn-md gap-2"
+                    onClick={() => setRequestAdd((c) => c + 1)}
+                  >
+                    <FiPlus className="h-5 w-5" />
+                    Add Report
+                  </button>
                 </div>
-              </label>
-            ))}
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* ── VIEW SELECTOR — Segmented tabs ── */}
+      {!isChildActive && (
+        <div className="flex justify-start">
+          <div className="inline-flex bg-base-200/60 rounded-2xl p-2 shadow-inner border border-base-300/40">
+            {views.map(({ label, value, description, icon: Icon }) => {
+              const isActive = activeView === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => setActiveView(value)}
+                  className={`
+                  relative flex items-center gap-3 px-7 py-4 rounded-xl text-base font-bold
+                  transition-all duration-200 cursor-pointer select-none
+                  ${
+                    isActive
+                      ? "bg-primary text-primary-content shadow-md shadow-primary/25 scale-[1.02]"
+                      : "text-base-content/60 hover:text-base-content hover:bg-base-100/80"
+                  }
+                `}
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="tracking-wide">{label}</span>
+                    <span
+                      className={`text-[11px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
+                    >
+                      {description}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Active table */}
-      {activeView === "MTC" && <JudgementMTC />}
-      {activeView === "RTC" && <JudgementRTC />}
+      {/* ── ACTIVE TABLE ── */}
+      {activeView === "MTC" && (
+        <JudgementMTC
+          selectedYear={selectedYear}
+          requestAdd={requestAdd}
+          onDataReady={(d) => {
+            exportDataRef.current = d;
+          }}
+          onActivePageChange={setIsChildActive}
+          activeView={activeView}
+          onSwitchView={handleSwitchView}
+        />
+      )}
+      {activeView === "RTC" && (
+        <JudgementRTC
+          selectedYear={selectedYear}
+          requestAdd={requestAdd}
+          onDataReady={(d) => {
+            exportDataRef.current = d;
+          }}
+          onActivePageChange={setIsChildActive}
+          activeView={activeView}
+          onSwitchView={handleSwitchView}
+        />
+      )}
     </div>
   );
 }
