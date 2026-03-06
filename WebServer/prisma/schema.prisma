@@ -86,6 +86,15 @@ model Case {
   assistantBranch String?
   caseNumber      String    @unique
   dateFiled       DateTime?
+  
+  criminalCase     CriminalCase?
+  petition         Petition?
+  specialProceeding SpecialProceeding?
+}
+
+model CriminalCase{
+  id              Int       @id @default(autoincrement())
+  caseNumber         String       @unique
   name            String
   charge          String?
   infoSheet       String?
@@ -116,6 +125,31 @@ model Case {
   total           String?
   amountInvolved  String?
   createdAt       DateTime  @default(now())
+
+  case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+}
+
+model Petition {
+  id         Int       @id @default(autoincrement())
+  caseNumber String    @unique
+  petitioner String?
+  raffledTo  String?
+  date       DateTime?
+  nature     String?
+
+  case     Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+}
+
+model SpecialProceeding {
+  id         Int       @id @default(autoincrement())
+  caseNumber String    @unique
+  petitioner String?
+  raffledTo  String?
+  date       DateTime?
+  nature     String?
+  respondent String?
+
+  case      Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
 
 model Employee {
@@ -232,27 +266,6 @@ model RecievingLog {
   branchNumber String?
   notes        String?
   createdAt    DateTime  @default(now())
-}
-
-model Petition {
-  id         Int       @id @default(autoincrement())
-  caseNumber String    @unique
-  petitioner String?
-  raffledTo  String?
-  date       DateTime?
-  nature     String?
-  createdAt  DateTime  @default(now())
-}
-
-model SpecialProceeding {
-  id         Int       @id @default(autoincrement())
-  caseNumber String    @unique
-  petitioner String?
-  raffledTo  String?
-  date       DateTime?
-  nature     String?
-  respondent String?
-  createdAt  DateTime  @default(now())
 }
 
 model Notarial {

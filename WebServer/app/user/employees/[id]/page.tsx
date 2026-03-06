@@ -1,6 +1,7 @@
 "use client";
 
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
+import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable";
 import type { Employee } from "@/app/generated/prisma/browser";
 import {
   enumToText,
@@ -202,16 +203,7 @@ export default function EmployeeDetailsPage() {
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <span className="loading loading-spinner loading-md text-primary/40" />
-          <p className="text-[12px] font-bold uppercase tracking-widest text-base-content/25 select-none">
-            Loading employee…
-          </p>
-        </div>
-      </div>
-    );
+    return <PageDetailSkeleton />;
   }
 
   // ── Not found ──────────────────────────────────────────────────────────────

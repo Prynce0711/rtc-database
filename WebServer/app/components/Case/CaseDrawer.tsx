@@ -1,7 +1,7 @@
 "use client";
 
-import { Case } from "@/app/generated/prisma/browser";
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
@@ -24,7 +24,8 @@ import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
 import {
   CaseEntry,
-  CaseSchema,
+  CriminalCaseData,
+  CriminalCaseSchema,
   caseToEntry,
   createEmptyEntry,
   createTempId,
@@ -691,27 +692,29 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 
 /* ─── Main Component ─────────────────────────────────────────── */
 const NewCaseModal = ({
-  type,
   onClose,
   selectedCase = null,
   onCreate,
   onUpdate,
 }: {
-  type: CaseModalType;
-  onClose: () => void;
-  selectedCase?: Case | null;
-  onCreate?: (caseData: Case) => void;
-  onUpdate?: (caseData: Case) => void;
+  onClose?: () => void;
+  selectedCase?: CriminalCaseData | null;
+  onCreate?: () => void;
+  onUpdate?: () => void;
 }) => {
-  const isEdit = type === CaseModalType.EDIT;
+  const isEdit = selectedCase !== null;
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
-  const makeFromCase = (sc: Case): CaseEntry => caseToEntry(sc);
+  console.log(isEdit, selectedCase);
+
+  const makeFromCase = (sc: CriminalCaseData): CaseEntry =>
+    caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
     if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
@@ -724,7 +727,7 @@ const NewCaseModal = ({
       setStep("entry");
       setActiveTab(0);
     }
-  }, [type, selectedCase, isEdit]);
+  }, [selectedCase, isEdit]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -820,7 +823,7 @@ const NewCaseModal = ({
 
   const buildPayload = (e: CaseEntry) => {
     const { id, errors, collapsed, saved, ...caseInput } = e;
-    return CaseSchema.safeParse(caseInput);
+    return CriminalCaseSchema.safeParse(caseInput);
   };
 
   const handleSubmit = async () => {
@@ -850,7 +853,7 @@ const NewCaseModal = ({
         });
         if (!response.success)
           throw new Error(response.error || "Failed to update case");
-        onUpdate?.(response.result);
+        onUpdate?.();
         statusPopup.showSuccess("Case updated successfully");
       } else {
         for (const entry of entries) {
@@ -868,7 +871,7 @@ const NewCaseModal = ({
           });
           if (!response.success)
             throw new Error(response.error || "Failed to create case");
-          onCreate?.(response.result);
+          onCreate?.();
         }
         statusPopup.showSuccess(
           entries.length === 1
@@ -876,7 +879,8 @@ const NewCaseModal = ({
             : `${entries.length} cases created successfully`,
         );
       }
-      onClose();
+
+      handleClose();
     } catch (err) {
       statusPopup.showError(
         err instanceof Error ? err.message : "Failed to save case",
@@ -886,6 +890,14 @@ const NewCaseModal = ({
       statusPopup.hidePopup();
     }
   };
+
+  function handleClose() {
+    if (onClose) {
+      onClose();
+    } else {
+      router.back();
+    }
+  }
 
   const currentTabCols = TAB_GROUPS[activeTab].cols;
   const tabHasErrors = (tabIdx: number) =>
@@ -902,7 +914,7 @@ const NewCaseModal = ({
           <div className="xls-topbar-left">
             <button
               className="xls-back-btn"
-              onClick={step === "review" ? () => setStep("entry") : onClose}
+              onClick={step === "review" ? () => setStep("entry") : handleClose}
               title="Back"
             >
               <FiArrowLeft size={16} />
@@ -1176,7 +1188,10 @@ const NewCaseModal = ({
                   </span>
                 </div>
                 <div className="xls-footer-right">
-                  <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                  <button
+                    className="xls-btn xls-btn-ghost"
+                    onClick={handleClose}
+                  >
                     Cancel
                   </button>
                   <button

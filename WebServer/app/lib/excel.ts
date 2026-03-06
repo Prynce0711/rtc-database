@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import z, { prettifyError } from "zod";
 import ActionResult from "../components/ActionResult";
+import { normalizeValueBySchema } from "./utils";
 
 const EXCEL_HEADERS_PREFIX = "excelHeaders:";
 
@@ -53,115 +54,6 @@ export const getRowValuesBySchema = <T extends z.ZodRawShape>(
   }
 
   return values;
-};
-
-const unwrapSchema = (schema: unknown): unknown => {
-  let current: unknown = schema;
-
-  while (true) {
-    if (current instanceof z.ZodOptional || current instanceof z.ZodNullable) {
-      current = (current as unknown as { unwrap: () => unknown }).unwrap();
-      continue;
-    }
-    const removeDefault = (
-      current as unknown as { removeDefault?: () => unknown }
-    ).removeDefault;
-    if (removeDefault) {
-      current = removeDefault();
-      continue;
-    }
-    const innerType = (current as unknown as { innerType?: () => unknown })
-      .innerType;
-    if (innerType) {
-      current = innerType();
-      continue;
-    }
-    return current;
-  }
-};
-
-const normalizeEnumValue = (
-  value: unknown,
-  allowedValues: Array<string | number>,
-): string | undefined => {
-  if (value === undefined || value === null) return undefined;
-  const raw = String(value).trim();
-  if (raw === "") return undefined;
-  const normalized = raw.replace(/\s+/g, "_").toUpperCase();
-  const normalizedAllowed = allowedValues.map((option) =>
-    String(option).trim(),
-  );
-  if (normalizedAllowed.includes(normalized)) {
-    return normalized;
-  }
-  const match = normalizedAllowed.find(
-    (option) => option.toLowerCase() === raw.toLowerCase(),
-  );
-  return match;
-};
-
-const normalizeBooleanValue = (value: unknown): boolean | undefined => {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  const raw = String(value).trim().toLowerCase();
-  if (raw === "") return undefined;
-  if (["yes", "true", "1", "y"].includes(raw)) return true;
-  if (["no", "false", "0", "n"].includes(raw)) return false;
-  return undefined;
-};
-
-const normalizeDateValue = (value: unknown): Date | undefined => {
-  if (value === undefined || value === null) return undefined;
-  if (value instanceof Date) {
-    return isValidDate(value) ? value : undefined;
-  }
-  if (typeof value === "number") {
-    const parsed = excelDateToJSDate(value);
-    return parsed && isValidDate(parsed) ? parsed : undefined;
-  }
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return !Number.isNaN(parsed.getTime()) && isValidDate(parsed)
-      ? parsed
-      : undefined;
-  }
-  return undefined;
-};
-
-const normalizeValueBySchema = (value: unknown, schema: unknown): unknown => {
-  const unwrapped = unwrapSchema(schema);
-
-  if (unwrapped instanceof z.ZodDate) {
-    return normalizeDateValue(value);
-  }
-
-  if (unwrapped instanceof z.ZodEnum) {
-    return normalizeEnumValue(value, unwrapped.options);
-  }
-
-  const nativeEnum = (unwrapped as { enum?: unknown }).enum;
-  if (
-    nativeEnum &&
-    typeof nativeEnum === "object" &&
-    !Array.isArray(nativeEnum)
-  ) {
-    const allowed = Object.values(nativeEnum).filter(
-      (option): option is string => typeof option === "string",
-    );
-    return normalizeEnumValue(value, allowed);
-  }
-
-  if (unwrapped instanceof z.ZodBoolean) {
-    return normalizeBooleanValue(value);
-  }
-
-  if (unwrapped instanceof z.ZodString) {
-    if (value === undefined || value === null) return value;
-    return typeof value === "string" ? value : String(value);
-  }
-
-  return value;
 };
 
 export const normalizeRowBySchema = <T extends z.ZodRawShape>(

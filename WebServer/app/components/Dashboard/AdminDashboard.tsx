@@ -4,7 +4,7 @@ import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
 import {
   getCaseStats,
   getCases,
-  type CaseStats,
+  type CriminalCaseStats,
 } from "@/app/components/Case/CasesActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
@@ -72,7 +72,7 @@ interface AuditLog {
 const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<Case[]>([]);
-  const [caseStats, setCaseStats] = useState<CaseStats | null>(null);
+  const [caseStats, setCaseStats] = useState<CriminalCaseStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
@@ -114,7 +114,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   const stats = useMemo(() => {
-    const base: CaseStats = caseStats ?? {
+    const base: CriminalCaseStats = caseStats ?? {
       totalCases: 0,
       detainedCases: 0,
       pendingCases: 0,

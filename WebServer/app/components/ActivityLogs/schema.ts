@@ -3,7 +3,7 @@ import Roles from "@/app/lib/Roles";
 import { z } from "zod";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
-import { CaseSchema } from "../Case/schema";
+import { CriminalCaseSchema } from "../Case/schema";
 import { EmployeeSchema } from "../Employee/schema";
 
 export const CreateLogData = z
@@ -44,8 +44,8 @@ export const CreateLogData = z
       action: z.literal(LogAction.UPDATE_CASE),
       details: z
         .object({
-          from: CaseSchema,
-          to: CaseSchema,
+          from: CriminalCaseSchema,
+          to: CriminalCaseSchema,
         })
         .or(
           z.object({

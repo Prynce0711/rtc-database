@@ -1,6 +1,5 @@
 "use client";
 
-import { Case } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
@@ -8,6 +7,7 @@ import { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
 import Table from "../Table/Table";
 import TipCell from "../Table/TipCell";
+import type { CriminalCaseData } from "./schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,7 +22,10 @@ const formatDate = (dateStr: string | Date | null | undefined) => {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type CaseSortConfig = { key: keyof Case; order: "asc" | "desc" } | null;
+export type CaseSortConfig = {
+  key: keyof CriminalCaseData;
+  order: "asc" | "desc";
+} | null;
 
 // ─── Case Row ─────────────────────────────────────────────────────────────────
 
@@ -30,7 +33,7 @@ const CaseRow = ({
   caseItem,
   handleDeleteCase,
 }: {
-  caseItem: Case;
+  caseItem: CriminalCaseData;
   handleDeleteCase: (caseId: number) => void;
 }) => {
   const session = useSession();
@@ -77,7 +80,7 @@ const CaseRow = ({
                     className="flex items-center gap-3 text-warning"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/user/casesmanage/${caseItem.id}/edit`);
+                      router.push(`/user/cases/${caseItem.id}/edit`);
                     }}
                   >
                     <FiEdit size={16} />
@@ -192,7 +195,7 @@ export const CaseTable = ({
   data,
   handleDeleteCase,
 }: {
-  data: Case[];
+  data: CriminalCaseData[];
   handleDeleteCase: (caseId: number) => void;
 }) => {
   const session = useSession();
@@ -205,7 +208,7 @@ export const CaseTable = ({
     order: "desc",
   });
 
-  const handleSort = (key: keyof Case) => {
+  const handleSort = (key: keyof CriminalCaseData) => {
     setSortConfig((prev) => ({
       key,
       order: prev?.key === key && prev.order === "asc" ? "desc" : "asc",
@@ -370,12 +373,11 @@ export const CaseTable = ({
   ];
 
   return (
-    <Table<Case>
+    <Table<CriminalCaseData>
       headers={headers}
       data={sorted}
       sortConfig={sortConfig}
       onSort={handleSort}
-      rowHoverHint="Click to view case details"
       renderRow={(item) => (
         <CaseRow
           key={item.id}

@@ -13,7 +13,7 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import type { Case, CaseType } from "../../generated/prisma/client";
+import { CaseType } from "../../generated/prisma/client";
 import FilterModal from "../Filter/FilterModal";
 import {
   ExactMatchMap,
@@ -26,24 +26,28 @@ import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import Table from "../Table/Table";
 import NewCaseModal, { CaseModalType } from "./CaseDrawer";
 import CaseRow from "./CaseRow";
-import {
-  deleteCase,
-  getCases,
-  getCaseStats,
-  type CaseFilters,
-} from "./CasesActions";
+import { deleteCase, getCases, getCaseStats } from "./CasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import { calculateCaseStats, type CaseStats } from "./Record";
+import type {
+  CriminalCaseData,
+  CriminalCaseFilters,
+  CriminalCasesFilterOptions,
+} from "./schema";
 
-type CaseFilterValues = CaseFilters;
+type CaseFilterValues = CriminalCaseFilters;
+type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
+type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
 
 const CasePage: React.FC = () => {
-  const [cases, setCases] = useState<Case[]>([]);
+  const [cases, setCases] = useState<CriminalCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<CaseModalType | null>(null);
-  const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [selectedCase, setSelectedCase] = useState<CriminalCaseData | null>(
+    null,
+  );
   const [stats, setStats] = useState<CaseStats>({
     totalCases: 0,
     detainedCases: 0,
@@ -58,12 +62,12 @@ const CasePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [caseTypeFilter, setCaseTypeFilter] = useState<string>("ALL");
+  const [caseTypeFilter, setCaseTypeFilter] = useState<"ALL" | CaseType>("ALL");
   const statusPopup = usePopup();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Case;
+    key: SortKey;
     order: "asc" | "desc";
   }>({ key: "dateFiled", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
@@ -195,7 +199,7 @@ const CasePage: React.FC = () => {
   const totalItems = totalCount;
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  const handleSort = (key: keyof Case) => {
+  const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
@@ -225,17 +229,20 @@ const CasePage: React.FC = () => {
       pageSize: 10,
       filters: { [key]: inputValue } as CaseFilters,
       exactMatchMap: { [key]: false },
-      sortKey: key as keyof Case,
+      sortKey: key as SortKey,
       sortOrder: "asc",
     });
 
     if (!res.success || !res.result) return [];
     const items = Array.isArray(res.result)
       ? res.result
-      : (res.result.items as Case[]);
+      : (res.result.items as CriminalCaseData[]);
 
     const values = items
-      .map((c) => (c[key as keyof Case] as string | null | undefined) || "")
+      .map(
+        (c) =>
+          (c[key as keyof CriminalCaseData] as string | null | undefined) || "",
+      )
       .filter((v) => v.length > 0);
 
     return Array.from(new Set(values)).sort().slice(0, 10);
@@ -375,7 +382,6 @@ const CasePage: React.FC = () => {
   if (modalType) {
     return (
       <NewCaseModal
-        type={modalType}
         onClose={() => {
           setModalType(null);
           setSelectedCase(null);
@@ -440,7 +446,10 @@ const CasePage: React.FC = () => {
             />
             <select
               value={caseTypeFilter}
-              onChange={(e) => setCaseTypeFilter(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value as "ALL" | CaseType;
+                setCaseTypeFilter(value);
+              }}
               className="select select-bordered"
             >
               <option value="ALL">All Types</option>
@@ -665,7 +674,7 @@ const CasePage: React.FC = () => {
             rowsPerPage={pageSize}
             showPagination={false}
             sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
-            onSort={(k) => handleSort(k)}
+            onSort={(k) => handleSort(k as SortKey)}
             renderRow={(caseItem) => (
               <CaseRow
                 key={caseItem.id}

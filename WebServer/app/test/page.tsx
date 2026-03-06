@@ -1,5 +1,5 @@
-import EmployeeTest from "./EmployeeTest";
+import CaseTester from "./CaseTester";
 
 export default function page() {
-  return <EmployeeTest />;
+  return <CaseTester />;
 }

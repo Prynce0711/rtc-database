@@ -1,9 +1,21 @@
-import { Case } from "@/app/generated/prisma/browser";
+import type { Case, CriminalCase } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
+import { FilterOptions } from "../Filter/FilterUtils";
 
-export const CaseSchema = z.object({
+export type CriminalCasesFilterOptions = FilterOptions<CriminalCaseSchema>;
+
+export type CriminalCaseFilters = CriminalCasesFilterOptions["filters"];
+
+export type CriminalCaseStats = {
+  totalCases: number;
+  detainedCases: number;
+  pendingCases: number;
+  recentlyFiled: number;
+};
+
+export const BaseCaseSchema = z.object({
   id: z.coerce.number().int().optional(), // Optional for new cases that haven't been saved yet
   branch: z
     .string()
@@ -33,6 +45,11 @@ export const CaseSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Date Filed", "Filing Date"])),
+  caseType: z.enum(CaseType),
+});
+export type BaseCaseSchema = z.infer<typeof BaseCaseSchema>;
+
+const CriminalCaseObjectSchema = z.object({
   name: z
     .string()
     .min(1, "Name is required")
@@ -52,7 +69,6 @@ export const CaseSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Court"])),
-  caseType: z.enum(CaseType),
   detained: z
     .string()
     .nullable()
@@ -180,59 +196,13 @@ export const CaseSchema = z.object({
     .optional()
     .describe(excelHeaders(["Amount Involved", "AMOUNT INVOLVED"])),
 });
-export type CaseSchema = z.infer<typeof CaseSchema>;
 
-/** Form entry used by the grid UI (CaseSchema + UI metadata). */
-export type CaseEntry = Case & {
-  errors: Record<string, string>;
-  collapsed: boolean;
-  saved: boolean;
-};
+export const CriminalCaseSchema = BaseCaseSchema.merge(
+  CriminalCaseObjectSchema,
+);
+export type CriminalCaseSchema = z.infer<typeof CriminalCaseSchema>;
 
-/** Convert CaseSchema to CaseEntry (for editing existing cases). */
-export const caseToEntry = (c: Case): CaseEntry => ({
-  ...c,
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
-
-export const initialCaseFormData: Omit<Case, "id" | "createdAt"> = {
-  branch: null,
-  assistantBranch: null,
-  caseNumber: "",
-  dateFiled: new Date(),
-  caseType: "UNKNOWN",
-  name: "",
-  charge: null,
-  infoSheet: null,
-  court: null,
-  detained: null,
-  consolidation: null,
-  eqcNumber: null,
-  bond: null,
-  raffleDate: null,
-  committee1: null,
-  committee2: null,
-  judge: null,
-  ao: null,
-  complainant: null,
-  houseNo: null,
-  street: null,
-  barangay: null,
-  municipality: null,
-  province: null,
-  counts: null,
-  jdf: null,
-  sajj: null,
-  sajj2: null,
-  mf: null,
-  stf: null,
-  lrf: null,
-  vcf: null,
-  total: null,
-  amountInvolved: null,
-};
+export type CriminalCaseData = Case & CriminalCase;
 
 let tempIdCounter = 0;
 
@@ -241,11 +211,64 @@ export const createTempId = (): number => {
   return -tempIdCounter;
 };
 
+/** Form entry used by the grid UI (CaseSchema + UI metadata). */
+export type CaseEntry = CriminalCaseSchema & {
+  id: number;
+  errors: Record<string, string>;
+  collapsed: boolean;
+  saved: boolean;
+};
+
+/** Convert CaseSchema to CaseEntry (for editing existing cases). */
+export const caseToEntry = (c: CriminalCaseData): CaseEntry => ({
+  ...c,
+  id: c.id ?? createTempId(),
+  errors: {},
+  collapsed: false,
+  saved: false,
+});
+
+export const initialCaseFormData: Omit<CriminalCaseSchema, "id" | "createdAt"> =
+  {
+    branch: null,
+    assistantBranch: null,
+    caseNumber: "",
+    dateFiled: new Date(),
+    caseType: "UNKNOWN",
+    name: "",
+    charge: null,
+    infoSheet: null,
+    court: null,
+    detained: null,
+    consolidation: null,
+    eqcNumber: null,
+    bond: null,
+    raffleDate: null,
+    committee1: null,
+    committee2: null,
+    judge: null,
+    ao: null,
+    complainant: null,
+    houseNo: null,
+    street: null,
+    barangay: null,
+    municipality: null,
+    province: null,
+    jdf: null,
+    sajj: null,
+    sajj2: null,
+    mf: null,
+    stf: null,
+    lrf: null,
+    vcf: null,
+    total: null,
+    amountInvolved: null,
+  };
+
 /** Create an empty entry based on schema defaults. */
 export const createEmptyEntry = (): CaseEntry => ({
   ...initialCaseFormData,
   id: createTempId(),
-  createdAt: new Date(),
   errors: {},
   collapsed: false,
   saved: false,

@@ -1,4 +1,4 @@
-import type { Case } from "../../generated/prisma/client";
+import type { CriminalCaseData } from "./schema";
 
 export interface CaseStats {
   totalCases: number;
@@ -7,7 +7,7 @@ export interface CaseStats {
   recentlyFiled: number;
 }
 
-export const calculateCaseStats = (cases: Case[]): CaseStats => {
+export const calculateCaseStats = (cases: CriminalCaseData[]): CaseStats => {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -15,15 +15,18 @@ export const calculateCaseStats = (cases: Case[]): CaseStats => {
     totalCases: cases.length,
     detainedCases: cases.filter((c) => c.detained).length,
     pendingCases: cases.filter((c) => !c.raffleDate).length,
-    recentlyFiled: cases.filter((c) => new Date(c.dateFiled) >= thirtyDaysAgo)
-      .length,
+    recentlyFiled: cases.filter(
+      (c) => c.dateFiled && new Date(c.dateFiled) >= thirtyDaysAgo,
+    ).length,
   };
 };
 
-export const formatCaseForDisplay = (caseItem: Case) => {
+export const formatCaseForDisplay = (caseItem: CriminalCaseData) => {
   return {
     ...caseItem,
-    dateFiled: new Date(caseItem.dateFiled).toLocaleDateString(),
+    dateFiled: caseItem.dateFiled
+      ? new Date(caseItem.dateFiled).toLocaleDateString()
+      : "—",
     raffleDate: caseItem.raffleDate
       ? new Date(caseItem.raffleDate).toLocaleDateString()
       : "Not scheduled",
@@ -33,10 +36,10 @@ export const formatCaseForDisplay = (caseItem: Case) => {
 };
 
 export const sortCases = (
-  cases: Case[],
-  sortBy: keyof Case,
+  cases: CriminalCaseData[],
+  sortBy: keyof CriminalCaseData,
   order: "asc" | "desc",
-): Case[] => {
+): CriminalCaseData[] => {
   return [...cases].sort((a, b) => {
     const aVal = a[sortBy];
     const bVal = b[sortBy];
