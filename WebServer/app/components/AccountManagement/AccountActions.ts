@@ -175,6 +175,56 @@ export async function updateRole(
   }
 }
 
+export async function cancelPendingAccount(
+  userId: string,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, status: true },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.status !== Status.PENDING) {
+      throw new Error("Only pending users can be cancelled");
+    }
+
+    await auth.api.revokeUserSessions({
+      body: {
+        userId: user.id,
+      },
+      headers: await headers(),
+    });
+
+    await prisma.user.delete({
+      where: { id: user.id },
+    });
+
+    await createLog({
+      action: LogAction.DELETE_USER,
+      details: {
+        id: user.id,
+      },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error cancelling pending account:", error);
+    return {
+      success: false,
+      error: "Failed to cancel pending account",
+    };
+  }
+}
+
 export async function deactivateAccount(
   userId: string[],
   banReason?: string,

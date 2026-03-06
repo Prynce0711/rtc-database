@@ -7,12 +7,16 @@ interface PaginationProps {
   pageCount: number;
   currentPage: number;
   onPageChange?: (page: number) => void;
+  className?: string;
+  joinClassName?: string;
 }
 
 const Pagination: React.FC<PaginationProps> = ({
   pageCount,
   currentPage,
   onPageChange,
+  className,
+  joinClassName,
 }) => {
   const getPages = () => {
     const pages: (number | string)[] = [];
@@ -61,8 +65,10 @@ const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className="w-full flex justify-center py-4">
-      <div className="join shadow-sm bg-base-100 rounded-lg p-1">
+    <div className={className ?? "w-full flex justify-center py-4"}>
+      <div
+        className={joinClassName ?? "join shadow-sm bg-base-100 rounded-lg p-1"}
+      >
         {/* PREVIOUS (hidden on first page) */}
         {currentPage > 1 && (
           <button

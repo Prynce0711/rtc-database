@@ -1,5 +1,7 @@
 "use client";
 
+import Pagination from "@/app/components/Pagination/Pagination";
+import TipCell from "@/app/components/Table/TipCell";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { enumToText, getAgeFromDate } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
@@ -57,7 +59,7 @@ const SortTh = ({
       className={[
         "py-4 px-5 text-[13px] font-bold tracking-[0.05em] text-base-content/70 uppercase",
         "cursor-pointer select-none hover:text-base-content/80 transition-colors whitespace-nowrap",
-        "text-center",
+        align === "left" ? "text-left" : "text-center",
       ].join(" ")}
     >
       <span className="inline-flex items-center gap-1">
@@ -109,28 +111,13 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
   }, [employees, sortKey, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / rowsPerPage));
-  const paginated = useMemo(
-    () =>
-      sorted.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage),
-    [sorted, currentPage],
-  );
 
-  // ── Visible page numbers ───────────────────────────────────────────────────
-  const visiblePages = useMemo(() => {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-    pages.push(1, 2);
-    let left = Math.max(3, currentPage - 1);
-    let right = Math.min(totalPages - 2, currentPage + 1);
-    if (left > 3) pages.push("...");
-    for (let p = left; p <= right; p++) pages.push(p);
-    if (right < totalPages - 2) pages.push("...");
-    pages.push(totalPages - 1, totalPages);
-    return pages;
-  }, [currentPage, totalPages]);
+  const page = Math.min(currentPage, totalPages);
+
+  const paginated = useMemo(
+    () => sorted.slice((page - 1) * rowsPerPage, page * rowsPerPage),
+    [sorted, page],
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -294,31 +281,60 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                     </div>
                   </td>
 
-                  {/* Data cells */}
-                  <td className="py-4 px-5 font-semibold text-base-content">
-                    {emp.employeeName || "—"}
-                  </td>
-                  <td className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70">
-                    {emp.employeeNumber || "—"}
-                  </td>
-                  <td className="py-4 px-5 text-base-content/80">
-                    {emp.position || "—"}
-                  </td>
-                  <td className="py-4 px-5 text-base-content/80">
-                    {emp.branch || "—"}
-                  </td>
-                  <td className="py-4 px-5 text-center text-base-content/70">
-                    {getAgeFromDate(emp.birthDate) ?? "—"}
-                  </td>
-                  <td className="py-4 px-5 text-base-content/80">
-                    {emp.employmentType ? enumToText(emp.employmentType) : "—"}
-                  </td>
-                  <td className="py-4 px-5 text-center text-base-content/70">
-                    {emp.contactNumber || "—"}
-                  </td>
-                  <td className="py-4 px-5 text-base-content/60">
-                    {emp.email || "—"}
-                  </td>
+                  {/* Data cells with hover tooltip */}
+                  <TipCell
+                    label="Employee Name"
+                    value={emp.employeeName}
+                    className="py-4 px-5 font-semibold text-base-content"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Employee #"
+                    value={emp.employeeNumber}
+                    className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Position"
+                    value={emp.position}
+                    className="py-4 px-5 text-base-content/80"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Branch"
+                    value={emp.branch}
+                    className="py-4 px-5 text-base-content/80"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Age"
+                    value={getAgeFromDate(emp.birthDate)}
+                    className="py-4 px-5 text-center text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Employment Type"
+                    value={
+                      emp.employmentType
+                        ? enumToText(emp.employmentType)
+                        : undefined
+                    }
+                    className="py-4 px-5 text-base-content/80"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Contact No"
+                    value={emp.contactNumber}
+                    className="py-4 px-5 text-center text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Email"
+                    value={emp.email}
+                    className="py-4 px-5 text-base-content/60"
+                    truncate
+                    clickHint
+                  />
                 </tr>
               ))
             )}
@@ -326,67 +342,17 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
         </table>
       </div>
 
-      {/* ── Pagination ─────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-base-200">
+      <div className="flex flex-col md:flex-row items-center justify-center gap-3 px-5 py-4 border-t border-base-200">
         {/* Info */}
-        <p className="text-[13px] text-base-content/40 font-medium">
-          Showing{" "}
-          <span className="font-semibold text-base-content/60">
-            {Math.min((currentPage - 1) * rowsPerPage + 1, sorted.length)}
-          </span>{" "}
-          –{" "}
-          <span className="font-semibold text-base-content/60">
-            {Math.min(currentPage * rowsPerPage, sorted.length)}
-          </span>{" "}
-          of{" "}
-          <span className="font-semibold text-base-content/60">
-            {sorted.length}
-          </span>
-        </p>
 
-        {/* Page buttons */}
+        {/* Page buttons (shared design) */}
         {totalPages > 1 && (
-          <nav className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-base-content/40 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-            >
-              Prev
-            </button>
-
-            {visiblePages.map((p, idx) =>
-              p === "..." ? (
-                <span
-                  key={`dots-${idx}`}
-                  className="px-2 text-[13px] text-base-content/25"
-                >
-                  …
-                </span>
-              ) : (
-                <button
-                  key={`page-${p}`}
-                  onClick={() => setCurrentPage(Number(p))}
-                  className={[
-                    "w-8 h-8 rounded-lg text-[13px] font-semibold transition-all",
-                    currentPage === Number(p)
-                      ? "bg-primary text-primary-content"
-                      : "text-base-content/50 hover:text-base-content hover:bg-base-200",
-                  ].join(" ")}
-                >
-                  {p}
-                </button>
-              ),
-            )}
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-base-content/40 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-            >
-              Next
-            </button>
-          </nav>
+          <Pagination
+            pageCount={totalPages}
+            currentPage={page}
+            onPageChange={setCurrentPage}
+            className="w-full md:w-auto flex justify-center md:justify-end py-0"
+          />
         )}
       </div>
     </div>
