@@ -67,6 +67,9 @@ export default function AnnualPage() {
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString(),
   );
+  const [selectedMonth, setSelectedMonth] = useState(
+    new Date().toISOString().slice(0, 7),
+  );
   const [uploading, setUploading] = useState(false);
   const [requestAdd, setRequestAdd] = useState(0);
   const [isChildActive, setIsChildActive] = useState(false);
@@ -82,6 +85,17 @@ export default function AnnualPage() {
   const exportDataRef = useRef<Record<string, unknown>[]>([]);
 
   const yearLabel = selectedYear;
+  const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString(
+    "en-US",
+    { month: "long", year: "numeric" },
+  );
+
+  const viewSubtitles: Record<AnnualView, string> = {
+    MTC: "Municipal Trial Court — Track all received documents and case filings",
+    RTC: "Regional Trial Court — Track all received documents and case filings",
+    Inventory:
+      "Court Document Inventory — Overview of document counts and status",
+  };
 
   const handleExport = () => {
     const data = exportDataRef.current;
@@ -161,27 +175,32 @@ export default function AnnualPage() {
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                  Annual Reports
-                </h1>
-                <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                  <FiCalendar className="shrink-0" />
-                  <span>Statistics overview for {yearLabel}</span>
+                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                  <span>Annual Reports</span>
+                  <span className="text-base-content/30">/</span>
+                  <span className="text-base-content/70 font-medium">
+                    {activeView} Receiving Log
+                  </span>
+                </div>
+                <h2 className="text-5xl font-bold text-base-content">
+                  {views.find((v) => v.value === activeView)?.description ??
+                    activeView}
+                </h2>
+                <p className="flex text-lg items-center gap-2 text-base text-base-content/50 mt-1.5">
+                  <FiCalendar className="shrink-0 w-4 h-4" />
+                  <span>{viewSubtitles[activeView]}</span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                <select
-                  className="select select-bordered select-md w-72"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="month"
+                    className="input input-bordered input-md w-40"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  />
+                </div>
                 <div className="flex items-center gap-2 flex-nowrap">
                   <input
                     ref={fileInputRef}
@@ -206,7 +225,7 @@ export default function AnnualPage() {
                     Export Excel
                   </button>
                   <button
-                    className="btn btn-success btn-md gap-2"
+                    className="btn btn-primary btn-md gap-2"
                     onClick={() => setRequestAdd((c) => c + 1)}
                   >
                     <FiPlus className="h-5 w-5" />
@@ -222,7 +241,7 @@ export default function AnnualPage() {
       {/* ── VIEW SELECTOR — Segmented tabs ── */}
       {!isChildActive && (
         <div className="flex justify-start">
-          <div className="inline-flex bg-base-200/60 rounded-2xl p-2 shadow-inner border border-base-300/40">
+          <div className="inline-flex bg-base-200/60 rounded-xl p-1.5 gap-1 border border-base-300/40">
             {views.map(({ label, value, description, icon: Icon }) => {
               const isActive = activeView === value;
               return (
@@ -230,20 +249,20 @@ export default function AnnualPage() {
                   key={value}
                   onClick={() => setActiveView(value)}
                   className={`
-                  relative flex items-center gap-3 px-7 py-4 rounded-xl text-base font-bold
+                  relative flex items-center gap-2.5 px-5 py-3 rounded-lg text-sm font-bold
                   transition-all duration-200 cursor-pointer select-none
                   ${
                     isActive
-                      ? "bg-primary text-primary-content shadow-md shadow-primary/25 scale-[1.02]"
+                      ? "bg-primary text-primary-content shadow-md shadow-primary/25"
                       : "text-base-content/60 hover:text-base-content hover:bg-base-100/80"
                   }
                 `}
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <div className="flex flex-col items-start leading-tight">
                     <span className="tracking-wide">{label}</span>
                     <span
-                      className={`text-[11px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
+                      className={`text-[10px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
                     >
                       {description}
                     </span>

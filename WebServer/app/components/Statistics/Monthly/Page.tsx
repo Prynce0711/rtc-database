@@ -252,12 +252,15 @@ export default function MonthlyPage() {
         <div className="card-body p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
-              <h1 className="text-5xl font-black tracking-tight text-base-content">
+              <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
                 Monthly Reports
-              </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
+              </h2>
+              <p className=" flex items-center gap-2 text-lg text-base-content/50 mt-2">
                 <FiCalendar className="shrink-0" />
-                <span>Statistics overview for {monthLabel}</span>
+                <span>Statistics overview for </span>
+                <span className="font-bold text-base-content/80">
+                  {monthLabel}
+                </span>
               </p>
             </div>
 
@@ -292,7 +295,7 @@ export default function MonthlyPage() {
                   Export Excel
                 </button>
                 <button
-                  className="btn btn-success btn-md gap-2"
+                  className="btn btn-primary btn-md gap-2"
                   onClick={() => setShowAddPage(true)}
                 >
                   <FiPlus className="h-5 w-5" />

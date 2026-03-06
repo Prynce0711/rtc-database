@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { FiCheck, FiEdit2, FiSearch, FiTrash2, FiX } from "react-icons/fi";
+import {
+  FiCheck,
+  FiChevronDown,
+  FiEdit2,
+  FiSearch,
+  FiSettings,
+  FiTrash2,
+  FiX,
+} from "react-icons/fi";
 import type { SelectionMode } from "./MonthlyTable";
 
 interface MonthlyToolbarProps {
@@ -38,7 +46,7 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
       <div className="relative flex-1 max-w-md">
-        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40" />
+        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
         <input
           type="text"
           placeholder="Search branch, category…"
@@ -63,51 +71,67 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         ))}
       </select>
 
-      {/* Edit / Delete / Confirm / Cancel — right next to filters */}
+      {/* Actions */}
       {isSelecting ? (
-        <>
-          <span className="text-sm font-semibold text-base-content/70">
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-base-content/40 tabular-nums">
             {selectedCount} selected
           </span>
           <button
-            className={`btn btn-md gap-1.5 ${
-              selectionMode === "delete" ? "btn-error" : "btn-info"
+            className={`btn btn-sm gap-1.5 ${
+              selectionMode === "delete" ? "btn-error" : "btn-primary"
             }`}
             onClick={onConfirmSelection}
             disabled={selectedCount === 0}
           >
-            <FiCheck className="h-5 w-5" />
-            Confirm
+            <FiCheck className="h-3.5 w-3.5" />
+            Apply
           </button>
           <button
-            className="btn btn-ghost btn-md gap-1.5"
+            className="btn btn-sm btn-ghost text-base-content/50"
             onClick={onCancelSelection}
           >
-            <FiX className="h-5 w-5" />
-            Cancel
+            <FiX className="h-3.5 w-3.5" />
           </button>
-        </>
+        </div>
       ) : (
-        <>
-          {onStartEdit && (
-            <button
-              className="btn btn-outline btn-info btn-md gap-1.5"
-              onClick={onStartEdit}
-            >
-              <FiEdit2 className="h-5 w-5" />
-              Edit
-            </button>
-          )}
-          {onStartDelete && (
-            <button
-              className="btn btn-outline btn-error btn-md gap-1.5"
-              onClick={onStartDelete}
-            >
-              <FiTrash2 className="h-5 w-5" />
-              Delete
-            </button>
-          )}
-        </>
+        <div className="dropdown dropdown-end">
+          <label
+            tabIndex={0}
+            className="btn btn-sm btn-primary gap-2 text-base-100 "
+          >
+            <FiSettings className="h-4 w-4" />
+            Actions
+            <FiChevronDown className="h-3 w-3" />
+          </label>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 rounded-lg z-50 w-40 p-1.5 shadow-xl border border-base-200/80"
+          >
+            {onStartEdit && (
+              <li>
+                <button
+                  onClick={onStartEdit}
+                  className="gap-2.5 text-sm rounded-md"
+                >
+                  <FiEdit2 className="h-3.5 w-3.5 opacity-60" />
+                  Edit rows
+                </button>
+              </li>
+            )}
+            {onStartDelete && (
+              <li>
+                <button
+                  onClick={onStartDelete}
+                  className="gap-2.5 text-sm rounded-md hover:bg-error/10 hover:text-error"
+                >
+                  <FiTrash2 className="h-3.5 w-3.5 opacity-60" />
+                  Delete rows
+                </button>
+              </li>
+            )}
+          </ul>
+        </div>
       )}
 
       <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
