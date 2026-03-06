@@ -277,19 +277,19 @@ export default function MonthlyPage() {
                   onChange={handleImport}
                 />
                 <button
-                  className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
                   <FiUpload className="h-5 w-5" />
-                  {uploading ? "Importing..." : "Import"}
+                  {uploading ? "Importing..." : "Import Excel"}
                 </button>
                 <button
-                  className="btn btn-outline btn-info btn-md gap-2"
+                  className="btn btn-outline btn-md gap-2"
                   onClick={handleExport}
                 >
                   <FiDownload className="h-5 w-5" />
-                  Export
+                  Export Excel
                 </button>
                 <button
                   className="btn btn-success btn-md gap-2"

@@ -6,9 +6,11 @@ import { isTextFieldKey } from "@/app/lib/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
+  FiDownload,
   FiFileText,
   FiLock,
   FiSearch,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import type { Case, CaseType } from "../../generated/prisma/client";
@@ -475,6 +477,8 @@ const CasePage: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
+                {" "}
+                <FiUpload className="h-5 w-5" />
                 {uploading ? "Importing..." : "Import Excel"}
               </button>
             )}
@@ -484,6 +488,7 @@ const CasePage: React.FC = () => {
                 onClick={handleExportExcel}
                 disabled={exporting}
               >
+                <FiDownload className="h-5 w-5" />
                 {exporting ? "Exporting..." : "Export Excel"}
               </button>
             )}

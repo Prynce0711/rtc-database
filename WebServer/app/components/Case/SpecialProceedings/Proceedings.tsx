@@ -545,7 +545,7 @@ const Proceedings: React.FC = () => {
               ) : (
                 <>
                   <FiUpload className="h-5 w-5 mr-2" />
-                  Import
+                  Import Excel
                 </>
               )}
             </button>
@@ -570,7 +570,7 @@ const Proceedings: React.FC = () => {
               ) : (
                 <>
                   <FiDownload className="h-5 w-5 mr-2" />
-                  Export
+                  Export Excel
                 </>
               )}
             </button>
