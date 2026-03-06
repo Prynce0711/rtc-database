@@ -30,7 +30,7 @@ const SidebarButton = ({
   }, [isActive]);
 
   return (
-    <div className="flex flex-col">
+    <div className="fixed flex flex-col">
       {isParentOnly ? (
         <button
           onClick={() => setOpen((prev) => !prev)}
@@ -40,7 +40,7 @@ const SidebarButton = ({
               : "text-base-content/60 hover:bg-base-300/60 hover:text-base-content"
           }`}
         >
-          <span className="text-lg flex-shrink-0">{icon}</span>
+          <span className="text-lg shrink-0">{icon}</span>
 
           <span className="text-sm font-semibold tracking-wide flex-1 text-left">
             {label}
@@ -57,14 +57,14 @@ const SidebarButton = ({
               : "text-base-content/60 hover:bg-base-300/60 hover:text-base-content"
           }`}
         >
-          <span className="text-lg flex-shrink-0">{icon}</span>
+          <span className="text-lg shrink-0">{icon}</span>
 
           <span className="text-sm font-semibold tracking-wide flex-1">
             {label}
           </span>
 
           {isActive && (
-            <div className="h-1.5 w-1.5 rounded-full bg-primary-content/70 flex-shrink-0" />
+            <div className="h-1.5 w-1.5 rounded-full bg-primary-content/70 shrink-0" />
           )}
         </Link>
       )}
