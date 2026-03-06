@@ -7,9 +7,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
-import AnnualAddReportPage from "../Annual/AnnualAddReportPage";
 import AnnualRow from "../Annual/AnnualRow";
 import AnnualToolbar from "../Annual/AnnualToolbar";
+import JudgementAddReportPage from "./JudgementAddReportPage";
 import {
   AnyColumnDef,
   flattenColumns,
@@ -64,6 +64,8 @@ function JudgementTable<T extends Record<string, unknown>>({
   onUpdate,
   onDelete,
   onActivePageChange,
+  activeView,
+  onSwitchView,
 }: JudgementTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -345,7 +347,7 @@ function JudgementTable<T extends Record<string, unknown>>({
   /* ── Sub-page: Add/Edit ─────────────────────────────────────────── */
   if (showAddPage) {
     return (
-      <AnnualAddReportPage
+      <JudgementAddReportPage
         title={title}
         fields={fields}
         columns={columns}
@@ -356,26 +358,10 @@ function JudgementTable<T extends Record<string, unknown>>({
           setEditInitialData(undefined);
           onActivePageChange?.(false);
         }}
-        onSave={async (rows) => {
-          if (editInitialData && editInitialData.length > 0) {
-            for (const record of rows) {
-              await handleUpdate(record);
-            }
-            statusPopup.showSuccess(
-              `${rows.length} entry(s) updated successfully`,
-            );
-          } else {
-            for (const record of rows) {
-              await handleCreate(record);
-            }
-            statusPopup.showSuccess(
-              `${rows.length} entry(s) added successfully`,
-            );
-          }
-          setShowAddPage(false);
-          setEditInitialData(undefined);
-          onActivePageChange?.(false);
-        }}
+        onAdd={onAdd}
+        onUpdate={onUpdate}
+        activeView={activeView}
+        onSwitchView={onSwitchView}
       />
     );
   }
