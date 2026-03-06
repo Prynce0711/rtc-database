@@ -60,7 +60,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       const rec = statisticsData[i];
       Object.entries(rec).forEach(([k, v]) => {
         if (typeof v === "number") keys.add(k);
-        else if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) keys.add(k);
+        else if (
+          typeof v === "string" &&
+          v.trim() !== "" &&
+          !Number.isNaN(Number(v))
+        )
+          keys.add(k);
       });
     }
     return Array.from(keys);
