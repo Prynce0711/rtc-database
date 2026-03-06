@@ -1,8 +1,18 @@
 "use server";
 
 import ActionResult from "@/app/components/ActionResult";
-import { CaseSchema } from "@/app/components/Case/schema";
-import { CaseType, LogAction, Prisma } from "@/app/generated/prisma/client";
+import {
+  BaseCaseSchema,
+  CriminalCaseData,
+  CriminalCaseSchema,
+} from "@/app/components/Case/schema";
+import {
+  Case,
+  CaseType,
+  CriminalCase,
+  LogAction,
+  Prisma,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   ExportExcelData,
@@ -14,7 +24,9 @@ import {
   UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
+import { splitCaseData } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
@@ -42,11 +54,11 @@ export async function uploadExcel(
       console.warn("⚠ Unable to preview workbook for logging:", peekError);
     }
 
-    const headerMap = getExcelHeaderMap(CaseSchema);
+    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
     const branchHeaders = headerMap.branch ?? ["Branch"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(CaseSchema, row);
+      const values = normalizeRowBySchema(CriminalCaseSchema, row);
 
       return {
         ...values,
@@ -54,12 +66,12 @@ export async function uploadExcel(
     };
 
     const result = await processExcelUpload<
-      Prisma.CaseCreateManyInput,
+      CriminalCaseSchema,
       ReturnType<typeof getMappedCells>
     >({
       file,
       requiredHeaders: { Branch: branchHeaders },
-      schema: CaseSchema,
+      schema: CriminalCaseSchema,
       skipRowsWithoutCell: {
         getCells: getMappedCells,
         keys: ["caseNumber"],
@@ -86,10 +98,11 @@ export async function uploadExcel(
 
         const hydrated = {
           ...cells,
+          assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
           caseType,
         };
 
-        const validation = CaseSchema.safeParse(hydrated);
+        const validation = CriminalCaseSchema.safeParse(hydrated);
         if (!validation.success) {
           // console.warn(
           //   "Employee row validation failed:",
@@ -101,20 +114,32 @@ export async function uploadExcel(
           };
         }
 
-        const mappedRow: Prisma.CaseCreateManyInput = {
-          ...validation.data,
-          assistantBranch:
-            validation.data.assistantBranch ?? validation.data.branch ?? null,
-          caseType,
-        };
-
         return {
-          mapped: mappedRow,
+          mapped: validation.data,
           uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
-        const created = await prisma.case.createManyAndReturn({ data: rows });
+        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        const criminalRows: Prisma.CriminalCaseCreateManyInput[] = [];
+
+        rows.forEach((row) => {
+          const { caseData, criminalData } = splitCaseData(row);
+          caseRows.push(caseData);
+          criminalRows.push({
+            ...criminalData,
+            caseNumber: caseData.caseNumber,
+          });
+        });
+
+        const created = await prisma.case.createManyAndReturn({
+          data: caseRows,
+        });
+
+        if (criminalRows.length > 0) {
+          await prisma.criminalCase.createMany({ data: criminalRows });
+        }
+
         return { ids: created.map((c) => c.id), count: created.length };
       },
     });
@@ -176,50 +201,59 @@ export async function exportCasesExcel(): Promise<
       return sessionResult;
     }
 
-    const cases = await prisma.case.findMany({ orderBy: { id: "asc" } });
+    const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
+      all: ["id"],
+    });
 
-    const rows = cases.map((c) => {
-      const formatDate = (value: Date | null) => {
+    const caseFieldKeys = getSchemaFieldKeys(CriminalCaseSchema, {
+      all: ["id"],
+      stringKeys: [...baseCaseFieldKeys.stringKeys],
+      dateKeys: [...baseCaseFieldKeys.dateKeys],
+    });
+
+    const dateKeys = [
+      caseFieldKeys.dateKeys,
+      baseCaseFieldKeys.dateKeys,
+    ].flat();
+
+    const cases = await prisma.case.findMany({
+      orderBy: { id: "asc" },
+      include: { criminalCase: true },
+    });
+
+    const caseCombined: CriminalCaseData[] = cases
+      .filter(
+        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
+      )
+      .map((c) => ({
+        ...c,
+        ...c.criminalCase,
+      }));
+
+    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
+    const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
+
+    const header = (key: keyof typeof headerMap, fallback: string) =>
+      headerMap[key]?.[0] ?? fallback;
+
+    const rows = caseCombined.map((c) => {
+      const formatDate = (value: Date | null | undefined) => {
         if (!value) return "";
         const date = new Date(value);
         return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
       };
 
-      return {
-        "Case Number": c.caseNumber ?? "",
-        Name: c.name ?? "",
-        Branch: c.branch ?? "",
-        "Assistant Branch": c.assistantBranch ?? "",
-        Type: c.caseType ?? "",
-        "Date Filed": formatDate(c.dateFiled as unknown as Date | null),
-        Charge: c.charge ?? "",
-        Court: c.court ?? "",
-        Detained: c.detained ?? "",
-        Consolidation: c.consolidation ?? "",
-        "EQC Number": c.eqcNumber ?? "",
-        Bond: c.bond ?? "",
-        "Raffle Date": formatDate(c.raffleDate as unknown as Date | null),
-        "Committee 1": c.committee1 ?? "",
-        "Committee 2": c.committee2 ?? "",
-        Judge: c.judge ?? "",
-        AO: c.ao ?? "",
-        Complainant: c.complainant ?? "",
-        "House No": c.houseNo ?? "",
-        Street: c.street ?? "",
-        Barangay: c.barangay ?? "",
-        Municipality: c.municipality ?? "",
-        Province: c.province ?? "",
-        Counts: c.counts ?? "",
-        JDF: c.jdf ?? "",
-        SAJJ: c.sajj ?? "",
-        "SAJJ 2": c.sajj2 ?? "",
-        MF: c.mf ?? "",
-        STF: c.stf ?? "",
-        LRF: c.lrf ?? "",
-        VCF: c.vcf ?? "",
-        Total: c.total ?? "",
-        "Amount Involved": c.amountInvolved ?? "",
-      };
+      return headerKeys.reduce(
+        (acc, key) => {
+          const headerName = header(key, key);
+          const value = dateKeys.includes(key)
+            ? formatDate(c[key] as Date | null | undefined)
+            : (c[key] ?? "");
+          acc[headerName] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
     });
 
     const workbook = XLSX.utils.book_new();

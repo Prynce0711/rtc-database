@@ -1,216 +1,33 @@
 "use server";
 
-import { Case, LogAction, Prisma } from "@/app/generated/prisma/client";
+import {
+  Case,
+  CriminalCase,
+  LogAction,
+  Prisma,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import {
+  buildCaseWhere,
+  DEFAULT_PAGE_SIZE,
+  splitCaseData,
+} from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { prettifyError } from "zod";
 import ActionResult from "../ActionResult";
 import { createLog } from "../ActivityLogs/LogActions";
 import { PaginatedResult } from "../Filter/FilterTypes";
-import { CaseSchema } from "./schema";
-
-export type CaseFilters = {
-  branch?: string;
-  assistantBranch?: string;
-  caseNumber?: string;
-  caseType?: string;
-  name?: string;
-  charge?: string;
-  infoSheet?: string;
-  court?: string;
-  detained?: string;
-  consolidation?: string;
-  eqcNumber?: number;
-  bond?: string;
-  raffleDate?: { start?: string; end?: string };
-  dateFiled?: { start?: string; end?: string };
-  committee1?: string;
-  committee2?: string;
-  judge?: string;
-  ao?: string;
-  complainant?: string;
-  houseNo?: string;
-  street?: string;
-  barangay?: string;
-  municipality?: string;
-  province?: string;
-  counts?: string;
-  jdf?: string;
-  sajj?: string;
-  sajj2?: string;
-  mf?: string;
-  stf?: string;
-  lrf?: string;
-  vcf?: string;
-  total?: string;
-  amountInvolved?: string;
-};
-
-export type CaseStats = {
-  totalCases: number;
-  detainedCases: number;
-  pendingCases: number;
-  recentlyFiled: number;
-};
-
-export type GetCasesOptions = {
-  page?: number;
-  pageSize?: number;
-  searchTerm?: string;
-  filters?: CaseFilters;
-  sortKey?: keyof Case;
-  sortOrder?: "asc" | "desc";
-  exactMatchMap?: Record<string, boolean>;
-};
-
-const DEFAULT_PAGE_SIZE = 25;
-
-const stringFilterFields: (keyof CaseFilters)[] = [
-  "branch",
-  "assistantBranch",
-  "caseNumber",
-  "caseType",
-  "name",
-  "charge",
-  "infoSheet",
-  "court",
-  "detained",
-  "consolidation",
-  "bond",
-  "committee1",
-  "committee2",
-  "judge",
-  "ao",
-  "complainant",
-  "houseNo",
-  "street",
-  "barangay",
-  "municipality",
-  "province",
-  "counts",
-  "jdf",
-  "sajj",
-  "sajj2",
-  "mf",
-  "stf",
-  "lrf",
-  "vcf",
-  "total",
-  "amountInvolved",
-];
-
-const searchableFields = [
-  "branch",
-  "assistantBranch",
-  "caseNumber",
-  "caseType",
-  "name",
-  "charge",
-  "infoSheet",
-  "court",
-  "detained",
-  "consolidation",
-  "committee1",
-  "committee2",
-  "judge",
-  "ao",
-  "complainant",
-  "houseNo",
-  "street",
-  "barangay",
-  "municipality",
-  "province",
-  "counts",
-  "jdf",
-  "sajj",
-  "sajj2",
-  "mf",
-  "stf",
-  "lrf",
-  "vcf",
-  "total",
-  "amountInvolved",
-] as const;
-
-const buildCaseWhere = (options?: GetCasesOptions): Prisma.CaseWhereInput => {
-  const conditions: Prisma.CaseWhereInput[] = [];
-  const filters = options?.filters;
-  const exactMatchMap = options?.exactMatchMap ?? {};
-
-  const addStringFilter = (key: keyof CaseFilters, value?: string) => {
-    if (!value) return;
-    const isExact = exactMatchMap[key] ?? true;
-    const filter: Prisma.StringNullableFilter = {
-      [isExact ? "equals" : "contains"]: value,
-    };
-    conditions.push({ [key]: filter } as Prisma.CaseWhereInput);
-  };
-
-  stringFilterFields.forEach((field) => {
-    const value = filters?.[field];
-    addStringFilter(field, typeof value === "string" ? value : undefined);
-  });
-
-  if (filters?.eqcNumber !== undefined) {
-    conditions.push({ eqcNumber: filters.eqcNumber } as Prisma.CaseWhereInput);
-  }
-
-  if (filters?.dateFiled?.start || filters?.dateFiled?.end) {
-    conditions.push({
-      dateFiled: {
-        gte: filters.dateFiled.start
-          ? new Date(filters.dateFiled.start)
-          : undefined,
-        lte: filters.dateFiled.end
-          ? new Date(filters.dateFiled.end)
-          : undefined,
-      },
-    });
-  }
-
-  if (filters?.raffleDate?.start || filters?.raffleDate?.end) {
-    conditions.push({
-      raffleDate: {
-        not: null,
-        gte: filters.raffleDate.start
-          ? new Date(filters.raffleDate.start)
-          : undefined,
-        lte: filters.raffleDate.end
-          ? new Date(filters.raffleDate.end)
-          : undefined,
-      },
-    });
-  }
-
-  if (options?.searchTerm) {
-    const search = options.searchTerm.trim();
-    if (search.length > 0) {
-      const orConditions = searchableFields.map((field) => ({
-        [field]: { contains: search },
-      })) as Prisma.CaseWhereInput[];
-      const asNumber = Number(search);
-      if (!Number.isNaN(asNumber)) {
-        orConditions.push({ eqcNumber: asNumber });
-      }
-      conditions.push({ OR: orConditions });
-    }
-  }
-
-  if (conditions.length === 0) return {};
-  return { AND: conditions };
-};
-
-const normalizeCases = (cases: Case[]): Case[] => {
-  return cases.map((c) => ({
-    ...c,
-    dateFiled: c.dateFiled,
-    raffleDate: c.raffleDate ? c.raffleDate : null,
-  }));
-};
+import {
+  CriminalCaseData,
+  CriminalCaseSchema,
+  CriminalCasesFilterOptions,
+  CriminalCaseStats,
+} from "./schema";
 
 export async function getCases(
-  options?: GetCasesOptions,
-): Promise<ActionResult<PaginatedResult<Case>>> {
+  options?: CriminalCasesFilterOptions,
+): Promise<ActionResult<PaginatedResult<CriminalCaseData>>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
@@ -224,7 +41,7 @@ export async function getCases(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where = buildCaseWhere(options);
+    const where = buildCaseWhere(CriminalCaseSchema, options);
 
     const orderBy: Prisma.CaseOrderByWithRelationInput = {
       [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
@@ -239,14 +56,26 @@ export async function getCases(
         orderBy,
         skip,
         take,
+        include: {
+          criminalCase: true,
+        },
       }),
       prisma.case.count({ where }),
     ]);
 
+    const caseCombined: CriminalCaseData[] = cases
+      .filter(
+        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
+      )
+      .map((c) => ({
+        ...c,
+        ...c.criminalCase,
+      }));
+
     return {
       success: true,
       result: {
-        items: normalizeCases(cases),
+        items: caseCombined,
         total,
       },
     };
@@ -257,15 +86,15 @@ export async function getCases(
 }
 
 export async function getCaseStats(
-  options?: GetCasesOptions,
-): Promise<ActionResult<CaseStats>> {
+  options?: CriminalCasesFilterOptions,
+): Promise<ActionResult<CriminalCaseStats>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const where = buildCaseWhere(options);
+    const where = buildCaseWhere(CriminalCaseSchema, options);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [total, detainedCount, pendingCount, recentCount] =
@@ -275,14 +104,35 @@ export async function getCaseStats(
           where: {
             AND: [
               where,
-              { detained: { not: null } },
-              { detained: { not: "" } },
+              {
+                criminalCase: {
+                  is: {
+                    detained: { not: null },
+                  },
+                },
+              },
+              {
+                criminalCase: {
+                  is: {
+                    detained: { not: "" },
+                  },
+                },
+              },
             ],
           },
         }),
         prisma.case.count({
           where: {
-            AND: [where, { raffleDate: null }],
+            AND: [
+              where,
+              {
+                criminalCase: {
+                  is: {
+                    raffleDate: null,
+                  },
+                },
+              },
+            ],
           },
         }),
         prisma.case.count({
@@ -320,13 +170,23 @@ export async function createCase(
       throw new Error("New case data should not include an id");
     }
 
-    const caseData = CaseSchema.safeParse(data);
+    const caseData = CriminalCaseSchema.safeParse(data);
     if (!caseData.success) {
-      throw new Error(`Invalid case data: ${caseData.error.message}`);
+      console.log(`Invalid case data: ${prettifyError(caseData.error)}`);
+      throw new Error(`Invalid case data: ${prettifyError(caseData.error)}`);
     }
 
+    const { caseData: casePayload, criminalData } = splitCaseData(
+      caseData.data,
+    );
+
     const newCase = await prisma.case.create({
-      data: caseData.data,
+      data: {
+        ...casePayload,
+        criminalCase: {
+          create: criminalData,
+        },
+      },
     });
 
     await createLog({
@@ -353,22 +213,47 @@ export async function updateCase(
       return sessionResult;
     }
 
-    const caseData = CaseSchema.safeParse(data);
+    const caseData = CriminalCaseSchema.safeParse(data);
     if (!caseData.success) {
       throw new Error(`Invalid case data: ${caseData.error.message}`);
     }
 
+    const { caseData: casePayload, criminalData } = splitCaseData(
+      caseData.data,
+    );
+
     const originalCase = await prisma.case.findUnique({
       where: { id: caseId },
+      include: { criminalCase: true },
     });
 
     if (!originalCase) {
       throw new Error("Case not found");
     }
-    const updatedCase = await prisma.case.update({
-      where: { id: caseId },
-      data: caseData.data,
-    });
+
+    if (originalCase.caseNumber !== casePayload.caseNumber) {
+      throw new Error("Case number cannot be changed");
+    }
+
+    const [, , updatedCase] = await prisma.$transaction([
+      prisma.case.update({
+        where: { id: caseId },
+        data: casePayload,
+      }),
+      prisma.criminalCase.upsert({
+        where: { caseNumber: casePayload.caseNumber },
+        update: criminalData,
+        create: {
+          ...criminalData,
+          case: { connect: { id: caseId } },
+        },
+      }),
+      prisma.case.findUnique({
+        where: { id: caseId },
+        include: { criminalCase: true },
+      }),
+    ]);
+
     if (!updatedCase) {
       throw new Error("Failed to update case");
     }

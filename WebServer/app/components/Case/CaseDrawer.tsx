@@ -1,6 +1,5 @@
 "use client";
 
-import { Case } from "@/app/generated/prisma/browser";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -25,7 +24,8 @@ import { usePopup } from "../Popup/PopupProvider";
 import { createCase, updateCase } from "./CasesActions";
 import {
   CaseEntry,
-  CaseSchema,
+  CriminalCaseData,
+  CriminalCaseSchema,
   caseToEntry,
   createEmptyEntry,
   createTempId,
@@ -698,9 +698,9 @@ const NewCaseModal = ({
   onUpdate,
 }: {
   onClose?: () => void;
-  selectedCase?: Case | null;
-  onCreate?: (caseData: Case) => void;
-  onUpdate?: (caseData: Case) => void;
+  selectedCase?: CriminalCaseData | null;
+  onCreate?: () => void;
+  onUpdate?: () => void;
 }) => {
   const isEdit = selectedCase !== null;
   const statusPopup = usePopup();
@@ -713,7 +713,8 @@ const NewCaseModal = ({
 
   console.log(isEdit, selectedCase);
 
-  const makeFromCase = (sc: Case): CaseEntry => caseToEntry(sc);
+  const makeFromCase = (sc: CriminalCaseData): CaseEntry =>
+    caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
     if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
@@ -822,7 +823,7 @@ const NewCaseModal = ({
 
   const buildPayload = (e: CaseEntry) => {
     const { id, errors, collapsed, saved, ...caseInput } = e;
-    return CaseSchema.safeParse(caseInput);
+    return CriminalCaseSchema.safeParse(caseInput);
   };
 
   const handleSubmit = async () => {
@@ -852,7 +853,7 @@ const NewCaseModal = ({
         });
         if (!response.success)
           throw new Error(response.error || "Failed to update case");
-        onUpdate?.(response.result);
+        onUpdate?.();
         statusPopup.showSuccess("Case updated successfully");
       } else {
         for (const entry of entries) {
@@ -870,7 +871,7 @@ const NewCaseModal = ({
           });
           if (!response.success)
             throw new Error(response.error || "Failed to create case");
-          onCreate?.(response.result);
+          onCreate?.();
         }
         statusPopup.showSuccess(
           entries.length === 1

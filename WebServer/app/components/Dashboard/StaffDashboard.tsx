@@ -11,7 +11,11 @@ import {
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
-import { getCaseStats, getCases, type CaseStats } from "../Case/CasesActions";
+import {
+  getCaseStats,
+  getCases,
+  type CriminalCaseStats,
+} from "../Case/CasesActions";
 import { usePopup } from "../Popup/PopupProvider";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
@@ -22,7 +26,7 @@ interface Props {
 
 const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   const [cases, setCases] = useState<Case[]>([]);
-  const [caseStats, setCaseStats] = useState<CaseStats | null>(null);
+  const [caseStats, setCaseStats] = useState<CriminalCaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const statusPopup = usePopup();
@@ -65,7 +69,7 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   };
 
   const stats = useMemo(() => {
-    const base: CaseStats = caseStats ?? {
+    const base: CriminalCaseStats = caseStats ?? {
       totalCases: 0,
       detainedCases: 0,
       pendingCases: 0,
