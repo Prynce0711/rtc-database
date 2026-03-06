@@ -896,6 +896,10 @@ const UserCard = ({
   );
 };
 
+// Convenience references for commonly-used nav items
+const caseManagementNavItem = caseNavItems[0];
+const statisticsNavItem = caseNavItems[1];
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const { data: session } = useSession();
@@ -1000,7 +1004,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             whileTap={{ scale: 0.96 }}
             className={[
               "flex items-center w-full rounded-xl transition-all duration-200 group",
-              "bg-base-content/3 hover:bg-base-content/7",
+              "bg-base-content/3 hover:bg-base-content/7 text-center",
               isExpanded ? "gap-2.5 px-3 py-2" : "justify-center py-2",
             ].join(" ")}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -1023,7 +1027,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -8 }}
                   transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="text-[11px] font-semibold text-base-content/35 group-hover:text-primary/70 whitespace-nowrap overflow-hidden transition-colors duration-200"
+                  className="text-[11px] text-center font-semibold text-base-content/35 group-hover:text-primary/70 whitespace-nowrap overflow-hidden transition-colors duration-200"
                 >
                   Collapse
                 </motion.span>

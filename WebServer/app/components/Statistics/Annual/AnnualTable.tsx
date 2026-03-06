@@ -200,6 +200,13 @@ function AnnualTable<T extends Record<string, unknown>>({
       }
       return [
         {
+          label: "Branches",
+          value: branchSet.size,
+          subtitle: "Active branches",
+          icon: FileText,
+          delay: 300,
+        },
+        {
           label: "Pending",
           value: pending,
           subtitle: "Total pending cases",
@@ -220,13 +227,6 @@ function AnnualTable<T extends Record<string, unknown>>({
           icon: BarChart3,
           delay: 200,
         },
-        {
-          label: "Branches",
-          value: branchSet.size,
-          subtitle: "Active branches",
-          icon: FileText,
-          delay: 300,
-        },
       ];
     }
     // inventory
@@ -245,6 +245,13 @@ function AnnualTable<T extends Record<string, unknown>>({
       if (r.branch) branchSet.add(String(r.branch));
     }
     return [
+      {
+        label: "Branches",
+        value: branchSet.size,
+        subtitle: "Active branches",
+        icon: FileText,
+        delay: 300,
+      },
       {
         label: "Cases Filed",
         value: filed,
@@ -265,13 +272,6 @@ function AnnualTable<T extends Record<string, unknown>>({
         subtitle: "All cases combined",
         icon: BarChart3,
         delay: 200,
-      },
-      {
-        label: "Branches",
-        value: branchSet.size,
-        subtitle: "Active branches",
-        icon: FileText,
-        delay: 300,
       },
     ];
   }, [yearFilteredData, variant]);
@@ -449,32 +449,52 @@ function AnnualTable<T extends Record<string, unknown>>({
       </div>
       {/* ── KPI CARDS ── */}
       <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
-        {kpiCards.map((card, idx) => (
-          <div
-            key={idx}
-            className="card shadow-xl hover:shadow-2xl hover:scale-[1.03] transition-all duration-300 group"
-            style={{ transitionDelay: `${card.delay}ms` }}
-          >
-            <div className="card-body p-4 sm:p-6 relative overflow-hidden">
-              <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                <card.icon className="h-full w-full" />
-              </div>
-              <div className="relative">
-                <div className="badge border-base-100 gap-2 mb-3">
-                  <span className="font-extrabold uppercase text-sm tracking-wide">
-                    {card.label}
-                  </span>
+        {kpiCards.map((card, idx) => {
+          const isGrand = card.label === "Grand Total";
+          const outerClass = isGrand
+            ? "transform hover:scale-105 card bg-primary/10 shadow-lg hover:shadow-xl transition-shadow ring-1 ring-primary/20 group"
+            : "transform hover:scale-105 card surface-card-hover group";
+
+          const labelClass = isGrand
+            ? "font-extrabold uppercase text-sm tracking-wide text-primary/70 mb-3"
+            : "font-extrabold uppercase text-sm tracking-wide text-base-content mb-3";
+
+          const numberClass = isGrand
+            ? "text-4xl sm:text-5xl font-black text-primary mb-2"
+            : "text-4xl sm:text-5xl font-black text-base-content mb-2";
+
+          const subtitleClass = isGrand
+            ? "text-sm sm:text-base font-semibold text-primary/50"
+            : "text-sm sm:text-base font-semibold text-muted";
+
+          return (
+            <div
+              key={idx}
+              className={outerClass}
+              style={{
+                transitionDelay: `${card.delay}ms`,
+                transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <div
+                className="card-body relative overflow-hidden"
+                style={{ padding: "var(--space-card-padding)" }}
+              >
+                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                  <card.icon className="h-full w-full" />
                 </div>
-                <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                  {card.value.toLocaleString()}
-                </p>
-                <p className="text-sm sm:text-base font-semibold text-base-content/60">
-                  {card.subtitle}
-                </p>
+
+                <div className="relative">
+                  <p className={labelClass}>{card.label}</p>
+                </div>
+
+                <p className={numberClass}>{card.value.toLocaleString()}</p>
+
+                <p className={subtitleClass}>{card.subtitle}</p>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
       {/* ── TOOLBAR ── */}
       <AnnualToolbar
@@ -525,7 +545,7 @@ function AnnualTable<T extends Record<string, unknown>>({
           <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
             <thead>
               {/* Primary header row */}
-              <tr className="bg-base-300 text-base-content text-sm uppercase tracking-widest">
+              <tr className="bg-base-200/50 border-b border-base-200 text-base-content/50 text-sm uppercase tracking-wider">
                 {isSelecting && (
                   <th
                     rowSpan={hasGroups ? 2 : 1}
@@ -552,7 +572,7 @@ function AnnualTable<T extends Record<string, unknown>>({
                       <th
                         key={col.title + i}
                         colSpan={col.children.length}
-                        className="py-4 px-5 text-center font-extrabold border-b border-base-200 bg-base-content/5"
+                        className="py-4 px-5 text-center font-bold border-b border-base-200 bg-base-content/5"
                       >
                         {col.title}
                       </th>
@@ -562,7 +582,7 @@ function AnnualTable<T extends Record<string, unknown>>({
                     <th
                       key={col.key}
                       rowSpan={hasGroups ? 2 : 1}
-                      className={`py-4 px-5 font-extrabold align-middle ${
+                      className={`py-4 px-5 font-bold align-middle ${
                         col.align === "center"
                           ? "text-center"
                           : col.align === "right"
@@ -582,13 +602,13 @@ function AnnualTable<T extends Record<string, unknown>>({
 
               {/* Second header row – group children only */}
               {hasGroups && (
-                <tr className="bg-base-300/80 text-base-content text-xs uppercase tracking-widest">
+                <tr className="bg-base-200/30 text-base-content/50 text-xs uppercase tracking-wider">
                   {columns.flatMap((col, gi) => {
                     if (!isGroupColumn(col)) return [];
                     return col.children.map((child) => (
                       <th
                         key={child.key + gi}
-                        className={`py-3 px-5 font-extrabold ${
+                        className={`py-3 px-5 font-bold ${
                           child.align === "center"
                             ? "text-center"
                             : child.align === "right"
@@ -648,7 +668,7 @@ function AnnualTable<T extends Record<string, unknown>>({
 
               {/* ── Grand total row ── */}
               {filteredAndSorted.length > 0 && (
-                <tr className="bg-primary text-primary-content">
+                <tr className="bg-primary/80 text-primary-content">
                   {isSelecting && <td />}
                   {leafColumns.map((col) => {
                     const total = columnTotals[col.key];
@@ -666,7 +686,7 @@ function AnnualTable<T extends Record<string, unknown>>({
                       >
                         {isFirstCol ? (
                           <span className="text-sm uppercase tracking-widest">
-                            Grand Total
+                            Grand Total :
                           </span>
                         ) : total != null ? (
                           total.toLocaleString()

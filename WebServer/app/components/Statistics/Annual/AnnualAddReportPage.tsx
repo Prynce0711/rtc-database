@@ -9,8 +9,8 @@ import React, {
 } from "react";
 import {
   FiArrowLeft,
-  FiCalendar,
   FiCheck,
+  FiChevronRight,
   FiCopy,
   FiEdit3,
   FiEye,
@@ -511,120 +511,79 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   /* ---------------------------------------------------------------- */
 
   return (
-    <div className="space-y-0 flex flex-col h-full min-h-[calc(100vh-6rem)]">
-      {/* ── HEADER ── */}
-      <header className="card bg-base-100 shadow-xl rounded-b-none">
-        <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button
-                className="btn btn-ghost btn-circle"
-                onClick={step === "review" ? () => setStep("edit") : onBack}
-                title={
-                  step === "review" ? "Back to Edit" : "Back to Annual Reports"
-                }
-              >
-                <FiArrowLeft className="h-6 w-6" />
-              </button>
-              <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-base-content">
-                  {step === "edit"
-                    ? `Add ${title} Entry`
-                    : `Review ${title} Entry`}
-                </h1>
-                <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                  <FiCalendar className="shrink-0" />
-                  <span>
-                    {step === "edit" ? (
-                      <>
-                        Entering data for{" "}
-                        <span className="text-primary font-semibold">
-                          {yearLabel}
-                        </span>{" "}
-                        — type directly or paste from Excel
-                      </>
-                    ) : (
-                      <>
-                        Review your entries for{" "}
-                        <span className="text-primary font-semibold">
-                          {yearLabel}
-                        </span>{" "}
-                        before saving
-                      </>
-                    )}
-                  </span>
-                </p>
-              </div>
+    <div className="xls-root">
+      {/* ══ TOPBAR ══ */}
+      <div className="bg-base-100 xls-topbar border-b border-base-200">
+        <div className="flex items-center gap-4">
+          <button
+            className="p-2 rounded hover:bg-base-200/60"
+            onClick={step === "review" ? () => setStep("edit") : onBack}
+            title={
+              step === "review" ? "Back to Edit" : "Back to Annual Reports"
+            }
+          >
+            <FiArrowLeft size={18} className="text-base-content/70" />
+          </button>
+
+          <nav className="flex items-center gap-2 text-sm text-base-content/60">
+            <span className="hover:text-base-content cursor-pointer">
+              Annual Reports
+            </span>
+            <FiChevronRight size={12} className="text-base-content/40" />
+            <span className="hover:text-base-content cursor-pointer">
+              {title}
+            </span>
+            <FiChevronRight size={12} className="text-base-content/40" />
+            <span className="font-semibold text-base-content">
+              {step === "edit" ? "Add Report" : "Review"}
+            </span>
+          </nav>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
+          <div className="inline-flex items-center rounded-md bg-base-200/50 px-3 py-1 text-sm text-base-content/60">
+            <div
+              className={`inline-flex items-center justify-center w-7 h-7 rounded-full mr-2 ${step === "edit" ? "bg-primary/10 text-primary" : "bg-base-300 text-base-content/50"}`}
+            >
+              {step === "edit" ? <FiEdit3 size={14} /> : <FiCheck size={14} />}
             </div>
-
-            {/* ── STEP INDICATOR ── */}
-            <div className="flex items-center gap-0">
-              {/* Step 1 */}
-              <button
-                className="flex items-center gap-2 cursor-pointer"
-                onClick={() => setStep("edit")}
-              >
-                <div
-                  className={`flex items-center justify-center h-9 w-9 rounded-full font-bold text-sm transition-all ${
-                    step === "edit"
-                      ? "bg-primary text-primary-content shadow-lg shadow-primary/30 scale-110"
-                      : "bg-success text-success-content"
-                  }`}
-                >
-                  {step === "review" ? (
-                    <FiCheck className="h-4 w-4" />
-                  ) : (
-                    <FiEdit3 className="h-4 w-4" />
-                  )}
-                </div>
-                <span
-                  className={`text-sm font-bold hidden sm:inline ${
-                    step === "edit" ? "text-primary" : "text-success"
-                  }`}
-                >
-                  Enter Data
-                </span>
-              </button>
-
-              {/* Connector */}
-              <div
-                className={`w-12 sm:w-20 h-1 mx-2 rounded-full transition-colors ${
-                  step === "review" ? "bg-primary" : "bg-base-300"
-                }`}
-              />
-
-              {/* Step 2 */}
-              <button
-                className="flex items-center gap-2 cursor-pointer"
-                onClick={() => validCount > 0 && setStep("review")}
-                disabled={validCount === 0 && step === "edit"}
-              >
-                <div
-                  className={`flex items-center justify-center h-9 w-9 rounded-full font-bold text-sm transition-all ${
-                    step === "review"
-                      ? "bg-primary text-primary-content shadow-lg shadow-primary/30 scale-110"
-                      : "bg-base-300 text-base-content/40"
-                  }`}
-                >
-                  <FiEye className="h-4 w-4" />
-                </div>
-                <span
-                  className={`text-sm font-bold hidden sm:inline ${
-                    step === "review" ? "text-primary" : "text-base-content/40"
-                  }`}
-                >
-                  Review & Save
-                </span>
-              </button>
+            <div className="flex flex-col leading-tight">
+              <span className="text-xs text-base-content/50">Step</span>
+              <span className="text-sm font-semibold">
+                {step === "edit" ? "Data Entry" : "Review"}
+              </span>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* ── STEP CONTENT ── */}
+      {/* ══ BODY ══ */}
       {step === "edit" ? (
-        <>
-          {/* ── TOOLBAR ── */}
+        <div className="xls-main">
+          {/* ── Title row ── */}
+          <div className="xls-title-row flex items-start justify-between gap-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold text-base-content mb-2">
+                Add {title} Report
+              </h1>
+              <p className="text-sm text-base-content/60 mb-6">
+                Entering data for{" "}
+                <strong className="text-base-content">{yearLabel}</strong>. You
+                can type directly or paste from Excel.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-base-200/50 text-base-content">
+                {rows.length} rows
+              </span>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary/10 text-primary font-semibold">
+                {validCount} valid
+              </span>
+            </div>
+          </div>
+
+          {/* ── Toolbar ── */}
           <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-y border-base-300 bg-base-200/40">
             <button
               className="btn btn-outline btn-success gap-2"
@@ -735,14 +694,10 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           )}
 
           {/* ── EXCEL-LIKE TABLE ── */}
-          <div
-            ref={tableRef}
-            className="flex-1 overflow-auto bg-base-100 border-x border-base-300/50"
-            onPaste={handlePaste}
-          >
-            <table className="table w-full border-collapse">
+          <div className="xls-sheet-wrap" ref={tableRef} onPaste={handlePaste}>
+            <table className="xls-table">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-base-300 text-base-content text-xs uppercase tracking-widest">
+                <tr className="xls-thead-cols">
                   <th
                     className={`${isCompact ? "py-2.5 px-2" : "py-3 px-3"} text-center border-r border-base-content/10`}
                   >
@@ -797,7 +752,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   return (
                     <tr
                       key={row._rowId}
-                      className={`group transition-colors duration-75 ${
+                      className={`xls-row group transition-colors duration-75 ${
                         isSelected
                           ? "bg-primary/10"
                           : idx % 2 === 0
@@ -843,7 +798,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                           >
                             {f.type === "select" && f.options ? (
                               <select
-                                className={`select select-ghost w-full font-medium`}
+                                className={`xls-input select select-ghost w-full font-medium`}
                                 value={String(row[f.name] ?? "")}
                                 onChange={(e) =>
                                   updateCell(row._rowId, f.name, e.target.value)
@@ -866,7 +821,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                               <input
                                 type="number"
                                 min={0}
-                                className={`input input-ghost w-full text-center tabular-nums font-medium`}
+                                className={`xls-input input input-ghost w-full text-center tabular-nums font-medium`}
                                 value={row[f.name] || ""}
                                 placeholder="0"
                                 onChange={(e) =>
@@ -885,7 +840,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                             ) : (
                               <input
                                 type="text"
-                                className={`input input-ghost w-full font-medium`}
+                                className={`xls-input input input-ghost w-full font-medium`}
                                 value={String(row[f.name] ?? "")}
                                 placeholder={f.placeholder ?? ""}
                                 onChange={(e) =>
@@ -924,7 +879,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
               {/* ── Footer totals ── */}
               <tfoot className="sticky bottom-0">
-                <tr className="bg-base-300 font-bold text-sm">
+                <tr className="xls-thead-cols font-bold text-sm">
                   <td
                     colSpan={2}
                     className={`${isCompact ? "px-2 py-2.5" : "px-3 py-3"} text-right uppercase tracking-wider text-base-content/60`}
@@ -973,17 +928,17 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           </div>
 
           {/* ── BOTTOM BAR (Edit) ── */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-base-300 bg-base-200/50 rounded-b-xl shadow-xl">
+          <div className="xls-footer">
             <p className="text-xs text-base-content/40">
               Tip: You can paste data directly from Excel. Use Tab/Enter to
               navigate cells.
             </p>
             <div className="flex items-center gap-3">
-              <button className="btn btn-ghost" onClick={onBack}>
+              <button className="xls-btn xls-btn-ghost" onClick={onBack}>
                 Cancel
               </button>
               <button
-                className="btn btn-outline btn-primary gap-2"
+                className="xls-btn xls-btn-primary"
                 onClick={() => setStep("review")}
                 disabled={validCount === 0}
               >
@@ -992,11 +947,11 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               </button>
             </div>
           </div>
-        </>
+        </div>
       ) : (
-        <>
+        <div className="xls-main">
           {/* ── REVIEW VIEW ── */}
-          <div className="flex-1 overflow-auto bg-base-100 border-x border-base-300/50 p-4 sm:p-6 space-y-6">
+          <div className="flex-1 overflow-auto bg-base-100 p-4 sm:p-6 space-y-6">
             {/* Summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {editableFields
@@ -1042,22 +997,20 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             </div>
 
             {/* Review table */}
-            <div className="bg-base-100 rounded-xl shadow-lg border border-base-300/50 overflow-hidden">
+            <div className="xls-sheet-wrap">
               <div className="overflow-x-auto">
-                <table className="table table-sm w-full">
+                <table className="xls-table table-sm w-full">
                   <thead>
                     {/* Primary header row */}
-                    <tr className="bg-base-300 text-base-content text-xs uppercase tracking-widest">
-                      <th className="py-3 px-4 text-center font-extrabold">
-                        #
-                      </th>
+                    <tr className="xls-thead-cols">
+                      <th className="py-3 px-4 text-center font-bold">#</th>
                       {columns.map((col, i) => {
                         if (isGroupColumn(col)) {
                           return (
                             <th
                               key={col.title + i}
                               colSpan={col.children.length}
-                              className="py-3 px-4 text-center font-extrabold border-b border-base-200 bg-base-content/5"
+                              className="py-3 px-4 text-center font-bold border-b border-base-200 bg-base-content/5"
                             >
                               {col.title}
                             </th>
@@ -1067,7 +1020,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                           <th
                             key={col.key}
                             rowSpan={hasGroups ? 2 : 1}
-                            className={`py-3 px-4 font-extrabold align-middle ${
+                            className={`py-3 px-4 font-bold align-middle ${
                               col.align === "center"
                                 ? "text-center"
                                 : col.align === "right"
@@ -1083,13 +1036,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
                     {/* Second header row for group children */}
                     {hasGroups && (
-                      <tr className="bg-base-300/80 text-base-content text-xs uppercase tracking-widest">
+                      <tr className="xls-thead-cols">
                         {columns.flatMap((col, gi) => {
                           if (!isGroupColumn(col)) return [];
                           return col.children.map((child) => (
                             <th
                               key={child.key + gi}
-                              className={`py-2 px-4 font-extrabold ${
+                              className={`py-2 px-4 font-bold ${
                                 child.align === "center"
                                   ? "text-center"
                                   : child.align === "right"
@@ -1141,7 +1094,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
                     {/* Grand total */}
                     {validRows.length > 0 && (
-                      <tr className="bg-primary text-primary-content">
+                      <tr className="bg-primary/80 text-primary-content">
                         <td className="px-4 py-4 font-black text-sm uppercase tracking-widest">
                           Total
                         </td>
@@ -1171,22 +1124,19 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           </div>
 
           {/* ── BOTTOM BAR (Review) ── */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-base-300 bg-base-200/50 rounded-b-xl shadow-xl">
+          <div className="xls-footer">
             <button
-              className="btn btn-outline gap-2"
+              className="xls-btn xls-btn-ghost"
               onClick={() => setStep("edit")}
             >
               <FiEdit3 className="h-5 w-5" />
               Go Back to Edit
             </button>
             <div className="flex items-center gap-3">
-              <button className="btn btn-ghost" onClick={onBack}>
+              <button className="xls-btn xls-btn-ghost" onClick={onBack}>
                 Cancel
               </button>
-              <button
-                className="btn btn-outline btn-success gap-2"
-                onClick={handleSave}
-              >
+              <button className="xls-btn xls-btn-success" onClick={handleSave}>
                 <FiCheck className="h-5 w-5" />
                 Confirm & Save{" "}
                 {validCount > 0 &&
@@ -1194,7 +1144,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
