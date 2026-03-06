@@ -78,7 +78,7 @@ function Table<T extends Record<string, unknown>>({
     <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
       <div className="overflow-x-auto overflow-y-visible">
         <table className="table table-compact uppercase table-zebra w-full text-center">
-          <thead className="text-sm bg-[#e6eef5] text-sm">
+          <thead className="text-sm bg-base-300 rounded-t-lg">
             <tr>
               {headers.map((h) => {
                 const alignClass =

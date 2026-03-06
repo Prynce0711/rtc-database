@@ -1492,6 +1492,19 @@
   border-top-color: oklch(0.2 0.02 260);
 }
 
+/* First row has no room above; render tooltip below to avoid clipping */
+tbody tr:first-child .cell-tip {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+tbody tr:first-child .cell-tip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: oklch(0.2 0.02 260);
+}
+
 /* Keep thead below body-row tooltips */
 thead {
   position: relative;
@@ -1510,6 +1523,15 @@ tbody tr:hover {
   gap: 2px;
 }
 
+/* Also show tooltip when the cell receives keyboard focus (accessibility) */
+.group\/tip:focus > .cell-tip,
+.group\/tip:focus-within > .cell-tip,
+.group\/tip:active > .cell-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .cell-tip-label {
   font-size: 10px;
   font-weight: 700;
@@ -1522,6 +1544,14 @@ tbody tr:hover {
   font-size: 12px;
   font-weight: 500;
   color: #fff;
+}
+
+.cell-tip-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 6px;
+  font-style: italic;
+  opacity: 0.95;
 }
 
 @keyframes cellTipIn {

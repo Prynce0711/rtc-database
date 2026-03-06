@@ -529,7 +529,44 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             )}
           </AnimatePresence>
         </div>
-
+        <div className="px-2.5 pb-2 relative z-10">
+          <motion.button
+            onClick={() => setCollapsed((c) => !c)}
+            whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.06)" }}
+            whileTap={{ scale: 0.96 }}
+            className={[
+              "flex items-center w-full rounded-xl transition-all duration-200 group",
+              "bg-base-content/3 hover:bg-base-content/7",
+              isExpanded ? "gap-2.5 px-3 py-2" : "justify-center py-2",
+            ].join(" ")}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <motion.span
+              animate={{ rotate: collapsed ? 0 : 0 }}
+              className="text-base-content/35 group-hover:text-primary/70 transition-colors duration-200"
+            >
+              {collapsed ? (
+                <FiChevronsRight size={16} />
+              ) : (
+                <FiChevronsLeft size={16} />
+              )}
+            </motion.span>
+            <AnimatePresence mode="wait">
+              {isExpanded && (
+                <motion.span
+                  key="collapse-label"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="text-[11px] font-semibold text-base-content/35 group-hover:text-primary/70 whitespace-nowrap overflow-hidden transition-colors duration-200"
+                >
+                  Collapse
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        </div>
         {/* ── Nav ─────────────────────────────────────── */}
         <nav
           className={[
@@ -655,44 +692,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
         </nav>
 
         {/* ── Collapse toggle ────────────────────────── */}
-        <div className="px-2.5 pb-2 relative z-10">
-          <motion.button
-            onClick={() => setCollapsed((c) => !c)}
-            whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.06)" }}
-            whileTap={{ scale: 0.96 }}
-            className={[
-              "flex items-center w-full rounded-xl transition-all duration-200 group",
-              "bg-base-content/3 hover:bg-base-content/7",
-              isExpanded ? "gap-2.5 px-3 py-2" : "justify-center py-2",
-            ].join(" ")}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <motion.span
-              animate={{ rotate: collapsed ? 0 : 0 }}
-              className="text-base-content/35 group-hover:text-primary/70 transition-colors duration-200"
-            >
-              {collapsed ? (
-                <FiChevronsRight size={16} />
-              ) : (
-                <FiChevronsLeft size={16} />
-              )}
-            </motion.span>
-            <AnimatePresence mode="wait">
-              {isExpanded && (
-                <motion.span
-                  key="collapse-label"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="text-[11px] font-semibold text-base-content/35 group-hover:text-primary/70 whitespace-nowrap overflow-hidden transition-colors duration-200"
-                >
-                  Collapse
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        </div>
 
         {/* ── Footer / User ──────────────────────────── */}
         <div

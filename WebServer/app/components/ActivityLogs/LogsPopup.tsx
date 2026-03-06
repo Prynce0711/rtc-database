@@ -1,146 +1,422 @@
-import { Case, Employee } from "@/app/generated/prisma/client";
+import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
-import { User } from "better-auth";
-import {
-  FiCalendar,
-  FiClock,
-  FiFileText,
-  FiShield,
-  FiUser,
-} from "react-icons/fi";
-import ModalBase from "../Popup/ModalBase";
+import { useMemo, useState } from "react";
 import LogBadges from "./LogBadges";
 import { CompleteLogData } from "./schema";
+
+// ─── Shared UI pieces (copied layout style from Cases details page) ─────────-
+
+const NavButton = ({
+  direction,
+  label,
+  sublabel,
+  onClick,
+  disabled,
+}: {
+  direction: "prev" | "next";
+  label: string;
+  sublabel?: string;
+  onClick: () => void;
+  disabled: boolean;
+}) => {
+  const isPrev = direction === "prev";
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        "group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150 min-w-0",
+        disabled
+          ? "opacity-25 cursor-not-allowed border-base-200 bg-transparent"
+          : "border-base-200 bg-base-100 hover:bg-base-200/60 hover:border-base-content/15",
+        isPrev ? "" : "flex-row-reverse text-right",
+      ].join(" ")}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        className="shrink-0 text-base-content/30 group-hover:text-base-content/60 transition-colors"
+        aria-hidden="true"
+      >
+        {isPrev ? (
+          <path
+            d="M10 3L5 8L10 13"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : (
+          <path
+            d="M6 3L11 8L6 13"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+      </svg>
+
+      <div
+        className={["min-w-0", isPrev ? "" : "items-end flex flex-col"].join(
+          " ",
+        )}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
+          {isPrev ? "Previous" : "Next"}
+        </p>
+        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-40 transition-colors leading-snug">
+          {label}
+        </p>
+        {sublabel && (
+          <p className="text-[11px] text-base-content/30 truncate max-w-40 leading-snug mt-0.5">
+            {sublabel}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+};
+
+const Detail = ({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: unknown;
+  mono?: boolean;
+}) => {
+  const isEmpty =
+    value === null || value === undefined || value === "" || value === "N/A";
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-base-content/30 select-none">
+        {label}
+      </span>
+      <div
+        className={[
+          "px-5 py-4 rounded-xl border min-h-14.5 flex items-center",
+          isEmpty
+            ? "bg-base-200/40 border-base-200/60"
+            : "bg-base-200/70 border-base-200",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "leading-relaxed",
+            isEmpty
+              ? "text-[13px] italic text-base-content/25 font-normal"
+              : mono
+                ? "font-mono text-[13px] text-base-content/60"
+                : "text-[15px] font-semibold text-base-content",
+          ].join(" ")}
+        >
+          {isEmpty ? "—" : String(value)}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const Section = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div className="space-y-5">
+    <p className="text-[15px] font-bold uppercase tracking-[0.14em] text-base-content">
+      {label}
+    </p>
+    {children}
+  </div>
+);
+
+const formatDate = (date: Date | string | null | undefined) => {
+  if (!date) return "—";
+  return new Date(date).toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
 
 const LogsPopup = ({
   selectedLog,
   onClose,
+  onSelectLog,
+  logs,
   users,
   cases,
   employees,
 }: {
   selectedLog: CompleteLogData;
   onClose: () => void;
+  onSelectLog?: (log: CompleteLogData) => void;
+  logs?: CompleteLogData[];
   users: User[];
   cases: Case[];
   employees: Employee[];
 }) => {
+  const [activeTab, setActiveTab] = useState<"details" | "additional">(
+    "details",
+  );
+
+  const index = useMemo(() => {
+    if (!logs) return -1;
+    return logs.findIndex((l) => l.id === selectedLog.id);
+  }, [logs, selectedLog.id]);
+
+  const prevLog = useMemo(() => {
+    if (!logs || index <= 0) return null;
+    return logs[index - 1] ?? null;
+  }, [logs, index]);
+
+  const nextLog = useMemo(() => {
+    if (!logs || index === -1 || index >= logs.length - 1) return null;
+    return logs[index + 1] ?? null;
+  }, [logs, index]);
+
+  const summaryText = useMemo(() => {
+    return createDetailText(selectedLog, users, cases, employees);
+  }, [selectedLog, users, cases, employees]);
+
+  const canPrevNext = !!logs && !!onSelectLog;
+
   return (
-    <ModalBase onClose={onClose}>
-      {/* Header */}
-      <div className="px-6 py-5 border-b border-base-200 relative">
-        <button
-          className="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 text-base-content/50 hover:text-base-content"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          ✕
-        </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <FiFileText className="w-5 h-5 text-primary" />
+    <div className="min-h-screen bg-base-100 animate-fade-in">
+      {/* ══════════════════════════════════════════
+          TOPBAR
+      ══════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
+        <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 15 15"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M9.5 2.5L4.5 7.5L9.5 12.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Back
+          </button>
+
+          <div className="flex items-center gap-2 text-[12px] font-semibold text-base-content/30 select-none">
+            <span>Activity Reports</span>
+            <span className="opacity-40">/</span>
+            <span className="text-base-content/55 font-bold">
+              #{selectedLog.id}
+            </span>
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-base-content">
-              Activity Details
-            </h3>
-            <div className="mt-1">
-              <LogBadges logAction={selectedLog.action as LogAction} />
-            </div>
+
+          {/* Prev / Next compact */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => prevLog && onSelectLog?.(prevLog)}
+              disabled={!canPrevNext || !prevLog}
+              title={prevLog ? `Previous: #${prevLog.id}` : "No previous log"}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 2L4 7L9 12"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
+              #{selectedLog.id}
+            </span>
+
+            <button
+              onClick={() => nextLog && onSelectLog?.(nextLog)}
+              disabled={!canPrevNext || !nextLog}
+              title={nextLog ? `Next: #${nextLog.id}` : "No next log"}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M5 2L10 7L5 12"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Body */}
-      <div className="px-6 py-5 space-y-5 bg-base-100">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
-              <FiUser className="w-4 h-4 text-base-content/50" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
-                User
-              </p>
-              <p className="text-sm font-semibold text-base-content">
-                {selectedLog.user?.name || "N/A"}
-              </p>
-            </div>
+      {/* ══════════════════════════════════════════
+          MAIN
+      ══════════════════════════════════════════ */}
+      <main className="max-w-5xl mx-auto px-8 py-14 space-y-10">
+        {/* ── Hero Block ───────────────────────────────────── */}
+        <div className="space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary/55">
+            Activity Record
+          </p>
+          <h1 className="text-[34px] font-bold text-base-content tracking-tight leading-tight">
+            Activity #{selectedLog.id}
+          </h1>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            <p className="text-[15px] text-base-content/45 font-medium">
+              Logged {formatDate(selectedLog.timestamp)}
+            </p>
+            <LogBadges logAction={selectedLog.action as LogAction} />
           </div>
+        </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
-              <FiShield className="w-4 h-4 text-base-content/50" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
-                Role
-              </p>
-              <p className="text-sm font-semibold text-base-content capitalize">
-                {selectedLog.user?.role || "N/A"}
-              </p>
-            </div>
-          </div>
+        <div className="h-px bg-base-200" />
 
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
-              <FiClock className="w-4 h-4 text-base-content/50" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
-                Timestamp
-              </p>
-              <p className="text-sm font-semibold text-base-content">
-                {new Date(selectedLog.timestamp).toLocaleString()}
-              </p>
-            </div>
-          </div>
+        {/* ── Tabs ─────────────────────────────────────────── */}
+        <div className="flex items-end border-b border-base-200 gap-1">
+          {(["details", "additional"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={[
+                "px-5 pb-3 pt-1 text-[13px] font-bold capitalize tracking-wide border-b-2 -mb-px transition-all duration-150 whitespace-nowrap",
+                activeTab === tab
+                  ? "border-primary text-primary"
+                  : "border-transparent text-base-content/30 hover:text-base-content/55",
+              ].join(" ")}
+            >
+              {tab === "details" ? "Activity Details" : "Raw Details"}
+            </button>
+          ))}
+        </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-base-200 flex items-center justify-center shrink-0 mt-0.5">
-              <FiCalendar className="w-4 h-4 text-base-content/50" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider">
-                Action
-              </p>
-              <div className="mt-0.5">
-                <LogBadges logAction={selectedLog.action as LogAction} />
+        {/* ══════════════════════════════════════════
+            TAB — DETAILS
+        ══════════════════════════════════════════ */}
+        {activeTab === "details" && (
+          <div className="space-y-10 animate-slide-up">
+            <Section label="Overview">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <Detail label="User" value={selectedLog.user?.name ?? "N/A"} />
+                <Detail
+                  label="Email"
+                  value={selectedLog.user?.email ?? "N/A"}
+                />
+                <Detail label="Role" value={selectedLog.user?.role ?? "N/A"} />
+                <Detail label="Action" value={selectedLog.action} mono />
+                <Detail
+                  label="Timestamp"
+                  value={new Date(selectedLog.timestamp).toLocaleString()}
+                  mono
+                />
+                <Detail label="IP Address" value={selectedLog.ipAddress} mono />
+                <Detail label="User Agent" value={selectedLog.userAgent} mono />
               </div>
+            </Section>
+
+            <Section label="Summary">
+              <div className="px-5 py-4 rounded-xl border bg-base-200/70 border-base-200 space-y-3">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-base-content/30 select-none">
+                    Badge
+                  </span>
+                  <div className="mt-2">
+                    <LogBadges logAction={selectedLog.action as LogAction} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-base-content/30 select-none">
+                    Description
+                  </span>
+                  <p className="mt-2 text-[15px] font-semibold text-base-content leading-relaxed">
+                    {summaryText}
+                  </p>
+                </div>
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════
+            TAB — RAW
+        ══════════════════════════════════════════ */}
+        {activeTab === "additional" && (
+          <div className="space-y-10 animate-slide-up">
+            <Section label="Raw Details">
+              <div className="px-5 py-4 rounded-xl border bg-base-200/70 border-base-200">
+                <pre className="bg-base-300/50 p-3 rounded-lg overflow-auto max-h-105 text-xs font-mono text-base-content/70 leading-relaxed">
+                  {JSON.stringify(selectedLog.details ?? null, null, 2)}
+                </pre>
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {/* ── Prev / Next bottom nav ────────────────────────── */}
+        {canPrevNext && (
+          <>
+            <div className="h-px bg-base-200" />
+            <div className="flex items-stretch justify-between gap-3">
+              <NavButton
+                direction="prev"
+                label={prevLog ? `#${prevLog.id}` : "—"}
+                sublabel={prevLog ? String(prevLog.action) : undefined}
+                onClick={() => prevLog && onSelectLog?.(prevLog)}
+                disabled={!prevLog}
+              />
+              <NavButton
+                direction="next"
+                label={nextLog ? `#${nextLog.id}` : "—"}
+                sublabel={nextLog ? String(nextLog.action) : undefined}
+                onClick={() => nextLog && onSelectLog?.(nextLog)}
+                disabled={!nextLog}
+              />
             </div>
-          </div>
+          </>
+        )}
+
+        <div className="h-px bg-base-200" />
+        <div className="flex items-center justify-between py-1">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-base-content/20 select-none">
+            Activity Reports
+          </p>
+          <p className="text-[11px] text-base-content/20 font-semibold select-none">
+            Logged {new Date(selectedLog.timestamp).toLocaleString()}
+          </p>
         </div>
-
-        {selectedLog.details && (
-          <div className="bg-base-200/50 p-4 rounded-xl border border-base-200">
-            <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-2">
-              Summary
-            </p>
-            <p className="text-sm font-medium text-base-content leading-relaxed">
-              {createDetailText(selectedLog, users, cases, employees)}
-            </p>
-          </div>
-        )}
-
-        {selectedLog.details && (
-          <div className="bg-base-200/50 p-4 rounded-xl border border-base-200">
-            <p className="text-[11px] font-medium text-base-content/40 uppercase tracking-wider mb-2">
-              Raw Details
-            </p>
-            <pre className="bg-base-300/50 p-3 rounded-lg overflow-auto max-h-48 text-xs font-mono text-base-content/70 leading-relaxed">
-              {JSON.stringify(selectedLog.details, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-base-200 bg-base-100 rounded-b-2xl">
-        <button className="btn btn-sm btn-primary" onClick={() => onClose()}>
-          Close
-        </button>
-      </div>
-    </ModalBase>
+      </main>
+    </div>
   );
 };
 

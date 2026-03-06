@@ -46,7 +46,7 @@ const getStatusLabel = (status: Status | "ALL") => {
   return status;
 };
 
-const roleToText = (role: Roles) => {
+const roleToText = (role: User["role"] | Roles) => {
   switch (role) {
     case Roles.ADMIN:
       return "Admin";
@@ -55,7 +55,7 @@ const roleToText = (role: Roles) => {
     case Roles.USER:
       return "Staff";
     default:
-      return role;
+      return String(role);
   }
 };
 
@@ -262,10 +262,10 @@ const AccountDashboard = () => {
         {/* ── HEADER ───────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
           <div>
-            <h2 className="text-5xl font-black tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
               Account Management
             </h2>
-            <p className="text-lg text-base-content/50 mt-2">
+            <p className="text-xl text-base-content/50 mt-2">
               Manage user accounts and permissions
             </p>
           </div>
@@ -281,7 +281,7 @@ const AccountDashboard = () => {
         {/* ── STATUS TABS ──────────────────────────────────── */}
         <div className="relative flex p-1.5 rounded-full bg-base-200 border border-base-200 w-fit mb-8">
           <div
-            className="absolute top-1.5 bottom-1.5 rounded-full bg-base-100 shadow-sm transition-all duration-300 ease-out"
+            className="absolute top-1.5 bottom-1.5 rounded-full bg-base-100 shadow-sm transition-all duration-300 ease-out upper"
             style={indicatorStyle}
           />
           {tabs.map((tab, index) => {
@@ -302,7 +302,7 @@ const AccountDashboard = () => {
                   setCurrentPage(1);
                 }}
                 className={[
-                  "relative z-10 px-6 py-2.5 rounded-full text-[14px] font-bold transition-colors duration-150 flex items-center gap-2",
+                  "relative z-10 px-6 py-2.5 rounded-full text-[14px] font-bold transition-colors duration-150 flex uppercase items-center gap-2",
                   isActive
                     ? "text-primary"
                     : "text-base-content/40 hover:text-base-content/70",
@@ -311,7 +311,7 @@ const AccountDashboard = () => {
                 {label}
                 <span
                   className={[
-                    "px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-[18px] text-center",
+                    "px-1.5 py-0.5 rounded-full text-[15px] font-black min-w-[18px] text-center",
                     isActive
                       ? "bg-primary/10 text-primary"
                       : "bg-base-300 text-base-content/40",
@@ -326,12 +326,9 @@ const AccountDashboard = () => {
         {/* ── SEARCH + FILTER ──────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
           <div className="relative flex-1 max-w-md">
-            <FiSearch
-              size={14}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/30"
-            />
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
-              className="w-full h-[42px] pl-10 pr-4 rounded-xl border border-base-200 bg-base-100 text-[14px] placeholder:text-base-content/25 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+              className="input input-bordered input-lg w-full pl-12 text-base"
               placeholder="Search name or email…"
               value={searchQuery}
               onChange={(e) => {
@@ -341,7 +338,7 @@ const AccountDashboard = () => {
             />
           </div>
           <select
-            className="h-[42px] px-4 rounded-xl border border-base-200 bg-base-100 text-[14px] text-base-content/70 font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-full sm:w-48"
+            className="h-[42px] px-4 rounded-xl border select select-bordered bg-base-100 text-[14px] text-base-content/70 font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-full sm:w-48"
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value as RoleFilterType);
@@ -354,7 +351,7 @@ const AccountDashboard = () => {
           </select>
         </div>
         {/* ── TABLE ────────────────────────────────────────── */}
-        <div className="bg-base-100 rounded-xl border border-base-200 overflow-hidden">
+        <div className="bg-base-100 rounded-xl border border-base-200 overflow-visible">
           {paginated.length === 0 ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -378,7 +375,7 @@ const AccountDashboard = () => {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto text-xl">
+              <div className="overflow-x-auto overflow-y-visible text-xl">
                 <table className="w-full text-xl">
                   {/* HEADER */}
                   <thead className="text-xl">
@@ -496,6 +493,11 @@ const AccountDashboard = () => {
                                   prev.map((u) =>
                                     u.id === updated.id ? updated : u,
                                   ),
+                                )
+                              }
+                              onRemove={(userId) =>
+                                setUsers((prev) =>
+                                  prev.filter((u) => u.id !== userId),
                                 )
                               }
                             />

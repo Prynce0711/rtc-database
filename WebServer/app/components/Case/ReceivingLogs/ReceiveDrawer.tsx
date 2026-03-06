@@ -814,33 +814,23 @@ const ReceiveDrawer = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
           >
-            <div className="rv-summary">
+            <div className="border-none rv-summary">
               <div className="rv-summary-left">
-                <div className="rv-summary-icon">
-                  <FiCheck size={17} strokeWidth={2.5} />
-                </div>
                 <div>
-                  <p className="rv-summary-title">
+                  <p className="text-4xl font-black">
                     {isEdit
                       ? "Review your edits"
                       : entries.length === 1
                         ? "Review before saving"
                         : `Review ${entries.length} entries before saving`}
                   </p>
-                  <p className="rv-summary-sub">
+                  <p className="font-light text-md mt-1">
                     {isEdit
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
                 </div>
               </div>
-              <button
-                className="xls-btn xls-btn-outline"
-                onClick={() => setStep("entry")}
-              >
-                <FiEdit3 size={14} />
-                Go Back & Edit
-              </button>
             </div>
 
             <div className="rv-layout">

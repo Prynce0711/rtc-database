@@ -3,10 +3,11 @@ import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
 import { Activity, CalendarCheck, Users, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { FiCopy, FiDownload, FiFilter, FiSearch, FiX } from "react-icons/fi";
+import { FiDownload, FiFilter, FiSearch, FiX } from "react-icons/fi";
 import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCases } from "../Case/CasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
+import { Pagination } from "../Pagination";
 import { usePopup } from "../Popup/PopupProvider";
 import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
@@ -136,6 +137,9 @@ const LogsDashboard: React.FC = () => {
     order: "desc",
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -155,7 +159,7 @@ const LogsDashboard: React.FC = () => {
 
       const cases = await getCases();
       if (cases.success) {
-        setCases(cases.result || []);
+        setCases(cases.result?.items || []);
       }
 
       const employees = await getEmployees();
@@ -166,7 +170,7 @@ const LogsDashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [statusPopup]);
 
   // ─── Stats ─────────────────────────────────────────────────────────────────
 
@@ -233,7 +237,7 @@ const LogsDashboard: React.FC = () => {
     if (!sortConfig) return filteredLogs;
     const { key, order } = sortConfig;
     const copy = [...filteredLogs];
-    copy.sort((a: any, b: any) => {
+    copy.sort((a, b) => {
       let va, vb;
 
       // Handle nested properties
@@ -250,8 +254,8 @@ const LogsDashboard: React.FC = () => {
 
       // handle dates
       if (key === "timestamp") {
-        const da = new Date(va).getTime();
-        const db = new Date(vb).getTime();
+        const da = new Date(va as string | number | Date).getTime();
+        const db = new Date(vb as string | number | Date).getTime();
         return order === "asc" ? da - db : db - da;
       }
 
@@ -270,7 +274,26 @@ const LogsDashboard: React.FC = () => {
     return copy;
   }, [filteredLogs, sortConfig]);
 
+  const pageCount = Math.max(1, Math.ceil(sortedLogs.length / pageSize));
+  const effectivePage = Math.min(currentPage, pageCount);
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(pageCount, page)));
+  };
+  const paginatedLogs = useMemo(() => {
+    const start = (effectivePage - 1) * pageSize;
+    return sortedLogs.slice(start, start + pageSize);
+  }, [sortedLogs, effectivePage]);
+
+  const tableSortConfig = useMemo(() => {
+    if (!sortConfig) return undefined;
+    return sortConfig as unknown as {
+      key: keyof CompleteLogData;
+      order: "asc" | "desc";
+    };
+  }, [sortConfig]);
+
   const handleSort = (key: string) => {
+    setCurrentPage(1);
     setSortConfig((prev) => {
       const typedKey = key as SortConfigType extends null
         ? never
@@ -337,12 +360,24 @@ const LogsDashboard: React.FC = () => {
     );
   }
 
-  return (
+  return selectedLog ? (
+    <LogsPopup
+      selectedLog={selectedLog}
+      onClose={() => setSelectedLog(null)}
+      onSelectLog={setSelectedLog}
+      logs={sortedLogs}
+      users={users}
+      cases={cases}
+      employees={employees}
+    />
+  ) : (
     <div className="space-y-6 w-full">
       {/* ─── Header ──────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-5xl font-bold tracking-tight">Activity Reports</h1>
-        <p className="text-lg text-base-content/50 mt-2">
+        <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
+          Activity Reports
+        </h2>
+        <p className="text-xl text-base-content/50 mt-2 mb-10">
           Track and review all user activities and system changes.
         </p>
       </div>
@@ -423,21 +458,21 @@ const LogsDashboard: React.FC = () => {
         {/* Row 1: Search + Export */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="flex-1 relative">
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/40 w-4 h-4" />
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               placeholder="Search by user, action, or role..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="input input-bordered input-sm w-full pl-10 h-10 bg-base-200/50 border-base-300 focus:border-primary text-sm"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="input input-bordered input-lg w-full pl-12 text-base "
             />
           </div>
 
           <div className="flex gap-1.5">
-            <button className="btn btn-primary btn-sm gap-1.5 h-10 px-4">
-              <FiDownload className="w-3.5 h-3.5" /> Export
-            </button>
-            <button className="btn btn-ghost btn-sm gap-1.5 h-10 px-4 border border-base-300">
-              <FiCopy className="w-3.5 h-3.5" /> Copy
+            <button className="btn btn-primary btn-md gap-1.5 h-10 px-5">
+              <FiDownload className="w-5 h-5" /> Export
             </button>
           </div>
         </div>
@@ -445,16 +480,19 @@ const LogsDashboard: React.FC = () => {
         {/* Row 2: Filter controls */}
         <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
           <div className="flex items-center gap-1.5 text-base-content/50 shrink-0">
-            <FiFilter className="w-3.5 h-3.5" />
-            <span className="text-xs font-semibold uppercase tracking-wider">
+            <FiFilter className="w-5 h-5" />
+            <span className="text-sm mr-5 font-semibold uppercase tracking-wider">
               Filters
             </span>
           </div>
 
           <select
             value={userFilter}
-            onChange={(e) => setUserFilter(e.target.value)}
-            className="select select-bordered select-sm h-9 bg-base-200/50 border-base-300 text-sm flex-1 sm:flex-none sm:min-w-48"
+            onChange={(e) => {
+              setUserFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="select select-bordered select-sm h-9 bg-base-100 border-base-300 text-sm flex-1 sm:flex-none sm:min-w-48"
           >
             <option value="all">All Users</option>
             {logUsers.map(([id, name]) => (
@@ -466,10 +504,11 @@ const LogsDashboard: React.FC = () => {
 
           <select
             value={categoryFilter}
-            onChange={(e) =>
-              setCategoryFilter(e.target.value as ActionCategory)
-            }
-            className="select select-bordered select-sm h-9 bg-base-200/50 border-base-300 text-sm flex-1 sm:flex-none sm:min-w-40"
+            onChange={(e) => {
+              setCategoryFilter(e.target.value as ActionCategory);
+              setCurrentPage(1);
+            }}
+            className="select select-bordered select-sm h-9 bg-base-100 border-base-300 text-sm flex-1 sm:flex-none sm:min-w-40"
           >
             <option value="all">All Categories</option>
             <option value="auth">Authentication</option>
@@ -480,22 +519,28 @@ const LogsDashboard: React.FC = () => {
           </select>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-base-content/40 shrink-0">From</span>
+            <span className="text-sm text-base-content/60 shrink-0">From</span>
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="input input-bordered input-sm h-9 bg-base-200/50 border-base-300 text-sm w-full sm:w-auto"
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="input input-bordered input-sm h-9 bg-base-100 border-base-300 text-sm w-full sm:w-auto"
             />
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-base-content/40 shrink-0">To</span>
+            <span className="text-sm text-base-content/60 shrink-0">To</span>
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="input input-bordered input-sm h-9 bg-base-200/50 border-base-300 text-sm w-full sm:w-auto"
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="input input-bordered input-sm h-9 bg-base-100 border-base-300 text-sm w-full sm:w-auto"
             />
           </div>
         </div>
@@ -557,116 +602,89 @@ const LogsDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* ─── Results count ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between text-sm text-base-content/50 px-1">
-        <span>
-          Showing{" "}
-          <span className="font-semibold text-base-content">
-            {sortedLogs.length}
-          </span>{" "}
-          of {logs.length} activities
-        </span>
-      </div>
-
       {/* ─── Table ───────────────────────────────────────────────────────── */}
-      <div className="bg-base-100 rounded-2xl border border-base-200 overflow-hidden">
-        {sortedLogs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-            <FiSearch className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-lg font-medium">No activities found</p>
-            <p className="text-sm mt-1">
-              Try adjusting your search or filter criteria.
-            </p>
-          </div>
-        ) : (
-          <Table
-            className="p-0 text-sm font-medium"
-            headers={[
-              {
-                key: "user.name",
-                label: "User",
-                sortable: true,
-                className: "text-xs font-semibold uppercase tracking-wider",
-                align: "center" as const,
-              },
-              {
-                key: "user.role",
-                label: "Role",
-                sortable: true,
-                className: "text-xs font-semibold uppercase tracking-wider",
-                align: "center" as const,
-              },
-              {
-                key: "action",
-                label: "Action",
-                sortable: true,
-                className: "text-xs font-semibold uppercase tracking-wider",
-                align: "center" as const,
-              },
-              {
-                key: "timestamp",
-                label: "Time",
-                sortable: true,
-                className: "text-xs font-semibold uppercase tracking-wider",
-                align: "center" as const,
-              },
-            ]}
-            data={sortedLogs}
-            rowsPerPage={10}
-            sortConfig={(sortConfig as any) ?? undefined}
-            onSort={(k) => handleSort(k as string)}
-            renderRow={(log) => (
-              <tr
-                key={log.id}
-                className="hover:bg-base-200/50 transition-colors duration-150 cursor-pointer group border-b border-base-200/50 last:border-0"
-                onClick={() => setSelectedLog(log)}
-              >
-                <td className="py-3.5 align-middle text-center">
-                  <div className="flex items-center justify-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                      {getUserInitials(log.user?.name)}
-                    </div>
-                    <span className="font-medium text-sm">
-                      {log.user?.name || "Unknown"}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3.5 align-middle text-center">
-                  <span className="text-sm text-base-content/60 capitalize">
-                    {log.user?.role || "N/A"}
-                  </span>
-                </td>
-                <td className="py-3.5 align-middle text-center">
-                  <div className="flex justify-center">
-                    <LogBadges logAction={log.action as LogAction} />
-                  </div>
-                </td>
-                <td className="py-3.5 align-middle text-center">
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm text-base-content/70 font-medium">
-                      {getRelativeTime(log.timestamp)}
-                    </span>
-                    <span className="text-[10px] text-base-content/40 group-hover:text-base-content/50 transition-colors">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            )}
-          />
+      <Table
+        headers={[
+          {
+            key: "user.name",
+            label: "User",
+            sortable: true,
+            className: "text-xs font-semibold uppercase tracking-wider",
+            align: "center" as const,
+          },
+          {
+            key: "user.role",
+            label: "Role",
+            sortable: true,
+            className: "text-xs font-semibold uppercase tracking-wider",
+            align: "center" as const,
+          },
+          {
+            key: "action",
+            label: "Action",
+            sortable: true,
+            className: "text-xs font-semibold uppercase tracking-wider",
+            align: "center" as const,
+          },
+          {
+            key: "timestamp",
+            label: "Time",
+            sortable: true,
+            className: "text-xs font-semibold uppercase tracking-wider",
+            align: "center" as const,
+          },
+        ]}
+        data={paginatedLogs}
+        rowsPerPage={pageSize}
+        showPagination={false}
+        sortConfig={tableSortConfig}
+        onSort={(k) => handleSort(k as string)}
+        className="bg-base-300 rounded-lg shadow"
+        renderRow={(log) => (
+          <tr
+            key={log.id}
+            className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
+            onClick={() => setSelectedLog(log)}
+          >
+            <td className="py-3.5 align-middle text-center">
+              <div className="flex items-center justify-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                  {getUserInitials(log.user?.name)}
+                </div>
+                <span className="font-medium text-sm">
+                  {log.user?.name || "Unknown"}
+                </span>
+              </div>
+            </td>
+            <td className="py-3.5 align-middle text-center">
+              <span className="text-sm text-base-content/60 capitalize">
+                {log.user?.role || "N/A"}
+              </span>
+            </td>
+            <td className="py-3.5 align-middle text-center">
+              <div className="flex justify-center">
+                <LogBadges logAction={log.action as LogAction} />
+              </div>
+            </td>
+            <td className="py-3.5 align-middle text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-sm text-base-content/70 font-medium">
+                  {getRelativeTime(log.timestamp)}
+                </span>
+                <span className="text-[10px] text-base-content/40 group-hover:text-base-content/50 transition-colors">
+                  {new Date(log.timestamp).toLocaleString()}
+                </span>
+              </div>
+            </td>
+          </tr>
         )}
-      </div>
+      />
 
-      {/* ─── Detail Popup ────────────────────────────────────────────────── */}
-      {selectedLog && (
-        <LogsPopup
-          selectedLog={selectedLog}
-          onClose={() => setSelectedLog(null)}
-          users={users}
-          cases={cases}
-          employees={employees}
-        />
-      )}
+      <Pagination
+        currentPage={effectivePage}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 };
