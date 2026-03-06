@@ -50,7 +50,14 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
       try {
         const res = await getCases();
         if (res.success) {
-          setCases(res.result);
+          const result: any = res.result;
+          let items: Case[] = [];
+          if (Array.isArray(result)) {
+            items = result as Case[];
+          } else if (result && Array.isArray(result.items)) {
+            items = result.items as Case[];
+          }
+          setCases(items);
           setTimeout(() => setIsVisible(true), 100);
         }
       } finally {

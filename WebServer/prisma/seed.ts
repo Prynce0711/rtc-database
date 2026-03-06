@@ -49,6 +49,28 @@ async function main() {
     data: { role: "atty", status: Status.ACTIVE },
   });
 
+  // Create Statistics Account
+  try {
+    const attyResult = await auth.api.signUpEmail({
+      body: {
+        email: "stats@stats.com",
+        password: "stats12345",
+        name: "Statistics",
+      },
+    });
+
+    if (attyResult) {
+      console.log("Created statistics user successfully");
+    }
+  } catch (error: any) {
+    console.error(`Failed to create statistics user: ${error.message}`);
+  }
+
+  await prisma.user.update({
+    where: { email: "stats@stats.com" },
+    data: { role: "statistics", status: Status.ACTIVE },
+  });
+
   // Create staff user
   try {
     const staffResult = await auth.api.signUpEmail({
