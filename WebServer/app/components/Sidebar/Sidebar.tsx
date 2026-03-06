@@ -345,31 +345,35 @@ const SectionLabel = ({
 };
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
-const caseManagementNavItem: NavItem = {
-  icon: <FiFileText />,
-  href: "cases",
-  label: "Case Management",
-  dropdowns: [
-    { label: "Cases", href: "" },
-    { label: "Petition", href: "petition" },
-    { label: "Special Proceedings", href: "proceedings" },
-    { label: "Receiving Logs", href: "Receive" },
-    { label: "Notarial", href: "notarial" },
-  ],
-};
-
-// Statistics sidebar button is defined here.
-const statisticsNavItem: NavItem = {
-  icon: <FiBarChart2 />,
-  href: "statistics",
-  label: "Statistics",
-  dropdowns: [
-    { label: "Monthly Reports", href: "monthly" },
-    { label: "Annual Reports", href: "annual" },
-    { label: "Judgment Day", href: "judgement" },
-    { label: "Summary", href: "summary" },
-  ],
-};
+const caseNavItems: NavItem[] = [
+  {
+    icon: <FiFileText />,
+    href: "cases",
+    label: "Case Management",
+    dropdowns: [
+      { label: "Criminal Cases", href: "" },
+      { label: "Civil Cases", href: "civil" },
+      { label: "Petition", href: "petition" },
+      { label: "Special Proceedings", href: "proceedings" },
+      { label: "Receiving Logs", href: "Receive" },
+      { label: "Notarial", href: "notarial" },
+      { label: "Raffle", href: "raffle" },
+      { label: "Sheriff", href: "sheriff" },
+      { label: "Archives", href: "archives" },
+    ],
+  },
+  {
+    icon: <FiBarChart2 />,
+    href: "statistics",
+    label: "Statistics",
+    dropdowns: [
+      { label: "Monthly Reports", href: "monthly" },
+      { label: "Annual Reports", href: "annual" },
+      { label: "Judgment Day", href: "judgement" },
+      { label: "Summary", href: "summary" },
+    ],
+  },
+];
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },

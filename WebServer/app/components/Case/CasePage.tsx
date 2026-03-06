@@ -394,10 +394,10 @@ const CasePage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Case Management
+            Criminal Cases
           </h2>
           <p className="text-xl text-base-content/50 mt-2">
-            Manage all court cases
+            Manage all Criminal cases
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
             <svg
@@ -426,7 +426,7 @@ const CasePage: React.FC = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search cases..."
+              placeholder="Search Criminal cases..."
               className="input input-bordered input-lg w-full pl-12 text-base"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

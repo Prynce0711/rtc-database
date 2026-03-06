@@ -498,7 +498,7 @@ const Proceedings: React.FC = () => {
         <div className="relative mb-6">
           <div className="flex gap-4">
             <div className="relative flex-1">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl" />
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
               <input
                 type="text"
                 placeholder="Search cases..."

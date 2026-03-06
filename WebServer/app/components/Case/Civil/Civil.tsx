@@ -21,7 +21,6 @@ import {
   FiDownload,
   FiEdit,
   FiEdit3,
-  FiExternalLink,
   FiEye,
   FiFileText,
   FiFolder,
@@ -45,8 +44,11 @@ type NotarialRecord = {
   title: string;
   name: string;
   atty: string;
+  defendant?: string;
   date: string;
   link: string;
+  notes?: string;
+  nature?: string;
 };
 
 type NotarialFilterValues = {
@@ -61,51 +63,67 @@ type NotarialFilterValues = {
 const MOCK_RECORDS: NotarialRecord[] = [
   {
     id: 1,
-    title: "NO ENTRY REPORT (NOTARY)",
-    name: "ATTY. MELBA G. AGUSTIN-DAVID",
-    atty: "ATTY. JUSTIN G. SAMBILE",
-    date: "",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. SAMBILE-NOTARIAL REPORT\\2025-09 - No Entry Report (Notary).pdf",
+    title: "01-M-2006",
+    name: "18",
+    atty: "MARICEL L. PINEDA",
+    defendant: "MUNER JAHER",
+    date: "2006-01-02",
+    link: "SUPPORT",
+    notes: "Support",
+    nature: "Support",
   },
   {
     id: 2,
-    title: "NOTARIAL REGISTER",
-    name: "ATTY. JOSE P. REYES",
-    atty: "ATTY. MARIA S. SANTOS",
-    date: "2025-08-15",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. REYES-NOTARIAL REGISTER\\2025-08 - Notarial Register.pdf",
+    title: "02-M-2006",
+    name: "11",
+    atty: "RENATO OCTANIO",
+    defendant: "HEIRS OF JOSE DELA CRUZ",
+    date: "2006-01-02",
+    link: "ANNULMENT OF JUDGMENT",
+    notes: "Annulment of judgment",
+    nature: "Annulment",
   },
   {
     id: 3,
-    title: "MONTHLY REPORT",
-    name: "ATTY. ANA L. GARCIA",
-    atty: "ATTY. CARLOS B. DELA CRUZ",
-    date: "2025-07-30",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. GARCIA-MONTHLY REPORT\\2025-07 - Monthly Report.pdf",
+    title: "03-M-2006",
+    name: "12",
+    atty: "JOHN DOE",
+    defendant: "JANE DOE",
+    date: "2006-01-03",
+    link: "CASE FILE",
+    notes: "",
+    nature: "Property",
   },
   {
     id: 4,
-    title: "NO ENTRY REPORT (NOTARY)",
-    name: "ATTY. ROBERTO M. VILLANUEVA",
-    atty: "ATTY. ELENA C. FERNANDEZ",
-    date: "2025-09-01",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. VILLANUEVA-NOTARIAL REPORT\\2025-09 - No Entry Report.pdf",
+    title: "04-M-2006",
+    name: "15",
+    atty: "ALICE SMITH",
+    defendant: "BOB SMITH",
+    date: "2006-01-04",
+    link: "CASE FILE",
+    notes: "Appealed",
+    nature: "Criminal",
   },
   {
     id: 5,
-    title: "ANNUAL NOTARIAL REPORT",
-    name: "ATTY. LOURDES P. BAUTISTA",
-    atty: "ATTY. DANTE R. MORALES",
-    date: "2024-12-31",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. BAUTISTA-ANNUAL REPORT\\2024 - Annual Notarial Report.pdf",
+    title: "05-M-2006",
+    name: "20",
+    atty: "CARLOS RIVERA",
+    defendant: "SOMEONE ELSE",
+    date: "2006-01-05",
+    link: "CASE FILE",
+    notes: "",
+    nature: "Support",
   },
 ];
 
 const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
-  { key: "title", label: "Title", type: "text" },
-  { key: "name", label: "Name", type: "text" },
-  { key: "atty", label: "Attorney", type: "text" },
+  { key: "title", label: "Case Number", type: "text" },
+  { key: "name", label: "Branch", type: "text" },
+  { key: "atty", label: "Petitioner", type: "text" },
   { key: "date", label: "Date", type: "daterange" },
+  { key: "nature", label: "Nature", type: "text" },
 ];
 
 // ─── Form Types ───────────────────────────────────────────────────────────────
@@ -115,8 +133,11 @@ type FormEntry = {
   title: string;
   name: string;
   atty: string;
+  defendant?: string;
   date: string;
   link: string;
+  notes?: string;
+  nature?: string;
 
   file?: File | null; // ✅ ADD THIS
 
@@ -131,8 +152,11 @@ const createEmptyEntry = (id: string): FormEntry => ({
   title: "",
   name: "",
   atty: "",
+  defendant: "",
   date: "",
   link: "",
+  notes: "",
+  nature: "",
   file: null, // ✅ ADD
 
   errors: {},
@@ -144,8 +168,11 @@ const recordToEntry = (id: string, r: NotarialRecord): FormEntry => ({
   title: r.title,
   name: r.name,
   atty: r.atty,
+  defendant: r.defendant ?? "",
   date: r.date,
   link: r.link,
+  notes: r.notes ?? "",
+  nature: r.nature ?? "",
 
   errors: {},
   saved: false,
@@ -166,16 +193,16 @@ type ColDef = {
 const FROZEN_COLS: ColDef[] = [
   {
     key: "title",
-    label: "Title",
-    placeholder: "NO ENTRY REPORT (NOTARY)",
+    label: "Case Number",
+    placeholder: "01-M-2006",
     type: "text",
     width: 260,
     required: true,
   },
   {
     key: "name",
-    label: "Name",
-    placeholder: "ATTY. JUAN DELA CRUZ",
+    label: "Branch",
+    placeholder: "18",
     type: "text",
     width: 240,
     required: true,
@@ -185,24 +212,39 @@ const FROZEN_COLS: ColDef[] = [
 const DETAIL_COLS: ColDef[] = [
   {
     key: "atty",
-    label: "Attorney",
-    placeholder: "ATTY. MARIA SANTOS",
+    label: "Petitioner/s",
+    placeholder: "MARICEL L. PINEDA",
     type: "text",
-    width: 240,
+    width: 300,
     required: true,
   },
   {
+    key: "defendant",
+    label: "Defendant/s",
+    placeholder: "MUNER JAHER",
+    type: "text",
+    width: 300,
+  },
+  {
     key: "date",
-    label: "Date",
+    label: "Date Filed",
     placeholder: "",
     type: "date",
     width: 148,
     mono: true,
   },
   {
-    key: "link",
-    label: "File / Link",
-    placeholder: "RTC-Data\\Notarial Files\\...",
+    key: "notes",
+    label: "Notes/Appealed",
+    placeholder: "Appealed",
+    type: "text",
+    width: 240,
+    mono: true,
+  },
+  {
+    key: "nature",
+    label: "Nature of Petition",
+    placeholder: "Support",
     type: "text",
     width: 360,
     mono: true,
@@ -551,10 +593,10 @@ const NotarialModal = ({
             <FiArrowLeft size={16} />
           </button>
           <nav className="xls-breadcrumb">
-            <span>Notarial</span>
+            <span>Civil Cases</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Record" : "New Notarial Entries"}
+              {isEdit ? "Edit Civil Case" : "New Civil Case"}
             </span>
             {step === "review" && (
               <>
@@ -600,7 +642,7 @@ const NotarialModal = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Notarial Record" : "New Notarial Entries"}
+                  {isEdit ? "Edit Civil Case" : "New Civil Case"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (
@@ -608,7 +650,7 @@ const NotarialModal = ({
                   ) : (
                     <>
                       Fill rows like a spreadsheet —{" "}
-                      <kbd className="xls-kbd">Tab</kbd> past the last cell to
+                      <kbd className="xls-kbd">Tab</kbd> pa st the last cell to
                       add a new row.
                     </>
                   )}
@@ -651,7 +693,7 @@ const NotarialModal = ({
               <div className="xls-tab-bar">
                 <button className="xls-tab active">
                   <FiFileText size={13} />
-                  Notarial Info
+                  Civil Case Info
                 </button>
               </div>
 
@@ -674,7 +716,7 @@ const NotarialModal = ({
                         <div className="xls-group-label">Identity</div>
                       </th>
                       <th colSpan={DETAIL_COLS.length}>
-                        <div className="xls-group-label">Notarial Info</div>
+                        <div className="xls-group-label">Civil Case Info</div>
                       </th>
                       <th />
                     </tr>
@@ -1119,41 +1161,21 @@ const NotarialRow = ({
       </div>
     </td>
     <TipCell
-      label="Title"
+      label="Case Number"
       value={record.title}
       truncate
       className="font-semibold"
     />
-    <TipCell label="Name" value={record.name} truncate />
-    <TipCell label="Attorney" value={record.atty} truncate />
+    <TipCell label="Branch" value={record.name} truncate />
+    <TipCell label="Petitioner/s" value={record.atty} truncate />
+    <TipCell label="Defendant/s" value={record.defendant} truncate />
     <TipCell
-      label="Date"
+      label="Date Filed"
       value={formatDate(record.date)}
       className="text-base-content/70"
     />
-    <td
-      className="text-center relative group/tip"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {record.link ? (
-        <a
-          href="#"
-          className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
-          title={record.link}
-        >
-          <FiExternalLink size={12} />
-          <span className="truncate">{record.link.split("\\").pop()}</span>
-        </a>
-      ) : (
-        <span className="text-base-content/30">—</span>
-      )}
-      {record.link && (
-        <div className="cell-tip">
-          <span className="cell-tip-label">File / Link</span>
-          <span className="cell-tip-value">{record.link}</span>
-        </div>
-      )}
-    </td>
+    <TipCell label="Notes/Appealed" value={record.notes} />
+    <TipCell label="Nature of Petition" value={record.nature} />
   </tr>
 );
 
@@ -1209,8 +1231,8 @@ const Pagination: React.FC<{
     setActiveEllipsis(null);
     setEllipsisValue("");
   };
-
   const pages = getPages();
+
   return (
     <div className="w-full flex justify-center py-4">
       <div className="join shadow-sm bg-base-100 rounded-lg p-1">
@@ -1222,6 +1244,7 @@ const Pagination: React.FC<{
             <GrFormPrevious className="w-5 h-5" />
           </button>
         )}
+
         {pages.map((page, index) => {
           if (page === "...") {
             if (activeEllipsis === index) {
@@ -1267,6 +1290,7 @@ const Pagination: React.FC<{
             </PageButton>
           );
         })}
+
         <button
           className="join-item btn btn-sm btn-ghost"
           onClick={() => onPageChange?.(Math.min(pageCount, currentPage + 1))}
@@ -1281,7 +1305,7 @@ const Pagination: React.FC<{
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const NotarialPage: React.FC = () => {
+const Civil: React.FC = () => {
   const router = useRouter();
   const [records, setRecords] = useState<NotarialRecord[]>(MOCK_RECORDS);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1433,10 +1457,10 @@ const NotarialPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Notarial Records
+            Civil Cases
           </h2>
           <p className="text-xl text-base-content/50 mt-2">
-            Manage notarial reports and filings
+            Manage civil cases and filings
           </p>
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
             <svg
@@ -1466,7 +1490,7 @@ const NotarialPage: React.FC = () => {
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
               <input
                 type="text"
-                placeholder="Search by title, name, attorney..."
+                placeholder="Search by case number, branch, petitioner..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -1566,30 +1590,30 @@ const NotarialPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
             {
-              label: "Total Records",
+              label: "TOTAL RECORDS",
               value: (stats.total ?? 0).toLocaleString(),
               subtitle: `${(stats.noDate ?? 0).toLocaleString()} missing dates`,
               icon: FiBarChart2,
               delay: 0,
             },
             {
-              label: "This Month",
+              label: "THIS MONTH",
               value: (stats.thisMonth ?? 0).toLocaleString(),
               subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} entries this month`,
               icon: FiFileText,
               delay: 100,
             },
             {
-              label: "Unique Attorneys",
+              label: "UNIQUE PETITIONERS",
               value: (stats.attorneys ?? 0).toLocaleString(),
-              subtitle: `${(stats.attorneys ?? 0).toLocaleString()} attorneys`,
+              subtitle: `${(stats.attorneys ?? 0).toLocaleString()} petitioners`,
               icon: FiUsers,
               delay: 200,
             },
             {
-              label: "No Date",
+              label: "RECORDS MISSING DATE",
               value: (stats.noDate ?? 0).toLocaleString(),
-              subtitle: `Records without date`,
+              subtitle: `${(stats.noDate ?? 0).toLocaleString()} records without date`,
               icon: FiLock,
               delay: 300,
             },
@@ -1639,45 +1663,52 @@ const NotarialPage: React.FC = () => {
               <tr className="text-center">
                 {isAdminOrAtty && <th>ACTIONS</th>}
                 <SortTh
-                  label="TITLE"
+                  label="CASE NUMBER"
                   colKey="title"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="NAME"
+                  label="BRANCH"
                   colKey="name"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="ATTORNEY"
+                  label="PETITIONER/S"
                   colKey="atty"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="DATE"
+                  label="DEFENDANT/S"
+                  colKey="defendant"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <SortTh
+                  label="DATE FILED"
                   colKey="date"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
-                <th>LINK</th>
+                <th>NOTES/APPEALED</th>
+                <th>NATURE OF PETITION</th>
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-                      <div className=" flex items-center justify-center mb-4">
+                  <td colSpan={isAdminOrAtty ? 8 : 7}>
+                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-[220px]">
+                      <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
                       </div>
                       <p className="text-lg uppercase font-semibold text-base-content/50">
                         No records found
                       </p>
                       <p className="text-sm mt-1 uppercase text-base-content/35">
-                        No notarial records match your current filters.
+                        No civil cases match your current filters.
                       </p>
                     </div>
                   </td>
@@ -1692,9 +1723,21 @@ const NotarialPage: React.FC = () => {
                       setModalType("EDIT");
                     }}
                     onDelete={handleDelete}
-                    onRowClick={(item) =>
-                      router.push(`/user/cases/notarial/${item.id}`)
-                    }
+                    onRowClick={(item) => {
+                      try {
+                        localStorage.setItem(
+                          "__temp_case",
+                          JSON.stringify(item),
+                        );
+                        localStorage.setItem(
+                          "__temp_cases",
+                          JSON.stringify(records || []),
+                        );
+                      } catch (e) {
+                        // ignore
+                      }
+                      router.push(`/user/cases/civil/${item.id}`);
+                    }}
                   />
                 ))
               )}
@@ -1718,4 +1761,4 @@ const NotarialPage: React.FC = () => {
   );
 };
 
-export default NotarialPage;
+export default Civil;

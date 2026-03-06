@@ -1281,7 +1281,7 @@ const Pagination: React.FC<{
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const NotarialPage: React.FC = () => {
+const Raffle: React.FC = () => {
   const router = useRouter();
   const [records, setRecords] = useState<NotarialRecord[]>(MOCK_RECORDS);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1433,7 +1433,7 @@ const NotarialPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Notarial Records
+            Raffles / Re-Raffles
           </h2>
           <p className="text-xl text-base-content/50 mt-2">
             Manage notarial reports and filings
@@ -1472,7 +1472,10 @@ const NotarialPage: React.FC = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
+            <select className="select select-bordered">
+              <option value="ALL">All Types</option>
+              <option value="CRIMINAL">Re-Raffle</option>
+            </select>
             <button
               className={`btn btn-outline ${activeFilterCount > 0 ? "btn-primary" : ""}`}
               onClick={() => setFilterModalOpen((prev) => !prev)}
@@ -1718,4 +1721,4 @@ const NotarialPage: React.FC = () => {
   );
 };
 
-export default NotarialPage;
+export default Raffle;
