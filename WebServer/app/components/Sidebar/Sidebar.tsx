@@ -899,10 +899,6 @@ const UserCard = ({
   );
 };
 
-// Convenience references for commonly-used nav items
-const caseManagementNavItem = caseNavItems[0];
-const statisticsNavItem = caseNavItems[1];
-
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const { data: session } = useSession();
