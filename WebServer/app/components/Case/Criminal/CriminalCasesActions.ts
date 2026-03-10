@@ -2,6 +2,7 @@
 
 import {
   Case,
+  CaseType,
   CriminalCase,
   LogAction,
   Prisma,
@@ -15,9 +16,9 @@ import {
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import { prettifyError } from "zod";
-import ActionResult from "../ActionResult";
-import { createLog } from "../ActivityLogs/LogActions";
-import { PaginatedResult } from "../Filter/FilterTypes";
+import ActionResult from "../../ActionResult";
+import { createLog } from "../../ActivityLogs/LogActions";
+import { PaginatedResult } from "../../Filter/FilterTypes";
 import {
   CriminalCaseData,
   CriminalCaseSchema,
@@ -25,7 +26,7 @@ import {
   CriminalCaseStats,
 } from "./schema";
 
-export async function getCases(
+export async function getCriminalCases(
   options?: CriminalCasesFilterOptions,
 ): Promise<ActionResult<PaginatedResult<CriminalCaseData>>> {
   try {
@@ -85,7 +86,7 @@ export async function getCases(
   }
 }
 
-export async function getCaseStats(
+export async function getCriminalCaseStats(
   options?: CriminalCasesFilterOptions,
 ): Promise<ActionResult<CriminalCaseStats>> {
   try {
@@ -157,7 +158,7 @@ export async function getCaseStats(
   }
 }
 
-export async function createCase(
+export async function createCriminalCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
@@ -198,12 +199,12 @@ export async function createCase(
 
     return { success: true, result: newCase };
   } catch (error) {
-    console.error("Error creating case:", error);
-    return { success: false, error: "Error creating case" };
+    console.error("Error creating criminal case:", error);
+    return { success: false, error: "Error creating criminal case" };
   }
 }
 
-export async function updateCase(
+export async function updateCriminalCase(
   caseId: number,
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
@@ -273,7 +274,9 @@ export async function updateCase(
   }
 }
 
-export async function deleteCase(caseId: number): Promise<ActionResult<void>> {
+export async function deleteCriminalCase(
+  caseId: number,
+): Promise<ActionResult<void>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
@@ -293,14 +296,14 @@ export async function deleteCase(caseId: number): Promise<ActionResult<void>> {
 
     return { success: true, result: undefined };
   } catch (error) {
-    console.error("Error deleting case:", error);
-    return { success: false, error: "Error deleting case" };
+    console.error("Error deleting  criminal case:", error);
+    return { success: false, error: "Error deleting criminal case" };
   }
 }
 
-export async function getCaseById(
+export async function getCriminalCaseById(
   id: string | number,
-): Promise<ActionResult<Case>> {
+): Promise<ActionResult<CriminalCaseData>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
@@ -311,15 +314,28 @@ export async function getCaseById(
       return { success: false, error: "Invalid case ID" };
     }
 
-    const result = await prisma.case.findUnique({
-      where: { id: Number(id) },
+    const criminalCase = await prisma.case.findUnique({
+      where: { id: Number(id), criminalCase: { isNot: null } },
+      include: { criminalCase: true },
     });
 
-    if (!result) {
+    if (!criminalCase) {
       return { success: false, error: "Case not found" };
     }
 
-    return { success: true, result };
+    if (
+      criminalCase.caseType !== CaseType.CRIMINAL ||
+      !criminalCase.criminalCase
+    ) {
+      return { success: false, error: "Case is not a criminal case" };
+    }
+
+    const caseCombined: CriminalCaseData = {
+      ...criminalCase,
+      ...criminalCase.criminalCase,
+    };
+
+    return { success: true, result: caseCombined };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch case" };

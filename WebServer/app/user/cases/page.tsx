@@ -1,7 +1,7 @@
 "use client";
 
-import CasePage from "@/app/components/Case/CasePage";
+import CriminalCasePage from "@/app/components/Case/Criminal/CriminalCasePage";
 
 export default function Page() {
-  return <CasePage />;
+  return <CriminalCasePage />;
 }

@@ -4,8 +4,8 @@ import z from "zod";
 import type {
   BaseCaseSchema as BaseCaseSchemaType,
   CriminalCaseSchema as CriminalCaseSchemaType,
-} from "../components/Case/schema";
-import { BaseCaseSchema } from "../components/Case/schema";
+} from "../components/Case/Criminal/schema";
+import { BaseCaseSchema } from "../components/Case/Criminal/schema";
 import { FilterOptions } from "../components/Filter/FilterUtils";
 import { Prisma } from "../generated/prisma/client";
 import { getSchemaFieldKeys } from "./utils";

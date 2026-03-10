@@ -12,10 +12,10 @@ import {
 import React, { useEffect, useMemo, useState } from "react";
 import type { Case } from "../../generated/prisma/client";
 import {
-  getCaseStats,
-  getCases,
+  getCriminalCaseStats,
+  getCriminalCases,
   type CriminalCaseStats,
-} from "../Case/CasesActions";
+} from "../Case/Criminal/CriminalCasesActions";
 import { usePopup } from "../Popup/PopupProvider";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
@@ -39,13 +39,13 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
     try {
       setLoading(true);
       const [casesRes, statsRes] = await Promise.all([
-        getCases({
+        getCriminalCases({
           page: 1,
           pageSize: 15,
           sortKey: "dateFiled",
           sortOrder: "desc",
         }),
-        getCaseStats(),
+        getCriminalCaseStats(),
       ]);
 
       if (!casesRes.success) {

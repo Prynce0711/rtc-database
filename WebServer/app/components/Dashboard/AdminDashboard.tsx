@@ -2,10 +2,10 @@
 
 import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
 import {
-  getCaseStats,
-  getCases,
+  getCriminalCaseStats,
+  getCriminalCases,
   type CriminalCaseStats,
-} from "@/app/components/Case/CasesActions";
+} from "@/app/components/Case/Criminal/CriminalCasesActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
@@ -87,13 +87,13 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
     async function fetchAll() {
       try {
         const [c, s, e, a] = await Promise.all([
-          getCases({
+          getCriminalCases({
             page: 1,
             pageSize: 20,
             sortKey: "dateFiled",
             sortOrder: "desc",
           }),
-          getCaseStats(),
+          getCriminalCaseStats(),
           getEmployees(),
           getAccounts(),
         ]);

@@ -5,7 +5,7 @@ import { Activity, CalendarCheck, Users, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiDownload, FiFilter, FiSearch, FiX } from "react-icons/fi";
 import { getAccounts } from "../AccountManagement/AccountActions";
-import { getCases } from "../Case/CasesActions";
+import { getCriminalCases } from "../Case/Criminal/CriminalCasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
 import { Pagination } from "../Pagination";
 import { usePopup } from "../Popup/PopupProvider";
@@ -157,7 +157,7 @@ const LogsDashboard: React.FC = () => {
         setUsers(users.result || []);
       }
 
-      const cases = await getCases();
+      const cases = await getCriminalCases();
       if (cases.success) {
         setCases(cases.result?.items || []);
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { getCaseById } from "@/app/components/Case/CasesActions";
+import { getCriminalCaseById } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import type { Case } from "@/app/generated/prisma/browser";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -169,9 +169,9 @@ export default function CivilCaseDetailsPage() {
         }
 
         const [current, prev, next] = await Promise.allSettled([
-          getCaseById(numId),
-          getCaseById(numId - 1),
-          getCaseById(numId + 1),
+          getCriminalCaseById(numId),
+          getCriminalCaseById(numId - 1),
+          getCriminalCaseById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {

@@ -1,13 +1,15 @@
 import type { CriminalCaseData } from "./schema";
 
-export interface CaseStats {
+export interface CriminalCaseStats {
   totalCases: number;
   detainedCases: number;
   pendingCases: number;
   recentlyFiled: number;
 }
 
-export const calculateCaseStats = (cases: CriminalCaseData[]): CaseStats => {
+export const calculateCriminalCaseStats = (
+  cases: CriminalCaseData[],
+): CriminalCaseStats => {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -21,7 +23,7 @@ export const calculateCaseStats = (cases: CriminalCaseData[]): CaseStats => {
   };
 };
 
-export const formatCaseForDisplay = (caseItem: CriminalCaseData) => {
+export const formatCriminalCaseForDisplay = (caseItem: CriminalCaseData) => {
   return {
     ...caseItem,
     dateFiled: caseItem.dateFiled
@@ -35,7 +37,7 @@ export const formatCaseForDisplay = (caseItem: CriminalCaseData) => {
   };
 };
 
-export const sortCases = (
+export const sortCriminalCases = (
   cases: CriminalCaseData[],
   sortBy: keyof CriminalCaseData,
   order: "asc" | "desc",

@@ -5,8 +5,8 @@ import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
-import Table from "../Table/Table";
-import TipCell from "../Table/TipCell";
+import Table from "../../Table/Table";
+import TipCell from "../../Table/TipCell";
 import type { CriminalCaseData } from "./schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ export type CaseSortConfig = {
 
 // ─── Case Row ─────────────────────────────────────────────────────────────────
 
-const CaseRow = ({
+const CriminalCaseRow = ({
   caseItem,
   handleDeleteCase,
 }: {
@@ -379,7 +379,7 @@ export const CaseTable = ({
       sortConfig={sortConfig}
       onSort={handleSort}
       renderRow={(item) => (
-        <CaseRow
+        <CriminalCaseRow
           key={item.id}
           caseItem={item}
           handleDeleteCase={handleDeleteCase}
@@ -391,4 +391,4 @@ export const CaseTable = ({
   );
 };
 
-export default CaseRow;
+export default CriminalCaseRow;

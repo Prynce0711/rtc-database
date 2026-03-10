@@ -89,6 +89,7 @@ model Case {
   
   criminalCase     CriminalCase?
   petition         Petition?
+  civilCase        CivilCase?
   specialProceeding SpecialProceeding?
 }
 
@@ -125,6 +126,24 @@ model CriminalCase{
   total           String?
   amountInvolved  String?
   createdAt       DateTime  @default(now())
+
+  case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+}
+
+model CivilCase{
+  id              Int       @id @default(autoincrement())
+  caseNumber         String       @unique
+  petitioners    String
+  defendants    String?
+  notes         String?
+  nature        String?
+  originCaseNumber String?
+  reRaffleDate     DateTime?
+  reRaffleBranch    String?
+  consolitationDate DateTime?
+  consolidationBranch String?
+  dateRemanded       DateTime?
+  remandedNote        String?
 
   case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }

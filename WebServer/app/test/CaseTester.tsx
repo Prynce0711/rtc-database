@@ -1,20 +1,20 @@
 "use client";
 
 import {
-  createCase,
-  deleteCase,
-  getCases,
-  updateCase,
-} from "@/app/components/Case/CasesActions";
+  createCriminalCase,
+  deleteCriminalCase,
+  getCriminalCases,
+  updateCriminalCase,
+} from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
   exportCasesExcel,
   uploadExcel,
-} from "@/app/components/Case/ExcelActions";
+} from "@/app/components/Case/Criminal/ExcelActions";
 import {
   CaseEntry,
   caseToEntry,
   createEmptyEntry,
-} from "@/app/components/Case/schema";
+} from "@/app/components/Case/Criminal/schema";
 import { Case, CaseType } from "@/app/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
@@ -47,7 +47,7 @@ export default function CaseTester() {
 
   const loadCases = async () => {
     setLoading(true);
-    const result = await getCases();
+    const result = await getCriminalCases();
     if (result.success) {
       setCases(result.result.items);
       setMessage({ type: "success", text: "Cases loaded successfully" });
@@ -114,12 +114,12 @@ export default function CaseTester() {
 
       let result;
       if (isEditing && editingId) {
-        result = await updateCase(editingId, data);
+        result = await updateCriminalCase(editingId, data);
         if (result.success) {
           setMessage({ type: "success", text: "Case updated successfully" });
         }
       } else {
-        result = await createCase(data);
+        result = await createCriminalCase(data);
         if (result.success) {
           setMessage({ type: "success", text: "Case created successfully" });
         }
@@ -151,7 +151,7 @@ export default function CaseTester() {
     if (!confirm("Are you sure you want to delete this case?")) return;
 
     setLoading(true);
-    const result = await deleteCase(id);
+    const result = await deleteCriminalCase(id);
     if (result.success) {
       setMessage({ type: "success", text: "Case deleted successfully" });
       await loadCases();

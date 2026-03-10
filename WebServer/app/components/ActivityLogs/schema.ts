@@ -1,9 +1,9 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
+import { CriminalCaseSchema } from "../Case/Criminal/schema";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
-import { CriminalCaseSchema } from "../Case/schema";
 import { EmployeeSchema } from "../Employee/schema";
 
 export const CreateLogData = z

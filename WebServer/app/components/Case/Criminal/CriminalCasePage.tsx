@@ -13,22 +13,28 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { CaseType } from "../../generated/prisma/client";
-import FilterModal from "../Filter/FilterModal";
+import { CaseType } from "../../../generated/prisma/client";
+import FilterModal from "../../Filter/FilterModal";
 import {
   ExactMatchMap,
   FilterOption,
   FilterValues,
-} from "../Filter/FilterTypes";
-import Pagination from "../Pagination/Pagination";
-import { usePopup } from "../Popup/PopupProvider";
-import { PageListSkeleton } from "../Skeleton/SkeletonTable";
-import Table from "../Table/Table";
-import NewCaseModal, { CaseModalType } from "./CaseDrawer";
-import CaseRow from "./CaseRow";
-import { deleteCase, getCases, getCaseStats } from "./CasesActions";
+} from "../../Filter/FilterTypes";
+import Pagination from "../../Pagination/Pagination";
+import { usePopup } from "../../Popup/PopupProvider";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
+import Table from "../../Table/Table";
+import NewCriminalCaseModal, {
+  CriminalCaseModalType,
+} from "./CriminalCaseDrawer";
+import CriminalCaseRow from "./CriminalCaseRow";
+import {
+  deleteCriminalCase,
+  getCriminalCaseStats,
+  getCriminalCases,
+} from "./CriminalCasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
-import { calculateCaseStats, type CaseStats } from "./Record";
+import { calculateCriminalCaseStats, type CriminalCaseStats } from "./Record";
 import type {
   CriminalCaseData,
   CriminalCaseFilters,
@@ -39,16 +45,18 @@ type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
 type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
 
-const CasePage: React.FC = () => {
+const CriminalCasePage: React.FC = () => {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<CaseModalType | null>(null);
+  const [modalType, setModalType] = useState<CriminalCaseModalType | null>(
+    null,
+  );
   const [selectedCase, setSelectedCase] = useState<CriminalCaseData | null>(
     null,
   );
-  const [stats, setStats] = useState<CaseStats>({
+  const [stats, setStats] = useState<CriminalCaseStats>({
     totalCases: 0,
     detainedCases: 0,
     pendingCases: 0,
@@ -142,7 +150,7 @@ const CasePage: React.FC = () => {
       try {
         setLoading(true);
         const [casesRes, statsRes] = await Promise.all([
-          getCases({
+          getCriminalCases({
             page,
             pageSize,
             searchTerm,
@@ -151,7 +159,7 @@ const CasePage: React.FC = () => {
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
-          getCaseStats({
+          getCriminalCaseStats({
             searchTerm,
             filters: appliedFilters,
             exactMatchMap,
@@ -166,7 +174,7 @@ const CasePage: React.FC = () => {
         const result = casesRes.result;
         setCases(result.items);
         setTotalCount(result.total ?? result.items.length);
-        setStats(calculateCaseStats(result.items));
+        setStats(calculateCriminalCaseStats(result.items));
 
         if (statsRes.success && statsRes.result) {
           setStats(statsRes.result);
@@ -224,7 +232,7 @@ const CasePage: React.FC = () => {
 
     if (!isTextField) return [];
 
-    const res = await getCases({
+    const res = await getCriminalCases({
       page: 1,
       pageSize: 10,
       filters: { [key]: inputValue } as CaseFilters,
@@ -266,7 +274,7 @@ const CasePage: React.FC = () => {
     )
       return;
 
-    const result = await deleteCase(caseId);
+    const result = await deleteCriminalCase(caseId);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete case");
       return;
@@ -363,7 +371,7 @@ const CasePage: React.FC = () => {
     }
   };
 
-  const showModal = (type: CaseModalType) => {
+  const showModal = (type: CriminalCaseModalType) => {
     setModalType(type);
   };
 
@@ -381,7 +389,7 @@ const CasePage: React.FC = () => {
 
   if (modalType) {
     return (
-      <NewCaseModal
+      <NewCriminalCaseModal
         onClose={() => {
           setModalType(null);
           setSelectedCase(null);
@@ -504,7 +512,7 @@ const CasePage: React.FC = () => {
             {isAdminOrAtty && (
               <button
                 className="btn btn-primary"
-                onClick={() => showModal(CaseModalType.ADD)}
+                onClick={() => showModal(CriminalCaseModalType.ADD)}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -676,7 +684,7 @@ const CasePage: React.FC = () => {
             sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
             onSort={(k) => handleSort(k as SortKey)}
             renderRow={(caseItem) => (
-              <CaseRow
+              <CriminalCaseRow
                 key={caseItem.id}
                 caseItem={caseItem}
                 handleDeleteCase={handleDeleteCase}
@@ -701,4 +709,4 @@ const CasePage: React.FC = () => {
   );
 };
 
-export default CasePage;
+export default CriminalCasePage;
