@@ -1065,7 +1065,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
               </button>
             </div>
             <button
-              className="xls-btn xls-btn-success"
+              className="btn btn-outline btn-success"
               style={{
                 height: 50,
                 paddingLeft: 30,

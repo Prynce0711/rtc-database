@@ -36,8 +36,8 @@ const views: {
 
 export default function Judgement() {
   const [activeView, setActiveView] = useState<JudgementView>("MTC");
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString(),
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().slice(0, 10),
   );
   const [uploading, setUploading] = useState(false);
   const [requestAdd, setRequestAdd] = useState(0);
@@ -50,7 +50,12 @@ export default function Judgement() {
   };
 
   const exportDataRef = useRef<Record<string, unknown>[]>([]);
-  const yearLabel = selectedYear;
+  const selectedYear = selectedDate.slice(0, 4);
+  const selectedDateLabel = new Date(selectedDate).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const handleExport = () => {
     const data = exportDataRef.current;
@@ -69,11 +74,11 @@ export default function Judgement() {
     XLSX.utils.book_append_sheet(
       workbook,
       worksheet,
-      `${activeView} ${yearLabel}`,
+      `${activeView} ${selectedYear}`,
     );
     XLSX.writeFile(
       workbook,
-      `Judgement-${activeView}-Report-${yearLabel}.xlsx`,
+      `Judgement-${activeView}-Report-${selectedYear}.xlsx`,
     );
   };
 
@@ -96,10 +101,7 @@ export default function Judgement() {
     }
   };
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 13 }, (_, i) =>
-    (currentYear - 10 + i).toString(),
-  );
+  // yearOptions no longer needed — selection is by full date
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -115,23 +117,18 @@ export default function Judgement() {
                 <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
                   <FiCalendar className="shrink-0" />
                   <span>
-                    Judgment day statistics and reports for {yearLabel}
+                    Judgment day statistics and reports for {selectedDateLabel}
                   </span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                <select
-                  className="select select-bordered select-md w-72"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="date"
+                  className="input input-bordered input-md w-72"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                />
                 <div className="flex items-center gap-2 flex-nowrap">
                   <input
                     ref={fileInputRef}

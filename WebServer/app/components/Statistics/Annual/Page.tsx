@@ -89,6 +89,11 @@ export default function AnnualPage() {
     "en-US",
     { month: "long", year: "numeric" },
   );
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const viewSubtitles: Record<AnnualView, string> = {
     MTC: "Municipal Trial Court — Track all received documents and case filings",
@@ -171,7 +176,7 @@ export default function AnnualPage() {
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
       {!isChildActive && (
-        <header className="card bg-base-100 ">
+        <header className="card bg-base-100 shadow-xl">
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
@@ -188,18 +193,25 @@ export default function AnnualPage() {
                 </h2>
                 <p className="flex text-lg items-center gap-2 text-base text-base-content/50 mt-1.5">
                   <FiCalendar className="shrink-0 w-4 h-4" />
-                  <span>{viewSubtitles[activeView]}</span>
+                  <span>
+                    {viewSubtitles[activeView]} — {yearLabel} — {todayLabel}
+                  </span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-3">
                 <div className="flex items-center gap-2">
-                  <input
-                    type="month"
-                    className="input input-bordered input-md w-40"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                  />
+                  <select
+                    className="select select-bordered select-md w-72"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                  >
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center gap-2 flex-nowrap">
                   <input
@@ -210,22 +222,22 @@ export default function AnnualPage() {
                     onChange={handleImport}
                   />
                   <button
-                    className={`btn btn-outline  btn-md gap-2 ${uploading ? "loading" : ""}`}
+                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
                     <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import Excel"}
+                    {uploading ? "Importing..." : "Import"}
                   </button>
                   <button
-                    className="btn btn-outline btn-md gap-2"
+                    className="btn btn-outline btn-info btn-md gap-2"
                     onClick={handleExport}
                   >
                     <FiDownload className="h-5 w-5" />
-                    Export Excel
+                    Export
                   </button>
                   <button
-                    className="btn btn-primary btn-md gap-2"
+                    className="btn btn-success btn-md gap-2"
                     onClick={() => setRequestAdd((c) => c + 1)}
                   >
                     <FiPlus className="h-5 w-5" />
@@ -248,21 +260,13 @@ export default function AnnualPage() {
                 <button
                   key={value}
                   onClick={() => setActiveView(value)}
-                  className={`
-                  relative flex items-center gap-2.5 px-5 py-3 rounded-lg text-sm font-bold
-                  transition-all duration-200 cursor-pointer select-none
-                  ${
-                    isActive
-                      ? "bg-primary text-primary-content shadow-md shadow-primary/25"
-                      : "text-base-content/60 hover:text-base-content hover:bg-base-100/80"
-                  }
-                `}
+                  className={`relative flex items-center gap-3 px-7 py-4 rounded-xl text-base font-bold transition-all duration-200 cursor-pointer select-none ${isActive ? "bg-primary text-primary-content shadow-md shadow-primary/25 scale-[1.02]" : "text-base-content/60 hover:text-base-content hover:bg-base-100/80"}`}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className="h-5 w-5 shrink-0" />
                   <div className="flex flex-col items-start leading-tight">
                     <span className="tracking-wide">{label}</span>
                     <span
-                      className={`text-[10px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
+                      className={`text-[11px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
                     >
                       {description}
                     </span>

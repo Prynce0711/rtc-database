@@ -1,15 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  FiCheck,
-  FiChevronDown,
-  FiEdit2,
-  FiSearch,
-  FiSettings,
-  FiTrash2,
-  FiX,
-} from "react-icons/fi";
+import { FiCheck, FiEdit2, FiSearch, FiTrash2, FiX } from "react-icons/fi";
 
 export type AnnualSelectionMode = "edit" | "delete" | null;
 
@@ -59,63 +51,47 @@ const AnnualToolbar: React.FC<AnnualToolbarProps> = ({
       {/* Actions */}
       {isSelecting ? (
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-base-content/40 tabular-nums">
+          <span className="text-sm text-base-content/40 tabular-nums">
             {selectedCount} selected
           </span>
           <button
-            className={`btn btn-sm gap-1.5 ${
+            className={`btn btn-md gap-2 ${
               selectionMode === "delete" ? "btn-error" : "btn-primary"
             }`}
             onClick={onConfirmSelection}
             disabled={selectedCount === 0}
           >
-            <FiCheck className="h-3.5 w-3.5" />
+            <FiCheck className="h-4 w-4" />
             Apply
           </button>
           <button
-            className="btn btn-sm btn-ghost text-base-content/50"
+            className="btn btn-md btn-ghost text-base-content/50"
             onClick={onCancelSelection}
           >
-            <FiX className="h-3.5 w-3.5" />
+            <FiX className="h-4 w-4" />
           </button>
         </div>
       ) : (
-        <div className="dropdown dropdown-end">
-          <label
-            tabIndex={0}
-            className="btn btn-sm btn-primary gap-2 text-base-100"
-          >
-            <FiSettings className="h-4 w-4" />
-            Actions
-            <FiChevronDown className="h-3 w-3" />
-          </label>
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu bg-base-100 rounded-lg z-50 w-40 p-1.5 shadow-xl border border-base-200/80"
-          >
-            {onStartEdit && (
-              <li>
-                <button
-                  onClick={onStartEdit}
-                  className="gap-2.5 text-sm rounded-md"
-                >
-                  <FiEdit2 className="h-3.5 w-3.5 opacity-60" />
-                  Edit rows
-                </button>
-              </li>
-            )}
-            {onStartDelete && (
-              <li>
-                <button
-                  onClick={onStartDelete}
-                  className="gap-2.5 text-sm rounded-md hover:bg-error/10 hover:text-error"
-                >
-                  <FiTrash2 className="h-3.5 w-3.5 opacity-60" />
-                  Delete rows
-                </button>
-              </li>
-            )}
-          </ul>
+        // Visible action buttons beside the search input instead of a dropdown
+        <div className="flex items-center gap-3 ml-3">
+          {onStartEdit && (
+            <button
+              className="btn btn-md btn-outline gap-2"
+              onClick={onStartEdit}
+            >
+              <FiEdit2 className="h-4 w-4" />
+              Edit rows
+            </button>
+          )}
+          {onStartDelete && (
+            <button
+              className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
+              onClick={onStartDelete}
+            >
+              <FiTrash2 className="h-4 w-4" />
+              Delete rows
+            </button>
+          )}
         </div>
       )}
 
