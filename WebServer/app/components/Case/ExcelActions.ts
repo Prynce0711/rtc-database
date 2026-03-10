@@ -72,14 +72,9 @@ export async function uploadExcel(
       file,
       requiredHeaders: { Branch: branchHeaders },
       schema: CriminalCaseSchema,
-      skipRowsWithoutCell: {
-        getCells: getMappedCells,
-        keys: ["caseNumber"],
-      },
-      uniqueKeys: {
-        getCells: getMappedCells,
-        keys: ["caseNumber"],
-      },
+      getCells: getMappedCells,
+      skipRowsWithoutCell: ["caseNumber"],
+      uniqueKeys: ["caseNumber"],
       uniqueKeyLabel: "Case number",
       checkExistingUniqueKeys: async (keys) => {
         const existing = await prisma.case.findMany({

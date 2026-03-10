@@ -315,17 +315,13 @@ export type ProcessExcelMeta = {
   validRows: number;
 };
 
-type CellsConfig<TCells extends Record<string, unknown>> = {
-  getCells: (row: Record<string, unknown>) => TCells;
-  keys?: Array<keyof TCells>;
-};
-
 type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   file: File;
   requiredHeaders: Record<string, string[]>;
   schema: z.ZodType<T>;
-  skipRowsWithoutCell?: CellsConfig<TCells>;
-  uniqueKeys?: CellsConfig<TCells>;
+  getCells: (row: Record<string, unknown>) => TCells;
+  skipRowsWithoutCell?: Array<keyof TCells>;
+  uniqueKeys?: Array<keyof TCells>;
   checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
   uniqueKeyLabel?: string;
   mapRow: (row: Record<string, unknown>) => {
@@ -338,11 +334,9 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
 };
 
 function extractUniqueKeyFromRow<TCells extends Record<string, unknown>>(
-  row: Record<string, unknown>,
-  config: CellsConfig<TCells>,
+  cells: TCells,
+  keys: Array<keyof TCells>,
 ): string | undefined {
-  const cells = config.getCells(row);
-  const keys = config.keys ?? [];
   const values = keys
     .map((key) => cells[key])
     .filter((value) => hasContent(value));
@@ -369,6 +363,7 @@ export async function processExcelUpload<
     file,
     requiredHeaders,
     schema,
+    getCells,
     skipRowsWithoutCell: skipRows,
     uniqueKeys,
     checkExistingUniqueKeys,
@@ -410,8 +405,7 @@ export async function processExcelUpload<
     const rawSheetData = XLSX.utils.sheet_to_json<FailedRow>(worksheet);
     const sheetData = skipRows
       ? rawSheetData.filter(
-          (row) =>
-            !isMappedRowEmpty(skipRows.getCells(row), skipRows.keys ?? []),
+          (row) => !isMappedRowEmpty(getCells(row), skipRows ?? []),
         )
       : rawSheetData;
 
@@ -461,7 +455,7 @@ export async function processExcelUpload<
     let existingUniqueKeys = new Set<string>();
     if (uniqueKeys && checkExistingUniqueKeys) {
       const keys = sheetData
-        .map((row) => extractUniqueKeyFromRow(row, uniqueKeys))
+        .map((row) => extractUniqueKeyFromRow(getCells(row), uniqueKeys))
         .filter((val): val is string => !!val);
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
@@ -478,7 +472,9 @@ export async function processExcelUpload<
 
       const uniqueKey =
         mapResult.uniqueKey ??
-        (uniqueKeys ? extractUniqueKeyFromRow(row, uniqueKeys) : undefined);
+        (uniqueKeys
+          ? extractUniqueKeyFromRow(getCells(row), uniqueKeys)
+          : undefined);
       if (uniqueKey) {
         if (
           existingUniqueKeys.has(uniqueKey) ||
