@@ -88,7 +88,7 @@ function AnnualTable<T extends Record<string, unknown>>({
   const session = useSession();
   const isAdminOrAtty =
     session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
+    session?.data?.user?.role === Roles.STATISTICS;
 
   const statusPopup = usePopup();
 
