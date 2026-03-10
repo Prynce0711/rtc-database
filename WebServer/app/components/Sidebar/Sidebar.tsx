@@ -370,6 +370,17 @@ const caseNavItems: NavItem[] = [
       { label: "Monthly Reports", href: "monthly" },
       { label: "Annual Reports", href: "annual" },
       { label: "Judgment Day", href: "judgement" },
+    ],
+  },
+
+  {
+    icon: <FiBarChart2 />,
+    href: "statistics",
+    label: "Admin Statistics",
+    dropdowns: [
+      { label: "Monthly Reports", href: "monthly" },
+      { label: "Annual Reports", href: "annual" },
+      { label: "Judgment Day", href: "judgement" },
       { label: "Summary", href: "summary" },
     ],
   },
@@ -378,6 +389,7 @@ const caseNavItems: NavItem[] = [
 // Backwards-compatible aliases used across the file
 const caseManagementNavItem: NavItem = caseNavItems[0];
 const statisticsNavItem: NavItem = caseNavItems[1];
+const adminStatisticsNavItem: NavItem = caseNavItems[2];
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
@@ -447,7 +459,7 @@ function adminSidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={adminStatisticsNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -688,15 +700,6 @@ function statsSidebar({
           badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
-        />
-      </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
         />
       </div>
 
