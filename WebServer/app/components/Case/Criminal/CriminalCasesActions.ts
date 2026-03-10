@@ -12,7 +12,7 @@ import { prisma } from "@/app/lib/prisma";
 import {
   buildCaseWhere,
   DEFAULT_PAGE_SIZE,
-  splitCaseData,
+  splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import { prettifyError } from "zod";
@@ -177,7 +177,7 @@ export async function createCriminalCase(
       throw new Error(`Invalid case data: ${prettifyError(caseData.error)}`);
     }
 
-    const { caseData: casePayload, criminalData } = splitCaseData(
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
 
@@ -185,7 +185,7 @@ export async function createCriminalCase(
       data: {
         ...casePayload,
         criminalCase: {
-          create: criminalData,
+          create: detailData as Prisma.CriminalCaseCreateWithoutCaseInput,
         },
       },
     });
@@ -219,7 +219,7 @@ export async function updateCriminalCase(
       throw new Error(`Invalid case data: ${caseData.error.message}`);
     }
 
-    const { caseData: casePayload, criminalData } = splitCaseData(
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
 
@@ -243,9 +243,9 @@ export async function updateCriminalCase(
       }),
       prisma.criminalCase.upsert({
         where: { caseNumber: casePayload.caseNumber },
-        update: criminalData,
+        update: detailData,
         create: {
-          ...criminalData,
+          ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
       }),

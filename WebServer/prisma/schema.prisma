@@ -133,7 +133,7 @@ model CriminalCase{
 model CivilCase{
   id              Int       @id @default(autoincrement())
   caseNumber         String       @unique
-  petitioners    String
+  petitioners    String?
   defendants    String?
   notes         String?
   nature        String?
@@ -144,6 +144,7 @@ model CivilCase{
   consolidationBranch String?
   dateRemanded       DateTime?
   remandedNote        String?
+  undocketed Boolean @default(false)
 
   case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
@@ -214,6 +215,8 @@ model User {
   banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
+  darkMode       Boolean?  @default(false)
+
   sessions      Session[]
   accounts      Account[]
 

@@ -1,19 +1,23 @@
 "server-only";
 
 import z from "zod";
-import type {
-  BaseCaseSchema as BaseCaseSchemaType,
-  CriminalCaseSchema as CriminalCaseSchemaType,
-} from "../components/Case/Criminal/schema";
-import { BaseCaseSchema } from "../components/Case/Criminal/schema";
+import type { BaseCaseSchema as BaseCaseSchemaType } from "../components/Case/schema";
+import { BaseCaseSchema } from "../components/Case/schema";
 import { FilterOptions } from "../components/Filter/FilterUtils";
 import { Prisma } from "../generated/prisma/client";
 import { getSchemaFieldKeys } from "./utils";
 
 export const DEFAULT_PAGE_SIZE = 25;
 
-export const buildCaseWhere = <T extends z.ZodType>(
+type CaseRelationKey =
+  | "criminalCase"
+  | "civilCase"
+  | "petition"
+  | "specialProceeding";
+
+export const buildCaseWhereForRelation = <T extends z.ZodType>(
   schema: T,
+  relationKey: CaseRelationKey,
   options?: FilterOptions<z.infer<T>>,
 ): Prisma.CaseWhereInput => {
   const conditions: Prisma.CaseWhereInput[] = [];
@@ -32,7 +36,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
     dateKeys: [...baseCaseFieldKeys.dateKeys],
   });
 
-  conditions.push({ criminalCase: { isNot: null } });
+  conditions.push({ [relationKey]: { isNot: null } });
 
   const addCaseStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
@@ -43,14 +47,14 @@ export const buildCaseWhere = <T extends z.ZodType>(
     conditions.push({ [key]: filter } as Prisma.CaseWhereInput);
   };
 
-  const addCriminalStringFilter = (key: keyof Filters, value?: string) => {
+  const addRelatedStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
     const isExact = exactMatchMap[key] ?? true;
     const filter: Prisma.StringNullableFilter = {
       [isExact ? "equals" : "contains"]: value,
     };
     conditions.push({
-      criminalCase: {
+      [relationKey]: {
         is: {
           [key]: filter,
         },
@@ -68,7 +72,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
 
   caseFieldKeys.stringKeys.forEach((field) => {
     const value = filters?.[field as keyof Filters];
-    addCriminalStringFilter(
+    addRelatedStringFilter(
       field as keyof Filters,
       typeof value === "string" ? value : undefined,
     );
@@ -84,7 +88,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
     const value = filters?.[field as keyof Filters];
     if (!value) return;
     conditions.push({
-      criminalCase: {
+      [relationKey]: {
         is: {
           [field]: value,
         },
@@ -96,7 +100,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
     const value = filters?.[field as keyof Filters];
     if (value === undefined || value === null) return;
     conditions.push({
-      criminalCase: {
+      [relationKey]: {
         is: {
           [field]: value,
         },
@@ -123,7 +127,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
       | undefined;
     if (!range?.start && !range?.end) return;
     conditions.push({
-      criminalCase: {
+      [relationKey]: {
         is: {
           [field]: {
             not: null,
@@ -143,7 +147,7 @@ export const buildCaseWhere = <T extends z.ZodType>(
           [field]: { contains: search },
         })),
         ...caseFieldKeys.stringKeys.map((field) => ({
-          criminalCase: {
+          [relationKey]: {
             is: {
               [field]: { contains: search },
             },
@@ -152,12 +156,14 @@ export const buildCaseWhere = <T extends z.ZodType>(
       ];
       const asNumber = Number(search);
       if (!Number.isNaN(asNumber)) {
-        orConditions.push({
-          criminalCase: {
-            is: {
-              eqcNumber: asNumber,
+        caseFieldKeys.numberKeys.forEach((field) => {
+          orConditions.push({
+            [relationKey]: {
+              is: {
+                [field]: asNumber,
+              },
             },
-          },
+          });
         });
       }
       conditions.push({ OR: orConditions });
@@ -167,6 +173,12 @@ export const buildCaseWhere = <T extends z.ZodType>(
   if (conditions.length === 0) return {};
   return { AND: conditions };
 };
+
+export const buildCaseWhere = <T extends z.ZodType>(
+  schema: T,
+  options?: FilterOptions<z.infer<T>>,
+): Prisma.CaseWhereInput =>
+  buildCaseWhereForRelation(schema, "criminalCase", options);
 
 type BaseCaseData = Omit<BaseCaseSchemaType, "id">;
 type CriminalData = Prisma.CriminalCaseCreateWithoutCaseInput;
@@ -179,26 +191,26 @@ const baseCaseKeySet = new Set([
   ...baseCaseFieldKeys.enumKeys,
 ]);
 
-export const splitCaseData = <T>(
-  data: CriminalCaseSchemaType,
+export const splitCaseDataBySchema = <T extends Record<string, unknown>>(
+  data: T,
 ): {
   caseData: BaseCaseData;
-  criminalData: CriminalData;
+  detailData: Record<string, unknown>;
 } => {
   const { id: _id, ...rest } = data;
   const caseData: Record<string, unknown> = {};
-  const criminalData: Record<string, unknown> = {};
+  const detailData: Record<string, unknown> = {};
 
   Object.entries(rest).forEach(([key, value]) => {
     if (baseCaseKeySet.has(key)) {
       caseData[key] = value;
     } else {
-      criminalData[key] = value;
+      detailData[key] = value;
     }
   });
 
   return {
     caseData: caseData as BaseCaseData,
-    criminalData: criminalData as CriminalData,
+    detailData,
   };
 };

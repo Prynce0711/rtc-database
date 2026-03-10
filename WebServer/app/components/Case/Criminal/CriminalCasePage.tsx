@@ -34,11 +34,12 @@ import {
   getCriminalCases,
 } from "./CriminalCasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
-import { calculateCriminalCaseStats, type CriminalCaseStats } from "./Record";
-import type {
-  CriminalCaseData,
-  CriminalCaseFilters,
-  CriminalCasesFilterOptions,
+import {
+  calculateCriminalCaseStats,
+  CriminalCaseStats,
+  type CriminalCaseData,
+  type CriminalCaseFilters,
+  type CriminalCasesFilterOptions,
 } from "./schema";
 
 type CaseFilterValues = CriminalCaseFilters;

@@ -1,1 +1,287 @@
 "use server";
+
+import ActionResult from "@/app/components/ActionResult";
+import {
+  CivilCaseData,
+  CivilCaseSchema,
+} from "@/app/components/Case/Civil/schema";
+import {
+  Case,
+  CaseType,
+  CivilCase,
+  LogAction,
+  Prisma,
+} from "@/app/generated/prisma/client";
+import { validateSession } from "@/app/lib/authActions";
+import {
+  ExportExcelData,
+  getExcelHeaderMap,
+  isMappedRowEmpty,
+  normalizeRowBySchema,
+  ProcessExcelMeta,
+  processExcelUpload,
+  UploadExcelResult,
+} from "@/app/lib/excel";
+import { prisma } from "@/app/lib/prisma";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
+import Roles from "@/app/lib/Roles";
+import { getSchemaFieldKeys } from "@/app/lib/utils";
+import * as XLSX from "xlsx";
+import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
+
+export async function uploadExcel(
+  file: File,
+  caseType: CaseType,
+): Promise<ActionResult<UploadExcelResult>> {
+  try {
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
+
+    // Peek workbook to log sheet names (processExcelUpload will parse again for validation)
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      console.log(
+        `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+      );
+    } catch (peekError) {
+      console.warn("WARN Unable to preview workbook for logging:", peekError);
+    }
+
+    const headerMap = getExcelHeaderMap(CivilCaseSchema);
+    const branchHeaders = headerMap.branch ?? ["Branch"];
+
+    const getMappedCells = (row: Record<string, unknown>) => {
+      const values = normalizeRowBySchema(CivilCaseSchema, row);
+
+      return {
+        ...values,
+      };
+    };
+
+    const result = await processExcelUpload<CivilCaseSchema>({
+      file,
+      requiredHeaders: { Branch: branchHeaders },
+      schema: CivilCaseSchema,
+      getCells: getMappedCells,
+      skipRowsWithoutCell: ["caseNumber"],
+      uniqueKeys: ["caseNumber"],
+      uniqueKeyLabel: "Case number",
+      checkExistingUniqueKeys: async (keys) => {
+        const existing = await prisma.case.findMany({
+          where: { caseNumber: { in: keys } },
+          select: { caseNumber: true },
+        });
+        return new Set(existing.map((c) => c.caseNumber.trim()));
+      },
+      mapRow: (row, rowNum) => {
+        const cells = getMappedCells(row);
+
+        // Skip rows that have no mapped content beyond the case number (or are entirely empty)
+        if (isMappedRowEmpty(cells, ["caseNumber"])) {
+          return { skip: true };
+        }
+
+        const caseNumberRaw = cells.caseNumber?.toString().trim();
+        const petitioner = cells.petitioners
+          ?.toString()
+          .trim()
+          .replace(" ", "-"); // Replace spaces with dashes to avoid issues in undocketed case numbers
+        const respondent = cells.defendants
+          ?.toString()
+          .trim()
+          .replace(" ", "-"); // Replace spaces with dashes to avoid issues in undocketed case numbers
+        const dateFiled =
+          cells.dateFiled instanceof Date || typeof cells.dateFiled === "string"
+            ? new Date(cells.dateFiled)
+            : null;
+
+        const caseNumber = cells.caseNumber
+          ?.toString()
+          .trim()
+          ?.toLowerCase()
+          .includes("undocketed")
+          ? caseNumberRaw +
+            `${petitioner ? "-" + petitioner : ""}-${respondent ? "-" + respondent : ""}-${dateFiled?.getTime() ?? "nofiledate"}`
+          : caseNumberRaw;
+
+        const undocketed = caseNumber
+          ?.toLocaleLowerCase()
+          .includes("undocketed");
+
+        const hydrated = {
+          ...cells,
+          caseNumber,
+          assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
+          caseType,
+          undocketed,
+        };
+
+        const validation = CivilCaseSchema.safeParse(hydrated);
+        if (!validation.success) {
+          return {
+            errorMessage: prettifyError(validation.error),
+          };
+        }
+
+        return {
+          mapped: validation.data,
+          uniqueKey: validation.data.caseNumber?.toString().trim(),
+        };
+      },
+      onBatchInsert: async (rows) => {
+        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        const civilRows: Prisma.CivilCaseCreateManyInput[] = [];
+
+        rows.forEach((row) => {
+          const { caseData, detailData } = splitCaseDataBySchema(row);
+          caseRows.push(caseData);
+          civilRows.push({
+            ...detailData,
+            caseNumber: caseData.caseNumber,
+          } as Prisma.CivilCaseCreateManyInput);
+        });
+
+        const created = await prisma.case.createManyAndReturn({
+          data: caseRows,
+        });
+
+        if (civilRows.length > 0) {
+          await prisma.civilCase.createMany({ data: civilRows });
+        }
+
+        return { ids: created.map((c) => c.id), count: created.length };
+      },
+    });
+
+    if (result.success) {
+      const meta: ProcessExcelMeta = result.result?.meta;
+      const imported = meta.importedCount;
+      const errors = meta.errorCount;
+      const sheets = meta.sheetSummary;
+
+      console.log(
+        `OK Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
+      );
+      if (sheets.length > 0) {
+        sheets.forEach(
+          (s: {
+            sheet: string;
+            valid: number;
+            rows: number;
+            failed: number;
+          }) => {
+            console.log(
+              `  Sheet "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+            );
+          },
+        );
+      }
+
+      if (result.result?.failedExcel) {
+        console.log(
+          "WARN Failed rows file generated:",
+          result.result.failedExcel.fileName,
+        );
+      }
+
+      await createLog({
+        action: LogAction.IMPORT_CASES,
+        details: {
+          ids: meta.importedIds ?? [],
+        },
+      });
+    } else {
+      console.error("ERROR Import failed:", result.error);
+    }
+
+    return result;
+  } catch (error) {
+    console.error("Upload error:", error);
+    return { success: false, error: "Upload failed" };
+  }
+}
+
+export async function exportCasesExcel(): Promise<
+  ActionResult<ExportExcelData>
+> {
+  try {
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
+      all: ["id"],
+    });
+
+    const caseFieldKeys = getSchemaFieldKeys(CivilCaseSchema, {
+      all: ["id"],
+      stringKeys: [...baseCaseFieldKeys.stringKeys],
+      dateKeys: [...baseCaseFieldKeys.dateKeys],
+    });
+
+    const dateKeys = [
+      caseFieldKeys.dateKeys,
+      baseCaseFieldKeys.dateKeys,
+    ].flat();
+
+    const cases = await prisma.case.findMany({
+      orderBy: { id: "asc" },
+      include: { civilCase: true },
+    });
+
+    const caseCombined: CivilCaseData[] = cases
+      .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
+      .map((c) => ({
+        ...c,
+        ...c.civilCase,
+      }));
+
+    const headerMap = getExcelHeaderMap(CivilCaseSchema);
+    const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
+
+    const header = (key: keyof typeof headerMap, fallback: string) =>
+      headerMap[key]?.[0] ?? fallback;
+
+    const rows = caseCombined.map((c) => {
+      const formatDate = (value: Date | null | undefined) => {
+        if (!value) return "";
+        const date = new Date(value);
+        return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
+      };
+
+      return headerKeys.reduce(
+        (acc, key) => {
+          const headerName = header(key, key);
+          const value = dateKeys.includes(key)
+            ? formatDate(c[key] as Date | null | undefined)
+            : (c[key] ?? "");
+          acc[headerName] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
+    });
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Cases");
+
+    const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+    const fileName = `cases-export-${Date.now()}.xlsx`;
+
+    await createLog({ action: LogAction.EXPORT_CASES, details: null });
+
+    return { success: true, result: { fileName, base64 } };
+  } catch (error) {
+    console.error("Cases export error:", error);
+    return { success: false, error: "Export failed" };
+  }
+}

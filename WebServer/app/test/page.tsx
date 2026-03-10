@@ -1,5 +1,5 @@
-import CaseTester from "./CaseTester";
+import CivilCaseTester from "./CivilCaseTester";
 
 export default function page() {
-  return <CaseTester />;
+  return <CivilCaseTester />;
 }

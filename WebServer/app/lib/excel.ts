@@ -59,7 +59,7 @@ export const getRowValuesBySchema = <T extends z.ZodRawShape>(
 export const normalizeRowBySchema = <T extends z.ZodRawShape>(
   schema: z.ZodObject<T>,
   row: Record<string, unknown>,
-): Partial<Record<keyof T, unknown>> => {
+) => {
   const headers = getExcelHeaderMap(schema);
   const values: Partial<Record<keyof T, unknown>> = {};
   const shape = schema.shape;
@@ -226,26 +226,123 @@ export async function isExcel(file: File): Promise<boolean> {
 export const normalizeHeader = (val: string) =>
   val.toLowerCase().replace(/[\s.]/g, "").trim();
 
-export const getHeaderRow = (worksheet: XLSX.WorkSheet): string[] =>
-  (
-    (XLSX.utils.sheet_to_json<string[]>(worksheet, {
-      header: 1,
-      range: 0,
-      blankrows: false,
-    })[0] as string[] | undefined) || []
-  ).map((cell) => cell ?? "");
+type HeaderRowInfo = {
+  headerRow: string[];
+  headerRowIndex: number;
+};
+
+const toCellText = (cell: string | number | null | undefined): string => {
+  if (cell === null || cell === undefined) return "";
+  const asString = typeof cell === "string" ? cell : String(cell);
+  return asString.replace(/\s+/g, " ").trim();
+};
+
+const buildCompositeHeaderRow = (
+  rows: (string | number | null)[][],
+  headerRowIndex: number,
+): string[] => {
+  const rowLengths = [
+    rows[headerRowIndex]?.length ?? 0,
+    rows[headerRowIndex - 1]?.length ?? 0,
+    rows[headerRowIndex - 2]?.length ?? 0,
+  ];
+  const maxCols = Math.max(...rowLengths);
+
+  const nonEmptyCounts = rows.map(
+    (row) => row.filter((cell) => toCellText(cell) !== "").length,
+  );
+
+  return Array.from({ length: maxCols }).map((_, colIndex) => {
+    const parts: string[] = [];
+
+    for (let offset = 2; offset >= 1; offset -= 1) {
+      const rowIndex = headerRowIndex - offset;
+      if (rowIndex < 0) continue;
+      if (nonEmptyCounts[rowIndex] < 2) continue;
+      const value = toCellText(rows[rowIndex]?.[colIndex]);
+      if (value) parts.push(value);
+    }
+
+    const headerValue = toCellText(rows[headerRowIndex]?.[colIndex]);
+    if (headerValue) parts.push(headerValue);
+
+    return parts.join(" ").trim();
+  });
+};
+
+export const getHeaderRowInfo = (
+  worksheet: XLSX.WorkSheet,
+  expectedHeaders: string[] = [],
+): HeaderRowInfo => {
+  const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
+    header: 1,
+    range: 0,
+    blankrows: false,
+  }) as unknown as (string | number | null)[][];
+
+  const normalizedExpected = expectedHeaders
+    .map(normalizeHeader)
+    .filter((value) => value.length > 0);
+
+  const maxScan = Math.min(rows.length, 75);
+  let bestIndex = 0;
+  let bestMatchScore = -1;
+  let bestNonEmpty = -1;
+
+  for (let i = 0; i < maxScan; i += 1) {
+    const row = rows[i] ?? [];
+    const normalized = row.map((cell) => toCellText(cell));
+    const nonEmptyCount = normalized.filter((cell) => cell !== "").length;
+    let matchScore = 0;
+
+    if (normalizedExpected.length > 0) {
+      const normalizedRow = normalized.map(normalizeHeader);
+      normalizedExpected.forEach((expected) => {
+        if (!expected) return;
+        const hasMatch = normalizedRow.some(
+          (cell) =>
+            cell === expected ||
+            (cell &&
+              expected &&
+              (cell.includes(expected) || expected.includes(cell))),
+        );
+        if (hasMatch) matchScore += 1;
+      });
+    }
+
+    if (
+      matchScore > bestMatchScore ||
+      (matchScore === bestMatchScore && nonEmptyCount > bestNonEmpty)
+    ) {
+      bestMatchScore = matchScore;
+      bestNonEmpty = nonEmptyCount;
+      bestIndex = i;
+    }
+  }
+
+  const headerRow = buildCompositeHeaderRow(rows, bestIndex);
+
+  return {
+    headerRow,
+    headerRowIndex: bestIndex,
+  };
+};
 
 export const hasRequiredHeaders = (
   requiredHeaders: Record<string, string[]>,
   worksheet: XLSX.WorkSheet,
+  headerRow?: string[],
 ): { success: true } | { success: false; missingHeaders: string[] } => {
-  const headerRow = getHeaderRow(worksheet);
+  const resolvedHeaderRow = headerRow
+    ? headerRow
+    : getHeaderRowInfo(worksheet, Object.values(requiredHeaders).flat())
+        .headerRow;
 
   const missingHeaders: string[] = [];
 
   for (const key in requiredHeaders) {
     const targets = requiredHeaders[key].map(normalizeHeader);
-    const found = headerRow.some((cell) => {
+    const found = resolvedHeaderRow.some((cell) => {
       if (typeof cell !== "string") return false;
       const normalized = normalizeHeader(cell);
       return targets.some(
@@ -324,7 +421,10 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   uniqueKeys?: Array<keyof TCells>;
   checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
   uniqueKeyLabel?: string;
-  mapRow: (row: Record<string, unknown>) => {
+  mapRow: (
+    row: Record<string, unknown>,
+    rowNum: number,
+  ) => {
     mapped?: T;
     skip?: boolean;
     errorMessage?: string;
@@ -402,7 +502,18 @@ export async function processExcelUpload<
 
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName];
-    const rawSheetData = XLSX.utils.sheet_to_json<FailedRow>(worksheet);
+    const schemaHeaderMap =
+      schema instanceof z.ZodObject ? getExcelHeaderMap(schema) : {};
+    const expectedHeaders = [
+      ...Object.values(requiredHeaders).flat(),
+      ...Object.values(schemaHeaderMap).flat(),
+    ].filter((value): value is string => typeof value === "string");
+    const headerInfo = getHeaderRowInfo(worksheet, expectedHeaders);
+    const rawSheetData = XLSX.utils.sheet_to_json<FailedRow>(worksheet, {
+      header: headerInfo.headerRow,
+      range: headerInfo.headerRowIndex + 1,
+      blankrows: false,
+    });
     const sheetData = skipRows
       ? rawSheetData.filter(
           (row) => !isMappedRowEmpty(getCells(row), skipRows ?? []),
@@ -413,7 +524,11 @@ export async function processExcelUpload<
       `\n📋 Processing sheet "${sheetName}": ${sheetData.length} rows`,
     );
 
-    const headerCheck = hasRequiredHeaders(requiredHeaders, worksheet);
+    const headerCheck = hasRequiredHeaders(
+      requiredHeaders,
+      worksheet,
+      headerInfo.headerRow,
+    );
     if (headerCheck.success === false) {
       const errorReason = `Sheet "${sheetName}" is missing required column(s): ${headerCheck.missingHeaders.join(", ")}.`;
       const failedRows =
@@ -465,7 +580,7 @@ export async function processExcelUpload<
     for (let index = 0; index < sheetData.length; index++) {
       const row = sheetData[index];
 
-      const mapResult = mapRow(row);
+      const mapResult = mapRow(row, index + 2);
       if (mapResult.skip) {
         continue;
       }

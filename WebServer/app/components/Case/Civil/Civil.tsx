@@ -1,15 +1,12 @@
 "use client";
 
 import TipCell from "@/app/components/Table/TipCell";
+import { CaseType } from "@/app/generated/prisma/enums";
+import { useSession } from "@/app/lib/authClient";
+import { isTextFieldKey } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -35,7 +32,29 @@ import {
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
-import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../../Filter/FilterTypes";
+import { usePopup } from "../../Popup/PopupProvider";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
+import {
+  createCivilCase,
+  deleteCivilCase,
+  getCivilCases,
+  getCivilCaseStats,
+  updateCivilCase,
+} from "./CivilActions";
+import { exportCasesExcel, uploadExcel } from "./ExcelActions";
+import {
+  calculateCivilCaseStats,
+  CivilCaseSchema,
+  type CivilCaseData,
+  type CivilCaseFilters,
+  type CivilCasesFilterOptions,
+  type CivilCaseStats,
+} from "./schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,83 +65,22 @@ type NotarialRecord = {
   atty: string;
   defendant?: string;
   date: string;
-  link: string;
   notes?: string;
   nature?: string;
 };
 
-type NotarialFilterValues = {
-  title?: string;
-  name?: string;
-  atty?: string;
-  date?: { start?: string; end?: string };
-};
+type CaseFilterValues = CivilCaseFilters;
+type SortKey = NonNullable<CivilCasesFilterOptions["sortKey"]>;
+type CaseFilters = NonNullable<CivilCasesFilterOptions["filters"]>;
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_RECORDS: NotarialRecord[] = [
-  {
-    id: 1,
-    title: "01-M-2006",
-    name: "18",
-    atty: "MARICEL L. PINEDA",
-    defendant: "MUNER JAHER",
-    date: "2006-01-02",
-    link: "SUPPORT",
-    notes: "Support",
-    nature: "Support",
-  },
-  {
-    id: 2,
-    title: "02-M-2006",
-    name: "11",
-    atty: "RENATO OCTANIO",
-    defendant: "HEIRS OF JOSE DELA CRUZ",
-    date: "2006-01-02",
-    link: "ANNULMENT OF JUDGMENT",
-    notes: "Annulment of judgment",
-    nature: "Annulment",
-  },
-  {
-    id: 3,
-    title: "03-M-2006",
-    name: "12",
-    atty: "JOHN DOE",
-    defendant: "JANE DOE",
-    date: "2006-01-03",
-    link: "CASE FILE",
-    notes: "",
-    nature: "Property",
-  },
-  {
-    id: 4,
-    title: "04-M-2006",
-    name: "15",
-    atty: "ALICE SMITH",
-    defendant: "BOB SMITH",
-    date: "2006-01-04",
-    link: "CASE FILE",
-    notes: "Appealed",
-    nature: "Criminal",
-  },
-  {
-    id: 5,
-    title: "05-M-2006",
-    name: "20",
-    atty: "CARLOS RIVERA",
-    defendant: "SOMEONE ELSE",
-    date: "2006-01-05",
-    link: "CASE FILE",
-    notes: "",
-    nature: "Support",
-  },
-];
-
-const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
-  { key: "title", label: "Case Number", type: "text" },
-  { key: "name", label: "Branch", type: "text" },
-  { key: "atty", label: "Petitioner", type: "text" },
-  { key: "date", label: "Date", type: "daterange" },
+const CASE_FILTER_OPTIONS: FilterOption[] = [
+  { key: "branch", label: "Branch", type: "text" },
+  { key: "assistantBranch", label: "Assistant Branch", type: "text" },
+  { key: "caseNumber", label: "Case Number", type: "text" },
+  { key: "petitioners", label: "Petitioner/s", type: "text" },
+  { key: "defendants", label: "Defendant/s", type: "text" },
+  { key: "dateFiled", label: "Date Filed", type: "daterange" },
+  { key: "notes", label: "Notes", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
 ];
 
@@ -135,11 +93,10 @@ type FormEntry = {
   atty: string;
   defendant?: string;
   date: string;
-  link: string;
   notes?: string;
   nature?: string;
 
-  file?: File | null; // ✅ ADD THIS
+  file?: File | null;
 
   errors: Record<string, string>;
   saved: boolean;
@@ -154,10 +111,9 @@ const createEmptyEntry = (id: string): FormEntry => ({
   atty: "",
   defendant: "",
   date: "",
-  link: "",
   notes: "",
   nature: "",
-  file: null, // ✅ ADD
+  file: null,
 
   errors: {},
   saved: false,
@@ -170,12 +126,22 @@ const recordToEntry = (id: string, r: NotarialRecord): FormEntry => ({
   atty: r.atty,
   defendant: r.defendant ?? "",
   date: r.date,
-  link: r.link,
   notes: r.notes ?? "",
   nature: r.nature ?? "",
 
   errors: {},
   saved: false,
+});
+
+const caseToRecord = (c: CivilCaseData): NotarialRecord => ({
+  id: c.id,
+  title: c.caseNumber ?? "",
+  name: c.branch ?? "",
+  atty: c.petitioners ?? "",
+  defendant: c.defendants ?? "",
+  date: c.dateFiled ? new Date(c.dateFiled).toISOString().slice(0, 10) : "",
+  notes: c.notes ?? "",
+  nature: c.nature ?? "",
 });
 
 // ─── Column Definitions ───────────────────────────────────────────────────────
@@ -272,7 +238,7 @@ const formatDate = (dateStr: string) => {
   });
 };
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 15;
 
 // ─── Cell Input ───────────────────────────────────────────────────────────────
 
@@ -325,13 +291,13 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.atty || <span style={{ opacity: 0.4 }}>No Attorney</span>}
+            {entry.title || (
+              <span style={{ opacity: 0.4 }}>No case number</span>
+            )}
           </div>
           <div className="rv-hero-name">
-            {entry.title || (
-              <span style={{ opacity: 0.4, fontSize: 18 }}>
-                No title entered
-              </span>
+            {entry.atty || (
+              <span style={{ opacity: 0.4, fontSize: 18 }}>No petitioners</span>
             )}
           </div>
           {entry.name && <div className="rv-hero-charge">{entry.name}</div>}
@@ -354,25 +320,25 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
             </div>
             <div className="rv-grid rv-grid-3">
               <div className="rv-field">
-                <div className="rv-field-label">Title</div>
+                <div className="rv-field-label">Case Number</div>
                 <div className="rv-field-value">
                   {entry.title || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Name</div>
+                <div className="rv-field-label">Branch</div>
                 <div className="rv-field-value">
                   {entry.name || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Attorney</div>
+                <div className="rv-field-label">Petitioner/s</div>
                 <div className="rv-field-value">
                   {entry.atty || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Date</div>
+                <div className="rv-field-label">Date Filed</div>
                 <div className="rv-field-value rv-mono">
                   {fmtDate(entry.date) || <span className="rv-empty">—</span>}
                 </div>
@@ -383,19 +349,17 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
           <div className="rv-section">
             <div className="rv-section-header">
               <FiFolder size={13} />
-              <span>File Location</span>
+              <span>File</span>
             </div>
             <div className="rv-grid rv-grid-2">
               <div className="rv-field" style={{ gridColumn: "1 / -1" }}>
-                <div className="rv-field-label">Link / File Path</div>
+                <div className="rv-field-label">Attachment</div>
                 <div
                   className="rv-field-value rv-mono"
                   style={{ fontSize: 12, wordBreak: "break-all" }}
                 >
                   {entry.file ? (
                     <span>{entry.file.name}</span>
-                  ) : entry.link ? (
-                    <span>{entry.link}</span>
                   ) : (
                     <span className="rv-empty">—</span>
                   )}
@@ -424,9 +388,10 @@ const NotarialModal = ({
   type: ModalType;
   selectedRecord?: NotarialRecord | null;
   onClose: () => void;
-  onCreate?: (data: NotarialRecord) => void;
-  onUpdate?: (data: NotarialRecord) => void;
+  onCreate?: () => void;
+  onUpdate?: () => void;
 }) => {
+  const statusPopup = usePopup();
   const isEdit = type === "EDIT";
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -439,7 +404,6 @@ const NotarialModal = ({
           ? {
               ...e,
               file,
-              link: file ? file.name : e.link, // auto fill link display
             }
           : e,
       ),
@@ -534,7 +498,9 @@ const NotarialModal = ({
     });
     setEntries(validated);
     if (anyError) {
-      alert("Please fill in all required fields before reviewing.");
+      statusPopup.showError(
+        "Please fill in all required fields before reviewing.",
+      );
       return;
     }
     setReviewIdx(0);
@@ -542,39 +508,78 @@ const NotarialModal = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const buildPayload = (entry: FormEntry) => {
+    const payload = {
+      caseNumber: entry.title.trim(),
+      branch: entry.name.trim() || null,
+      assistantBranch: entry.name.trim() || null,
+      dateFiled: entry.date ? new Date(entry.date).toISOString() : null,
+      caseType: CaseType.CIVIL,
+      petitioners: entry.atty.trim() || null,
+      defendants: entry.defendant?.trim() || null,
+      notes: entry.notes?.trim() || null,
+      nature: entry.nature?.trim() || null,
+      originCaseNumber: null,
+      reRaffleDate: null,
+      reRaffleBranch: null,
+      consolitationDate: null,
+      consolidationBranch: null,
+      dateRemanded: null,
+      remandedNote: null,
+    };
+
+    return CivilCaseSchema.safeParse(payload);
+  };
+
   const handleSubmit = async () => {
     const label = isEdit
-      ? "Save changes to this record?"
+      ? "Save changes to this case?"
       : entries.length === 1
-        ? "Create this record?"
-        : `Create ${entries.length} records?`;
-    if (!confirm(label)) return;
+        ? "Create this case?"
+        : `Create ${entries.length} cases?`;
+    if (!(await statusPopup.showConfirm(label))) return;
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
-    if (isEdit && selectedRecord) {
-      const e = entries[0];
-      onUpdate?.({
-        ...selectedRecord,
-        title: e.title,
-        name: e.name,
-        atty: e.atty,
-        date: e.date,
-        link: e.link,
-      });
-    } else {
-      entries.forEach((e, i) => {
-        onCreate?.({
-          id: Date.now() + i,
-          title: e.title,
-          name: e.name,
-          atty: e.atty,
-          date: e.date,
-          link: e.link,
-        });
-      });
+    statusPopup.showLoading(
+      isEdit ? "Updating case..." : "Creating case(s)...",
+    );
+    try {
+      if (isEdit && selectedRecord) {
+        const entry = entries[0];
+        if (entry.title.trim() !== selectedRecord.title.trim()) {
+          throw new Error("Case number cannot be changed");
+        }
+        const parsed = buildPayload(entry);
+        if (!parsed.success) throw new Error("Invalid case data");
+        const response = await updateCivilCase(selectedRecord.id, parsed.data);
+        if (!response.success)
+          throw new Error(response.error || "Failed to update case");
+        onUpdate?.();
+        statusPopup.showSuccess("Case updated successfully");
+      } else {
+        for (const entry of entries) {
+          const parsed = buildPayload(entry);
+          if (!parsed.success) throw new Error("Invalid case data");
+          const response = await createCivilCase(parsed.data);
+          if (!response.success)
+            throw new Error(response.error || "Failed to create case");
+          onCreate?.();
+        }
+        statusPopup.showSuccess(
+          entries.length === 1
+            ? "Case created successfully"
+            : `${entries.length} cases created successfully`,
+        );
+      }
+
+      onClose();
+    } catch (err) {
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to save case",
+      );
+    } finally {
+      setIsSubmitting(false);
+      statusPopup.hidePopup();
     }
-    setIsSubmitting(false);
-    onClose();
   };
 
   const ROW_NUM_W = 48;
@@ -650,7 +655,7 @@ const NotarialModal = ({
                   ) : (
                     <>
                       Fill rows like a spreadsheet —{" "}
-                      <kbd className="xls-kbd">Tab</kbd> pa st the last cell to
+                      <kbd className="xls-kbd">Tab</kbd> past the last cell to
                       add a new row.
                     </>
                   )}
@@ -773,52 +778,21 @@ const NotarialModal = ({
                             ))}
                             {DETAIL_COLS.map((col, colIdx) => (
                               <td key={col.key}>
-                                {col.key === "link" ? (
-                                  <div className="flex flex-col gap-1">
-                                    {/* Upload File */}
-                                    <input
-                                      type="file"
-                                      className="file-input file-input-xs file-input-bordered w-full"
-                                      onChange={(e) =>
-                                        handleFileChange(
-                                          entry.id,
-                                          e.target.files?.[0] || null,
-                                        )
-                                      }
-                                    />
-
-                                    {entry.link ? (
-                                      <a
-                                        href={entry.link}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
-                                      >
-                                        {entry.link}
-                                      </a>
-                                    ) : null}
-                                  </div>
-                                ) : (
-                                  <CellInput
-                                    col={col}
-                                    value={entry[col.key] as string}
-                                    error={entry.errors[col.key as string]}
-                                    onChange={(v) =>
-                                      handleChange(
-                                        entry.id,
-                                        col.key as string,
-                                        v,
-                                      )
-                                    }
-                                    onKeyDown={(e) =>
-                                      handleCellKeyDown(
-                                        e,
-                                        entry.id,
-                                        colIdx === lastColIdx,
-                                      )
-                                    }
-                                  />
-                                )}
+                                <CellInput
+                                  col={col}
+                                  value={entry[col.key] as string}
+                                  error={entry.errors[col.key as string]}
+                                  onChange={(v) =>
+                                    handleChange(entry.id, col.key as string, v)
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleCellKeyDown(
+                                      e,
+                                      entry.id,
+                                      colIdx === lastColIdx,
+                                    )
+                                  }
+                                />
                               </td>
                             ))}
                             <td className="td-actions">
@@ -937,10 +911,10 @@ const NotarialModal = ({
                         <span className="rv-sidebar-num">{idx + 1}</span>
                         <div className="rv-sidebar-info">
                           <div className="rv-sidebar-casenum">
-                            {entry.title || "No title"}
+                            {entry.title || "No case number"}
                           </div>
                           <div className="rv-sidebar-name">
-                            {entry.name || "No name"}
+                            {entry.atty || "No petitioners"}
                           </div>
                         </div>
                       </button>
@@ -1033,7 +1007,7 @@ const NotarialModal = ({
 
 // ─── Sort TH ─────────────────────────────────────────────────────────────────
 
-type SortConfig = { key: keyof NotarialRecord; order: "asc" | "desc" };
+type SortConfig = { key: SortKey; order: "asc" | "desc" };
 
 const SortTh = ({
   label,
@@ -1042,9 +1016,9 @@ const SortTh = ({
   onSort,
 }: {
   label: string;
-  colKey: keyof NotarialRecord;
+  colKey: SortKey;
   sortConfig: SortConfig;
-  onSort: (k: keyof NotarialRecord) => void;
+  onSort: (k: SortKey) => void;
 }) => (
   <th
     className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
@@ -1060,37 +1034,6 @@ const SortTh = ({
     )}
   </th>
 );
-
-// ─── Filter Logic ─────────────────────────────────────────────────────────────
-
-const applyNotarialFilters = (
-  filters: NotarialFilterValues,
-  items: NotarialRecord[],
-): NotarialRecord[] =>
-  items.filter((r) => {
-    if (
-      filters.title &&
-      !r.title.toLowerCase().includes(filters.title.toLowerCase())
-    )
-      return false;
-    if (
-      filters.name &&
-      !r.name.toLowerCase().includes(filters.name.toLowerCase())
-    )
-      return false;
-    if (
-      filters.atty &&
-      !r.atty.toLowerCase().includes(filters.atty.toLowerCase())
-    )
-      return false;
-    if (filters.date) {
-      if (!r.date) return false;
-      const d = new Date(r.date);
-      if (filters.date.start && d < new Date(filters.date.start)) return false;
-      if (filters.date.end && d > new Date(filters.date.end)) return false;
-    }
-    return true;
-  });
 
 // ─── Row Component ────────────────────────────────────────────────────────────
 
@@ -1307,28 +1250,35 @@ const Pagination: React.FC<{
 
 const Civil: React.FC = () => {
   const router = useRouter();
-  const [records, setRecords] = useState<NotarialRecord[]>(MOCK_RECORDS);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "date",
-    order: "desc",
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-
+  const statusPopup = usePopup();
+  const [records, setRecords] = useState<NotarialRecord[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modalType, setModalType] = useState<ModalType | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
     null,
   );
-
+  const [stats, setStats] = useState<CivilCaseStats>({
+    totalCases: 0,
+    reRaffledCases: 0,
+    remandedCases: 0,
+    recentlyFiled: 0,
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "dateFiled",
+    order: "desc",
+  });
+  const [currentPage, setCurrentPage] = useState(1);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<NotarialFilterValues>(
-    {},
-  );
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<
-    NotarialRecord[]
-  >([]);
+  const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const isAdminOrAtty = true;
+  const session = useSession();
+  const isAdminOrAtty =
+    session?.data?.user?.role === "admin" ||
+    session?.data?.user?.role === "atty";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1337,103 +1287,244 @@ const Civil: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, appliedFilters]);
 
-  const handleSort = (key: keyof NotarialRecord) =>
+  const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
-
-  const getSuggestions = (key: string, inputValue: string): string[] => {
-    const textKeys = ["title", "name", "atty"];
-    if (!textKeys.includes(key)) return [];
-    const values = records
-      .map((r) => (r[key as keyof NotarialRecord] as string) || "")
-      .filter(Boolean);
-    const unique = Array.from(new Set(values)).sort();
-    if (!inputValue) return unique;
-    return unique.filter((v) =>
-      v.toLowerCase().includes(inputValue.toLowerCase()),
-    );
+    setCurrentPage(1);
   };
 
-  const handleApplyFilters = (filters: FilterValues) => {
-    const typed = filters as NotarialFilterValues;
-    setAppliedFilters(typed);
-    setFilteredByAdvanced(applyNotarialFilters(typed, records));
-  };
+  const fetchCases = useCallback(
+    async (page = currentPage) => {
+      try {
+        setLoading(true);
+        const [casesRes, statsRes] = await Promise.all([
+          getCivilCases({
+            page,
+            pageSize: PAGE_SIZE,
+            searchTerm,
+            filters: appliedFilters,
+            sortKey: sortConfig.key,
+            sortOrder: sortConfig.order,
+            exactMatchMap,
+          }),
+          getCivilCaseStats({
+            searchTerm,
+            filters: appliedFilters,
+            exactMatchMap,
+          }),
+        ]);
 
-  const filteredAndSorted = useMemo(() => {
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : records;
-    let filtered = baseList;
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      filtered = baseList.filter((r) =>
-        Object.values(r).some((v) =>
-          v?.toString().toLowerCase().includes(lower),
-        ),
-      );
-    }
-    return [...filtered].sort((a, b) => {
-      const aVal = a[sortConfig.key] ?? "";
-      const bVal = b[sortConfig.key] ?? "";
-      if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [records, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+        if (!casesRes.success) {
+          statusPopup.showError(casesRes.error || "Failed to fetch cases");
+          return;
+        }
 
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredAndSorted.length / PAGE_SIZE),
+        if (!casesRes.result) {
+          statusPopup.showError("Failed to fetch cases");
+          return;
+        }
+
+        const result = casesRes.result;
+        setRecords(result.items.map(caseToRecord));
+        setTotalCount(result.total ?? result.items.length);
+        setStats(calculateCivilCaseStats(result.items));
+
+        if (statsRes.success && statsRes.result) {
+          setStats(statsRes.result);
+        } else if (!statsRes.success) {
+          console.error("Failed to fetch case stats", statsRes.error);
+        }
+
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch cases");
+        console.error("Error fetching cases:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      appliedFilters,
+      currentPage,
+      exactMatchMap,
+      searchTerm,
+      sortConfig.key,
+      sortConfig.order,
+      statusPopup,
+    ],
   );
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage]);
 
-  const stats = useMemo(() => {
-    const total = records.length;
-    const now = new Date();
-    const thisMonth = records.filter((r) => {
-      if (!r.date) return false;
-      const d = new Date(r.date);
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    }).length;
-    const attorneys = new Set(records.map((r) => r.atty)).size;
-    const noDate = records.filter((r) => !r.date).length;
-    return { total, thisMonth, attorneys, noDate };
-  }, [records]);
+  useEffect(() => {
+    fetchCases(currentPage);
+  }, [fetchCases, currentPage]);
 
-  const activeFilterCount = Object.keys(appliedFilters).length;
+  const getCaseSuggestions = async (
+    key: string,
+    inputValue: string,
+  ): Promise<string[]> => {
+    const isTextField = isTextFieldKey(
+      CASE_FILTER_OPTIONS.reduce(
+        (acc, opt) => {
+          acc[opt.key] = opt.type;
+          return acc;
+        },
+        {} as Record<string, string>,
+      ),
+      key,
+    );
 
-  const handleDelete = (id: number) => {
-    if (!confirm("Are you sure you want to delete this record?")) return;
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    if (!isTextField) return [];
+
+    const res = await getCivilCases({
+      page: 1,
+      pageSize: 10,
+      filters: { [key]: inputValue } as CaseFilters,
+      exactMatchMap: { [key]: false },
+      sortKey: key as SortKey,
+      sortOrder: "asc",
+    });
+
+    if (!res.success || !res.result) return [];
+    const items = Array.isArray(res.result)
+      ? res.result
+      : (res.result.items as CivilCaseData[]);
+
+    const values = items
+      .map((c) => (c[key as keyof CivilCaseData] as string | null) || "")
+      .filter((v) => v.length > 0);
+
+    return Array.from(new Set(values)).sort().slice(0, 10);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleApplyFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
+    const typed = filters as CaseFilterValues;
+    setAppliedFilters(typed);
+    setExactMatchMap(exactMatchMapParam);
+    setCurrentPage(1);
+  };
+
+  const totalItems = totalCount;
+  const pageCount = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+  const handleDelete = async (id: number) => {
+    if (
+      !(await statusPopup.showConfirm(
+        "Are you sure you want to delete this case?",
+      ))
+    )
+      return;
+
+    const result = await deleteCivilCase(id);
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to delete case");
+      return;
+    }
+
+    statusPopup.showSuccess("Case deleted successfully");
+    await fetchCases();
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setUploading(true);
-    setTimeout(() => {
+    try {
+      const result = await uploadExcel(file, CaseType.CIVIL);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+      } else {
+        statusPopup.showSuccess("Cases imported successfully");
+        await fetchCases();
+      }
+
+      if (result.success && result.result?.failedExcel) {
+        const { fileName, base64 } = result.result.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        statusPopup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
+      }
+    } finally {
       setUploading(false);
-      alert("Import complete (mock)");
       e.target.value = "";
-    }, 1200);
+    }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setExporting(true);
-    setTimeout(() => {
+    try {
+      const result = await exportCasesExcel();
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to export cases");
+        return;
+      }
+
+      if (!result.result) {
+        statusPopup.showError("No export data available");
+        return;
+      }
+
+      const { fileName, base64 } = result.result;
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
       setExporting(false);
-      alert("Export complete (mock)");
-    }, 1000);
+    }
   };
 
-  // ── Full-page modal — same as Proceedings/CasePage ──
+  if (loading) {
+    return <PageListSkeleton statCards={4} tableColumns={7} tableRows={8} />;
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        <FiAlertCircle className="w-5 h-5" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+
   if (modalType) {
     return (
       <NotarialModal
@@ -1442,11 +1533,10 @@ const Civil: React.FC = () => {
         onClose={() => {
           setModalType(null);
           setSelectedRecord(null);
+          fetchCases();
         }}
-        onCreate={(r) => setRecords((prev) => [r, ...prev])}
-        onUpdate={(r) =>
-          setRecords((prev) => prev.map((x) => (x.id === r.id ? r : x)))
-        }
+        onCreate={() => fetchCases()}
+        onUpdate={() => fetchCases()}
       />
     );
   }
@@ -1498,7 +1588,7 @@ const Civil: React.FC = () => {
             </div>
 
             <button
-              className={`btn btn-outline ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+              className={`btn btn-outline ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
               onClick={() => setFilterModalOpen((prev) => !prev)}
             >
               <svg
@@ -1514,9 +1604,9 @@ const Civil: React.FC = () => {
                 />
               </svg>
               Filter
-              {activeFilterCount > 0 && (
+              {appliedFilters && Object.keys(appliedFilters).length > 0 && (
                 <span className="badge badge-sm badge-primary ml-1">
-                  {activeFilterCount}
+                  {Object.keys(appliedFilters).length}
                 </span>
               )}
             </button>
@@ -1535,7 +1625,6 @@ const Civil: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                {" "}
                 <FiUpload className="h-5 w-5" />
                 {uploading ? "Importing..." : "Import Excel"}
               </button>
@@ -1546,7 +1635,6 @@ const Civil: React.FC = () => {
                 onClick={handleExport}
                 disabled={exporting}
               >
-                {" "}
                 <FiDownload className="h-5 w-5" />
                 {exporting ? "Exporting..." : "Export Excel"}
               </button>
@@ -1579,10 +1667,11 @@ const Civil: React.FC = () => {
           <FilterModal
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
-            options={NOTARIAL_FILTER_OPTIONS}
+            options={CASE_FILTER_OPTIONS}
             onApply={handleApplyFilters}
             initialValues={appliedFilters}
-            getSuggestions={getSuggestions}
+            getSuggestions={getCaseSuggestions}
+            initialExactMatchMap={exactMatchMap}
           />
         </div>
 
@@ -1590,30 +1679,30 @@ const Civil: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
             {
-              label: "TOTAL RECORDS",
-              value: (stats.total ?? 0).toLocaleString(),
-              subtitle: `${(stats.noDate ?? 0).toLocaleString()} missing dates`,
+              label: "TOTAL CASES",
+              value: (stats.totalCases ?? 0).toLocaleString(),
+              subtitle: "All civil cases",
               icon: FiBarChart2,
               delay: 0,
             },
             {
-              label: "THIS MONTH",
-              value: (stats.thisMonth ?? 0).toLocaleString(),
-              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} entries this month`,
+              label: "RECENTLY FILED",
+              value: (stats.recentlyFiled ?? 0).toLocaleString(),
+              subtitle: "Filed in the last 30 days",
               icon: FiFileText,
               delay: 100,
             },
             {
-              label: "UNIQUE PETITIONERS",
-              value: (stats.attorneys ?? 0).toLocaleString(),
-              subtitle: `${(stats.attorneys ?? 0).toLocaleString()} petitioners`,
+              label: "RE-RAFFLED",
+              value: (stats.reRaffledCases ?? 0).toLocaleString(),
+              subtitle: "Re-raffled cases",
               icon: FiUsers,
               delay: 200,
             },
             {
-              label: "RECORDS MISSING DATE",
-              value: (stats.noDate ?? 0).toLocaleString(),
-              subtitle: `${(stats.noDate ?? 0).toLocaleString()} records without date`,
+              label: "REMANDED",
+              value: (stats.remandedCases ?? 0).toLocaleString(),
+              subtitle: "Cases remanded",
               icon: FiLock,
               delay: 300,
             },
@@ -1664,31 +1753,31 @@ const Civil: React.FC = () => {
                 {isAdminOrAtty && <th>ACTIONS</th>}
                 <SortTh
                   label="CASE NUMBER"
-                  colKey="title"
+                  colKey="caseNumber"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="BRANCH"
-                  colKey="name"
+                  colKey="branch"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="PETITIONER/S"
-                  colKey="atty"
+                  colKey="petitioners"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="DEFENDANT/S"
-                  colKey="defendant"
+                  colKey="defendants"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
                   label="DATE FILED"
-                  colKey="date"
+                  colKey="dateFiled"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
@@ -1697,10 +1786,10 @@ const Civil: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {records.length === 0 ? (
                 <tr>
                   <td colSpan={isAdminOrAtty ? 8 : 7}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-[220px]">
+                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-55">
                       <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
                       </div>
@@ -1714,7 +1803,7 @@ const Civil: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginated.map((r) => (
+                records.map((r) => (
                   <NotarialRow
                     key={r.id}
                     record={r}

@@ -2,7 +2,6 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import {
-  BaseCaseSchema,
   CriminalCaseData,
   CriminalCaseSchema,
 } from "@/app/components/Case/Criminal/schema";
@@ -24,12 +23,13 @@ import {
   UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
-import { splitCaseData } from "@/app/lib/PrismaHelper";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
 
 export async function uploadExcel(
   file: File,
@@ -119,10 +119,10 @@ export async function uploadExcel(
         const criminalRows: Prisma.CriminalCaseCreateManyInput[] = [];
 
         rows.forEach((row) => {
-          const { caseData, criminalData } = splitCaseData(row);
+          const { caseData, detailData } = splitCaseDataBySchema(row);
           caseRows.push(caseData);
           criminalRows.push({
-            ...criminalData,
+            ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
             caseNumber: caseData.caseNumber,
           });
         });
