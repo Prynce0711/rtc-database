@@ -1,5 +1,5 @@
-import CivilCaseTester from "./CivilCaseTester";
+import ChatTest from "./ChatTest";
 
 export default function page() {
-  return <CivilCaseTester />;
+  return <ChatTest />;
 }

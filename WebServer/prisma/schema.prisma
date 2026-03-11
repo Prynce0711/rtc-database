@@ -10,6 +10,11 @@ datasource db {
   provider = "sqlite"
 }
 
+enum ChatType {
+  GROUP
+  DIRECT
+}
+
 enum Roles {
   admin
   user
@@ -221,6 +226,8 @@ model User {
   accounts      Account[]
 
   status Status @default(PENDING)
+  chatMessages ChatMessage[]
+  chatMembers ChatMember[]
 
   Logs Log[]
 
@@ -298,11 +305,11 @@ model Notarial {
   createdAt DateTime @default(now())
   date      DateTime
 
-  file   NotarialFile? @relation(fields: [fileId], references: [id])
+  file   File? @relation(fields: [fileId], references: [id])
   fileId Int?
 }
 
-model NotarialFile {
+model File {
   id        Int      @id @default(autoincrement())
   filename  String
   path      String
@@ -311,6 +318,7 @@ model NotarialFile {
   createdAt DateTime @default(now())
 
   notarials Notarial[]
+  chatMessages ChatMessage[]
 }
 
 model RegionalTrialCourt {
@@ -418,4 +426,45 @@ model JudgementRegional {
   ciclInc         Int     @default(0)
   fine            Int     @default(0)
   total           Int     @default(0)
+}
+
+model Chat {
+  id            Int   @id @default(autoincrement())
+  type          ChatType @default(DIRECT)
+  name          String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastMessageAt DateTime @default(now())
+  // call          Call?
+
+  members  ChatMember[]
+  messages ChatMessage[]
+}
+
+model ChatMember {
+  id       Int   @id @default(autoincrement())
+  chatId   Int
+  userId   String
+  joinedAt DateTime @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+}
+
+model ChatMessage {
+  id        Int   @id @default(autoincrement())
+  chatId    Int
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileId Int?
+  file File? @relation(fields: [fileId], references: [id])
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

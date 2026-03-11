@@ -7,7 +7,8 @@
     "dev:noudp": "concurrently \"next dev\" \"prisma studio --browser none\"",
     "build": "next build",
     "start": "cross-env NODE_ENV=production node dist/server.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prepare": "next-ws patch"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.998.0",
@@ -22,12 +23,14 @@
     "framer-motion": "^12.31.0",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
+    "next-runtime-env": "^3.3.0",
     "next-ws": "^2.1.16",
     "nodemailer": "^8.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",
     "recharts": "^3.7.0",
+    "ws": "^8.19.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
@@ -38,6 +41,7 @@
     "@types/nodemailer": "^7.0.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "concurrently": "^9.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",

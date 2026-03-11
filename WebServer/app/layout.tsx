@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
 import PopupProvider from "./components/Popup/PopupProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
 import "./globals.css";
+import SocketProvider from "./lib/socket/SocketProvider";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -26,8 +28,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en" data-theme={darkModeClass}>
+      <head>
+        <PublicEnvScript />
+      </head>
       <body className={`${montserrat.variable} font-sans antialiased`}>
-        <PopupProvider>{children}</PopupProvider>
+        <PopupProvider>
+          <SocketProvider>{children}</SocketProvider>
+        </PopupProvider>
       </body>
     </html>
   );
