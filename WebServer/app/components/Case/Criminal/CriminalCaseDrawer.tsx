@@ -20,8 +20,8 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { usePopup } from "../Popup/PopupProvider";
-import { createCase, updateCase } from "./CasesActions";
+import { usePopup } from "../../Popup/PopupProvider";
+import { createCriminalCase, updateCriminalCase } from "./CriminalCasesActions";
 import {
   CaseEntry,
   CriminalCaseData,
@@ -31,7 +31,7 @@ import {
   createTempId,
 } from "./schema";
 
-export enum CaseModalType {
+export enum CriminalCaseModalType {
   ADD = "ADD",
   EDIT = "EDIT",
 }
@@ -691,7 +691,7 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────── */
-const NewCaseModal = ({
+const NewCriminalCaseModal = ({
   onClose,
   selectedCase = null,
   onCreate,
@@ -842,7 +842,7 @@ const NewCaseModal = ({
         const parsed = buildPayload(entries[0]);
         if (!parsed.success) throw new Error("Invalid data");
         const payload = parsed.data;
-        const response = await updateCase(selectedCase.id, {
+        const response = await updateCriminalCase(selectedCase.id, {
           ...payload,
           dateFiled: payload.dateFiled
             ? new Date(payload.dateFiled).toISOString()
@@ -860,7 +860,7 @@ const NewCaseModal = ({
           const parsed = buildPayload(entry);
           if (!parsed.success) throw new Error("Invalid data");
           const payload = parsed.data;
-          const response = await createCase({
+          const response = await createCriminalCase({
             ...payload,
             dateFiled: payload.dateFiled
               ? new Date(payload.dateFiled).toISOString()
@@ -1348,4 +1348,4 @@ const NewCaseModal = ({
   );
 };
 
-export default NewCaseModal;
+export default NewCriminalCaseModal;

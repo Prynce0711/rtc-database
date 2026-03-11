@@ -1,41 +1,34 @@
 "use client";
 
 import {
-  createCase,
-  deleteCase,
-  getCases,
-  updateCase,
-} from "@/app/components/Case/CasesActions";
+  createCivilCase,
+  deleteCivilCase,
+  getCivilCases,
+  updateCivilCase,
+} from "@/app/components/Case/Civil/CivilActions";
 import {
   exportCasesExcel,
   uploadExcel,
-} from "@/app/components/Case/ExcelActions";
+} from "@/app/components/Case/Civil/ExcelActions";
 import {
   CaseEntry,
+  CivilCaseData,
   caseToEntry,
   createEmptyEntry,
-} from "@/app/components/Case/schema";
-import { Case, CaseType } from "@/app/generated/prisma/client";
+} from "@/app/components/Case/Civil/schema";
+import { CaseType } from "@/app/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 
-const CASE_TYPES: CaseType[] = [
-  "CRIMINAL",
-  "CIVIL",
-  "LAND_REGISTRATION_CASE",
-  "PETITION",
-  "ELECTION",
-  "SCA",
-  "UNKNOWN",
-];
+const CASE_TYPES: CaseType[] = ["CIVIL"];
 
-export default function CaseTester() {
-  const [cases, setCases] = useState<Case[]>([]);
+export default function CivilCaseTester() {
+  const [cases, setCases] = useState<CivilCaseData[]>([]);
   const [formData, setFormData] = useState<CaseEntry>(createEmptyEntry());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [caseType, setCaseType] = useState<CaseType>("CRIMINAL");
+  const [caseType, setCaseType] = useState<CaseType>("CIVIL");
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -47,7 +40,7 @@ export default function CaseTester() {
 
   const loadCases = async () => {
     setLoading(true);
-    const result = await getCases();
+    const result = await getCivilCases();
     if (result.success) {
       setCases(result.result.items);
       setMessage({ type: "success", text: "Cases loaded successfully" });
@@ -80,46 +73,28 @@ export default function CaseTester() {
         assistantBranch: formData.assistantBranch,
         caseNumber: formData.caseNumber,
         dateFiled: formData.dateFiled,
-        name: formData.name,
-        charge: formData.charge,
-        infoSheet: formData.infoSheet,
-        court: formData.court,
         caseType: formData.caseType,
-        detained: formData.detained,
-        consolidation: formData.consolidation,
-        eqcNumber: formData.eqcNumber || null,
-        bond: formData.bond || null,
-        raffleDate: formData.raffleDate || null,
-        committee1: formData.committee1 || null,
-        committee2: formData.committee2 || null,
-        judge: formData.judge || null,
-        ao: formData.ao || null,
-        complainant: formData.complainant || null,
-        houseNo: formData.houseNo || null,
-        street: formData.street || null,
-        barangay: formData.barangay || null,
-        municipality: formData.municipality || null,
-        province: formData.province || null,
-        counts: formData.counts || null,
-        jdf: formData.jdf || null,
-        sajj: formData.sajj || null,
-        sajj2: formData.sajj2 || null,
-        mf: formData.mf || null,
-        stf: formData.stf || null,
-        lrf: formData.lrf || null,
-        vcf: formData.vcf || null,
-        total: formData.total || null,
-        amountInvolved: formData.amountInvolved || null,
+        petitioners: formData.petitioners,
+        defendants: formData.defendants || null,
+        notes: formData.notes || null,
+        nature: formData.nature || null,
+        originCaseNumber: formData.originCaseNumber || null,
+        reRaffleDate: formData.reRaffleDate || null,
+        reRaffleBranch: formData.reRaffleBranch || null,
+        consolitationDate: formData.consolitationDate || null,
+        consolidationBranch: formData.consolidationBranch || null,
+        dateRemanded: formData.dateRemanded || null,
+        remandedNote: formData.remandedNote || null,
       };
 
       let result;
       if (isEditing && editingId) {
-        result = await updateCase(editingId, data);
+        result = await updateCivilCase(editingId, data);
         if (result.success) {
           setMessage({ type: "success", text: "Case updated successfully" });
         }
       } else {
-        result = await createCase(data);
+        result = await createCivilCase(data);
         if (result.success) {
           setMessage({ type: "success", text: "Case created successfully" });
         }
@@ -133,14 +108,14 @@ export default function CaseTester() {
         setEditingId(null);
         await loadCases();
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "An error occurred" });
     }
 
     setLoading(false);
   };
 
-  const handleEdit = (caseItem: Case) => {
+  const handleEdit = (caseItem: CivilCaseData) => {
     const formEntry = caseToEntry(caseItem);
     setFormData(formEntry);
     setIsEditing(true);
@@ -151,7 +126,7 @@ export default function CaseTester() {
     if (!confirm("Are you sure you want to delete this case?")) return;
 
     setLoading(true);
-    const result = await deleteCase(id);
+    const result = await deleteCivilCase(id);
     if (result.success) {
       setMessage({ type: "success", text: "Case deleted successfully" });
       await loadCases();
@@ -210,7 +185,6 @@ export default function CaseTester() {
       });
     }
 
-    // Download failed rows Excel if available
     if (result.success && result.result?.failedExcel) {
       const { fileName, base64 } = result.result.failedExcel;
       const byteCharacters = atob(base64);
@@ -265,9 +239,8 @@ export default function CaseTester() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Case Tester</h1>
+        <h1 className="text-3xl font-bold mb-8">Civil Case Tester</h1>
 
-        {/* Messages */}
         {message && (
           <div
             className={`mb-4 p-4 rounded ${
@@ -281,7 +254,6 @@ export default function CaseTester() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Form */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 sticky top-8 max-h-screen overflow-y-auto">
               <h2 className="text-xl font-bold mb-4">
@@ -347,135 +319,82 @@ export default function CaseTester() {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Name</label>
+                  <label className="block font-medium mb-1">
+                    Petitioners *
+                  </label>
                   <input
                     type="text"
-                    value={formData.name ?? ""}
+                    value={formData.petitioners ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "name",
-                        e.target.value as CaseEntry["name"],
-                      )
+                      handleInputChange("petitioners", e.target.value)
+                    }
+                    className="w-full border rounded px-2 py-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Defendants</label>
+                  <input
+                    type="text"
+                    value={formData.defendants ?? ""}
+                    onChange={(e) =>
+                      handleInputChange("defendants", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Charge</label>
+                  <label className="block font-medium mb-1">Notes</label>
                   <input
                     type="text"
-                    value={formData.charge ?? ""}
+                    value={formData.notes ?? ""}
                     onChange={(e) =>
-                      handleInputChange("charge", e.target.value || null)
+                      handleInputChange("notes", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Info Sheet</label>
+                  <label className="block font-medium mb-1">Nature</label>
                   <input
                     type="text"
-                    value={formData.infoSheet ?? ""}
+                    value={formData.nature ?? ""}
                     onChange={(e) =>
-                      handleInputChange("infoSheet", e.target.value || null)
+                      handleInputChange("nature", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Court</label>
-                  <input
-                    type="text"
-                    value={formData.court ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("court", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Case Type *</label>
-                  <select
-                    value={formData.caseType}
-                    onChange={(e) =>
-                      handleInputChange<"caseType">(
-                        "caseType",
-                        e.target.value as CaseType,
-                      )
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  >
-                    {CASE_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Detained</label>
-                  <input
-                    type="text"
-                    value={formData.detained ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("detained", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                    placeholder="e.g., Yes, No, or leave blank"
                   />
                 </div>
                 <div>
                   <label className="block font-medium mb-1">
-                    Consolidation
+                    Origin Case Number
                   </label>
                   <input
                     type="text"
-                    value={formData.consolidation ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("consolidation", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <hr className="my-2" />
-
-                <div>
-                  <label className="block font-medium mb-1">EQC Number</label>
-                  <input
-                    type="number"
-                    value={formData.eqcNumber ?? ""}
+                    value={formData.originCaseNumber ?? ""}
                     onChange={(e) =>
                       handleInputChange(
-                        "eqcNumber",
-                        e.target.value ? Number(e.target.value) : null,
+                        "originCaseNumber",
+                        e.target.value || null,
                       )
                     }
                     className="w-full border rounded px-2 py-1"
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Bond</label>
-                  <input
-                    type="text"
-                    value={formData.bond ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("bond", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Raffle Date</label>
+                  <label className="block font-medium mb-1">
+                    Re-Raffle Date
+                  </label>
                   <input
                     type="date"
                     value={
-                      formData.raffleDate instanceof Date
-                        ? formData.raffleDate.toISOString().split("T")[0]
-                        : formData.raffleDate || ""
+                      formData.reRaffleDate instanceof Date
+                        ? formData.reRaffleDate.toISOString().split("T")[0]
+                        : formData.reRaffleDate || ""
                     }
                     onChange={(e) =>
                       handleInputChange(
-                        "raffleDate",
+                        "reRaffleDate",
                         e.target.value ? new Date(e.target.value) : null,
                       )
                     }
@@ -483,222 +402,86 @@ export default function CaseTester() {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Committee 1</label>
+                  <label className="block font-medium mb-1">
+                    Re-Raffle Branch
+                  </label>
                   <input
                     type="text"
-                    value={formData.committee1 ?? ""}
+                    value={formData.reRaffleBranch ?? ""}
                     onChange={(e) =>
-                      handleInputChange("committee1", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Committee 2</label>
-                  <input
-                    type="text"
-                    value={formData.committee2 ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("committee2", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Judge</label>
-                  <input
-                    type="text"
-                    value={formData.judge ?? ""}
-                    onChange={(e) => handleInputChange("judge", e.target.value)}
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">AO</label>
-                  <input
-                    type="text"
-                    value={formData.ao ?? ""}
-                    onChange={(e) => handleInputChange("ao", e.target.value)}
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Complainant</label>
-                  <input
-                    type="text"
-                    value={formData.complainant ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("complainant", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">House No</label>
-                  <input
-                    type="text"
-                    value={formData.houseNo ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("houseNo", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Street</label>
-                  <input
-                    type="text"
-                    value={formData.street ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("street", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Barangay</label>
-                  <input
-                    type="text"
-                    value={formData.barangay ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("barangay", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Municipality</label>
-                  <input
-                    type="text"
-                    value={formData.municipality ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("municipality", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Province</label>
-                  <input
-                    type="text"
-                    value={formData.province ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("province", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Counts</label>
-                  <input
-                    type="text"
-                    value={formData.counts ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("counts", e.target.value)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">JDF</label>
-                  <input
-                    type="text"
-                    value={formData.jdf ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("jdf", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">SAJJ</label>
-                  <input
-                    type="text"
-                    value={formData.sajj ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("sajj", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">SAJJ 2</label>
-                  <input
-                    type="text"
-                    value={formData.sajj2 ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("sajj2", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">MF</label>
-                  <input
-                    type="text"
-                    value={formData.mf ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("mf", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">STF</label>
-                  <input
-                    type="text"
-                    value={formData.stf ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("stf", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">LRF</label>
-                  <input
-                    type="text"
-                    value={formData.lrf ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("lrf", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">VCF</label>
-                  <input
-                    type="text"
-                    value={formData.vcf ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("vcf", e.target.value || null)
-                    }
-                    className="w-full border rounded px-2 py-1"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium mb-1">Total</label>
-                  <input
-                    type="text"
-                    value={formData.total ?? ""}
-                    onChange={(e) =>
-                      handleInputChange("total", e.target.value || null)
+                      handleInputChange(
+                        "reRaffleBranch",
+                        e.target.value || null,
+                      )
                     }
                     className="w-full border rounded px-2 py-1"
                   />
                 </div>
                 <div>
                   <label className="block font-medium mb-1">
-                    Amount Involved
+                    Consolidation Date
+                  </label>
+                  <input
+                    type="date"
+                    value={
+                      formData.consolitationDate instanceof Date
+                        ? formData.consolitationDate.toISOString().split("T")[0]
+                        : formData.consolitationDate || ""
+                    }
+                    onChange={(e) =>
+                      handleInputChange(
+                        "consolitationDate",
+                        e.target.value ? new Date(e.target.value) : null,
+                      )
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">
+                    Consolidation Branch
                   </label>
                   <input
                     type="text"
-                    value={formData.amountInvolved ?? ""}
+                    value={formData.consolidationBranch ?? ""}
                     onChange={(e) =>
                       handleInputChange(
-                        "amountInvolved",
+                        "consolidationBranch",
                         e.target.value || null,
                       )
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">
+                    Date Remanded
+                  </label>
+                  <input
+                    type="date"
+                    value={
+                      formData.dateRemanded instanceof Date
+                        ? formData.dateRemanded.toISOString().split("T")[0]
+                        : formData.dateRemanded || ""
+                    }
+                    onChange={(e) =>
+                      handleInputChange(
+                        "dateRemanded",
+                        e.target.value ? new Date(e.target.value) : null,
+                      )
+                    }
+                    className="w-full border rounded px-2 py-1"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">
+                    Remanded Note
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.remandedNote ?? ""}
+                    onChange={(e) =>
+                      handleInputChange("remandedNote", e.target.value || null)
                     }
                     className="w-full border rounded px-2 py-1"
                   />
@@ -726,9 +509,7 @@ export default function CaseTester() {
             </div>
           </div>
 
-          {/* Data and Controls */}
           <div className="lg:col-span-3">
-            {/* Controls */}
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <div className="flex gap-2 flex-wrap items-center">
                 <button
@@ -778,7 +559,6 @@ export default function CaseTester() {
               </div>
             </div>
 
-            {/* Table */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -786,11 +566,10 @@ export default function CaseTester() {
                     <tr>
                       <th className="px-4 py-2 text-left">ID</th>
                       <th className="px-4 py-2 text-left">Case No</th>
-                      <th className="px-4 py-2 text-left">Name</th>
+                      <th className="px-4 py-2 text-left">Petitioners</th>
+                      <th className="px-4 py-2 text-left">Defendants</th>
                       <th className="px-4 py-2 text-left">Branch</th>
-                      <th className="px-4 py-2 text-left">Type</th>
-                      <th className="px-4 py-2 text-left">Charge</th>
-                      <th className="px-4 py-2 text-left">Detained</th>
+                      <th className="px-4 py-2 text-left">Nature</th>
                       <th className="px-4 py-2 text-left">Actions</th>
                     </tr>
                   </thead>
@@ -798,7 +577,7 @@ export default function CaseTester() {
                     {cases.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={8}
+                          colSpan={7}
                           className="px-4 py-4 text-center text-gray-500"
                         >
                           No cases found
@@ -812,14 +591,13 @@ export default function CaseTester() {
                         >
                           <td className="px-4 py-2">{caseItem.id}</td>
                           <td className="px-4 py-2">{caseItem.caseNumber}</td>
-                          <td className="px-4 py-2">{caseItem.name}</td>
-                          <td className="px-4 py-2">{caseItem.branch}</td>
-                          <td className="px-4 py-2">{caseItem.caseType}</td>
-                          <td className="px-4 py-2 truncate max-w-xs">
-                            {caseItem.charge}
-                          </td>
+                          <td className="px-4 py-2">{caseItem.petitioners}</td>
                           <td className="px-4 py-2">
-                            {caseItem.detained ? "Yes" : "No"}
+                            {caseItem.defendants || "-"}
+                          </td>
+                          <td className="px-4 py-2">{caseItem.branch}</td>
+                          <td className="px-4 py-2 truncate max-w-xs">
+                            {caseItem.nature}
                           </td>
                           <td className="px-4 py-2">
                             <div className="flex gap-2">

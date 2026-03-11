@@ -2,14 +2,13 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import {
-  BaseCaseSchema,
-  CriminalCaseData,
-  CriminalCaseSchema,
-} from "@/app/components/Case/schema";
+  CivilCaseData,
+  CivilCaseSchema,
+} from "@/app/components/Case/Civil/schema";
 import {
   Case,
   CaseType,
-  CriminalCase,
+  CivilCase,
   LogAction,
   Prisma,
 } from "@/app/generated/prisma/client";
@@ -24,12 +23,13 @@ import {
   UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
-import { splitCaseData } from "@/app/lib/PrismaHelper";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
-import { createLog } from "../ActivityLogs/LogActions";
+import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
 
 export async function uploadExcel(
   file: File,
@@ -41,37 +41,34 @@ export async function uploadExcel(
       return sessionResult;
     }
 
-    console.log(`✓ Excel file received: ${file.name} (${file.size} bytes)`);
+    console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
     // Peek workbook to log sheet names (processExcelUpload will parse again for validation)
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
-        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+        `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
     } catch (peekError) {
-      console.warn("⚠ Unable to preview workbook for logging:", peekError);
+      console.warn("WARN Unable to preview workbook for logging:", peekError);
     }
 
-    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
+    const headerMap = getExcelHeaderMap(CivilCaseSchema);
     const branchHeaders = headerMap.branch ?? ["Branch"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(CriminalCaseSchema, row);
+      const values = normalizeRowBySchema(CivilCaseSchema, row);
 
       return {
         ...values,
       };
     };
 
-    const result = await processExcelUpload<
-      CriminalCaseSchema,
-      ReturnType<typeof getMappedCells>
-    >({
+    const result = await processExcelUpload<CivilCaseSchema>({
       file,
       requiredHeaders: { Branch: branchHeaders },
-      schema: CriminalCaseSchema,
+      schema: CivilCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
       uniqueKeys: ["caseNumber"],
@@ -83,7 +80,7 @@ export async function uploadExcel(
         });
         return new Set(existing.map((c) => c.caseNumber.trim()));
       },
-      mapRow: (row) => {
+      mapRow: (row, rowNum) => {
         const cells = getMappedCells(row);
 
         // Skip rows that have no mapped content beyond the case number (or are entirely empty)
@@ -91,19 +88,43 @@ export async function uploadExcel(
           return { skip: true };
         }
 
+        const caseNumberRaw = cells.caseNumber?.toString().trim();
+        const petitioner = cells.petitioners
+          ?.toString()
+          .trim()
+          .replace(" ", "-"); // Replace spaces with dashes to avoid issues in undocketed case numbers
+        const respondent = cells.defendants
+          ?.toString()
+          .trim()
+          .replace(" ", "-"); // Replace spaces with dashes to avoid issues in undocketed case numbers
+        const dateFiled =
+          cells.dateFiled instanceof Date || typeof cells.dateFiled === "string"
+            ? new Date(cells.dateFiled)
+            : null;
+
+        const caseNumber = cells.caseNumber
+          ?.toString()
+          .trim()
+          ?.toLowerCase()
+          .includes("undocketed")
+          ? caseNumberRaw +
+            `${petitioner ? "-" + petitioner : ""}-${respondent ? "-" + respondent : ""}-${dateFiled?.getTime() ?? "nofiledate"}`
+          : caseNumberRaw;
+
+        const undocketed = caseNumber
+          ?.toLocaleLowerCase()
+          .includes("undocketed");
+
         const hydrated = {
           ...cells,
+          caseNumber,
           assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
           caseType,
+          undocketed,
         };
 
-        const validation = CriminalCaseSchema.safeParse(hydrated);
+        const validation = CivilCaseSchema.safeParse(hydrated);
         if (!validation.success) {
-          // console.warn(
-          //   "Employee row validation failed:",
-          //   prettifyError(validation.error),
-          //   { row: cells },
-          // );
           return {
             errorMessage: prettifyError(validation.error),
           };
@@ -116,23 +137,23 @@ export async function uploadExcel(
       },
       onBatchInsert: async (rows) => {
         const caseRows: Prisma.CaseCreateManyInput[] = [];
-        const criminalRows: Prisma.CriminalCaseCreateManyInput[] = [];
+        const civilRows: Prisma.CivilCaseCreateManyInput[] = [];
 
         rows.forEach((row) => {
-          const { caseData, criminalData } = splitCaseData(row);
+          const { caseData, detailData } = splitCaseDataBySchema(row);
           caseRows.push(caseData);
-          criminalRows.push({
-            ...criminalData,
+          civilRows.push({
+            ...detailData,
             caseNumber: caseData.caseNumber,
-          });
+          } as Prisma.CivilCaseCreateManyInput);
         });
 
         const created = await prisma.case.createManyAndReturn({
           data: caseRows,
         });
 
-        if (criminalRows.length > 0) {
-          await prisma.criminalCase.createMany({ data: criminalRows });
+        if (civilRows.length > 0) {
+          await prisma.civilCase.createMany({ data: civilRows });
         }
 
         return { ids: created.map((c) => c.id), count: created.length };
@@ -146,7 +167,7 @@ export async function uploadExcel(
       const sheets = meta.sheetSummary;
 
       console.log(
-        `✓ Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach(
@@ -157,7 +178,7 @@ export async function uploadExcel(
             failed: number;
           }) => {
             console.log(
-              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+              `  Sheet "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
             );
           },
         );
@@ -165,7 +186,7 @@ export async function uploadExcel(
 
       if (result.result?.failedExcel) {
         console.log(
-          "⚠ Failed rows file generated:",
+          "WARN Failed rows file generated:",
           result.result.failedExcel.fileName,
         );
       }
@@ -177,7 +198,7 @@ export async function uploadExcel(
         },
       });
     } else {
-      console.error("✗ Import failed:", result.error);
+      console.error("ERROR Import failed:", result.error);
     }
 
     return result;
@@ -200,7 +221,7 @@ export async function exportCasesExcel(): Promise<
       all: ["id"],
     });
 
-    const caseFieldKeys = getSchemaFieldKeys(CriminalCaseSchema, {
+    const caseFieldKeys = getSchemaFieldKeys(CivilCaseSchema, {
       all: ["id"],
       stringKeys: [...baseCaseFieldKeys.stringKeys],
       dateKeys: [...baseCaseFieldKeys.dateKeys],
@@ -213,19 +234,17 @@ export async function exportCasesExcel(): Promise<
 
     const cases = await prisma.case.findMany({
       orderBy: { id: "asc" },
-      include: { criminalCase: true },
+      include: { civilCase: true },
     });
 
-    const caseCombined: CriminalCaseData[] = cases
-      .filter(
-        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
-      )
+    const caseCombined: CivilCaseData[] = cases
+      .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
       .map((c) => ({
         ...c,
-        ...c.criminalCase,
+        ...c.civilCase,
       }));
 
-    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
+    const headerMap = getExcelHeaderMap(CivilCaseSchema);
     const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
 
     const header = (key: keyof typeof headerMap, fallback: string) =>

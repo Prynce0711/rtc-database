@@ -1,6 +1,13 @@
 "use client";
 
+import { ChatData, Message as NetworkMessage } from "@/@types/network";
+import {
+  createGroupChat as createGroupChatAction,
+  getChats,
+} from "@/app/components/Messages/MessagesActions";
+import { usePopup } from "@/app/components/Popup/PopupProvider";
 import { useSession } from "@/app/lib/authClient";
+import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import React, {
@@ -17,7 +24,6 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiClock,
-  FiEdit,
   FiFile,
   FiImage,
   FiMaximize2,
@@ -107,254 +113,6 @@ const mockUsers: User[] = [
     lastSeen: "2026-02-27T09:00:00",
   },
 ];
-
-const generateMessages = (userId: string): Message[] => {
-  const conversations: Record<string, Message[]> = {
-    u1: [
-      {
-        id: "m1",
-        senderId: "u1",
-        text: "Good morning! I've reviewed the case files for Civil Case No. 2026-0145.",
-        timestamp: "2026-02-27T08:00:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m2",
-        senderId: CURRENT_USER_ID,
-        text: "Thank you, Atty. Santos. Any issues with the documentation?",
-        timestamp: "2026-02-27T08:02:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m3",
-        senderId: "u1",
-        text: "Everything looks good. The petition is properly formatted. I'll file it this afternoon.",
-        timestamp: "2026-02-27T08:05:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m4",
-        senderId: CURRENT_USER_ID,
-        text: "Perfect. Please update the system once filed.",
-        timestamp: "2026-02-27T08:06:00",
-        status: "delivered",
-        type: "text",
-      },
-      {
-        id: "m5",
-        senderId: "u1",
-        text: "Will do. Also, the hearing for Case No. 2026-0098 has been moved to March 5.",
-        timestamp: "2026-02-27T08:10:00",
-        status: "read",
-        type: "text",
-        isPinned: true,
-      },
-      {
-        id: "m5b",
-        senderId: CURRENT_USER_ID,
-        text: "",
-        timestamp: "2026-02-27T08:11:00",
-        status: "read",
-        type: "file",
-        fileName: "Case_2026-0145_Petition.pdf",
-        fileSize: "2.4 MB",
-      },
-      {
-        id: "m6",
-        senderId: CURRENT_USER_ID,
-        text: "Noted. I'll update the calendar.",
-        timestamp: "2026-02-27T08:12:00",
-        status: "sent",
-        type: "text",
-      },
-    ],
-    u2: [
-      {
-        id: "m7",
-        senderId: "u2",
-        text: "Hi, I submitted the required documents yesterday. Can you confirm if they were received?",
-        timestamp: "2026-02-27T07:30:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m8",
-        senderId: CURRENT_USER_ID,
-        text: "Let me check the records. One moment please.",
-        timestamp: "2026-02-27T07:32:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m8b",
-        senderId: "u2",
-        text: "",
-        timestamp: "2026-02-27T07:33:00",
-        status: "read",
-        type: "image",
-        imageUrl:
-          "https://placehold.co/400x300/e2e8f0/64748b?text=Document+Photo",
-      },
-      {
-        id: "m9",
-        senderId: CURRENT_USER_ID,
-        text: "Yes, all documents have been received and are under review.",
-        timestamp: "2026-02-27T07:35:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m10",
-        senderId: "u2",
-        text: "Great, thank you! When can I expect an update?",
-        timestamp: "2026-02-27T07:36:00",
-        status: "read",
-        type: "text",
-      },
-    ],
-    u3: [
-      {
-        id: "m11",
-        senderId: "u3",
-        text: "Please ensure all pending cases from January are updated in the system by end of day.",
-        timestamp: "2026-02-26T16:00:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m12",
-        senderId: CURRENT_USER_ID,
-        text: "Understood. I'm working on the remaining 5 cases now.",
-        timestamp: "2026-02-26T16:10:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m13",
-        senderId: "u3",
-        text: "Good. Send me a summary once completed.",
-        timestamp: "2026-02-26T16:12:00",
-        status: "read",
-        type: "text",
-      },
-    ],
-    u4: [
-      {
-        id: "m14",
-        senderId: "u4",
-        text: "I need the court order for Special Proceeding No. 2026-SP-0023.",
-        timestamp: "2026-02-27T06:45:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m15",
-        senderId: CURRENT_USER_ID,
-        text: "I'll prepare it right away and send it to your email.",
-        timestamp: "2026-02-27T06:50:00",
-        status: "delivered",
-        type: "text",
-      },
-    ],
-    u5: [
-      {
-        id: "m16",
-        senderId: "u5",
-        text: "Hello! I'd like to follow up on my case status. It's been two weeks since the filing.",
-        timestamp: "2026-02-27T09:15:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m17",
-        senderId: CURRENT_USER_ID,
-        text: "Hi Elena! Let me pull up your case information.",
-        timestamp: "2026-02-27T09:16:00",
-        status: "sent",
-        type: "text",
-      },
-    ],
-    u6: [
-      {
-        id: "m18",
-        senderId: "u6",
-        text: "The mediation for Case 2026-0077 is scheduled for next week. Please prepare the room.",
-        timestamp: "2026-02-26T14:00:00",
-        status: "read",
-        type: "text",
-      },
-    ],
-    u7: [
-      {
-        id: "m19",
-        senderId: "u7",
-        text: "Good afternoon! I want to inquire about the requirements for filing a small claims case.",
-        timestamp: "2026-02-27T09:30:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m20",
-        senderId: CURRENT_USER_ID,
-        text: "Good afternoon, Roberto. For small claims, you'll need the following documents...",
-        timestamp: "2026-02-27T09:32:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m21",
-        senderId: "u7",
-        text: "Thank you for the information. I'll prepare these documents.",
-        timestamp: "2026-02-27T09:35:00",
-        status: "read",
-        type: "text",
-      },
-    ],
-    u8: [
-      {
-        id: "m22",
-        senderId: "u8",
-        text: "System maintenance is scheduled for tonight at 11 PM. Please save all your work.",
-        timestamp: "2026-02-27T08:00:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m23",
-        senderId: CURRENT_USER_ID,
-        text: "Acknowledged. How long will the downtime be?",
-        timestamp: "2026-02-27T08:05:00",
-        status: "read",
-        type: "text",
-      },
-      {
-        id: "m24",
-        senderId: "u8",
-        text: "Approximately 2 hours. The system should be back by 1 AM.",
-        timestamp: "2026-02-27T08:06:00",
-        status: "read",
-        type: "text",
-      },
-    ],
-  };
-  return conversations[userId] || [];
-};
-
-const mockConversations: Conversation[] = mockUsers.map((user, i) => {
-  const msgs = generateMessages(user.id);
-  return {
-    id: `conv-${user.id}`,
-    participant: user,
-    messages: msgs,
-    lastMessage: msgs[msgs.length - 1],
-    unreadCount: i < 3 ? [2, 1, 0][i] : 0,
-    isPinned: i < 2,
-    isTyping: i === 0,
-  };
-});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatTime = (iso: string) => {
@@ -584,17 +342,18 @@ const GroupAvatar = ({
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const Messages: React.FC = () => {
-  useSession();
+  const session = useSession();
+  const statusPopup = usePopup();
+  const currentUserId = session.data?.user?.id ?? "";
+  const viewerId = currentUserId || CURRENT_USER_ID;
 
-  const [conversations, setConversations] =
-    useState<Conversation[]>(mockConversations);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState<ConvoFilter>("all");
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
-  const [showCompose, setShowCompose] = useState(false);
   const [composeSearch, setComposeSearch] = useState("");
   const [attachments, setAttachments] = useState<
     { name: string; type: "image" | "file"; size: string }[]
@@ -611,7 +370,120 @@ const Messages: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const onlineStripRef = useRef<HTMLDivElement>(null);
+  const activeChatId = useMemo(() => {
+    if (!activeId) return null;
+    const numeric = Number(activeId);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  }, [activeId]);
+  const { messages: backendMessages, sendMessage } = useMessaging(
+    activeChatId ?? 0,
+    Boolean(activeChatId),
+  );
   const activeConvo = conversations.find((c) => c.id === activeId) ?? null;
+
+  const mapChatToConversation = useCallback(
+    (chat: ChatData): Conversation => {
+      const name = chat.name || chat.email || "Unknown";
+      const latest = chat.latestMessage;
+      const latestText = latest
+        ? typeof latest.content === "string"
+          ? latest.content
+          : "[binary message]"
+        : "No messages yet";
+      const latestTimestamp = latest?.createdAt
+        ? new Date(latest.createdAt).toISOString()
+        : new Date().toISOString();
+      const participants: User[] = (chat.members ?? []).map((member) => ({
+        id: member.id,
+        name: member.name,
+        role: "user",
+        avatar: member.image ?? undefined,
+        isOnline: false,
+      }));
+      const fallbackParticipant = participants.find(
+        (member) => member.id !== viewerId,
+      );
+
+      return {
+        id: String(chat.id),
+        participant: fallbackParticipant ??
+          participants[0] ?? {
+            id: chat.email || String(chat.id),
+            name,
+            role: "user",
+            avatar: chat.src ?? undefined,
+            isOnline: false,
+          },
+        participants: chat.type === "GROUP" ? participants : undefined,
+        isGroup: chat.type === "GROUP",
+        groupName: chat.type === "GROUP" ? name : undefined,
+        messages: [],
+        lastMessage: {
+          id: String(latest?.id ?? `chat-${chat.id}-latest`),
+          senderId: latest?.userId ?? "",
+          text: latestText,
+          timestamp: latestTimestamp,
+          status: latest?.userId === viewerId ? "sent" : "delivered",
+          type: "text",
+        },
+        unreadCount: 0,
+        isPinned: false,
+      };
+    },
+    [viewerId],
+  );
+
+  const mapBackendMessage = useCallback(
+    (message: NetworkMessage): Message => {
+      const text =
+        typeof message.content === "string"
+          ? message.content
+          : "[binary message]";
+      return {
+        id: String(message.id),
+        senderId: message.userId,
+        text,
+        timestamp: new Date(message.createdAt).toISOString(),
+        status: message.userId === viewerId ? "sent" : "delivered",
+        type: "text",
+      };
+    },
+    [viewerId],
+  );
+
+  const loadChats = useCallback(async () => {
+    const result = await getChats();
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to load chats");
+      return;
+    }
+    const mapped = result.result.map(mapChatToConversation);
+    setConversations(mapped);
+    if (mapped.length > 0) {
+      setActiveId((prev) => prev ?? mapped[0].id);
+    }
+  }, [mapChatToConversation, statusPopup]);
+
+  useEffect(() => {
+    void loadChats();
+  }, [loadChats]);
+
+  useEffect(() => {
+    if (!activeId || !activeChatId) return;
+    const mappedMessages = backendMessages.map(mapBackendMessage);
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId
+          ? {
+              ...c,
+              messages: mappedMessages,
+              lastMessage:
+                mappedMessages[mappedMessages.length - 1] ?? c.lastMessage,
+            }
+          : c,
+      ),
+    );
+  }, [activeChatId, activeId, backendMessages, mapBackendMessage]);
 
   // scroll to bottom
   useEffect(() => {
@@ -647,55 +519,25 @@ const Messages: React.FC = () => {
   }, [conversations, filter, search]);
 
   // ── Send message ────────────────────────────────────────────────────────
-  const handleSend = useCallback(() => {
-    if ((!input.trim() && attachments.length === 0) || !activeId) return;
-
-    const newMessages: Message[] = [];
-
-    // send attachments first
-    attachments.forEach((att, idx) => {
-      newMessages.push({
-        id: `m-att-${Date.now()}-${idx}`,
-        senderId: CURRENT_USER_ID,
-        text: "",
-        timestamp: new Date().toISOString(),
-        status: "sent",
-        type: att.type,
-        fileName: att.type === "file" ? att.name : undefined,
-        fileSize: att.type === "file" ? att.size : undefined,
-        imageUrl:
-          att.type === "image"
-            ? `https://placehold.co/400x300/e2e8f0/64748b?text=${encodeURIComponent(att.name)}`
-            : undefined,
-      });
-    });
-
-    // then text
-    if (input.trim()) {
-      newMessages.push({
-        id: `m-${Date.now()}`,
-        senderId: CURRENT_USER_ID,
-        text: input.trim(),
-        timestamp: new Date().toISOString(),
-        status: "sent",
-        type: "text",
-      });
+  const handleSend = useCallback(async () => {
+    if (!activeChatId) {
+      statusPopup.showWarning("Select a conversation first.");
+      return;
     }
+    if (attachments.length > 0) {
+      statusPopup.showWarning("Attachments are not supported yet.");
+      return;
+    }
+    if (!input.trim()) return;
 
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeId
-          ? {
-              ...c,
-              messages: [...c.messages, ...newMessages],
-              lastMessage: newMessages[newMessages.length - 1],
-            }
-          : c,
-      ),
-    );
-    setInput("");
-    setAttachments([]);
-  }, [input, attachments, activeId]);
+    try {
+      await sendMessage(input.trim());
+      setInput("");
+      setAttachments([]);
+    } catch {
+      statusPopup.showError("Failed to send message.");
+    }
+  }, [activeChatId, attachments.length, input, sendMessage, statusPopup]);
 
   // ── Select conversation ─────────────────────────────────────────────────
   const selectConvo = useCallback((id: string) => {
@@ -785,37 +627,21 @@ const Messages: React.FC = () => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
-  // ── Compose: start new conversation ─────────────────────────────────────
-  const startNewConvo = useCallback(
-    (user: User) => {
-      const existing = conversations.find((c) => c.participant.id === user.id);
-      if (existing) {
-        selectConvo(existing.id);
-      } else {
-        const newConvo: Conversation = {
-          id: `conv-${user.id}`,
-          participant: user,
-          messages: [],
-          lastMessage: {
-            id: "placeholder",
-            senderId: "",
-            text: "No messages yet",
-            timestamp: new Date().toISOString(),
-            status: "read",
-            type: "text",
-          },
-          unreadCount: 0,
-          isPinned: false,
-        };
-        setConversations((prev) => [newConvo, ...prev]);
-        setActiveId(newConvo.id);
-        setShowMobileChat(true);
-      }
-      setShowCompose(false);
-      setComposeSearch("");
-    },
-    [conversations, selectConvo],
-  );
+  const availableUsers = useMemo(() => {
+    const unique = new Map<string, User>();
+    conversations.forEach((conversation) => {
+      const entries = conversation.participants?.length
+        ? conversation.participants
+        : [conversation.participant];
+      entries.forEach((entry) => {
+        if (!entry || entry.id === viewerId) return;
+        unique.set(entry.id, entry);
+      });
+    });
+    return Array.from(unique.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [conversations, viewerId]);
 
   // ── Group chat creation ─────────────────────────────────────────────────
   const toggleGroupMember = useCallback((user: User) => {
@@ -825,37 +651,27 @@ const Messages: React.FC = () => {
         : [...prev, user],
     );
   }, []);
-
-  const createGroupChat = useCallback(() => {
-    if (groupMembers.length < 2) return;
+  const createGroupChat = useCallback(async () => {
+    if (groupMembers.length < 2) {
+      statusPopup.showWarning("Select at least 2 members.");
+      return;
+    }
     const name =
       groupName.trim() ||
       groupMembers.map((u) => u.name.split(" ")[0]).join(", ");
-    const newConvo: Conversation = {
-      id: `group-${Date.now()}`,
-      participant: groupMembers[0], // primary for avatar fallback
-      participants: groupMembers,
-      groupName: name,
-      isGroup: true,
-      messages: [],
-      lastMessage: {
-        id: "placeholder",
-        senderId: "",
-        text: "Group created",
-        timestamp: new Date().toISOString(),
-        status: "read",
-        type: "text",
-      },
-      unreadCount: 0,
-      isPinned: false,
-    };
-    setConversations((prev) => [newConvo, ...prev]);
-    setActiveId(newConvo.id);
-    setShowMobileChat(true);
+    const memberIds = groupMembers.map((member) => member.id);
+    const result = await createGroupChatAction(name, memberIds);
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to create group chat");
+      return;
+    }
     setShowGroupCompose(false);
     setGroupMembers([]);
     setGroupName("");
-  }, [groupMembers, groupName]);
+    setComposeSearch("");
+    await loadChats();
+    setActiveId(String(result.result));
+  }, [groupMembers, groupName, loadChats, statusPopup]);
 
   // ── Online users scroll ─────────────────────────────────────────────────
   const onlineUsers = useMemo(() => mockUsers.filter((u) => u.isOnline), []);
@@ -941,10 +757,10 @@ const Messages: React.FC = () => {
               </div>
               <button
                 className="btn btn-primary btn-sm btn-square rounded-lg"
-                title="New message"
-                onClick={() => setShowCompose(true)}
+                title="Create group"
+                onClick={() => setShowGroupCompose(true)}
               >
-                <FiEdit className="w-4 h-4" />
+                <FiUsers className="w-4 h-4" />
               </button>
             </div>
 
@@ -1048,7 +864,7 @@ const Messages: React.FC = () => {
             ) : (
               filtered.map((convo) => {
                 const isActive = convo.id === activeId;
-                const isOwn = convo.lastMessage.senderId === CURRENT_USER_ID;
+                const isOwn = convo.lastMessage.senderId === viewerId;
                 const badge = getRoleBadge(convo.participant.role);
                 const isHovered = hoveredConvo === convo.id;
                 return (
@@ -1294,7 +1110,7 @@ const Messages: React.FC = () => {
                           <div className="max-h-48 overflow-y-auto bg-warning/3 divide-y divide-base-200/60">
                             {pinned.map((msg) => {
                               const sender =
-                                msg.senderId === CURRENT_USER_ID
+                                msg.senderId === viewerId
                                   ? "You"
                                   : activeConvo.isGroup
                                     ? (activeConvo.participants
@@ -1363,7 +1179,7 @@ const Messages: React.FC = () => {
                     {/* Messages */}
                     <div className="space-y-1.5">
                       {group.messages.map((msg, i) => {
-                        const isOwn = msg.senderId === CURRENT_USER_ID;
+                        const isOwn = msg.senderId === viewerId;
                         const showAvatar =
                           !isOwn &&
                           (i === 0 ||
@@ -1612,7 +1428,7 @@ const Messages: React.FC = () => {
                 {(() => {
                   const lastOwn = [...activeConvo.messages]
                     .reverse()
-                    .find((m) => m.senderId === CURRENT_USER_ID);
+                    .find((m) => m.senderId === viewerId);
                   if (!lastOwn || lastOwn.status !== "read") return null;
                   return (
                     <div className="flex justify-end pr-1">
@@ -1813,120 +1629,6 @@ const Messages: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Compose New Message Modal ──────────────────────────────────── */}
-      <AnimatePresence>
-        {showCompose && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => setShowCompose(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-base-200"
-            >
-              {/* Modal header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
-                <h3 className="text-lg font-bold text-base-content flex items-center gap-2">
-                  <FiEdit className="w-5 h-5 text-primary" />
-                  New Message
-                </h3>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      setShowCompose(false);
-                      setShowGroupCompose(true);
-                    }}
-                    className="btn btn-ghost btn-sm rounded-lg gap-1 text-base-content/60 hover:text-primary"
-                  >
-                    <FiUsers className="w-4 h-4" />
-                    <span className="text-xs">Group</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCompose(false)}
-                    className="btn btn-ghost btn-sm btn-square rounded-lg"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Search contacts */}
-              <div className="px-5 py-3 border-b border-base-200">
-                <div className="relative">
-                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search by name or role..."
-                    value={composeSearch}
-                    onChange={(e) => setComposeSearch(e.target.value)}
-                    className="input input-bordered input-sm w-full pl-9 rounded-lg"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {/* Contact list */}
-              <div className="max-h-72 overflow-y-auto">
-                {mockUsers
-                  .filter(
-                    (u) =>
-                      u.id !== CURRENT_USER_ID &&
-                      (!composeSearch.trim() ||
-                        u.name
-                          .toLowerCase()
-                          .includes(composeSearch.toLowerCase()) ||
-                        u.role
-                          .toLowerCase()
-                          .includes(composeSearch.toLowerCase())),
-                  )
-                  .map((user) => {
-                    const badge = getRoleBadge(user.role);
-                    return (
-                      <button
-                        key={user.id}
-                        onClick={() => startNewConvo(user)}
-                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-base-200/50 transition-colors text-left"
-                      >
-                        <UserAvatar user={user} size="md" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-base-content truncate">
-                              {user.name}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badge.cls}`}
-                            >
-                              {badge.label}
-                            </span>
-                          </div>
-                          <p className="text-xs text-base-content/50">
-                            {user.isOnline ? (
-                              <span className="text-success font-medium flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                                Active now
-                              </span>
-                            ) : (
-                              formatLastSeen(user.lastSeen)
-                            )}
-                          </p>
-                        </div>
-                        <FiSend className="w-4 h-4 text-base-content/20" />
-                      </button>
-                    );
-                  })}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ── Create Group Chat Modal ────────────────────────────────────── */}
       <AnimatePresence>
         {showGroupCompose && (
@@ -2014,14 +1716,13 @@ const Messages: React.FC = () => {
               </div>
 
               <div className="max-h-56 overflow-y-auto">
-                {mockUsers
+                {availableUsers
                   .filter(
                     (u) =>
-                      u.id !== CURRENT_USER_ID &&
-                      (!composeSearch.trim() ||
-                        u.name
-                          .toLowerCase()
-                          .includes(composeSearch.toLowerCase())),
+                      !composeSearch.trim() ||
+                      u.name
+                        .toLowerCase()
+                        .includes(composeSearch.toLowerCase()),
                   )
                   .map((user) => {
                     const isSelected = groupMembers.some(

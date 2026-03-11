@@ -1,6 +1,6 @@
 "use client";
 
-import { getCases } from "@/app/components/Case/CasesActions";
+import { getCriminalCases } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
   BarChart3,
   Calendar,
@@ -48,7 +48,7 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
   useEffect(() => {
     async function fetchCases() {
       try {
-        const res = await getCases();
+        const res = await getCriminalCases();
         if (res.success) {
           const result: any = res.result;
           let items: Case[] = [];

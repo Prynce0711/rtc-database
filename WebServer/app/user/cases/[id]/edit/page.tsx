@@ -1,5 +1,5 @@
-import NewCaseModal from "@/app/components/Case/CaseDrawer";
-import { getCaseById } from "@/app/components/Case/CasesActions";
+import NewCriminalCaseModal from "@/app/components/Case/Criminal/CriminalCaseDrawer";
+import { getCriminalCaseById } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import ErrorPopup from "@/app/components/Popup/ErrorPopup";
 import { auth } from "@/app/lib/auth";
 import Roles from "@/app/lib/Roles";
@@ -21,14 +21,14 @@ const page = async ({ params }: { params: Promise<{ id: string }> }) => {
   }
 
   const { id } = await params;
-  const caseResult = await getCaseById(id);
+  const caseResult = await getCriminalCaseById(id);
   if (!caseResult.success) {
     return <ErrorPopup message={caseResult.error || "Case not found."} />;
   }
 
   console.log("Loaded case for editing:", caseResult.result);
 
-  return <NewCaseModal selectedCase={caseResult.result} />;
+  return <NewCriminalCaseModal selectedCase={caseResult.result} />;
 };
 
 export default page;

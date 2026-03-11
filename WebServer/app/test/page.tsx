@@ -1,5 +1,5 @@
-import CaseTester from "./CaseTester";
+import ChatTest from "./ChatTest";
 
 export default function page() {
-  return <CaseTester />;
+  return <ChatTest />;
 }

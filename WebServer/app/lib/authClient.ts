@@ -18,6 +18,10 @@ export const authClient = createAuthClient({
           type: "string",
           input: false,
         },
+        darkMode: {
+          type: "boolean",
+          input: false,
+        },
       },
     }),
   ],

@@ -22,7 +22,7 @@ import {
   FiSun,
   FiUsers,
 } from "react-icons/fi";
-
+import { updateDarkMode } from "./DarkModeActions";
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SidebarProps {
   children: ReactNode;
@@ -912,8 +912,21 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    if (typeof document === "undefined") return;
+    const current =
+      document.documentElement.getAttribute("data-theme") === "dim"
+        ? "dim"
+        : "winter";
+    setTheme(current);
+  }, []);
+
+  async function updateTheme(newTheme: "winter" | "dim") {
+    const result = await updateDarkMode(newTheme);
+    if (result.success) {
+      setTheme(newTheme);
+      document.documentElement.setAttribute("data-theme", newTheme);
+    }
+  }
 
   async function handleLogout() {
     await authClient.signOut({
@@ -931,7 +944,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     setOpenDropdown,
     onExpandSidebar: () => setCollapsed(false),
     theme,
-    onToggleTheme: () => setTheme((t) => (t === "winter" ? "dim" : "winter")),
+    onToggleTheme: () => updateTheme(theme === "winter" ? "dim" : "winter"),
     onOpenMessages: () => router.push("/user/messages"),
     onOpenNotifications: () => router.push("/user/notifications"),
     onOpenSettings: () => router.push("/user/settings"),
