@@ -248,64 +248,66 @@ export default function MonthlyPage() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
-      <header className="card bg-base-100 ">
-        <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1">
-              <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-                Monthly Reports
-              </h2>
-              <p className=" flex items-center gap-2 text-lg text-base-content/50 mt-2">
-                <FiCalendar className="shrink-0" />
-                <span>Statistics overview for </span>
-                <span className="font-bold text-base-content/80">
-                  {monthLabel}
-                </span>
-              </p>
-            </div>
+      {!showAddPage && !showViewPage && (
+        <header className="card bg-base-100 shadow-xl">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+                  Monthly Reports
+                </h1>
+                <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
+                  <FiCalendar className="shrink-0" />
+                  <span>Statistics overview for </span>
+                  <span className="font-bold text-base-content/80">
+                    {monthLabel}
+                  </span>
+                </p>
+              </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <input
-                type="month"
-                className="input input-bordered input-md w-72"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
-              <div className="flex items-center gap-2 flex-nowrap">
+              <div className="flex flex-col items-end gap-3">
                 <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleImport}
+                  type="month"
+                  className="input input-bordered input-md w-72"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
                 />
-                <button
-                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <FiUpload className="h-5 w-5" />
-                  {uploading ? "Importing..." : "Import Excel"}
-                </button>
-                <button
-                  className="btn btn-outline btn-md gap-2"
-                  onClick={handleExport}
-                >
-                  <FiDownload className="h-5 w-5" />
-                  Export Excel
-                </button>
-                <button
-                  className="btn btn-primary btn-md gap-2"
-                  onClick={() => setShowAddPage(true)}
-                >
-                  <FiPlus className="h-5 w-5" />
-                  Add Report
-                </button>
+                <div className="flex items-center gap-2 flex-nowrap">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImport}
+                  />
+                  <button
+                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <FiUpload className="h-5 w-5" />
+                    {uploading ? "Importing..." : "Import"}
+                  </button>
+                  <button
+                    className="btn btn-outline btn-info btn-md gap-2"
+                    onClick={handleExport}
+                  >
+                    <FiDownload className="h-5 w-5" />
+                    Export
+                  </button>
+                  <button
+                    className="btn btn-success btn-md gap-2"
+                    onClick={() => setShowAddPage(true)}
+                  >
+                    <FiPlus className="h-5 w-5" />
+                    Add Report
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* ── KPI CARDS ── */}
       <MonthlyKPI {...kpi} />

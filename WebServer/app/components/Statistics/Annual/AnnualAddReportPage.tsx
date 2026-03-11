@@ -17,6 +17,7 @@ import {
   FiFileText,
   FiGrid,
   FiPlus,
+  FiSave,
   FiTrash2,
 } from "react-icons/fi";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
@@ -41,6 +42,8 @@ export interface AnnualAddReportPageProps {
   onSwitchView?: (view: string) => void;
   /** If provided, only show these view buttons in the toolbar (e.g. ["MTC","RTC"]) */
   allowedViews?: string[];
+  /** Optional pre-defined tabs to show instead of the auto-computed grouping */
+  customTabs?: { label: string; fields: FieldConfig[] }[] | null;
   onBack: () => void;
   onSave: (rows: Record<string, unknown>[]) => void;
 }
@@ -81,6 +84,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   activeView,
   onSwitchView,
   allowedViews,
+  customTabs,
   onBack,
   onSave,
 }) => {
@@ -118,7 +122,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   );
 
   /* ---- Tabbed field groups for compact / inventory mode ---- */
-  const fieldTabs = useMemo(() => {
+  const computedFieldTabs = useMemo(() => {
     if (!isCompact) return null;
 
     const textFields = editableFields.filter((f) => !isNumericField(f.name));
@@ -231,6 +235,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
     return compactTabs;
   }, [isCompact, editableFields, isNumericField]);
+
+  // If the caller supplies `customTabs`, prefer that over the computed grouping.
+  // We pick it from props by reading the incoming props object above.
+  // Note: keep the runtime check simple — if `customTabs` is set, use it.
+  const fieldTabs = (customTabs ?? computedFieldTabs) as
+    | { label: string; fields: FieldConfig[] }[]
+    | null;
 
   const [activeFieldTab, setActiveFieldTab] = useState(0);
 
@@ -513,45 +524,44 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   return (
     <div className="xls-root">
       {/* ══ TOPBAR ══ */}
-      <div className="bg-base-100 xls-topbar border-b border-base-200">
-        <div className="flex items-center gap-4">
+      <div className="bg-base-100 xls-topbar">
+        <div className="xls-topbar-left">
           <button
-            className="p-2 rounded hover:bg-base-200/60"
+            className="xls-back-btn"
             onClick={step === "review" ? () => setStep("edit") : onBack}
             title={
               step === "review" ? "Back to Edit" : "Back to Annual Reports"
             }
           >
-            <FiArrowLeft size={18} className="text-base-content/70" />
+            <FiArrowLeft size={16} />
           </button>
-
-          <nav className="flex items-center gap-2 text-sm text-base-content/60">
-            <span className="hover:text-base-content cursor-pointer">
-              Annual Reports
-            </span>
-            <FiChevronRight size={12} className="text-base-content/40" />
-            <span className="hover:text-base-content cursor-pointer">
-              {title}
-            </span>
-            <FiChevronRight size={12} className="text-base-content/40" />
-            <span className="font-semibold text-base-content">
+          <nav className="xls-breadcrumb">
+            <span>Annual Reports</span>
+            <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+            <span>{title}</span>
+            <FiChevronRight size={12} className="xls-breadcrumb-sep" />
+            <span className="xls-breadcrumb-current">
               {step === "edit" ? "Add Report" : "Review"}
             </span>
           </nav>
         </div>
-
-        <div className="ml-auto flex items-center gap-3">
-          <div className="inline-flex items-center rounded-md bg-base-200/50 px-3 py-1 text-sm text-base-content/60">
-            <div
-              className={`inline-flex items-center justify-center w-7 h-7 rounded-full mr-2 ${step === "edit" ? "bg-primary/10 text-primary" : "bg-base-300 text-base-content/50"}`}
-            >
-              {step === "edit" ? <FiEdit3 size={14} /> : <FiCheck size={14} />}
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-xs text-base-content/50">Step</span>
-              <span className="text-sm font-semibold">
-                {step === "edit" ? "Data Entry" : "Review"}
+        <div className="xls-topbar-right">
+          <div className="xls-stepper">
+            <div className={`xls-step ${step === "edit" ? "active" : "done"}`}>
+              <span className="xls-step-dot">
+                {step === "review" ? (
+                  <FiCheck size={10} strokeWidth={3} />
+                ) : (
+                  <FiEdit3 size={10} />
+                )}
               </span>
+              Data Entry
+            </div>
+            <div className={`xls-step ${step === "review" ? "active" : ""}`}>
+              <span className="xls-step-dot">
+                <FiEye size={10} />
+              </span>
+              Review
             </div>
           </div>
         </div>
@@ -561,86 +571,140 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       {step === "edit" ? (
         <div className="xls-main">
           {/* ── Title row ── */}
-          <div className="xls-title-row flex items-start justify-between gap-6">
+          <div className="xls-title-row">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold text-base-content mb-2">
-                Add {title} Report
-              </h1>
-              <p className="text-sm text-base-content/60 mb-6">
+              <h1 className="text-5xl xls-title">Add {title} Report</h1>
+              <p className="text-lg mb-9 xls-subtitle">
                 Entering data for{" "}
-                <strong className="text-base-content">{yearLabel}</strong>. You
-                can type directly or paste from Excel.
+                <strong style={{ color: "var(--color-primary)" }}>
+                  {yearLabel}
+                </strong>
+                . Use tabs to navigate or paste from Excel.{" "}
+                <kbd className="xls-kbd">Tab</kbd> /{" "}
+                <kbd className="xls-kbd">Enter</kbd> to move between cells.
               </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-base-200/50 text-base-content">
-                {rows.length} rows
-              </span>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary/10 text-primary font-semibold">
-                {validCount} valid
-              </span>
+              <div className="xls-pills" style={{ marginTop: 10 }}>
+                <span className="xls-pill xls-pill-neutral">
+                  <span className="xls-pill-dot" />
+                  {rows.length} {rows.length === 1 ? "row" : "rows"}
+                </span>
+                <span
+                  className={`xls-pill ${validCount > 0 ? "xls-pill-ok" : "xls-pill-neutral"}`}
+                >
+                  <span className="xls-pill-dot" />
+                  {validCount} valid
+                </span>
+                {rows.length - validCount > 0 && (
+                  <span className="xls-pill xls-pill-err">
+                    <span className="xls-pill-dot" />
+                    {rows.length - validCount} incomplete
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
+          {/* ── Progress bar ── */}
+          <div className="xls-progress">
+            <div
+              className="xls-progress-fill"
+              style={{
+                width: `${rows.length ? (validCount / rows.length) * 100 : 0}%`,
+              }}
+            />
+          </div>
+
           {/* ── Toolbar ── */}
-          <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-y border-base-300 bg-base-200/40">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
             <button
-              className="btn btn-outline btn-success gap-2"
+              className="btn btn-success gap-2"
               onClick={() => addRows(1)}
             >
-              <FiPlus className="h-5 w-5" />
+              <FiPlus size={15} />
               Add Row
             </button>
             <button
-              className="btn btn-outline gap-2"
+              className="btn btn-success btn-outline gap-2"
               onClick={() => addRows(5)}
             >
-              <FiPlus className="h-5 w-5" />
-              Add 5 Rows
+              <FiPlus size={15} />
+              +5 Rows
             </button>
             <button
-              className="btn btn-outline gap-2"
+              className="btn btn-success btn-outline gap-2"
               onClick={() => addRows(10)}
             >
-              <FiPlus className="h-5 w-5" />
-              Add 10 Rows
+              <FiPlus size={15} />
+              +10 Rows
             </button>
 
-            <div className="divider divider-horizontal mx-1 h-8" />
+            <div
+              style={{
+                width: 1,
+                height: 28,
+                background: "var(--surface-border)",
+                margin: "0 4px",
+              }}
+            />
 
             <button
-              className="btn btn-outline btn-info gap-2"
+              className="btn btn-info btn-outline gap-2"
               onClick={duplicateSelectedRows}
               disabled={selectedRows.size === 0}
             >
-              <FiCopy className="h-5 w-5" />
+              <FiCopy size={15} />
               Duplicate
             </button>
             <button
-              className="btn btn-outline btn-error gap-2"
+              className="btn btn-error btn-outline gap-2"
               onClick={deleteSelectedRows}
               disabled={selectedRows.size === 0}
             >
-              <FiTrash2 className="h-5 w-5" />
-              Delete
-              {selectedRows.size > 0 ? ` (${selectedRows.size})` : ""}
+              <FiTrash2 size={15} />
+              Delete{selectedRows.size > 0 ? ` (${selectedRows.size})` : ""}
             </button>
 
-            <div className="divider divider-horizontal mx-1 h-8" />
+            <div
+              style={{
+                width: 1,
+                height: 28,
+                background: "var(--surface-border)",
+                margin: "0 4px",
+              }}
+            />
 
-            <button
-              className="btn btn-outline btn-warning gap-2"
-              onClick={clearAll}
-            >
+            <button className="btn btn-warning btn-outline" onClick={clearAll}>
               Clear All
             </button>
 
             {onSwitchView && (
               <>
-                <div className="divider divider-horizontal mx-3 h-8" />
+                <div
+                  style={{
+                    width: 1,
+                    height: 28,
+                    background: "var(--surface-border)",
+                    margin: "0 8px",
+                  }}
+                />
 
-                <div className="inline-flex bg-base-300/50 rounded-xl p-1 gap-1">
+                <div
+                  style={{
+                    display: "inline-flex",
+                    background: "var(--surface-inset)",
+                    borderRadius: 12,
+                    padding: 4,
+                    gap: 4,
+                    border: "1px solid var(--surface-border)",
+                  }}
+                >
                   {viewButtons
                     .filter(
                       (b) => !allowedViews || allowedViews.includes(b.value),
@@ -651,13 +715,25 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                         <button
                           key={value}
                           onClick={() => onSwitchView(value)}
-                          className={`btn btn-md gap-3 rounded-lg transition-all ${
-                            isCurrent
-                              ? "btn-primary shadow-lg"
-                              : "btn-ghost text-base-content/60 hover:text-base-content"
-                          }`}
+                          className="xls-btn"
+                          style={{
+                            height: 36,
+                            padding: "0 16px",
+                            fontSize: 14,
+                            borderRadius: 8,
+                            gap: 6,
+                            background: isCurrent
+                              ? "var(--color-primary)"
+                              : "transparent",
+                            color: isCurrent
+                              ? "var(--color-primary-content)"
+                              : "var(--color-muted)",
+                            boxShadow: isCurrent
+                              ? "0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent)"
+                              : "none",
+                          }}
                         >
-                          <Icon className="h-5 w-5" />
+                          <Icon size={15} />
                           {label}
                         </button>
                       );
@@ -665,27 +741,16 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 </div>
               </>
             )}
-
-            <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-              {rows.length} row{rows.length !== 1 && "s"} •{" "}
-              <span className="text-success font-semibold">
-                {validCount} valid
-              </span>
-            </span>
           </div>
 
           {/* ── FIELD TABS (compact / inventory) ── */}
           {fieldTabs && (
-            <div className="flex items-center border-b border-base-300 bg-base-100 px-4 sm:px-6">
+            <div className="xls-tab-bar">
               {fieldTabs.map((tab, i) => (
                 <button
                   key={tab.label}
                   onClick={() => setActiveFieldTab(i)}
-                  className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
-                    activeFieldTab === i
-                      ? "border-primary text-primary"
-                      : "border-transparent text-base-content/50 hover:text-base-content/80"
-                  }`}
+                  className={`xls-tab ${activeFieldTab === i ? "active" : ""}`}
                 >
                   {tab.label}
                 </button>
@@ -693,247 +758,296 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             </div>
           )}
 
-          {/* ── EXCEL-LIKE TABLE ── */}
-          <div className="xls-sheet-wrap" ref={tableRef} onPaste={handlePaste}>
-            <table className="xls-table">
-              <thead className="sticky top-0 z-10">
-                <tr className="xls-thead-cols">
-                  <th
-                    className={`${isCompact ? "py-2.5 px-2" : "py-3 px-3"} text-center border-r border-base-content/10`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={
-                        rows.length > 0 && selectedRows.size === rows.length
+          {/* ── Sheet ── */}
+          <div className="xls-sheet-wrap">
+            <div
+              className="xls-table-outer"
+              ref={tableRef}
+              onPaste={handlePaste}
+            >
+              <table className="xls-table xls-table-auto">
+                <thead>
+                  <tr className="xls-thead-cols">
+                    <th style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        className="xls-checkbox"
+                        checked={
+                          rows.length > 0 && selectedRows.size === rows.length
+                        }
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                    <th style={{ textAlign: "center" }}>#</th>
+                    {visibleFields.map((f) => (
+                      <th
+                        key={f.name}
+                        style={{
+                          textAlign: isNumericField(f.name) ? "center" : "left",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={f.label}
+                      >
+                        {f.label}
+                        {f.required && (
+                          <span className="text-error ml-1">*</span>
+                        )}
+                      </th>
+                    ))}
+                    {(!isCompact || hasVisibleNumeric) && (
+                      <th style={{ textAlign: "center" }}>Total</th>
+                    )}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {rows.map((row, idx) => {
+                    const isSelected = selectedRows.has(row._rowId);
+
+                    // Compute total from all numeric fields
+                    let total = 0;
+                    editableFields.forEach((f) => {
+                      if (isNumericField(f.name)) {
+                        total += Number(row[f.name]) || 0;
                       }
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th
-                    className={`${isCompact ? "py-2.5 px-2" : "py-3 px-3"} text-center font-extrabold border-r border-base-content/10`}
-                  >
-                    #
-                  </th>
-                  {visibleFields.map((f) => (
-                    <th
-                      key={f.name}
-                      className={`${isCompact ? "py-2.5 px-2 text-xs" : "py-3 px-4"} font-extrabold border-r border-base-content/10 ${
-                        isNumericField(f.name) ? "text-center" : "text-left"
-                      } whitespace-nowrap`}
-                      title={f.label}
-                    >
-                      {f.label}
-                      {f.required && <span className="text-error ml-1">*</span>}
-                    </th>
-                  ))}
-                  {(!isCompact || hasVisibleNumeric) && (
-                    <th
-                      className={`${isCompact ? "py-2.5 px-2" : "py-3 px-4"} text-center font-extrabold bg-base-content/5`}
-                    >
-                      Total
-                    </th>
-                  )}
-                </tr>
-              </thead>
+                    });
 
-              <tbody>
-                {rows.map((row, idx) => {
-                  const isSelected = selectedRows.has(row._rowId);
-
-                  // Compute total from all numeric fields
-                  let total = 0;
-                  editableFields.forEach((f) => {
-                    if (isNumericField(f.name)) {
-                      total += Number(row[f.name]) || 0;
-                    }
-                  });
-
-                  return (
-                    <tr
-                      key={row._rowId}
-                      className={`xls-row group transition-colors duration-75 ${
-                        isSelected
-                          ? "bg-primary/10"
-                          : idx % 2 === 0
-                            ? "bg-base-100"
-                            : "bg-base-200/30"
-                      } hover:bg-primary/5`}
-                    >
-                      {/* Checkbox */}
-                      <td
-                        className={`${isCompact ? "px-2 py-1.5" : "px-3 py-2"} text-center border-r border-base-300/40`}
+                    return (
+                      <tr
+                        key={row._rowId}
+                        className="xls-row"
+                        style={
+                          isSelected
+                            ? {
+                                background:
+                                  "color-mix(in srgb, var(--color-primary) 8%, transparent)",
+                              }
+                            : undefined
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={isSelected}
-                          onChange={() => toggleSelectRow(row._rowId)}
-                        />
-                      </td>
-
-                      {/* Row number */}
-                      <td
-                        className={`${isCompact ? "px-2 py-1.5" : "px-3 py-2"} text-center text-sm text-base-content/40 font-mono border-r border-base-300/40 select-none`}
-                      >
-                        {idx + 1}
-                      </td>
-
-                      {/* Dynamic fields */}
-                      {visibleFields.map((f) => {
-                        const isNum = isNumericField(f.name);
-                        const isActive =
-                          activeCell?.rowIdx === idx &&
-                          activeCell?.col === f.name;
-
-                        return (
-                          <td
-                            key={f.name}
-                            className={`${isCompact ? "px-2 py-1.5" : "px-2 py-2"} border-r border-base-300/40 ${
-                              isActive ? "ring-2 ring-primary ring-inset" : ""
-                            }`}
-                            onClick={() =>
-                              setActiveCell({ rowIdx: idx, col: f.name })
-                            }
-                          >
-                            {f.type === "select" && f.options ? (
-                              <select
-                                className={`xls-input select select-ghost w-full font-medium`}
-                                value={String(row[f.name] ?? "")}
-                                onChange={(e) =>
-                                  updateCell(row._rowId, f.name, e.target.value)
-                                }
-                                onFocus={() =>
-                                  setActiveCell({ rowIdx: idx, col: f.name })
-                                }
-                                onKeyDown={(e) => handleKeyDown(e, idx, f.name)}
-                              >
-                                <option value="" disabled>
-                                  Select…
-                                </option>
-                                {f.options.map((opt) => (
-                                  <option key={opt} value={opt}>
-                                    {opt}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : isNum ? (
-                              <input
-                                type="number"
-                                min={0}
-                                className={`xls-input input input-ghost w-full text-center tabular-nums font-medium`}
-                                value={row[f.name] || ""}
-                                placeholder="0"
-                                onChange={(e) =>
-                                  updateCell(
-                                    row._rowId,
-                                    f.name,
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                onFocus={(e) => {
-                                  setActiveCell({ rowIdx: idx, col: f.name });
-                                  e.target.select();
-                                }}
-                                onKeyDown={(e) => handleKeyDown(e, idx, f.name)}
-                              />
-                            ) : (
-                              <input
-                                type="text"
-                                className={`xls-input input input-ghost w-full font-medium`}
-                                value={String(row[f.name] ?? "")}
-                                placeholder={f.placeholder ?? ""}
-                                onChange={(e) =>
-                                  updateCell(row._rowId, f.name, e.target.value)
-                                }
-                                onFocus={() =>
-                                  setActiveCell({ rowIdx: idx, col: f.name })
-                                }
-                                onKeyDown={(e) => handleKeyDown(e, idx, f.name)}
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Total (auto) */}
-                      {(!isCompact || hasVisibleNumeric) && (
-                        <td
-                          className={`${isCompact ? "px-2 py-1.5" : "px-4 py-2"} text-center tabular-nums font-bold text-base bg-base-content/3`}
-                        >
-                          <span
-                            className={
-                              total > 0
-                                ? "text-base-content"
-                                : "text-base-content/30"
-                            }
-                          >
-                            {total > 0 ? total.toLocaleString() : "—"}
-                          </span>
+                        {/* Checkbox */}
+                        <td className="td-num">
+                          <input
+                            type="checkbox"
+                            className="xls-checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectRow(row._rowId)}
+                          />
                         </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
 
-              {/* ── Footer totals ── */}
-              <tfoot className="sticky bottom-0">
-                <tr className="xls-thead-cols font-bold text-sm">
-                  <td
-                    colSpan={2}
-                    className={`${isCompact ? "px-2 py-2.5" : "px-3 py-3"} text-right uppercase tracking-wider text-base-content/60`}
-                  >
-                    Totals
-                  </td>
-                  {visibleFields.map((f) => {
-                    if (!isNumericField(f.name)) {
+                        {/* Row number */}
+                        <td className="td-num">
+                          <span className="xls-rownum">{idx + 1}</span>
+                        </td>
+
+                        {/* Dynamic fields */}
+                        {visibleFields.map((f) => {
+                          const isNum = isNumericField(f.name);
+                          const isActive =
+                            activeCell?.rowIdx === idx &&
+                            activeCell?.col === f.name;
+
+                          return (
+                            <td
+                              key={f.name}
+                              style={
+                                isActive
+                                  ? {
+                                      boxShadow: `inset 0 0 0 2px var(--color-primary)`,
+                                      borderRadius: 4,
+                                    }
+                                  : undefined
+                              }
+                              onClick={() =>
+                                setActiveCell({ rowIdx: idx, col: f.name })
+                              }
+                            >
+                              {f.type === "select" && f.options ? (
+                                <select
+                                  className="xls-input"
+                                  value={String(row[f.name] ?? "")}
+                                  onChange={(e) =>
+                                    updateCell(
+                                      row._rowId,
+                                      f.name,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onFocus={() =>
+                                    setActiveCell({ rowIdx: idx, col: f.name })
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleKeyDown(e, idx, f.name)
+                                  }
+                                >
+                                  <option value="" disabled>
+                                    Select…
+                                  </option>
+                                  {f.options.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : isNum ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="xls-input xls-mono"
+                                  style={{ textAlign: "center" }}
+                                  value={row[f.name] || ""}
+                                  placeholder="0"
+                                  onChange={(e) =>
+                                    updateCell(
+                                      row._rowId,
+                                      f.name,
+                                      Number(e.target.value) || 0,
+                                    )
+                                  }
+                                  onFocus={(e) => {
+                                    setActiveCell({ rowIdx: idx, col: f.name });
+                                    e.target.select();
+                                  }}
+                                  onKeyDown={(e) =>
+                                    handleKeyDown(e, idx, f.name)
+                                  }
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  className="xls-input"
+                                  value={String(row[f.name] ?? "")}
+                                  placeholder={f.placeholder ?? ""}
+                                  onChange={(e) =>
+                                    updateCell(
+                                      row._rowId,
+                                      f.name,
+                                      e.target.value,
+                                    )
+                                  }
+                                  onFocus={() =>
+                                    setActiveCell({ rowIdx: idx, col: f.name })
+                                  }
+                                  onKeyDown={(e) =>
+                                    handleKeyDown(e, idx, f.name)
+                                  }
+                                />
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Total (auto) */}
+                        {(!isCompact || hasVisibleNumeric) && (
+                          <td
+                            className="td-num"
+                            style={{ fontWeight: 700, fontSize: 15 }}
+                          >
+                            <span
+                              style={{
+                                color:
+                                  total > 0
+                                    ? "var(--color-base-content)"
+                                    : "var(--color-muted)",
+                              }}
+                            >
+                              {total > 0 ? total.toLocaleString() : "—"}
+                            </span>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+                {/* ── Footer totals ── */}
+                <tfoot>
+                  <tr className="xls-thead-cols">
+                    <td
+                      colSpan={2}
+                      style={{
+                        textAlign: "right",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "var(--color-muted)",
+                        padding: "10px 14px",
+                      }}
+                    >
+                      Totals
+                    </td>
+                    {visibleFields.map((f) => {
+                      if (!isNumericField(f.name)) {
+                        return <td key={f.name} />;
+                      }
                       return (
                         <td
                           key={f.name}
-                          className={isCompact ? "px-2 py-2.5" : "px-3 py-3"}
-                        />
+                          className="xls-mono"
+                          style={{
+                            textAlign: "center",
+                            fontWeight: 700,
+                            fontSize: 15,
+                            padding: "10px 14px",
+                          }}
+                        >
+                          {rows
+                            .reduce((s, r) => s + (Number(r[f.name]) || 0), 0)
+                            .toLocaleString()}
+                        </td>
                       );
-                    }
-                    return (
+                    })}
+                    {(!isCompact || hasVisibleNumeric) && (
                       <td
-                        key={f.name}
-                        className={`${isCompact ? "px-2 py-2.5" : "px-3 py-3 text-base"} text-center tabular-nums`}
+                        className="xls-mono"
+                        style={{
+                          textAlign: "center",
+                          fontWeight: 800,
+                          fontSize: 15,
+                          padding: "10px 14px",
+                        }}
                       >
                         {rows
-                          .reduce((s, r) => s + (Number(r[f.name]) || 0), 0)
+                          .reduce((s, r) => {
+                            let t = 0;
+                            editableFields.forEach((f) => {
+                              if (isNumericField(f.name))
+                                t += Number(r[f.name]) || 0;
+                            });
+                            return s + t;
+                          }, 0)
                           .toLocaleString()}
                       </td>
-                    );
-                  })}
-                  {(!isCompact || hasVisibleNumeric) && (
-                    <td
-                      className={`${isCompact ? "px-2 py-2.5" : "px-3 py-3 text-base"} text-center tabular-nums font-extrabold bg-base-content/5`}
-                    >
-                      {rows
-                        .reduce((s, r) => {
-                          let t = 0;
-                          editableFields.forEach((f) => {
-                            if (isNumericField(f.name))
-                              t += Number(r[f.name]) || 0;
-                          });
-                          return s + t;
-                        }, 0)
-                        .toLocaleString()}
-                    </td>
-                  )}
-                </tr>
-              </tfoot>
-            </table>
+                    )}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Add row button */}
+            <button
+              type="button"
+              className="xls-add-row"
+              onClick={() => addRows(1)}
+            >
+              <FiPlus size={14} strokeWidth={2.5} />
+              Add Row
+            </button>
           </div>
 
-          {/* ── BOTTOM BAR (Edit) ── */}
+          {/* ── Footer ── */}
           <div className="xls-footer">
-            <p className="text-xs text-base-content/40">
-              Tip: You can paste data directly from Excel. Use Tab/Enter to
-              navigate cells.
-            </p>
-            <div className="flex items-center gap-3">
+            <div className="xls-footer-meta">
+              <span>
+                <strong>{validCount}</strong> of <strong>{rows.length}</strong>{" "}
+                rows ready
+              </span>
+              <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
+                Paste from Excel supported. Use Tab/Enter to navigate cells.
+              </span>
+            </div>
+            <div className="xls-footer-right">
               <button className="xls-btn xls-btn-ghost" onClick={onBack}>
                 Cancel
               </button>
@@ -941,208 +1055,248 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 className="xls-btn xls-btn-primary"
                 onClick={() => setStep("review")}
                 disabled={validCount === 0}
+                style={{ opacity: validCount === 0 ? 0.5 : 1 }}
               >
-                <FiEye className="h-5 w-5" />
-                Review
+                <FiEye size={15} />
+                Review{validCount > 0 ? ` (${validCount})` : ""}
               </button>
             </div>
           </div>
         </div>
       ) : (
         <div className="xls-main">
-          {/* ── REVIEW VIEW ── */}
-          <div className="flex-1 overflow-auto bg-base-100 p-4 sm:p-6 space-y-6">
-            {/* Summary cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {editableFields
-                .filter((f) => isNumericField(f.name))
-                .slice(0, 2)
-                .map((f) => {
-                  const total = validRows.reduce(
-                    (s, r) => s + (Number(r[f.name]) || 0),
-                    0,
-                  );
-                  return (
-                    <div key={f.name} className="card bg-base-200/50 shadow">
-                      <div className="card-body p-4 text-center">
-                        <p className="text-xs uppercase tracking-wider text-base-content/50 font-bold">
-                          Total {f.label}
-                        </p>
-                        <p className="text-3xl font-black text-base-content">
-                          {total.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              <div className="card bg-primary/10 shadow">
-                <div className="card-body p-4 text-center">
-                  <p className="text-xs uppercase tracking-wider text-primary/70 font-bold">
-                    Grand Total
-                  </p>
-                  <p className="text-3xl font-black text-primary">
-                    {validRows
-                      .reduce((s, r) => {
-                        let t = 0;
-                        editableFields.forEach((f) => {
-                          if (isNumericField(f.name))
-                            t += Number(r[f.name]) || 0;
-                        });
-                        return s + t;
-                      }, 0)
-                      .toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Review table */}
-            <div className="xls-sheet-wrap">
-              <div className="overflow-x-auto">
-                <table className="xls-table table-sm w-full">
-                  <thead>
-                    {/* Primary header row */}
-                    <tr className="xls-thead-cols">
-                      <th className="py-3 px-4 text-center font-bold">#</th>
-                      {columns.map((col, i) => {
-                        if (isGroupColumn(col)) {
-                          return (
-                            <th
-                              key={col.title + i}
-                              colSpan={col.children.length}
-                              className="py-3 px-4 text-center font-bold border-b border-base-200 bg-base-content/5"
-                            >
-                              {col.title}
-                            </th>
-                          );
-                        }
-                        return (
-                          <th
-                            key={col.key}
-                            rowSpan={hasGroups ? 2 : 1}
-                            className={`py-3 px-4 font-bold align-middle ${
-                              col.align === "center"
-                                ? "text-center"
-                                : col.align === "right"
-                                  ? "text-right"
-                                  : "text-left"
-                            }`}
-                          >
-                            {col.label}
-                          </th>
-                        );
-                      })}
-                    </tr>
-
-                    {/* Second header row for group children */}
-                    {hasGroups && (
-                      <tr className="xls-thead-cols">
-                        {columns.flatMap((col, gi) => {
-                          if (!isGroupColumn(col)) return [];
-                          return col.children.map((child) => (
-                            <th
-                              key={child.key + gi}
-                              className={`py-2 px-4 font-bold ${
-                                child.align === "center"
-                                  ? "text-center"
-                                  : child.align === "right"
-                                    ? "text-right"
-                                    : "text-left"
-                              }`}
-                            >
-                              {child.label}
-                            </th>
-                          ));
-                        })}
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody className="divide-y divide-base-200">
-                    {validRows.map((row, idx) => {
-                      // Build a Record<string, unknown> for column renderers
-                      const record: Record<string, unknown> = {};
-                      for (const f of fields) {
-                        record[f.name] = row[f.name];
-                      }
-                      return (
-                        <tr
-                          key={row._rowId}
-                          className={`${
-                            idx % 2 === 0 ? "bg-base-100" : "bg-base-200/25"
-                          } hover:bg-primary/5 transition-colors`}
-                        >
-                          <td className="px-4 py-3 text-center text-sm font-mono text-base-content/40">
-                            {idx + 1}
-                          </td>
-                          {leafColumns.map((col) => (
-                            <td
-                              key={col.key}
-                              className={`px-4 py-3 tabular-nums text-base ${
-                                col.align === "center"
-                                  ? "text-center"
-                                  : col.align === "right"
-                                    ? "text-right"
-                                    : ""
-                              }`}
-                            >
-                              {col.render(record)}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-
-                    {/* Grand total */}
-                    {validRows.length > 0 && (
-                      <tr className="bg-primary/80 text-primary-content">
-                        <td className="px-4 py-4 font-black text-sm uppercase tracking-widest">
-                          Total
-                        </td>
-                        {leafColumns.map((col) => {
-                          const total = reviewColumnTotals[col.key];
-                          return (
-                            <td
-                              key={col.key}
-                              className={`px-4 py-4 font-black tabular-nums text-base ${
-                                col.align === "center"
-                                  ? "text-center"
-                                  : col.align === "right"
-                                    ? "text-right"
-                                    : ""
-                              }`}
-                            >
-                              {total != null ? total.toLocaleString() : ""}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+          {/* ── Review summary ── */}
+          <div className="border-none rv-summary">
+            <div className="rv-summary-left">
+              <div>
+                <p className="text-4xl font-black">
+                  Review {validCount} {validCount === 1 ? "entry" : "entries"}{" "}
+                  before saving
+                </p>
+                <p className="font-light text-md mt-1">
+                  Data for{" "}
+                  <strong style={{ color: "var(--color-primary)" }}>
+                    {yearLabel}
+                  </strong>
+                  . Confirm the details are correct.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* ── BOTTOM BAR (Review) ── */}
+          {/* ── Summary cards ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {editableFields
+              .filter((f) => isNumericField(f.name))
+              .slice(0, 2)
+              .map((f) => {
+                const total = validRows.reduce(
+                  (s, r) => s + (Number(r[f.name]) || 0),
+                  0,
+                );
+                return (
+                  <div key={f.name} className="card bg-base-200/50 shadow">
+                    <div className="card-body p-4 text-center">
+                      <p className="text-xs uppercase tracking-wider text-base-content/50 font-bold">
+                        Total {f.label}
+                      </p>
+                      <p className="text-3xl font-black text-base-content">
+                        {total.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            <div className="card bg-primary/10 shadow">
+              <div className="card-body p-4 text-center">
+                <p className="text-xs uppercase tracking-wider text-primary/70 font-bold">
+                  Grand Total
+                </p>
+                <p className="text-3xl font-black text-primary">
+                  {validRows
+                    .reduce((s, r) => {
+                      let t = 0;
+                      editableFields.forEach((f) => {
+                        if (isNumericField(f.name)) t += Number(r[f.name]) || 0;
+                      });
+                      return s + t;
+                    }, 0)
+                    .toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Review table ── */}
+          <div className="xls-sheet-wrap">
+            <div className="xls-table-outer">
+              <table className="xls-table xls-table-auto">
+                <thead>
+                  <tr className="xls-thead-cols">
+                    <th style={{ textAlign: "center", width: 48 }}>#</th>
+                    {columns.map((col, i) => {
+                      if (isGroupColumn(col)) {
+                        return (
+                          <th
+                            key={col.title + i}
+                            colSpan={col.children.length}
+                            style={{ textAlign: "center" }}
+                          >
+                            <div className="xls-group-label">{col.title}</div>
+                          </th>
+                        );
+                      }
+                      return (
+                        <th
+                          key={col.key}
+                          rowSpan={hasGroups ? 2 : 1}
+                          style={{
+                            textAlign:
+                              col.align === "center"
+                                ? "center"
+                                : col.align === "right"
+                                  ? "right"
+                                  : "left",
+                            verticalAlign: "middle",
+                            whiteSpace: "nowrap",
+                            minWidth: 120,
+                          }}
+                        >
+                          {col.label}
+                        </th>
+                      );
+                    })}
+                  </tr>
+
+                  {/* Second header row for group children */}
+                  {hasGroups && (
+                    <tr className="xls-thead-cols">
+                      {columns.flatMap((col, gi) => {
+                        if (!isGroupColumn(col)) return [];
+                        return col.children.map((child) => (
+                          <th
+                            key={child.key + gi}
+                            style={{
+                              textAlign:
+                                child.align === "center"
+                                  ? "center"
+                                  : child.align === "right"
+                                    ? "right"
+                                    : "left",
+                              whiteSpace: "nowrap",
+                              minWidth: 120,
+                            }}
+                          >
+                            {child.label}
+                          </th>
+                        ));
+                      })}
+                    </tr>
+                  )}
+                </thead>
+                <tbody>
+                  {validRows.map((row, idx) => {
+                    // Build a Record<string, unknown> for column renderers
+                    const record: Record<string, unknown> = {};
+                    for (const f of fields) {
+                      record[f.name] = row[f.name];
+                    }
+                    return (
+                      <tr key={row._rowId} className="xls-row">
+                        <td className="td-num">
+                          <span className="xls-rownum">{idx + 1}</span>
+                        </td>
+                        {leafColumns.map((col) => (
+                          <td
+                            key={col.key}
+                            className="xls-mono"
+                            style={{
+                              padding: "12px 14px",
+                              textAlign:
+                                col.align === "center"
+                                  ? "center"
+                                  : col.align === "right"
+                                    ? "right"
+                                    : "left",
+                              fontSize: 15,
+                            }}
+                          >
+                            {col.render(record)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+
+                  {/* Grand total */}
+                  {validRows.length > 0 && (
+                    <tr className="bg-primary/80 text-primary-content">
+                      <td
+                        style={{
+                          padding: "14px 14px",
+                          fontWeight: 900,
+                          fontSize: 13,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                        }}
+                      >
+                        Grand Total
+                      </td>
+                      {leafColumns.map((col) => {
+                        const total = reviewColumnTotals[col.key];
+                        return (
+                          <td
+                            key={col.key}
+                            className="xls-mono"
+                            style={{
+                              padding: "14px 14px",
+                              textAlign:
+                                col.align === "center"
+                                  ? "center"
+                                  : col.align === "right"
+                                    ? "right"
+                                    : "left",
+                              fontWeight: 900,
+                              fontSize: 16,
+                            }}
+                          >
+                            {total != null ? total.toLocaleString() : ""}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Footer ── */}
           <div className="xls-footer">
-            <button
-              className="xls-btn xls-btn-ghost"
-              onClick={() => setStep("edit")}
-            >
-              <FiEdit3 className="h-5 w-5" />
-              Go Back to Edit
-            </button>
-            <div className="flex items-center gap-3">
-              <button className="xls-btn xls-btn-ghost" onClick={onBack}>
-                Cancel
-              </button>
-              <button className="xls-btn xls-btn-success" onClick={handleSave}>
-                <FiCheck className="h-5 w-5" />
-                Confirm & Save{" "}
-                {validCount > 0 &&
-                  `(${validCount} row${validCount !== 1 ? "s" : ""})`}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                className="xls-btn xls-btn-ghost"
+                onClick={() => setStep("edit")}
+              >
+                <FiArrowLeft size={14} />
+                Back to Edit
               </button>
             </div>
+            <button
+              className="xls-btn xls-btn-success"
+              style={{
+                height: 50,
+                paddingLeft: 30,
+                paddingRight: 30,
+                fontSize: 16,
+              }}
+              onClick={handleSave}
+            >
+              <FiSave size={17} />
+              Confirm & Save
+              {validCount > 0 &&
+                ` (${validCount} row${validCount !== 1 ? "s" : ""})`}
+            </button>
           </div>
         </div>
       )}

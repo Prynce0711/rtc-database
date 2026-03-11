@@ -653,6 +653,7 @@ function AnnualTable<T extends Record<string, unknown>>({
                     }}
                     onDelete={handleDelete}
                     even={idx % 2 === 0}
+                    rowIndex={idx}
                     selectionMode={selectionMode}
                     isSelected={selectedIds.has(
                       (row as Record<string, unknown>).id as number,
