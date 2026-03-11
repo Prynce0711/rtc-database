@@ -13,6 +13,72 @@ type JudgementAddProps = Omit<AnnualAddReportPageProps, "onSave"> & {
   onUpdate?: (record: Record<string, unknown>) => void | Promise<void>;
 };
 
+/* ---------------------------------------------------------------
+   Explicit tabs for Judgement add pages.
+   Splits the auto-computed "Case Metrics" (9 fields) into
+   "Cases Heard" + "Cases Disposed" so neither tab needs scrolling.
+--------------------------------------------------------------- */
+const _pick = (names: string[]) =>
+  rtcJudgementFields.filter((f) => names.includes(f.name));
+
+const judgementTabs = [
+  {
+    label: "Location",
+    fields: _pick(["branchNo"]),
+  },
+  {
+    label: "Cases Heard",
+    fields: _pick([
+      "civilV",
+      "civilInC",
+      "criminalV",
+      "criminalInC",
+      "totalHeard",
+    ]),
+  },
+  {
+    label: "Cases Disposed",
+    fields: _pick([
+      "disposedCivil",
+      "disposedCrim",
+      "summaryProc",
+      "casesDisposed",
+    ]),
+  },
+  {
+    label: "PDL Snapshot",
+    fields: _pick(["pdlM", "pdlF", "pdlCICL"]),
+  },
+  {
+    label: "PDL Release Flow",
+    fields: _pick([
+      "pdlV",
+      "pdlInC",
+      "pdlBail",
+      "pdlRecognizance",
+      "pdlMinRor",
+    ]),
+  },
+  {
+    label: "PDL Release Outcomes",
+    fields: _pick([
+      "pdlMaxSentence",
+      "pdlDismissal",
+      "pdlAcquittal",
+      "pdlMinSentence",
+      "pdlProbation",
+    ]),
+  },
+  {
+    label: "CICL Metrics",
+    fields: _pick(["ciclM", "ciclF", "ciclV", "ciclInC"]),
+  },
+  {
+    label: "Totals",
+    fields: _pick(["pdlTotal", "fine", "total"]),
+  },
+].filter((t) => t.fields.length > 0);
+
 const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
   onAdd,
   onUpdate,
@@ -54,6 +120,7 @@ const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
         rest.activeView === "MTC" ? rtcJudgementFields : (rest as any).fields
       }
       columns={rest.activeView === "MTC" ? rtcColumns : (rest as any).columns}
+      customTabs={judgementTabs}
       initialData={initialData}
       onBack={onBack}
       allowedViews={["MTC", "RTC"]}

@@ -405,24 +405,24 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             }}
           >
             <button
-              className="xls-btn xls-btn-ghost"
+              className="btn btn-success gap-2"
               onClick={() => addRows(1)}
             >
-              <FiPlus size={14} />
+              <FiPlus size={15} />
               Add Row
             </button>
             <button
-              className="xls-btn xls-btn-ghost"
+              className="btn btn-success btn-outline gap-2"
               onClick={() => addRows(5)}
             >
-              <FiPlus size={14} />
+              <FiPlus size={15} />
               +5 Rows
             </button>
             <button
-              className="xls-btn xls-btn-ghost"
+              className="btn btn-success btn-outline gap-2"
               onClick={() => addRows(10)}
             >
-              <FiPlus size={14} />
+              <FiPlus size={15} />
               +10 Rows
             </button>
 
@@ -436,21 +436,19 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             />
 
             <button
-              className="xls-btn xls-btn-ghost"
+              className="btn btn-info btn-outline gap-2"
               onClick={duplicateSelectedRows}
               disabled={selectedRows.size === 0}
-              style={{ opacity: selectedRows.size === 0 ? 0.4 : 1 }}
             >
-              <FiCopy size={14} />
+              <FiCopy size={15} />
               Duplicate
             </button>
             <button
-              className="xls-btn xls-btn-ghost"
+              className="btn btn-error btn-outline gap-2"
               onClick={deleteSelectedRows}
               disabled={selectedRows.size === 0}
-              style={{ opacity: selectedRows.size === 0 ? 0.4 : 1 }}
             >
-              <FiTrash2 size={14} />
+              <FiTrash2 size={15} />
               Delete{selectedRows.size > 0 ? ` (${selectedRows.size})` : ""}
             </button>
 
@@ -463,7 +461,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
               }}
             />
 
-            <button className="xls-btn xls-btn-ghost" onClick={clearAll}>
+            <button className="btn btn-warning btn-outline" onClick={clearAll}>
               Clear All
             </button>
           </div>
@@ -1065,7 +1063,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
               </button>
             </div>
             <button
-              className="btn btn-outline btn-success"
+              className="xls-btn xls-btn-success"
               style={{
                 height: 50,
                 paddingLeft: 30,
