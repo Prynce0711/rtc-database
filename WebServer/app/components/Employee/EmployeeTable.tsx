@@ -3,7 +3,12 @@
 import Pagination from "@/app/components/Pagination/Pagination";
 import TipCell from "@/app/components/Table/TipCell";
 import type { Employee } from "@/app/generated/prisma/browser";
-import { enumToText, getAgeFromDate } from "@/app/lib/utils";
+import {
+  enumToText,
+  formatDate,
+  getAgeFromDate,
+  isRetirementEligible,
+} from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
 import {
@@ -28,11 +33,15 @@ type SortKey =
       | "employeeNumber"
       | "position"
       | "branch"
+      | "birthDate"
+      | "dateHired"
       | "employmentType"
       | "contactNumber"
       | "email"
     >
-  | "age";
+  | "age"
+  | "yearsInService"
+  | "retirementEligibility";
 
 type SortOrder = "asc" | "desc";
 
@@ -80,6 +89,24 @@ const SortTh = ({
 const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
   const router = useRouter();
 
+  const getYearsInService = (
+    dateHired?: Date | string | null,
+  ): number | null => {
+    if (!dateHired) return null;
+    const hiredDate = new Date(dateHired);
+    if (Number.isNaN(hiredDate.getTime())) return null;
+
+    const today = new Date();
+    let years = today.getFullYear() - hiredDate.getFullYear();
+    const hasReachedHireAnniversary =
+      today.getMonth() > hiredDate.getMonth() ||
+      (today.getMonth() === hiredDate.getMonth() &&
+        today.getDate() >= hiredDate.getDate());
+
+    if (!hasReachedHireAnniversary) years -= 1;
+    return Math.max(0, years);
+  };
+
   const rowsPerPage = 10;
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState<SortKey>("employeeName");
@@ -100,6 +127,21 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
       if (sortKey === "age") {
         const aVal = getAgeFromDate(a.birthDate) ?? -1;
         const bVal = getAgeFromDate(b.birthDate) ?? -1;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      if (sortKey === "yearsInService") {
+        const aVal = getYearsInService(a.dateHired) ?? -1;
+        const bVal = getYearsInService(b.dateHired) ?? -1;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      if (sortKey === "retirementEligibility") {
+        const aVal = isRetirementEligible(a.birthDate) ? 1 : 0;
+        const bVal = isRetirementEligible(b.birthDate) ? 1 : 0;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      if (sortKey === "birthDate" || sortKey === "dateHired") {
+        const aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
+        const bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
         return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
       }
       const aVal = (a[sortKey] ?? "") as string;
@@ -133,19 +175,18 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                 Actions
               </th>
               <SortTh
-                label="Employee Name"
-                colKey="employeeName"
+                label="Branch"
+                colKey="branch"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
               />
               <SortTh
-                label="Employee #"
-                colKey="employeeNumber"
+                label="Full Name"
+                colKey="employeeName"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
-                align="center"
               />
               <SortTh
                 label="Position"
@@ -155,8 +196,31 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                 onSort={handleSort}
               />
               <SortTh
-                label="Branch"
-                colKey="branch"
+                label="Employee Number"
+                colKey="employeeNumber"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+                align="center"
+              />
+              <SortTh
+                label="Contact Number"
+                colKey="contactNumber"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+                align="center"
+              />
+              <SortTh
+                label="Email Address"
+                colKey="email"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+              />
+              <SortTh
+                label="Birthdate"
+                colKey="birthDate"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
@@ -170,23 +234,30 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                 align="center"
               />
               <SortTh
-                label="Employment Type"
+                label="Date Hired"
+                colKey="dateHired"
+                sortKey={sortKey}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+              />
+              <SortTh
+                label="Employment"
                 colKey="employmentType"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
               />
               <SortTh
-                label="Contact No"
-                colKey="contactNumber"
+                label="Years in Service"
+                colKey="yearsInService"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
                 align="center"
               />
               <SortTh
-                label="Email"
-                colKey="email"
+                label="Retirement Eligibility"
+                colKey="retirementEligibility"
                 sortKey={sortKey}
                 sortOrder={sortOrder}
                 onSort={handleSort}
@@ -199,7 +270,7 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
             {paginated.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={13}
                   className="text-center py-16 text-base-content/30 text-sm font-medium"
                 >
                   <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
@@ -283,15 +354,15 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
 
                   {/* Data cells with hover tooltip */}
                   <TipCell
-                    label="Employee Name"
-                    value={emp.employeeName}
-                    className="py-4 px-5 font-semibold text-base-content"
+                    label="Branch"
+                    value={emp.branch}
+                    className="py-4 px-5 text-base-content/80"
                     clickHint
                   />
                   <TipCell
-                    label="Employee #"
-                    value={emp.employeeNumber}
-                    className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70"
+                    label="Full Name"
+                    value={emp.employeeName}
+                    className="py-4 px-5 font-semibold text-base-content"
                     clickHint
                   />
                   <TipCell
@@ -301,9 +372,28 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                     clickHint
                   />
                   <TipCell
-                    label="Branch"
-                    value={emp.branch}
-                    className="py-4 px-5 text-base-content/80"
+                    label="Employee Number"
+                    value={emp.employeeNumber}
+                    className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Contact Number"
+                    value={emp.contactNumber}
+                    className="py-4 px-5 text-center text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Email Address"
+                    value={emp.email}
+                    className="py-4 px-5 text-base-content/60"
+                    truncate
+                    clickHint
+                  />
+                  <TipCell
+                    label="Birthdate"
+                    value={formatDate(emp.birthDate)}
+                    className="py-4 px-5 text-base-content/70"
                     clickHint
                   />
                   <TipCell
@@ -313,7 +403,13 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                     clickHint
                   />
                   <TipCell
-                    label="Employment Type"
+                    label="Date Hired"
+                    value={formatDate(emp.dateHired)}
+                    className="py-4 px-5 text-base-content/70"
+                    clickHint
+                  />
+                  <TipCell
+                    label="Employment"
                     value={
                       emp.employmentType
                         ? enumToText(emp.employmentType)
@@ -323,16 +419,19 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                     clickHint
                   />
                   <TipCell
-                    label="Contact No"
-                    value={emp.contactNumber}
+                    label="Years in Service"
+                    value={getYearsInService(emp.dateHired)}
                     className="py-4 px-5 text-center text-base-content/70"
                     clickHint
                   />
                   <TipCell
-                    label="Email"
-                    value={emp.email}
-                    className="py-4 px-5 text-base-content/60"
-                    truncate
+                    label="Retirement Eligibility"
+                    value={
+                      isRetirementEligible(emp.birthDate)
+                        ? "Eligible"
+                        : "Not Eligible"
+                    }
+                    className="py-4 px-5 text-base-content/80"
                     clickHint
                   />
                 </tr>
