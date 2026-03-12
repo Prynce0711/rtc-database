@@ -688,13 +688,21 @@ const StatisticsDashboard: React.FC = () => {
                         <td className="font-semibold">
                           {r.branchNo ?? `Branch ${r.id}`}
                         </td>
-                        <td className="text-right font-semibold">{fmt(num(r.civilV))}</td>
-                        <td className="text-right font-semibold">{fmt(num(r.criminalV))}</td>
-                        <td className="text-right font-semibold">{fmt(num(r.totalHeard))}</td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.civilV))}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.criminalV))}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.totalHeard))}
+                        </td>
                         <td className="text-right font-semibold">
                           {fmt(num(r.totalDisposed))}
                         </td>
-                        <td className="text-right font-semibold">{fmt(num(r.pdlTotal))}</td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.pdlTotal))}
+                        </td>
                         <td className="text-right font-semibold">
                           {fmt(num(r.total))}
                         </td>
@@ -743,18 +751,22 @@ const StatisticsDashboard: React.FC = () => {
                   {monthly.length > 0 ? (
                     monthly.slice(0, 15).map((r) => (
                       <tr
-                          key={r.id ?? `${r.month}-${r.category}-${r.branch}`}
-                          className="hover"
-                        >
-                          <td className="font-semibold">{r.month}</td>
-                          <td className="font-semibold">{r.category}</td>
-                          <td className="font-semibold">{r.branch}</td>
-                          <td className="text-right font-semibold">{fmt(r.criminal)}</td>
-                          <td className="text-right font-semibold">{fmt(r.civil)}</td>
-                          <td className="text-right font-semibold">
-                            {fmt(r.total)}
-                          </td>
-                        </tr>
+                        key={r.id ?? `${r.month}-${r.category}-${r.branch}`}
+                        className="hover"
+                      >
+                        <td className="font-semibold">{r.month}</td>
+                        <td className="font-semibold">{r.category}</td>
+                        <td className="font-semibold">{r.branch}</td>
+                        <td className="text-right font-semibold">
+                          {fmt(r.criminal)}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(r.civil)}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(r.total)}
+                        </td>
+                      </tr>
                     ))
                   ) : (
                     <tr>
