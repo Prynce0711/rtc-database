@@ -130,7 +130,9 @@ model CriminalCase{
   vcf             String?
   total           String?
   amountInvolved  String?
+
   createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 
   case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
@@ -151,6 +153,9 @@ model CivilCase{
   remandedNote        String?
   undocketed Boolean @default(false)
 
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
+
   case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
 
@@ -161,6 +166,9 @@ model Petition {
   raffledTo  String?
   date       DateTime?
   nature     String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 
   case     Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
@@ -173,6 +181,9 @@ model SpecialProceeding {
   date       DateTime?
   nature     String?
   respondent String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 
   case      Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
 }
@@ -188,7 +199,9 @@ model Employee {
   employmentType EmploymentType
   contactNumber    String?    @unique
   email            String?    @unique
-  createdAt        DateTime   @default(now())
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 }
 
 model Log {
@@ -205,7 +218,9 @@ model Log {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress String?
   userAgent String?
-  createdAt DateTime @default(now())
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 }
 
 model User {
@@ -294,28 +309,35 @@ model RecievingLog {
   content      String?
   branchNumber String?
   notes        String?
-  createdAt    DateTime  @default(now())
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 }
 
 model Notarial {
   id        Int      @id @default(autoincrement())
-  title     String
-  name      String
-  attorney  String
-  createdAt DateTime @default(now())
-  date      DateTime
+  title     String?
+  name      String?
+  attorney  String?
+  date      DateTime?
 
-  file   File? @relation(fields: [fileId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
+
+  file   FileData? @relation(fields: [fileId], references: [id])
   fileId Int?
 }
 
-model File {
+model FileData {
   id        Int      @id @default(autoincrement())
-  filename  String
+  key      String @unique
+  fileName  String
   path      String
   size      Int
   mimeType  String
-  createdAt DateTime @default(now())
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt
 
   notarials Notarial[]
   chatMessages ChatMessage[]
@@ -433,10 +455,11 @@ model Chat {
   type          ChatType @default(DIRECT)
   name          String?
   description   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
   lastMessageAt DateTime @default(now())
   // call          Call?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime? @updatedAt
 
   members  ChatMember[]
   messages ChatMessage[]
@@ -459,11 +482,12 @@ model ChatMessage {
   chatId    Int
   userId    String
   content   String
+
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime? @updatedAt
 
   fileId Int?
-  file File? @relation(fields: [fileId], references: [id])
+  file FileData? @relation(fields: [fileId], references: [id])
 
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

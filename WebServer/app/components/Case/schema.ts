@@ -3,7 +3,6 @@ import { excelHeaders } from "@/app/lib/excel";
 import z from "zod";
 
 export const BaseCaseSchema = z.object({
-  id: z.coerce.number().int().optional(), // Optional for new cases that haven't been saved yet
   branch: z
     .string()
     .nullable()
