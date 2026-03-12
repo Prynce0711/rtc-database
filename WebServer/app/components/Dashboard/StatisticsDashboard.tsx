@@ -671,7 +671,7 @@ const StatisticsDashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="table table-md w-full">
                 <thead>
-                  <tr className="text-sm text-base-content/50 uppercase">
+                  <tr className="text-sm text-base-content/50 uppercase font-bold">
                     <th>Branch</th>
                     <th className="text-right">Civil (V)</th>
                     <th className="text-right">Criminal (V)</th>
@@ -685,16 +685,24 @@ const StatisticsDashboard: React.FC = () => {
                   {mtc.length > 0 ? (
                     mtc.map((r) => (
                       <tr key={r.id} className="hover">
-                        <td className="font-medium">
+                        <td className="font-semibold">
                           {r.branchNo ?? `Branch ${r.id}`}
                         </td>
-                        <td className="text-right">{fmt(num(r.civilV))}</td>
-                        <td className="text-right">{fmt(num(r.criminalV))}</td>
-                        <td className="text-right">{fmt(num(r.totalHeard))}</td>
-                        <td className="text-right">
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.civilV))}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.criminalV))}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.totalHeard))}
+                        </td>
+                        <td className="text-right font-semibold">
                           {fmt(num(r.totalDisposed))}
                         </td>
-                        <td className="text-right">{fmt(num(r.pdlTotal))}</td>
+                        <td className="text-right font-semibold">
+                          {fmt(num(r.pdlTotal))}
+                        </td>
                         <td className="text-right font-semibold">
                           {fmt(num(r.total))}
                         </td>
@@ -730,7 +738,7 @@ const StatisticsDashboard: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="table table-md w-full">
                 <thead>
-                  <tr className="text-sm text-base-content/50 uppercase">
+                  <tr className="text-sm text-base-content/50 uppercase font-bold">
                     <th>Month</th>
                     <th>Category</th>
                     <th>Branch</th>
@@ -746,11 +754,15 @@ const StatisticsDashboard: React.FC = () => {
                         key={r.id ?? `${r.month}-${r.category}-${r.branch}`}
                         className="hover"
                       >
-                        <td className="font-medium">{r.month}</td>
-                        <td>{r.category}</td>
-                        <td>{r.branch}</td>
-                        <td className="text-right">{fmt(r.criminal)}</td>
-                        <td className="text-right">{fmt(r.civil)}</td>
+                        <td className="font-semibold">{r.month}</td>
+                        <td className="font-semibold">{r.category}</td>
+                        <td className="font-semibold">{r.branch}</td>
+                        <td className="text-right font-semibold">
+                          {fmt(r.criminal)}
+                        </td>
+                        <td className="text-right font-semibold">
+                          {fmt(r.civil)}
+                        </td>
                         <td className="text-right font-semibold">
                           {fmt(r.total)}
                         </td>
