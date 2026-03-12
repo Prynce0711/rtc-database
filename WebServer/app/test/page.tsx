@@ -1,5 +1,5 @@
-import ChatTest from "./ChatTest";
+import ExcelWithFileUpload from "./ExcelWithFileUpload";
 
 export default function page() {
-  return <ChatTest />;
+  return <ExcelWithFileUpload />;
 }

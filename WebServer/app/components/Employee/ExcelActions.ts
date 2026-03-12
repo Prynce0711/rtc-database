@@ -2,7 +2,7 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import { EmployeeSchema } from "@/app/components/Employee/schema";
-import { LogAction, Prisma } from "@/app/generated/prisma/client";
+import { LogAction } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   ExportExcelData,
@@ -56,24 +56,16 @@ export async function uploadEmployeeExcel(
       };
     };
 
-    const result = await processExcelUpload<
-      Prisma.EmployeeCreateManyInput,
-      ReturnType<typeof getMappedCells>
-    >({
+    const result = await processExcelUpload<EmployeeSchema>({
       file,
       requiredHeaders: {
         "Employee Name": employeeNameHeaders,
         "Employee Number": employeeNumberHeaders,
       },
+      getCells: getMappedCells,
       schema: EmployeeSchema,
-      skipRowsWithoutCell: {
-        getCells: getMappedCells,
-        keys: ["employeeNumber"], // Don't skip rows just because employee number is missing - we'll catch that in validation and report it as an error, but we want to attempt to process the row in case other data is present that can be used for error reporting
-      },
-      uniqueKeys: {
-        getCells: getMappedCells,
-        keys: ["employeeNumber", "email", "contactNumber"],
-      },
+      skipRowsWithoutCell: ["employeeNumber"], // Don't skip rows just because employee number is missing - we'll catch that in validation and report it as an error, but we want to attempt to process the row in case other data is present that can be used for error reporting
+      uniqueKeys: ["employeeNumber", "email", "contactNumber"],
       uniqueKeyLabel: "Employee number",
       checkExistingUniqueKeys: async (keys) => {
         const existing = await prisma.employee.findMany({

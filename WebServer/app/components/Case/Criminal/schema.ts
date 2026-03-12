@@ -1,4 +1,4 @@
-import type { Case, CriminalCase } from "@/app/generated/prisma/client";
+import type { Case, CriminalCase } from "@/app/generated/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
