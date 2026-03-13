@@ -70,8 +70,8 @@ const Inventory = ({
 
   return (
     <AnnualTable<InventoryLog & Record<string, unknown>>
-      title="Inventory"
-      subtitle="Court Document Inventory — Track all court documents and filings"
+      // title="Inventory"
+      // subtitle="Court Document Inventory — Track all court documents and filings"
       variant="inventory"
       data={records as (InventoryLog & Record<string, unknown>)[]}
       columns={inventoryColumns}

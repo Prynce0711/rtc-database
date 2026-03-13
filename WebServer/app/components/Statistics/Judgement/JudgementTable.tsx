@@ -2,7 +2,6 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import Pagination from "../../Pagination/Pagination";
@@ -162,12 +161,14 @@ function JudgementTable<T extends Record<string, unknown>>({
     if (requestAdd != null && requestAdd !== prevRequestAdd.current) {
       prevRequestAdd.current = requestAdd;
       if (isAdminOrAtty) {
-        setEditInitialData(undefined);
-        setShowAddPage(true);
-        onActivePageChange?.(true);
+        setTimeout(() => {
+          setEditInitialData(undefined);
+          setShowAddPage(true);
+          onActivePageChange?.(true);
+        }, 0);
       }
     }
-  }, [requestAdd, isAdminOrAtty]);
+  }, [requestAdd, isAdminOrAtty, onActivePageChange]);
 
   // Filter by year if provided
   const yearFilteredData = useMemo(() => {
@@ -179,51 +180,50 @@ function JudgementTable<T extends Record<string, unknown>>({
     });
   }, [data, selectedYear, dateKey]);
 
-  /* ── KPI cards ──────────────────────────────────────────────────── */
-  const kpiCards: KPICard[] = useMemo(() => {
-    const rows = yearFilteredData as Record<string, unknown>[];
-    let totalHeard = 0;
-    let totalDisposed = 0;
-    let totalPDL = 0;
-    const branchSet = new Set<string>();
-    for (const r of rows) {
-      totalHeard += Number(r.totalHeard) || 0;
-      totalDisposed +=
-        (Number(r.totalDisposed) || 0) + (Number(r.casesDisposed) || 0);
-      totalPDL += Number(r.pdlTotal) || 0;
-      if (r.branchNo) branchSet.add(String(r.branchNo));
-    }
-    return [
-      {
-        label: "Cases Heard",
-        value: totalHeard,
-        subtitle: "Total cases heard/tried",
-        icon: Scale,
-        delay: 0,
-      },
-      {
-        label: "Cases Disposed",
-        value: totalDisposed,
-        subtitle: "Total cases disposed",
-        icon: Gavel,
-        delay: 100,
-      },
-      {
-        label: "PDL Total",
-        value: totalPDL,
-        subtitle: "PDL/CICL total",
-        icon: BarChart3,
-        delay: 200,
-      },
-      {
-        label: "Branches",
-        value: branchSet.size,
-        subtitle: "Active branches",
-        icon: FileText,
-        delay: 300,
-      },
-    ];
-  }, [yearFilteredData]);
+  // const kpiCards: KPICard[] = useMemo(() => {
+  //   const rows = yearFilteredData as Record<string, unknown>[];
+  //   let totalHeard = 0;
+  //   let totalDisposed = 0;
+  //   let totalPDL = 0;
+  //   const branchSet = new Set<string>();
+  //   for (const r of rows) {
+  //     totalHeard += Number(r.totalHeard) || 0;
+  //     totalDisposed +=
+  //       (Number(r.totalDisposed) || 0) + (Number(r.casesDisposed) || 0);
+  //     totalPDL += Number(r.pdlTotal) || 0;
+  //     if (r.branchNo) branchSet.add(String(r.branchNo));
+  //   }
+  //   return [
+  //     {
+  //       label: "Cases Heard",
+  //       value: totalHeard,
+  //       subtitle: "Total cases heard/tried",
+  //       icon: Scale,
+  //       delay: 0,
+  //     },
+  //     {
+  //       label: "Cases Disposed",
+  //       value: totalDisposed,
+  //       subtitle: "Total cases disposed",
+  //       icon: Gavel,
+  //       delay: 100,
+  //     },
+  //     {
+  //       label: "PDL Total",
+  //       value: totalPDL,
+  //       subtitle: "PDL/CICL total",
+  //       icon: BarChart3,
+  //       delay: 200,
+  //     },
+  //     {
+  //       label: "Branches",
+  //       value: branchSet.size,
+  //       subtitle: "Active branches",
+  //       icon: FileText,
+  //       delay: 300,
+  //     },
+  //   ];
+  // }, [yearFilteredData]);
 
   /* ── Search + Sort ──────────────────────────────────────────────── */
   const sortRecords = <R extends Record<string, unknown>>(
@@ -260,10 +260,8 @@ function JudgementTable<T extends Record<string, unknown>>({
     Math.ceil(filteredAndSorted.length / PAGE_SIZE),
   );
 
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage]);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filteredAndSorted.slice(start, start + PAGE_SIZE);
 
   const handleSort = (key: string) => {
     setSortConfig((prev) => ({
@@ -395,7 +393,7 @@ function JudgementTable<T extends Record<string, unknown>>({
         )}
       </div>
       {/* ── KPI CARDS ── */}
-      <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
+      {/* <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
         {kpiCards.map((card, idx) => (
           <div
             key={idx}
@@ -422,7 +420,7 @@ function JudgementTable<T extends Record<string, unknown>>({
             </div>
           </div>
         ))}
-      </section>
+      </section> */}
       {/* ── TOOLBAR ── */}
       <AnnualToolbar
         search={searchTerm}

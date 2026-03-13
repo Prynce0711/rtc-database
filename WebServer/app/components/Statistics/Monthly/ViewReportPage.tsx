@@ -1,9 +1,9 @@
 "use client";
 
-import { BarChart3, Gavel, LayoutList, Scale, Trophy } from "lucide-react";
+import { BarChart3, Trophy } from "lucide-react";
 import React, { useMemo } from "react";
 import { FiArrowLeft, FiCalendar } from "react-icons/fi";
-import MonthlyKPI from "./MonthlyKPI";
+
 import type { MonthlyRow } from "./Schema";
 
 /* ------------------------------------------------------------------ */
@@ -125,7 +125,7 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
         </div>
       </header>
 
-      {/* ── KPI CARDS ── */}
+      {/* ── KPI CARDS ──
       <MonthlyKPI
         totalCriminal={totals.criminal}
         totalCivil={totals.civil}
@@ -137,7 +137,7 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
           grandTotal: BarChart3,
           branches: LayoutList,
         }}
-      />
+      /> */}
 
       {/* ── CATEGORY BREAKDOWN ── */}
       <section className="space-y-4">
@@ -357,8 +357,7 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
         </div>
       </section>
 
-      {/* ── ALL RECORDS ── */}
-      <section className="space-y-4">
+      {/* <section className="space-y-4">
         <h3 className="text-2xl font-bold text-base-content flex items-center gap-2.5">
           <LayoutList className="h-6 w-6 text-primary" />
           All Records
@@ -446,8 +445,8 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                           </tr>
                         ))}
 
-                        {/* Subtotal */}
-                        <tr className="bg-base-300/60 border-y border-base-300/80">
+          
+                        {/* <tr className="bg-base-300/60 border-y border-base-300/80">
                           <td
                             colSpan={3}
                             className="px-6 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-base-content/50"
@@ -473,10 +472,10 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                       </React.Fragment>
                     );
                   },
-                )}
+                )} */}
 
-                {/* Grand total */}
-                <tr className="bg-primary/80 text-primary-content">
+      {/* Grand total */}
+      {/* <tr className="bg-primary/80 text-primary-content">
                   <td
                     colSpan={3}
                     className="px-6 py-3.5 text-left font-black text-sm uppercase tracking-widest"
@@ -492,12 +491,12 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                   <td className="px-4 py-3.5 text-center font-black tabular-nums text-2xl">
                     {totals.total.toLocaleString()}
                   </td>
-                </tr>
-              </tbody>
+                </tr> */}
+      {/* </tbody>
             </table>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* ── FOOTER ── */}
       <p className="text-xs text-base-content/40 text-right">

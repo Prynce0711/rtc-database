@@ -7,9 +7,6 @@ import type { SelectionMode } from "./MonthlyTable";
 interface MonthlyToolbarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  categoryFilter: string;
-  onCategoryFilterChange: (value: string) => void;
-  categories: string[];
   rowCount: number;
   selectionMode?: SelectionMode;
   selectedCount?: number;
@@ -22,9 +19,6 @@ interface MonthlyToolbarProps {
 const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
   search,
   onSearchChange,
-  categoryFilter,
-  onCategoryFilterChange,
-  categories,
   rowCount,
   selectionMode,
   selectedCount = 0,
@@ -48,21 +42,6 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
           disabled={isSelecting}
         />
       </div>
-
-      {/* Category select (moved to appear before actions) */}
-      <select
-        className="select select-bordered"
-        value={categoryFilter}
-        onChange={(e) => onCategoryFilterChange(e.target.value)}
-        disabled={isSelecting}
-      >
-        <option value="all">All Categories</option>
-        {categories.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
 
       {/* Actions (now in the position where All Categories used to be) */}
       {isSelecting ? (

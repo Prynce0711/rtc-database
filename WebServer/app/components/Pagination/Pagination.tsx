@@ -65,14 +65,17 @@ const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className={className ?? "w-full flex justify-center py-4"}>
+    <div className={className ?? "w-full flex justify-center py-0"}>
       <div
-        className={joinClassName ?? "join shadow-sm bg-base-100 rounded-lg p-1"}
+        className={
+          joinClassName ??
+          "flex items-center gap-1 rounded-xl border border-base-200 bg-base-100 px-2 py-1 shadow-sm"
+        }
       >
         {/* PREVIOUS (hidden on first page) */}
         {currentPage > 1 && (
           <button
-            className="join-item btn btn-sm btn-ghost"
+            className="btn btn-sm btn-ghost rounded-lg px-2"
             onClick={() => onPageChange?.(Math.max(1, currentPage - 1))}
             aria-label="Previous page"
           >
@@ -86,10 +89,10 @@ const Pagination: React.FC<PaginationProps> = ({
           if (page === "...") {
             if (activeEllipsis === index) {
               return (
-                <div key={`ell-${index}`} className="join-item">
+                <div key={`ell-${index}`}>
                   <input
                     autoFocus
-                    className="input input-sm w-20 text-center"
+                    className="input input-sm w-20 text-center rounded-lg"
                     value={ellipsisValue}
                     onChange={(e) => setEllipsisValue(e.target.value)}
                     onBlur={() => submitEllipsis()}
@@ -109,7 +112,7 @@ const Pagination: React.FC<PaginationProps> = ({
             return (
               <button
                 key={`ell-btn-${index}`}
-                className="join-item btn btn-sm btn-ghost"
+                className="btn btn-sm btn-ghost rounded-lg min-w-8"
                 onClick={() => {
                   setActiveEllipsis(index);
                   setEllipsisValue("");
@@ -135,7 +138,7 @@ const Pagination: React.FC<PaginationProps> = ({
 
         {/* NEXT (disabled if last page) */}
         <button
-          className="join-item btn btn-sm btn-ghost"
+          className="btn btn-sm btn-ghost rounded-lg px-2"
           onClick={() => onPageChange?.(Math.min(pageCount, currentPage + 1))}
           aria-label="Next page"
           disabled={currentPage >= pageCount}
@@ -160,7 +163,11 @@ function PageButton({
 }) {
   return (
     <button
-      className={`join-item btn btn-sm btn-ghost ${isActive ? "btn-active" : ""}`}
+      className={`btn btn-sm rounded-lg min-w-8 px-2 ${
+        isActive
+          ? "bg-base-300 text-base-content font-bold hover:bg-base-300"
+          : "btn-ghost text-base-content/80 hover:text-base-content"
+      }`}
       onClick={onClick}
       disabled={disabled}
       aria-current={isActive ? "page" : undefined}
