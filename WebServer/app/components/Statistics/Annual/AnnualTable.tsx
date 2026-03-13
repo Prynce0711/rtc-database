@@ -15,7 +15,7 @@ import AnnualToolbar from "./AnnualToolbar";
 import { sortRecords } from "./AnnualUtils";
 import AnnualViewPage from "./AnnualViewPage";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 export type AnnualVariant = "court" | "inventory";
 
@@ -294,10 +294,9 @@ function AnnualTable<T extends Record<string, unknown>>({
     Math.ceil(filteredAndSorted.length / PAGE_SIZE),
   );
 
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage]);
+  const effectiveCurrentPage = Math.min(currentPage, pageCount);
+  const start = (effectiveCurrentPage - 1) * PAGE_SIZE;
+  const paginated = filteredAndSorted.slice(start, start + PAGE_SIZE);
 
   const handleSort = (key: string) => {
     setSortConfig((prev) => ({
@@ -447,7 +446,7 @@ function AnnualTable<T extends Record<string, unknown>>({
           <p className="mt-1 text-sm text-base-content/60">{subtitle}</p>
         )}
       </div>
-      {/* ── KPI CARDS ── */}
+      {/* ── KPI CARDS ──
       <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
         {kpiCards.map((card, idx) => {
           const isGrand = card.label === "Grand Total";
@@ -495,7 +494,7 @@ function AnnualTable<T extends Record<string, unknown>>({
             </div>
           );
         })}
-      </section>
+      </section> */}
       {/* ── TOOLBAR ── */}
       <AnnualToolbar
         search={searchTerm}
@@ -707,7 +706,7 @@ function AnnualTable<T extends Record<string, unknown>>({
       <div className="flex justify-end">
         <Pagination
           pageCount={pageCount}
-          currentPage={currentPage}
+          currentPage={effectiveCurrentPage}
           onPageChange={(page) => {
             setCurrentPage(page);
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -716,7 +715,7 @@ function AnnualTable<T extends Record<string, unknown>>({
       </div>
       {/* ── FOOTER ── */}
       <p className="text-xs text-base-content/40 text-right">
-        Showing page {currentPage} of {pageCount}
+        Showing page {effectiveCurrentPage} of {pageCount}
       </p>
     </div>
   );

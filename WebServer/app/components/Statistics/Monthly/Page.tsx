@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiCalendar, FiDownload, FiPlus, FiUpload } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiDownload,
+  FiFileText,
+  FiPlus,
+  FiUpload,
+} from "react-icons/fi";
 import * as XLSX from "xlsx";
+import RadioButton from "../../Filter/RadioButton";
 import {
   deleteMonthlyStatistic,
   getMonthlyStatistics,
@@ -11,10 +18,41 @@ import {
 import type { MonthlyRow } from "./Schema";
 
 import AddReportPage from "./AddReportPage";
-import MonthlyKPI from "./MonthlyKPI";
+
 import MonthlyTable from "./MonthlyTable";
 import MonthlyToolbar from "./MonthlyToolbar";
 import ViewReportPage from "./ViewReportPage";
+
+type MonthlyCategoryView =
+  | "Cases Disposed"
+  | "New Cases Filed"
+  | "Pending Cases";
+
+const categoryViews: {
+  label: string;
+  value: MonthlyCategoryView;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    label: "New Cases Filed",
+    value: "New Cases Filed",
+    description: "Newly filed case statistics",
+    icon: FiFileText,
+  },
+  {
+    label: "Cases Disposed",
+    value: "Cases Disposed",
+    description: "Disposed case statistics",
+    icon: FiFileText,
+  },
+  {
+    label: "Pending Cases",
+    value: "Pending Cases",
+    description: "Pending case statistics",
+    icon: FiFileText,
+  },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -25,7 +63,8 @@ export default function MonthlyPage() {
     new Date().toISOString().slice(0, 7),
   );
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [activeCategoryView, setActiveCategoryView] =
+    useState<MonthlyCategoryView>("New Cases Filed");
   const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showAddPage, setShowAddPage] = useState(false);
@@ -79,7 +118,7 @@ export default function MonthlyPage() {
       setEditMode(true);
       setShowAddPage(true);
       // Store selected data for AddReportPage — done via editMode + initialData filtering
-      setImportedData((prev) => {
+      setImportedData(() => {
         // Keep only selected rows for edit context
         return selected;
       });
@@ -102,16 +141,9 @@ export default function MonthlyPage() {
 
   /* ---------- derived ---------- */
 
-  const categories = useMemo(
-    () => Array.from(new Set(monthlyData.map((r) => r.category))),
-    [monthlyData],
-  );
-
   const filteredData = useMemo(() => {
     let rows = monthlyData;
-    if (categoryFilter !== "all") {
-      rows = rows.filter((r) => r.category === categoryFilter);
-    }
+    rows = rows.filter((r) => r.category === activeCategoryView);
     if (search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter(
@@ -124,17 +156,7 @@ export default function MonthlyPage() {
       );
     }
     return rows;
-  }, [search, categoryFilter, monthlyData]);
-
-  const kpi = useMemo(() => {
-    const all = monthlyData;
-    return {
-      totalCriminal: all.reduce((s, r) => s + r.criminal, 0),
-      totalCivil: all.reduce((s, r) => s + r.civil, 0),
-      grandTotal: all.reduce((s, r) => s + r.total, 0),
-      branches: new Set(all.map((r) => r.branch)).size,
-    };
-  }, [monthlyData]);
+  }, [search, activeCategoryView, monthlyData]);
 
   const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString(
     "en-US",
@@ -206,10 +228,6 @@ export default function MonthlyPage() {
       e.target.value = "";
     }
   };
-
-  /* ---------------------------------------------------------------- */
-  /*  Render                                                           */
-  /* ---------------------------------------------------------------- */
 
   if (showAddPage) {
     return (
@@ -309,16 +327,19 @@ export default function MonthlyPage() {
         </header>
       )}
 
-      {/* ── KPI CARDS ── */}
-      <MonthlyKPI {...kpi} />
+      {/* ── CATEGORY VIEW SELECTOR ── */}
+      <div className="flex justify-start overflow-x-auto pb-1">
+        <RadioButton
+          options={categoryViews}
+          value={activeCategoryView}
+          onChange={setActiveCategoryView}
+        />
+      </div>
 
       {/* ── TOOLBAR ── */}
       <MonthlyToolbar
         search={search}
         onSearchChange={setSearch}
-        categoryFilter={categoryFilter}
-        onCategoryFilterChange={setCategoryFilter}
-        categories={categories}
         rowCount={filteredData.length}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}

@@ -32,9 +32,9 @@ import {
   FilterValues,
 } from "../Filter/FilterTypes";
 import { usePopup } from "../Popup/PopupProvider";
+import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import EmployeeDrawer, { EmployeeDrawerType } from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
-import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 
 const EmployeeDashboard: React.FC = () => {
   const statusPopup = usePopup();
@@ -287,7 +287,7 @@ const EmployeeDashboard: React.FC = () => {
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) {
-    return <PageListSkeleton statCards={4} tableColumns={9} tableRows={8} />;
+    return <PageListSkeleton statCards={4} tableColumns={13} tableRows={8} />;
   }
 
   if (error) {

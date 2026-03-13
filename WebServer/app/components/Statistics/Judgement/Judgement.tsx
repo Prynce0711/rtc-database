@@ -2,13 +2,14 @@
 
 import { useRef, useState } from "react";
 import {
-  FiCalendar,
-  FiDownload,
-  FiFileText,
-  FiPlus,
-  FiUpload,
+    FiCalendar,
+    FiDownload,
+    FiFileText,
+    FiPlus,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
+import RadioButton from "../../Filter/RadioButton";
 import JudgementMTC from "./JudgementMTC";
 import JudgementRTC from "./JudgementRTC";
 
@@ -168,37 +169,12 @@ export default function Judgement() {
 
       {/* ── VIEW SELECTOR — Segmented tabs ── */}
       {!isChildActive && (
-        <div className="flex justify-start">
-          <div className="inline-flex bg-base-200/60 rounded-2xl p-2 shadow-inner border border-base-300/40">
-            {views.map(({ label, value, description, icon: Icon }) => {
-              const isActive = activeView === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => setActiveView(value)}
-                  className={`
-                  relative flex items-center gap-3 px-7 py-4 rounded-xl text-base font-bold
-                  transition-all duration-200 cursor-pointer select-none
-                  ${
-                    isActive
-                      ? "bg-primary text-primary-content shadow-md shadow-primary/25 scale-[1.02]"
-                      : "text-base-content/60 hover:text-base-content hover:bg-base-100/80"
-                  }
-                `}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  <div className="flex flex-col items-start leading-tight">
-                    <span className="tracking-wide">{label}</span>
-                    <span
-                      className={`text-[11px] font-medium ${isActive ? "text-primary-content/70" : "text-base-content/40"}`}
-                    >
-                      {description}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <div className="flex justify-start overflow-x-auto pb-1">
+          <RadioButton
+            options={views}
+            value={activeView}
+            onChange={setActiveView}
+          />
         </div>
       )}
 

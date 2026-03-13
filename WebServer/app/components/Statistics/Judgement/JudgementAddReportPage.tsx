@@ -11,6 +11,8 @@ import { rtcJudgementFields } from "./JudgementFieldConfig";
 type JudgementAddProps = Omit<AnnualAddReportPageProps, "onSave"> & {
   onAdd?: (record: Record<string, unknown>) => void | Promise<void>;
   onUpdate?: (record: Record<string, unknown>) => void | Promise<void>;
+  fields?: typeof rtcJudgementFields;
+  columns?: typeof rtcColumns;
 };
 
 /* ---------------------------------------------------------------
@@ -116,10 +118,8 @@ const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
       {...(rest as AnnualAddReportPageProps)}
       // If user is adding in MTC view for Judgement, use RTC's field/column
       // layout so the tabs and numeric grouping match the RTC add experience.
-      fields={
-        rest.activeView === "MTC" ? rtcJudgementFields : (rest as any).fields
-      }
-      columns={rest.activeView === "MTC" ? rtcColumns : (rest as any).columns}
+      fields={rest.activeView === "MTC" ? rtcJudgementFields : rest.fields}
+      columns={rest.activeView === "MTC" ? rtcColumns : rest.columns}
       customTabs={judgementTabs}
       initialData={initialData}
       onBack={onBack}
