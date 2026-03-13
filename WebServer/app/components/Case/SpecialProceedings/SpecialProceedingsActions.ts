@@ -1,29 +1,88 @@
 "use server";
 
-import { LogAction, SpecialProceeding } from "@/app/generated/prisma/client";
+import {
+  Case,
+  CaseType,
+  LogAction,
+  Prisma,
+  SpecialProceeding,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import {
+  buildCaseWhereForRelation,
+  DEFAULT_PAGE_SIZE,
+  splitCaseDataBySchema,
+} from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { prettifyError } from "zod";
 import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { SpecialProceedingSchema } from "./schema";
+import { PaginatedResult } from "../../Filter/FilterTypes";
+import {
+  SpecialProceedingData,
+  SpecialProceedingSchema,
+  SpecialProceedingsFilterOptions,
+} from "./schema";
 
-export async function getSpecialProceedings(): Promise<
-  ActionResult<SpecialProceeding[]>
-> {
+export async function getSpecialProceedings(
+  options?: SpecialProceedingsFilterOptions,
+): Promise<ActionResult<PaginatedResult<SpecialProceedingData>>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const specialProceedings = await prisma.specialProceeding.findMany({
-      orderBy: { date: "desc" },
-    });
+    const shouldPaginate = !!options;
+    const page = options?.page && options.page > 0 ? options.page : 1;
+    const pageSize =
+      options?.pageSize && options.pageSize > 0
+        ? options.pageSize
+        : DEFAULT_PAGE_SIZE;
+
+    const where = buildCaseWhereForRelation(
+      SpecialProceedingSchema,
+      "specialProceeding",
+      options,
+    );
+
+    const orderBy: Prisma.CaseOrderByWithRelationInput = {
+      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
+    } as Prisma.CaseOrderByWithRelationInput;
+
+    const skip = shouldPaginate ? (page - 1) * pageSize : 0;
+    const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
+
+    const [cases, total] = await prisma.$transaction([
+      prisma.case.findMany({
+        where,
+        orderBy,
+        skip,
+        take,
+        include: {
+          specialProceeding: true,
+        },
+      }),
+      prisma.case.count({ where }),
+    ]);
+
+    const specialProceedings: SpecialProceedingData[] = cases
+      .filter(
+        (c): c is Case & { specialProceeding: SpecialProceeding } =>
+          !!c.specialProceeding,
+      )
+      .map((c) => ({
+        ...c.specialProceeding,
+        ...c,
+      }));
 
     return {
       success: true,
-      result: specialProceedings,
+      result: {
+        items: specialProceedings,
+        total,
+      },
     };
   } catch (error) {
     console.error("Error fetching special proceedings:", error);
@@ -33,32 +92,57 @@ export async function getSpecialProceedings(): Promise<
 
 export async function createSpecialProceeding(
   data: Record<string, unknown>,
-): Promise<ActionResult<SpecialProceeding>> {
+): Promise<ActionResult<Case>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const specialProceedingData = SpecialProceedingSchema.safeParse(data);
-    if (!specialProceedingData.success) {
+    if (data.id) {
       throw new Error(
-        `Invalid special proceeding data: ${specialProceedingData.error.message}`,
+        "New special proceeding case data should not include an id",
       );
     }
 
-    const newSpecialProceeding = await prisma.specialProceeding.create({
-      data: specialProceedingData.data,
+    const normalized = {
+      ...data,
+      caseType: CaseType.SCA,
+      dateFiled: data.dateFiled ?? data.date ?? null,
+      branch: data.branch ?? data.raffledTo ?? null,
+      assistantBranch:
+        data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
+    };
+
+    const specialProceedingData = SpecialProceedingSchema.safeParse(normalized);
+    if (!specialProceedingData.success) {
+      throw new Error(
+        `Invalid special proceeding data: ${prettifyError(specialProceedingData.error)}`,
+      );
+    }
+
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
+      specialProceedingData.data,
+    );
+
+    const newCase = await prisma.case.create({
+      data: {
+        ...casePayload,
+        caseType: CaseType.SCA,
+        specialProceeding: {
+          create: detailData as Prisma.SpecialProceedingCreateWithoutCaseInput,
+        },
+      },
     });
 
     await createLog({
       action: LogAction.CREATE_CASE,
       details: {
-        id: newSpecialProceeding.id,
+        id: newCase.id,
       },
     });
 
-    return { success: true, result: newSpecialProceeding };
+    return { success: true, result: newCase };
   } catch (error) {
     console.error("Error creating special proceeding:", error);
     return { success: false, error: "Error creating special proceeding" };
@@ -66,50 +150,83 @@ export async function createSpecialProceeding(
 }
 
 export async function updateSpecialProceeding(
-  specialProceedingId: number,
+  caseId: number,
   data: Record<string, unknown>,
-): Promise<ActionResult<SpecialProceeding>> {
+): Promise<ActionResult<Case>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const specialProceedingData = SpecialProceedingSchema.safeParse(data);
+    const normalized = {
+      ...data,
+      caseType: CaseType.SCA,
+      dateFiled: data.dateFiled ?? data.date ?? null,
+      branch: data.branch ?? data.raffledTo ?? null,
+      assistantBranch:
+        data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
+    };
+
+    const specialProceedingData = SpecialProceedingSchema.safeParse(normalized);
     if (!specialProceedingData.success) {
       throw new Error(
-        `Invalid special proceeding data: ${specialProceedingData.error.message}`,
+        `Invalid special proceeding data: ${prettifyError(specialProceedingData.error)}`,
       );
     }
 
-    const originalSpecialProceeding = await prisma.specialProceeding.findUnique(
-      {
-        where: { id: specialProceedingId },
-      },
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
+      specialProceedingData.data,
     );
 
-    if (!originalSpecialProceeding) {
+    const originalCase = await prisma.case.findUnique({
+      where: { id: caseId },
+      include: { specialProceeding: true },
+    });
+
+    if (!originalCase || !originalCase.specialProceeding) {
       throw new Error("Special proceeding not found");
     }
 
-    const updatedSpecialProceeding = await prisma.specialProceeding.update({
-      where: { id: specialProceedingId },
-      data: specialProceedingData.data,
-    });
+    if (originalCase.caseNumber !== casePayload.caseNumber) {
+      throw new Error("Case number cannot be changed");
+    }
 
-    if (!updatedSpecialProceeding) {
+    const [, , updatedCase] = await prisma.$transaction([
+      prisma.case.update({
+        where: { id: caseId },
+        data: {
+          ...casePayload,
+          caseType: CaseType.SCA,
+        },
+      }),
+      prisma.specialProceeding.upsert({
+        where: { caseNumber: casePayload.caseNumber },
+        update: detailData,
+        create: {
+          ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
+          case: { connect: { id: caseId } },
+        },
+      }),
+      prisma.case.findUnique({
+        where: { id: caseId },
+        include: { specialProceeding: true },
+      }),
+    ]);
+
+    if (!updatedCase) {
       throw new Error("Failed to update special proceeding");
     }
 
     await createLog({
       action: LogAction.UPDATE_CASE,
       details: {
-        from: originalSpecialProceeding,
-        to: updatedSpecialProceeding,
+        from: originalCase,
+        to: updatedCase,
       },
     });
 
-    return { success: true, result: updatedSpecialProceeding };
+    return { success: true, result: updatedCase };
   } catch (error) {
     console.error("Error updating special proceeding:", error);
     return { success: false, error: "Error updating special proceeding" };
@@ -117,7 +234,7 @@ export async function updateSpecialProceeding(
 }
 
 export async function deleteSpecialProceeding(
-  specialProceedingId: number,
+  caseId: number,
 ): Promise<ActionResult<void>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -125,14 +242,14 @@ export async function deleteSpecialProceeding(
       return sessionResult;
     }
 
-    await prisma.specialProceeding.delete({
-      where: { id: specialProceedingId },
+    await prisma.case.delete({
+      where: { id: caseId },
     });
 
     await createLog({
       action: LogAction.DELETE_CASE,
       details: {
-        id: specialProceedingId,
+        id: caseId,
       },
     });
 
@@ -144,23 +261,38 @@ export async function deleteSpecialProceeding(
 }
 
 export async function getSpecialProceedingById(
-  id: number,
-): Promise<ActionResult<SpecialProceeding>> {
+  id: string | number,
+): Promise<ActionResult<SpecialProceedingData>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const result = await prisma.specialProceeding.findUnique({
-      where: { id },
+    if (isNaN(Number(id))) {
+      return { success: false, error: "Invalid case ID" };
+    }
+
+    const result = await prisma.case.findUnique({
+      where: { id: Number(id), specialProceeding: { isNot: null } },
+      include: { specialProceeding: true },
     });
 
-    if (!result) {
+    if (!result || !result.specialProceeding) {
       return { success: false, error: "Special proceeding not found" };
     }
 
-    return { success: true, result };
+    if (result.caseType !== CaseType.SCA) {
+      return { success: false, error: "Case is not a special proceeding case" };
+    }
+
+    return {
+      success: true,
+      result: {
+        ...result.specialProceeding,
+        ...result,
+      },
+    };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch special proceeding" };
@@ -169,22 +301,33 @@ export async function getSpecialProceedingById(
 
 export async function getSpecialProceedingByCaseNumber(
   caseNumber: string,
-): Promise<ActionResult<SpecialProceeding>> {
+): Promise<ActionResult<SpecialProceedingData>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const result = await prisma.specialProceeding.findUnique({
+    const result = await prisma.case.findUnique({
       where: { caseNumber },
+      include: { specialProceeding: true },
     });
 
-    if (!result) {
+    if (!result || !result.specialProceeding) {
       return { success: false, error: "Special proceeding not found" };
     }
 
-    return { success: true, result };
+    if (result.caseType !== CaseType.SCA) {
+      return { success: false, error: "Case is not a special proceeding case" };
+    }
+
+    return {
+      success: true,
+      result: {
+        ...result.specialProceeding,
+        ...result,
+      },
+    };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch special proceeding" };

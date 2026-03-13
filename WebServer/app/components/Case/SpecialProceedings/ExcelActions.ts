@@ -1,167 +1,190 @@
 "use server";
 
 import ActionResult from "@/app/components/ActionResult";
-import { SpecialProceedingSchema } from "@/app/components/Case/SpecialProceedings/schema";
-import { LogAction, Prisma } from "@/app/generated/prisma/client";
+import {
+  SpecialProceedingData,
+  SpecialProceedingSchema,
+} from "@/app/components/Case/SpecialProceedings/schema";
+import {
+  Case,
+  CaseType,
+  LogAction,
+  Prisma,
+  SpecialProceeding,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
-  excelDateToJSDate,
   ExportExcelData,
-  findColumnValue,
-  isExcel,
+  getExcelHeaderMap,
+  isMappedRowEmpty,
+  normalizeRowBySchema,
+  ProcessExcelMeta,
+  processExcelUpload,
+  UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
-import { prettifyError, z } from "zod";
+import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
 
 export async function uploadSpecialProceedingExcel(
   file: File,
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    if ((await isExcel(file)) === false) {
-      return { success: false, error: "File is not a valid Excel document" };
+    console.log(
+      `✓ Special proceeding Excel file received: ${file.name} (${file.size} bytes)`,
+    );
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      console.log(
+        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+      );
+    } catch (peekError) {
+      console.warn("⚠ Unable to preview workbook for logging:", peekError);
     }
 
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet);
+    const headerMap = getExcelHeaderMap(SpecialProceedingSchema);
+    const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
 
-    console.log(
-      `✓ Special Proceeding Excel file received: ${file.name} (${file.size} bytes)`,
-    );
-    console.log(`✓ Found ${rawData.length} rows in sheet "${sheetName}"`);
-
-    const mappedData = rawData.map((row: any) => {
-      // Use fuzzy matching for column names
-      const caseNumberCell = findColumnValue(row, [
-        "Case Number",
-        "Case no.",
-        "Case No.",
-        "Case No",
-        "CaseNumber",
-        "SPC. Case Number",
-        "SPC Case No.",
-        "SPC. Number",
-        "SPC Number",
-        "SPC. No.",
-        "SPC No.",
-      ]);
-      const petitionerCell = findColumnValue(row, [
-        "Petitioner",
-        "Petitioner/s",
-        "Petitioner Name",
-        "Petitioners",
-        "PetitionerName",
-      ]);
-      const raffledToCell = findColumnValue(row, [
-        "Raffled To",
-        "Raffled to",
-        "RaffledTo",
-        "Assigned To",
-      ]);
-      const dateCell = findColumnValue(row, ["Date", "DATE", "Filing Date"]);
-      const natureCell = findColumnValue(row, [
-        "Nature",
-        "NATURE",
-        "Nature of Proceeding",
-      ]);
-      const respondentCell = findColumnValue(row, [
-        "Respondent",
-        "Respondent/s",
-        "Respondent Name",
-        "Respondents",
-        "RespondentName",
-      ]);
-
-      let date: Date | undefined;
-
-      // Handle different date formats
-      if (typeof dateCell === "number") {
-        // Excel serial date
-        date = excelDateToJSDate(dateCell);
-      } else if (dateCell) {
-        // Try parsing as text date
-        const parsedDate = new Date(dateCell);
-        if (!isNaN(parsedDate.getTime())) {
-          date = parsedDate;
-        }
-      }
-
+    const getMappedCells = (row: Record<string, unknown>) => {
+      const values = normalizeRowBySchema(SpecialProceedingSchema, row);
       return {
-        caseNumber: caseNumberCell?.toString() || "",
-        petitioner: petitionerCell?.toString() || undefined,
-        raffledTo: raffledToCell?.toString() || undefined,
-        date: date || undefined,
-        nature: natureCell?.toString() || undefined,
-        respondent: respondentCell?.toString() || undefined,
+        ...values,
       };
-    });
-
-    const validationResults = {
-      specialProceedings: [] as Prisma.SpecialProceedingCreateManyInput[],
-      total: mappedData.length,
-      valid: 0,
-      errors: [] as Array<{ row: number; errors: z.ZodError }>,
     };
 
-    mappedData.forEach((row, index) => {
-      const validated = SpecialProceedingSchema.safeParse(row);
-      if (validated.success) {
-        validationResults.specialProceedings.push(validated.data);
-        validationResults.valid += 1;
-      } else {
-        validationResults.errors.push({
-          row: index + 2,
-          errors: validated.error,
+    const result = await processExcelUpload<
+      SpecialProceedingSchema,
+      ReturnType<typeof getMappedCells>
+    >({
+      file,
+      requiredHeaders: { "Case Number": caseNumberHeaders },
+      schema: SpecialProceedingSchema,
+      getCells: getMappedCells,
+      skipRowsWithoutCell: ["caseNumber"],
+      uniqueKeys: ["caseNumber"],
+      uniqueKeyLabel: "Case number",
+      checkExistingUniqueKeys: async (keys) => {
+        const existing = await prisma.case.findMany({
+          where: { caseNumber: { in: keys } },
+          select: { caseNumber: true },
         });
-      }
-    });
+        return new Set(existing.map((c) => c.caseNumber.trim()));
+      },
+      mapRow: (row) => {
+        const cells = getMappedCells(row);
 
-    console.log(
-      `✓ Special Proceeding rows validated: ${validationResults.valid}/${validationResults.total}`,
-    );
+        if (isMappedRowEmpty(cells, ["caseNumber"])) {
+          return { skip: true };
+        }
 
-    if (validationResults.errors.length > 0) {
-      console.log(
-        `⚠ ${validationResults.errors.length} special proceeding rows have validation errors:`,
-      );
+        const hydrated = {
+          ...cells,
+          caseType: CaseType.SCA,
+          dateFiled: cells.dateFiled ?? cells.date ?? null,
+          branch: cells.branch ?? cells.raffledTo ?? null,
+          assistantBranch:
+            cells.assistantBranch ?? cells.raffledTo ?? cells.branch ?? null,
+        };
 
-      let errorText = "";
-      validationResults.errors.forEach(({ row, errors }) => {
-        errorText += `  Row ${row}: ${prettifyError(errors)}\n`;
-        console.log(`  Row ${row}:`, prettifyError(errors));
-      });
+        const validation = SpecialProceedingSchema.safeParse(hydrated);
+        if (!validation.success) {
+          return {
+            errorMessage: prettifyError(validation.error),
+          };
+        }
 
-      return {
-        success: false,
-        error: `Validation failed: ${validationResults.errors.length} rows have errors\n${errorText}`,
-      };
-    }
+        return {
+          mapped: validation.data,
+          uniqueKey: validation.data.caseNumber?.toString().trim(),
+        };
+      },
+      onBatchInsert: async (rows) => {
+        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        const specialProceedingRows: Prisma.SpecialProceedingCreateManyInput[] =
+          [];
 
-    const createdSpecialProceedings =
-      await prisma.specialProceeding.createManyAndReturn({
-        data: validationResults.specialProceedings,
-      });
+        rows.forEach((row) => {
+          const { caseData, detailData } = splitCaseDataBySchema(row);
+          caseRows.push({
+            ...caseData,
+            caseType: CaseType.SCA,
+          });
+          specialProceedingRows.push({
+            ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
+            caseNumber: caseData.caseNumber,
+          });
+        });
 
-    await createLog({
-      action: LogAction.IMPORT_CASES,
-      details: {
-        ids: createdSpecialProceedings.map((sp) => sp.id),
+        const created = await prisma.case.createManyAndReturn({
+          data: caseRows,
+        });
+
+        if (specialProceedingRows.length > 0) {
+          await prisma.specialProceeding.createMany({
+            data: specialProceedingRows,
+          });
+        }
+
+        return { ids: created.map((c) => c.id), count: created.length };
       },
     });
 
-    return { success: true, result: undefined };
+    if (result.success) {
+      const meta: ProcessExcelMeta = result.result?.meta;
+      const imported = meta.importedCount;
+      const errors = meta.errorCount;
+      const sheets = meta.sheetSummary;
+
+      console.log(
+        `✓ Import completed: ${imported} special proceeding cases imported, ${errors} row(s) failed validation`,
+      );
+      if (sheets.length > 0) {
+        sheets.forEach(
+          (s: {
+            sheet: string;
+            valid: number;
+            rows: number;
+            failed: number;
+          }) => {
+            console.log(
+              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+            );
+          },
+        );
+      }
+
+      if (result.result?.failedExcel) {
+        console.log(
+          "⚠ Failed rows file generated:",
+          result.result.failedExcel.fileName,
+        );
+      }
+
+      await createLog({
+        action: LogAction.IMPORT_CASES,
+        details: {
+          ids: meta.importedIds ?? [],
+        },
+      });
+    } else {
+      console.error("✗ Import failed:", result.error);
+    }
+
+    return result;
   } catch (error) {
-    console.error("Special Proceeding upload error:", error);
+    console.error("Special proceeding upload error:", error);
     return { success: false, error: "Upload failed" };
   }
 }
@@ -175,27 +198,60 @@ export async function exportSpecialProceedingsExcel(): Promise<
       return sessionResult;
     }
 
-    const specialProceedings = await prisma.specialProceeding.findMany({
-      orderBy: { id: "asc" },
+    const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
+      all: ["id"],
     });
 
-    const rows = specialProceedings.map((sp) => {
-      let dateStr = "";
+    const caseFieldKeys = getSchemaFieldKeys(SpecialProceedingSchema, {
+      all: ["id"],
+      stringKeys: [...baseCaseFieldKeys.stringKeys],
+      dateKeys: [...baseCaseFieldKeys.dateKeys],
+    });
 
-      if (sp.date) {
-        const date = new Date(sp.date);
-        // Format date as MM/DD/YYYY
-        dateStr = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
-      }
+    const dateKeys = [
+      caseFieldKeys.dateKeys,
+      baseCaseFieldKeys.dateKeys,
+    ].flat();
 
-      return {
-        "Case Number": sp.caseNumber,
-        Petitioner: sp.petitioner ?? "",
-        "Raffled To": sp.raffledTo ?? "",
-        Date: dateStr,
-        Nature: sp.nature ?? "",
-        Respondent: sp.respondent ?? "",
+    const cases = await prisma.case.findMany({
+      orderBy: { id: "asc" },
+      include: { specialProceeding: true },
+    });
+
+    const specialProceedingCases: SpecialProceedingData[] = cases
+      .filter(
+        (c): c is Case & { specialProceeding: SpecialProceeding } =>
+          !!c.specialProceeding,
+      )
+      .map((c) => ({
+        ...c.specialProceeding,
+        ...c,
+      }));
+
+    const headerMap = getExcelHeaderMap(SpecialProceedingSchema);
+    const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
+
+    const header = (key: keyof typeof headerMap, fallback: string) =>
+      headerMap[key]?.[0] ?? fallback;
+
+    const rows = specialProceedingCases.map((item) => {
+      const formatDate = (value: Date | null | undefined) => {
+        if (!value) return "";
+        const date = new Date(value);
+        return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
       };
+
+      return headerKeys.reduce(
+        (acc, key) => {
+          const headerName = header(key, key);
+          const value = dateKeys.includes(key)
+            ? formatDate(item[key] as Date | null | undefined)
+            : (item[key] ?? "");
+          acc[headerName] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
     });
 
     const workbook = XLSX.utils.book_new();
@@ -205,14 +261,11 @@ export async function exportSpecialProceedingsExcel(): Promise<
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
     const fileName = `special-proceedings-export-${Date.now()}.xlsx`;
 
-    await createLog({
-      action: LogAction.EXPORT_CASES,
-      details: null,
-    });
+    await createLog({ action: LogAction.EXPORT_CASES, details: null });
 
     return { success: true, result: { fileName, base64 } };
   } catch (error) {
-    console.error("Special Proceeding export error:", error);
+    console.error("Special proceedings export error:", error);
     return { success: false, error: "Export failed" };
   }
 }

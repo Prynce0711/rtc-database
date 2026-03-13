@@ -1,27 +1,85 @@
 "use server";
 
-import { LogAction, Petition } from "@/app/generated/prisma/client";
+import {
+  Case,
+  CaseType,
+  LogAction,
+  Petition,
+  Prisma,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import {
+  buildCaseWhereForRelation,
+  DEFAULT_PAGE_SIZE,
+  splitCaseDataBySchema,
+} from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { prettifyError } from "zod";
 import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { PetitionSchema } from "./schema";
+import { PaginatedResult } from "../../Filter/FilterTypes";
+import {
+  PetitionCaseData,
+  PetitionCasesFilterOptions,
+  PetitionSchema,
+} from "./schema";
 
-export async function getPetitions(): Promise<ActionResult<Petition[]>> {
+export async function getPetitions(
+  options?: PetitionCasesFilterOptions,
+): Promise<ActionResult<PaginatedResult<PetitionCaseData>>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const petitions = await prisma.petition.findMany({
-      orderBy: { date: "desc" },
-    });
+    const shouldPaginate = !!options;
+    const page = options?.page && options.page > 0 ? options.page : 1;
+    const pageSize =
+      options?.pageSize && options.pageSize > 0
+        ? options.pageSize
+        : DEFAULT_PAGE_SIZE;
+
+    const where = buildCaseWhereForRelation(
+      PetitionSchema,
+      "petition",
+      options,
+    );
+
+    const orderBy: Prisma.CaseOrderByWithRelationInput = {
+      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
+    } as Prisma.CaseOrderByWithRelationInput;
+
+    const skip = shouldPaginate ? (page - 1) * pageSize : 0;
+    const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
+
+    const [cases, total] = await prisma.$transaction([
+      prisma.case.findMany({
+        where,
+        orderBy,
+        skip,
+        take,
+        include: {
+          petition: true,
+        },
+      }),
+      prisma.case.count({ where }),
+    ]);
+
+    const petitionCases: PetitionCaseData[] = cases
+      .filter((c): c is Case & { petition: Petition } => !!c.petition)
+      .map((c) => ({
+        ...c.petition,
+        ...c,
+      }));
 
     return {
       success: true,
-      result: petitions,
+      result: {
+        items: petitionCases,
+        total,
+      },
     };
   } catch (error) {
     console.error("Error fetching petitions:", error);
@@ -31,30 +89,55 @@ export async function getPetitions(): Promise<ActionResult<Petition[]>> {
 
 export async function createPetition(
   data: Record<string, unknown>,
-): Promise<ActionResult<Petition>> {
+): Promise<ActionResult<Case>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const petitionData = PetitionSchema.safeParse(data);
-    if (!petitionData.success) {
-      throw new Error(`Invalid petition data: ${petitionData.error.message}`);
+    if (data.id) {
+      throw new Error("New petition case data should not include an id");
     }
 
-    const newPetition = await prisma.petition.create({
-      data: petitionData.data,
+    const normalized = {
+      ...data,
+      caseType: CaseType.PETITION,
+      dateFiled: data.dateFiled ?? data.date ?? null,
+      branch: data.branch ?? data.raffledTo ?? null,
+      assistantBranch:
+        data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
+    };
+
+    const petitionData = PetitionSchema.safeParse(normalized);
+    if (!petitionData.success) {
+      throw new Error(
+        `Invalid petition data: ${prettifyError(petitionData.error)}`,
+      );
+    }
+
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
+      petitionData.data,
+    );
+
+    const newCase = await prisma.case.create({
+      data: {
+        ...casePayload,
+        caseType: CaseType.PETITION,
+        petition: {
+          create: detailData as Prisma.PetitionCreateWithoutCaseInput,
+        },
+      },
     });
 
     await createLog({
       action: LogAction.CREATE_CASE,
       details: {
-        id: newPetition.id,
+        id: newCase.id,
       },
     });
 
-    return { success: true, result: newPetition };
+    return { success: true, result: newCase };
   } catch (error) {
     console.error("Error creating petition:", error);
     return { success: false, error: "Error creating petition" };
@@ -62,46 +145,83 @@ export async function createPetition(
 }
 
 export async function updatePetition(
-  petitionId: number,
+  caseId: number,
   data: Record<string, unknown>,
-): Promise<ActionResult<Petition>> {
+): Promise<ActionResult<Case>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const petitionData = PetitionSchema.safeParse(data);
+    const normalized = {
+      ...data,
+      caseType: CaseType.PETITION,
+      dateFiled: data.dateFiled ?? data.date ?? null,
+      branch: data.branch ?? data.raffledTo ?? null,
+      assistantBranch:
+        data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
+    };
+
+    const petitionData = PetitionSchema.safeParse(normalized);
     if (!petitionData.success) {
-      throw new Error(`Invalid petition data: ${petitionData.error.message}`);
+      throw new Error(
+        `Invalid petition data: ${prettifyError(petitionData.error)}`,
+      );
     }
 
-    const originalPetition = await prisma.petition.findUnique({
-      where: { id: petitionId },
+    const { caseData: casePayload, detailData } = splitCaseDataBySchema(
+      petitionData.data,
+    );
+
+    const originalCase = await prisma.case.findUnique({
+      where: { id: caseId },
+      include: { petition: true },
     });
 
-    if (!originalPetition) {
+    if (!originalCase || !originalCase.petition) {
       throw new Error("Petition not found");
     }
 
-    const updatedPetition = await prisma.petition.update({
-      where: { id: petitionId },
-      data: petitionData.data,
-    });
+    if (originalCase.caseNumber !== casePayload.caseNumber) {
+      throw new Error("Case number cannot be changed");
+    }
 
-    if (!updatedPetition) {
+    const [, , updatedCase] = await prisma.$transaction([
+      prisma.case.update({
+        where: { id: caseId },
+        data: {
+          ...casePayload,
+          caseType: CaseType.PETITION,
+        },
+      }),
+      prisma.petition.upsert({
+        where: { caseNumber: casePayload.caseNumber },
+        update: detailData,
+        create: {
+          ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
+          case: { connect: { id: caseId } },
+        },
+      }),
+      prisma.case.findUnique({
+        where: { id: caseId },
+        include: { petition: true },
+      }),
+    ]);
+
+    if (!updatedCase) {
       throw new Error("Failed to update petition");
     }
 
     await createLog({
       action: LogAction.UPDATE_CASE,
       details: {
-        from: originalPetition,
-        to: updatedPetition,
+        from: originalCase,
+        to: updatedCase,
       },
     });
 
-    return { success: true, result: updatedPetition };
+    return { success: true, result: updatedCase };
   } catch (error) {
     console.error("Error updating petition:", error);
     return { success: false, error: "Error updating petition" };
@@ -109,7 +229,7 @@ export async function updatePetition(
 }
 
 export async function deletePetition(
-  petitionId: number,
+  caseId: number,
 ): Promise<ActionResult<void>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -117,14 +237,14 @@ export async function deletePetition(
       return sessionResult;
     }
 
-    await prisma.petition.delete({
-      where: { id: petitionId },
+    await prisma.case.delete({
+      where: { id: caseId },
     });
 
     await createLog({
       action: LogAction.DELETE_CASE,
       details: {
-        id: petitionId,
+        id: caseId,
       },
     });
 
@@ -136,23 +256,38 @@ export async function deletePetition(
 }
 
 export async function getPetitionById(
-  id: number,
-): Promise<ActionResult<Petition>> {
+  id: number | string,
+): Promise<ActionResult<PetitionCaseData>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const result = await prisma.petition.findUnique({
-      where: { id },
+    if (isNaN(Number(id))) {
+      return { success: false, error: "Invalid case ID" };
+    }
+
+    const result = await prisma.case.findUnique({
+      where: { id: Number(id), petition: { isNot: null } },
+      include: { petition: true },
     });
 
-    if (!result) {
+    if (!result || !result.petition) {
       return { success: false, error: "Petition not found" };
     }
 
-    return { success: true, result };
+    if (result.caseType !== CaseType.PETITION) {
+      return { success: false, error: "Case is not a petition case" };
+    }
+
+    return {
+      success: true,
+      result: {
+        ...result.petition,
+        ...result,
+      },
+    };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch petition" };
@@ -161,22 +296,33 @@ export async function getPetitionById(
 
 export async function getPetitionByCaseNumber(
   caseNumber: string,
-): Promise<ActionResult<Petition>> {
+): Promise<ActionResult<PetitionCaseData>> {
   try {
     const sessionResult = await validateSession();
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    const result = await prisma.petition.findUnique({
+    const result = await prisma.case.findUnique({
       where: { caseNumber },
+      include: { petition: true },
     });
 
-    if (!result) {
+    if (!result || !result.petition) {
       return { success: false, error: "Petition not found" };
     }
 
-    return { success: true, result };
+    if (result.caseType !== CaseType.PETITION) {
+      return { success: false, error: "Case is not a petition case" };
+    }
+
+    return {
+      success: true,
+      result: {
+        ...result.petition,
+        ...result,
+      },
+    };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch petition" };

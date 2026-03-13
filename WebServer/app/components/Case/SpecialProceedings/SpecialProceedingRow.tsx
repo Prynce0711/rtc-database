@@ -1,8 +1,8 @@
 "use client";
 
 import TipCell from "@/app/components/Table/TipCell";
-import { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import { SpecialProceedingData } from "./schema";
 
 const formatDate = (value: Date | string | null | undefined) => {
   if (!value) return "—";
@@ -21,10 +21,10 @@ const SpecialProceedingRow = ({
   onDelete,
   onRowClick,
 }: {
-  caseItem: SpecialProceeding;
-  onEdit: (c: SpecialProceeding) => void;
+  caseItem: SpecialProceedingData;
+  onEdit: (c: SpecialProceedingData) => void;
   onDelete: (id: number) => void;
-  onRowClick: (c: SpecialProceeding) => void;
+  onRowClick: (c: SpecialProceedingData) => void;
 }) => (
   <tr
     className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"

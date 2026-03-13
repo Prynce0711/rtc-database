@@ -2,149 +2,182 @@
 
 import ActionResult from "@/app/components/ActionResult";
 import { PetitionSchema } from "@/app/components/Case/Petition/schema";
-import { LogAction, Prisma } from "@/app/generated/prisma/client";
+import {
+  Case,
+  CaseType,
+  LogAction,
+  Petition,
+  Prisma,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
-  excelDateToJSDate,
   ExportExcelData,
-  findColumnValue,
-  isExcel,
+  getExcelHeaderMap,
+  isMappedRowEmpty,
+  normalizeRowBySchema,
+  ProcessExcelMeta,
+  processExcelUpload,
+  UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
-import { prettifyError, z } from "zod";
+import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
 
 export async function uploadPetitionExcel(
   file: File,
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    if ((await isExcel(file)) === false) {
-      return { success: false, error: "File is not a valid Excel document" };
-    }
-
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet);
-
     console.log(
       `✓ Petition Excel file received: ${file.name} (${file.size} bytes)`,
     );
-    console.log(`✓ Found ${rawData.length} rows in sheet "${sheetName}"`);
 
-    const mappedData = rawData.map((row: any) => {
-      // Use fuzzy matching for column names
-      const caseNumberCell = findColumnValue(row, [
-        "Case Number",
-        "Case no.",
-        "Case No.",
-        "Case No",
-        "CaseNumber",
-      ]);
-      const petitionerNameCell = findColumnValue(row, [
-        "Petitioner",
-        "Petitioner/s",
-        "Petitioner Name",
-        "Petitioners",
-        "PetitionerName",
-      ]);
-      const raffledToCell = findColumnValue(row, [
-        "Raffled To",
-        "Raffled to",
-        "RaffledTo",
-        "Assigned To",
-      ]);
-      const dateCell = findColumnValue(row, ["Date", "DATE", "Filing Date"]);
-      const natureCell = findColumnValue(row, [
-        "Nature",
-        "NATURE",
-        "Nature of Petition",
-      ]);
-
-      let date: Date | undefined;
-
-      // Handle different date formats
-      if (typeof dateCell === "number") {
-        // Excel serial date
-        date = excelDateToJSDate(dateCell);
-      } else if (dateCell) {
-        // Try parsing as text date
-        const parsedDate = new Date(dateCell);
-        if (!isNaN(parsedDate.getTime())) {
-          date = parsedDate;
-        }
-      }
-
-      return {
-        caseNumber: caseNumberCell?.toString() || "",
-        petitioner: petitionerNameCell?.toString() || undefined,
-        raffledTo: raffledToCell?.toString() || undefined,
-        date: date || undefined,
-        nature: natureCell?.toString() || undefined,
-      };
-    });
-
-    const validationResults = {
-      petitions: [] as Prisma.PetitionCreateManyInput[],
-      total: mappedData.length,
-      valid: 0,
-      errors: [] as Array<{ row: number; errors: z.ZodError }>,
-    };
-
-    mappedData.forEach((row, index) => {
-      const validated = PetitionSchema.safeParse(row);
-      if (validated.success) {
-        validationResults.petitions.push(validated.data);
-        validationResults.valid += 1;
-      } else {
-        validationResults.errors.push({
-          row: index + 2,
-          errors: validated.error,
-        });
-      }
-    });
-
-    console.log(
-      `✓ Petition rows validated: ${validationResults.valid}/${validationResults.total}`,
-    );
-
-    if (validationResults.errors.length > 0) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
-        `⚠ ${validationResults.errors.length} petition rows have validation errors:`,
+        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
-
-      let errorText = "";
-      validationResults.errors.forEach(({ row, errors }) => {
-        errorText += `  Row ${row}: ${prettifyError(errors)}\n`;
-        console.log(`  Row ${row}:`, prettifyError(errors));
-      });
-
-      return {
-        success: false,
-        error: `Validation failed: ${validationResults.errors.length} rows have errors\n${errorText}`,
-      };
+    } catch (peekError) {
+      console.warn("⚠ Unable to preview workbook for logging:", peekError);
     }
 
-    const createdPetitions = await prisma.petition.createManyAndReturn({
-      data: validationResults.petitions,
-    });
+    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
 
-    await createLog({
-      action: LogAction.IMPORT_CASES,
-      details: {
-        ids: createdPetitions.map((petition) => petition.id),
+    const getMappedCells = (row: Record<string, unknown>) => {
+      const values = normalizeRowBySchema(PetitionSchema, row);
+
+      return {
+        ...values,
+      };
+    };
+
+    const result = await processExcelUpload<
+      PetitionSchema,
+      ReturnType<typeof getMappedCells>
+    >({
+      file,
+      requiredHeaders: { "Case Number": caseNumberHeaders },
+      schema: PetitionSchema,
+      getCells: getMappedCells,
+      skipRowsWithoutCell: ["caseNumber"],
+      uniqueKeys: ["caseNumber"],
+      uniqueKeyLabel: "Case number",
+      checkExistingUniqueKeys: async (keys) => {
+        const existing = await prisma.case.findMany({
+          where: { caseNumber: { in: keys } },
+          select: { caseNumber: true },
+        });
+        return new Set(existing.map((c) => c.caseNumber.trim()));
+      },
+      mapRow: (row) => {
+        const cells = getMappedCells(row);
+
+        if (isMappedRowEmpty(cells, ["caseNumber"])) {
+          return { skip: true };
+        }
+
+        const hydrated = {
+          ...cells,
+          caseType: CaseType.PETITION,
+          dateFiled: cells.dateFiled ?? cells.date ?? null,
+          branch: cells.branch ?? cells.raffledTo ?? null,
+          assistantBranch:
+            cells.assistantBranch ?? cells.raffledTo ?? cells.branch ?? null,
+        };
+
+        const validation = PetitionSchema.safeParse(hydrated);
+        if (!validation.success) {
+          return {
+            errorMessage: prettifyError(validation.error),
+          };
+        }
+
+        return {
+          mapped: validation.data,
+          uniqueKey: validation.data.caseNumber?.toString().trim(),
+        };
+      },
+      onBatchInsert: async (rows) => {
+        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        const petitionRows: Prisma.PetitionCreateManyInput[] = [];
+
+        rows.forEach((row) => {
+          const { caseData, detailData } = splitCaseDataBySchema(row);
+          caseRows.push({
+            ...caseData,
+            caseType: CaseType.PETITION,
+          });
+          petitionRows.push({
+            ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
+            caseNumber: caseData.caseNumber,
+          });
+        });
+
+        const created = await prisma.case.createManyAndReturn({
+          data: caseRows,
+        });
+
+        if (petitionRows.length > 0) {
+          await prisma.petition.createMany({ data: petitionRows });
+        }
+
+        return { ids: created.map((c) => c.id), count: created.length };
       },
     });
 
-    return { success: true, result: undefined };
+    if (result.success) {
+      const meta: ProcessExcelMeta = result.result?.meta;
+      const imported = meta.importedCount;
+      const errors = meta.errorCount;
+      const sheets = meta.sheetSummary;
+
+      console.log(
+        `✓ Import completed: ${imported} petitions imported, ${errors} row(s) failed validation`,
+      );
+      if (sheets.length > 0) {
+        sheets.forEach(
+          (s: {
+            sheet: string;
+            valid: number;
+            rows: number;
+            failed: number;
+          }) => {
+            console.log(
+              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+            );
+          },
+        );
+      }
+
+      if (result.result?.failedExcel) {
+        console.log(
+          "⚠ Failed rows file generated:",
+          result.result.failedExcel.fileName,
+        );
+      }
+
+      await createLog({
+        action: LogAction.IMPORT_CASES,
+        details: {
+          ids: meta.importedIds ?? [],
+        },
+      });
+    } else {
+      console.error("✗ Import failed:", result.error);
+    }
+
+    return result;
   } catch (error) {
     console.error("Petition upload error:", error);
     return { success: false, error: "Upload failed" };
@@ -160,31 +193,62 @@ export async function exportPetitionsExcel(): Promise<
       return sessionResult;
     }
 
-    const petitions = await prisma.petition.findMany({
-      orderBy: { id: "asc" },
+    const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
+      all: ["id"],
     });
 
-    const rows = petitions.map((petition) => {
-      let dateStr = "";
+    const caseFieldKeys = getSchemaFieldKeys(PetitionSchema, {
+      all: ["id"],
+      stringKeys: [...baseCaseFieldKeys.stringKeys],
+      dateKeys: [...baseCaseFieldKeys.dateKeys],
+    });
 
-      if (petition.date) {
-        const date = new Date(petition.date);
-        // Format date as MM/DD/YYYY
-        dateStr = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
-      }
+    const dateKeys = [
+      caseFieldKeys.dateKeys,
+      baseCaseFieldKeys.dateKeys,
+    ].flat();
 
-      return {
-        "Case Number": petition.caseNumber,
-        "Petitioner/s": petition.petitioner ?? "",
-        "Raffled To": petition.raffledTo ?? "",
-        Date: dateStr,
-        Nature: petition.nature ?? "",
+    const cases = await prisma.case.findMany({
+      orderBy: { id: "asc" },
+      include: { petition: true },
+    });
+
+    const petitionCases = cases
+      .filter((c): c is Case & { petition: Petition } => !!c.petition)
+      .map((c) => ({
+        ...c.petition,
+        ...c,
+      }));
+
+    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
+
+    const header = (key: keyof typeof headerMap, fallback: string) =>
+      headerMap[key]?.[0] ?? fallback;
+
+    const rows = petitionCases.map((petitionCase) => {
+      const formatDate = (value: Date | null | undefined) => {
+        if (!value) return "";
+        const date = new Date(value);
+        return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
       };
+
+      return headerKeys.reduce(
+        (acc, key) => {
+          const headerName = header(key, key);
+          const value = dateKeys.includes(key)
+            ? formatDate(petitionCase[key] as Date | null | undefined)
+            : (petitionCase[key] ?? "");
+          acc[headerName] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
     });
 
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Petitions");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Petition Cases");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
     const fileName = `petitions-export-${Date.now()}.xlsx`;

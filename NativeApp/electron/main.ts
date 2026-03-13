@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 
+import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startUdpListener } from "./udpListener";
@@ -27,6 +28,85 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+
+const resolveSafePath = (baseFolder: string, relativePath: string) => {
+  const normalizedBase = path.resolve(baseFolder);
+  const safeRelative = relativePath.replace(/^[\\/]+/, "");
+  const fullPath = path.resolve(normalizedBase, safeRelative);
+
+  if (
+    fullPath !== normalizedBase &&
+    !fullPath.startsWith(`${normalizedBase}${path.sep}`)
+  ) {
+    return null;
+  }
+
+  return fullPath;
+};
+
+ipcMain.handle("files:select-base-folder", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle(
+  "files:check-exists",
+  async (_event, args: { baseFolder: string; relativePaths: string[] }) => {
+    const results: Record<string, boolean> = {};
+    const baseFolder = args.baseFolder;
+
+    await Promise.all(
+      args.relativePaths.map(async (relativePath) => {
+        const fullPath = resolveSafePath(baseFolder, relativePath);
+        if (!fullPath) {
+          results[relativePath] = false;
+          return;
+        }
+        try {
+          await fs.access(fullPath);
+          results[relativePath] = true;
+        } catch {
+          results[relativePath] = false;
+        }
+      }),
+    );
+
+    return results;
+  },
+);
+
+ipcMain.handle(
+  "files:read",
+  async (_event, args: { baseFolder: string; relativePath: string }) => {
+    const fullPath = resolveSafePath(args.baseFolder, args.relativePath);
+    if (!fullPath) {
+      return { success: false, error: "Invalid path." };
+    }
+
+    try {
+      const data = await fs.readFile(fullPath);
+      return {
+        success: true,
+        result: {
+          base64: data.toString("base64"),
+          name: path.basename(fullPath),
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to read file",
+      };
+    }
+  },
+);
 
 function createWindow() {
   win = new BrowserWindow({

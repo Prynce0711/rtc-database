@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import { Petition } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import React, { useEffect, useMemo, useState } from "react";
@@ -27,6 +26,7 @@ import { deletePetition, getPetitions } from "./PetitionActions";
 import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
+import { PetitionCaseData } from "./schema";
 
 type PetitionFilterValues = {
   caseNumber?: string;
@@ -37,12 +37,12 @@ type PetitionFilterValues = {
 };
 
 const ReceiveLogsPage: React.FC = () => {
-  const [logs, setLogs] = useState<Petition[]>([]);
+  const [logs, setLogs] = useState<PetitionCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [drawerType, setDrawerType] = useState<ReceiveDrawerType | null>(null);
-  const [selectedLog, setSelectedLog] = useState<Petition | null>(null);
+  const [selectedLog, setSelectedLog] = useState<PetitionCaseData | null>(null);
 
   const session = useSession();
   const isAdminOrAtty =
@@ -53,14 +53,16 @@ const ReceiveLogsPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Petition;
+    key: keyof PetitionCaseData;
     order: "asc" | "desc";
   }>({ key: "date", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<PetitionFilterValues>(
     {},
   );
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Petition[]>([]);
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState<
+    PetitionCaseData[]
+  >([]);
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const PAGE_SIZE = 25;
@@ -92,7 +94,7 @@ const ReceiveLogsPage: React.FC = () => {
         setError(response.error || "Failed to fetch petitions");
         return;
       }
-      setLogs(response.result || []);
+      setLogs(response.result?.items || []);
       setError(null);
     } catch (err) {
       setError(
@@ -128,7 +130,7 @@ const ReceiveLogsPage: React.FC = () => {
     return filteredAndSorted.slice(start, start + PAGE_SIZE);
   }, [filteredAndSorted, currentPage, PAGE_SIZE]);
 
-  const handleSort = (key: keyof Petition) => {
+  const handleSort = (key: keyof PetitionCaseData) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
@@ -137,9 +139,9 @@ const ReceiveLogsPage: React.FC = () => {
 
   const applyPetitionFilters = (
     filters: PetitionFilterValues,
-    items: Petition[],
+    items: PetitionCaseData[],
     exactMap: ExactMatchMap = {},
-  ): Petition[] => {
+  ): PetitionCaseData[] => {
     return items.filter((petition) => {
       const matchesText = (
         itemVal: string | null | undefined,
@@ -199,7 +201,10 @@ const ReceiveLogsPage: React.FC = () => {
     const textFields = ["caseNumber", "petitioner", "raffledTo", "nature"];
     if (!textFields.includes(key)) return [];
     const values = logs
-      .map((l) => (l[key as keyof Petition] as string | null | undefined) || "")
+      .map(
+        (l) =>
+          (l[key as keyof PetitionCaseData] as string | null | undefined) || "",
+      )
       .filter((v) => v.length > 0);
     const unique = Array.from(new Set(values)).sort();
     if (!inputValue) return unique;
@@ -298,11 +303,7 @@ const ReceiveLogsPage: React.FC = () => {
         }}
         selectedLog={selectedLog}
         onCreate={(newLog) => {
-          const withId: Petition = {
-            ...newLog,
-            id: Math.max(0, ...logs.map((l) => l.id)) + 1,
-          };
-          setLogs((prev) => [withId, ...prev]);
+          setLogs((prev) => [newLog as PetitionCaseData, ...prev]);
         }}
         onUpdate={(updatedLog) => {
           setLogs((prev) =>
@@ -535,7 +536,7 @@ const ReceiveLogsPage: React.FC = () => {
 
         {/* Table */}
         <div className="bg-base-100 rounded-lg shadow">
-          <Table<Petition>
+          <Table<PetitionCaseData>
             headers={[
               ...(isAdminOrAtty
                 ? [

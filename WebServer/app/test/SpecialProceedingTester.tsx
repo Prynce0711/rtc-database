@@ -4,26 +4,46 @@ import {
   exportSpecialProceedingsExcel,
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
-import {
-  SpecialProceedingEntry,
-  createEmptyEntry,
-  specialProceedingToEntry,
-} from "@/app/components/Case/SpecialProceedings/schema";
+import { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
 import {
   createSpecialProceeding,
   deleteSpecialProceeding,
   getSpecialProceedings,
   updateSpecialProceeding,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
-import { SpecialProceeding } from "@/app/generated/prisma/client";
 import { useEffect, useState } from "react";
+
+type SpecialProceedingFormEntry = {
+  caseNumber: string;
+  petitioner: string;
+  respondent: string;
+  raffledTo: string;
+  date: string;
+  nature: string;
+};
+
+const createEmptyForm = (): SpecialProceedingFormEntry => ({
+  caseNumber: "",
+  petitioner: "",
+  respondent: "",
+  raffledTo: "",
+  date: "",
+  nature: "",
+});
+
+const toInputDate = (value?: Date | string | null): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
 
 export default function SpecialProceedingTester() {
   const [specialProceedings, setSpecialProceedings] = useState<
-    SpecialProceeding[]
+    SpecialProceedingData[]
   >([]);
   const [formData, setFormData] =
-    useState<SpecialProceedingEntry>(createEmptyEntry());
+    useState<SpecialProceedingFormEntry>(createEmptyForm());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +61,7 @@ export default function SpecialProceedingTester() {
     setLoading(true);
     const result = await getSpecialProceedings();
     if (result.success) {
-      setSpecialProceedings(result.result);
+      setSpecialProceedings(result.result?.items || []);
       setMessage({
         type: "success",
         text: "Special proceedings loaded successfully",
@@ -101,7 +121,7 @@ export default function SpecialProceedingTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyForm());
         setIsEditing(false);
         setEditingId(null);
         await loadSpecialProceedings();
@@ -113,9 +133,15 @@ export default function SpecialProceedingTester() {
     setLoading(false);
   };
 
-  const handleEdit = (specialProceeding: SpecialProceeding) => {
-    const formEntry = specialProceedingToEntry(specialProceeding);
-    setFormData(formEntry);
+  const handleEdit = (specialProceeding: SpecialProceedingData) => {
+    setFormData({
+      caseNumber: specialProceeding.caseNumber || "",
+      petitioner: specialProceeding.petitioner || "",
+      respondent: specialProceeding.respondent || "",
+      raffledTo: specialProceeding.raffledTo || "",
+      date: toInputDate(specialProceeding.date),
+      nature: specialProceeding.nature || "",
+    });
     setIsEditing(true);
     setEditingId(specialProceeding.id);
   };
@@ -142,7 +168,7 @@ export default function SpecialProceedingTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyForm());
     setIsEditing(false);
     setEditingId(null);
   };

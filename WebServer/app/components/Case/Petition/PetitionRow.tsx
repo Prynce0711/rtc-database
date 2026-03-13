@@ -1,10 +1,10 @@
 "use client";
 
 import TipCell from "@/app/components/Table/TipCell";
-import { Petition } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import { PetitionCaseData } from "./schema";
 
 const ReceiveRow = ({
   log,
@@ -12,10 +12,10 @@ const ReceiveRow = ({
   onDelete,
   onView,
 }: {
-  log: Petition;
-  onEdit: (log: Petition) => void;
-  onDelete: (log: Petition) => void;
-  onView?: (log: Petition) => void;
+  log: PetitionCaseData;
+  onEdit: (log: PetitionCaseData) => void;
+  onDelete: (log: PetitionCaseData) => void;
+  onView?: (log: PetitionCaseData) => void;
 }) => {
   const session = useSession();
   const isAdminOrAtty =

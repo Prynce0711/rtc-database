@@ -424,6 +424,9 @@ function adminSidebar({
 }: SidebarMenuProps) {
   return (
     <>
+      <Link href="/test" className="btn">
+        Test
+      </Link>
       {/* Main */}
       <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
         <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
@@ -930,7 +933,12 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
 
   async function handleLogout() {
     await authClient.signOut({
-      fetchOptions: { onSuccess: () => router.push("/") },
+      fetchOptions: {
+        onSuccess: () => {
+          document.documentElement.setAttribute("data-theme", "winter");
+          router.push("/");
+        },
+      },
     });
   }
 

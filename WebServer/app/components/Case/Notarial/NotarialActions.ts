@@ -1,5 +1,8 @@
 "use server";
 
+import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
+import { FilterOptions } from "@/app/components/Filter/FilterUtils";
+import { Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   deleteGarageFile,
@@ -8,9 +11,93 @@ import {
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { createHash } from "crypto";
 import { prettifyError } from "zod";
 import ActionResult from "../../ActionResult";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
+
+type NotarialListFilterShape = {
+  title?: string | null;
+  name?: string | null;
+  atty?: string | null;
+  date?: { start?: string; end?: string };
+};
+
+export type NotarialFilterOptions = FilterOptions<NotarialListFilterShape> & {
+  sortKey?: "title" | "name" | "atty" | "date";
+};
+
+export type NotarialStats = {
+  totalRecords: number;
+  thisMonth: number;
+  uniqueAttorneys: number;
+  noDate: number;
+};
+
+function buildNotarialWhere(
+  options?: NotarialFilterOptions,
+): Prisma.NotarialWhereInput {
+  const filters = options?.filters;
+  const exactMatchMap = options?.exactMatchMap ?? {};
+  const conditions: Prisma.NotarialWhereInput[] = [];
+
+  const addStringFilter = (
+    key: "title" | "name" | "attorney",
+    value?: string | null,
+    exactKey?: "title" | "name" | "atty",
+  ) => {
+    if (!value) return;
+    const exactMatch = exactMatchMap[exactKey ?? key] ?? false;
+    conditions.push({
+      [key]: {
+        [exactMatch ? "equals" : "contains"]: value,
+      },
+    });
+  };
+
+  addStringFilter("title", filters?.title, "title");
+  addStringFilter("name", filters?.name, "name");
+  addStringFilter("attorney", filters?.atty, "atty");
+
+  if (filters?.date?.start || filters?.date?.end) {
+    conditions.push({
+      date: {
+        gte: filters.date.start ? new Date(filters.date.start) : undefined,
+        lte: filters.date.end ? new Date(filters.date.end) : undefined,
+      },
+    });
+  }
+
+  if (options?.searchTerm) {
+    const search = options.searchTerm.trim();
+    if (search.length > 0) {
+      conditions.push({
+        OR: [
+          { title: { contains: search } },
+          { name: { contains: search } },
+          { attorney: { contains: search } },
+        ],
+      });
+    }
+  }
+
+  return conditions.length > 0 ? { AND: conditions } : {};
+}
+
+async function getFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
+}
+
+async function deleteFileIfUnreferenced(fileId: number, key: string) {
+  const remainingReferences = await prisma.notarial.count({
+    where: { fileId },
+  });
+
+  if (remainingReferences === 0) {
+    await deleteGarageFile(key);
+  }
+}
 
 export async function getNotarial(): Promise<ActionResult<NotarialData[]>> {
   try {
@@ -32,6 +119,106 @@ export async function getNotarial(): Promise<ActionResult<NotarialData[]>> {
   }
 }
 
+export async function getNotarialPage(
+  options?: NotarialFilterOptions,
+): Promise<ActionResult<PaginatedResult<NotarialData>>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const page = options?.page && options.page > 0 ? options.page : 1;
+    const pageSize =
+      options?.pageSize && options.pageSize > 0 ? options.pageSize : 25;
+
+    const where = buildNotarialWhere(options);
+    const sortKey = options?.sortKey === "atty" ? "attorney" : options?.sortKey;
+    const orderBy: Prisma.NotarialOrderByWithRelationInput = {
+      [sortKey ?? "date"]: options?.sortOrder ?? "desc",
+    };
+
+    const [items, total] = await prisma.$transaction([
+      prisma.notarial.findMany({
+        where,
+        orderBy,
+        include: { file: true },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.notarial.count({ where }),
+    ]);
+
+    return {
+      success: true,
+      result: {
+        items,
+        total,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching paginated notarial data:", error);
+    return { success: false, error: "Error fetching paginated notarial data" };
+  }
+}
+
+export async function getNotarialStats(
+  options?: NotarialFilterOptions,
+): Promise<ActionResult<NotarialStats>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const where = buildNotarialWhere(options);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [totalRecords, thisMonth, noDate, attorneys] =
+      await prisma.$transaction([
+        prisma.notarial.count({ where }),
+        prisma.notarial.count({
+          where: {
+            AND: [
+              where,
+              {
+                date: {
+                  gte: monthStart,
+                  lt: nextMonthStart,
+                },
+              },
+            ],
+          },
+        }),
+        prisma.notarial.count({
+          where: {
+            AND: [where, { date: null }],
+          },
+        }),
+        prisma.notarial.findMany({
+          where,
+          select: { attorney: true },
+          distinct: ["attorney"],
+        }),
+      ]);
+
+    return {
+      success: true,
+      result: {
+        totalRecords,
+        thisMonth,
+        uniqueAttorneys: attorneys.filter((a) => !!a.attorney).length,
+        noDate,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching notarial stats:", error);
+    return { success: false, error: "Error fetching notarial stats" };
+  }
+}
+
 export async function createNotarial(
   data: Record<string, unknown>,
 ): Promise<ActionResult<NotarialData>> {
@@ -49,50 +236,45 @@ export async function createNotarial(
       };
     }
 
+    const {
+      file,
+      path: _path,
+      removeFile: _removeFile,
+      ...notarialFields
+    } = parsedData.data;
+
+    let uploadResult;
+    try {
+      const fileHash = await getFileHash(file);
+      uploadResult = await uploadFileToGarage(
+        file,
+        generateFileKey({ ...parsedData.data, fileHash }),
+      );
+    } catch (uploadError) {
+      console.error("Error uploading file to garage:", uploadError);
+      return {
+        success: false,
+        error:
+          "Notarial file upload failed: " +
+          (uploadError instanceof Error
+            ? uploadError.message
+            : "Unknown error"),
+      };
+    }
+
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        error: "Notarial file upload failed: " + uploadResult.error,
+      };
+    }
+
     const createdNotarial = await prisma.notarial.create({
       data: {
-        ...parsedData.data,
-        file: undefined,
-        fileId: undefined,
+        ...notarialFields,
+        fileId: uploadResult.result.id,
       },
     });
-    if (parsedData.data.file) {
-      try {
-        const uploadResult = await uploadFileToGarage(
-          parsedData.data.file,
-          generateFileKey(parsedData.data),
-        );
-
-        if (!uploadResult.success) {
-          await prisma.notarial.delete({ where: { id: createdNotarial.id } });
-          return {
-            success: false,
-            error:
-              "Notarial created but file upload failed: " + uploadResult.error,
-          };
-        }
-
-        await prisma.notarial.update({
-          where: { id: createdNotarial.id },
-          data: {
-            fileId: uploadResult.result.id,
-          },
-        });
-      } catch (uploadError) {
-        console.error("Error uploading file to garage:", uploadError);
-
-        await prisma.notarial.delete({ where: { id: createdNotarial.id } });
-
-        return {
-          success: false,
-          error:
-            "Notarial created but file upload failed: " +
-            (uploadError instanceof Error
-              ? uploadError.message
-              : "Unknown error"),
-        };
-      }
-    }
 
     const notarialWithFile = await prisma.notarial.findUnique({
       where: { id: createdNotarial.id },
@@ -174,7 +356,10 @@ export async function updateNotarial(
 
     if (removingOnly) {
       if (existingNotarial.file) {
-        await deleteGarageFile(existingNotarial.file.key);
+        await deleteFileIfUnreferenced(
+          existingNotarial.file.id,
+          existingNotarial.file.key,
+        );
       }
     } else if (incomingFile) {
       if (existingNotarial.file) {
@@ -182,10 +367,17 @@ export async function updateNotarial(
           where: { id },
           data: { fileId: null },
         });
-        await deleteGarageFile(existingNotarial.file.key);
+        await deleteFileIfUnreferenced(
+          existingNotarial.file.id,
+          existingNotarial.file.key,
+        );
       }
 
-      const uploadKey = generateFileKey(mergedData);
+      const incomingFileHash = await getFileHash(incomingFile);
+      const uploadKey = generateFileKey({
+        ...mergedData,
+        fileHash: incomingFileHash,
+      });
       if (!uploadKey) {
         return {
           success: false,
@@ -210,7 +402,10 @@ export async function updateNotarial(
         },
       });
     } else if (existingNotarial.file) {
-      const nextKey = generateFileKey(mergedData);
+      const nextKey = generateFileKey({
+        ...mergedData,
+        fileHash: existingNotarial.file.fileHash,
+      });
       if (nextKey && nextKey !== existingNotarial.file.key) {
         await moveGarageFile(existingNotarial.file.key, nextKey);
       }
@@ -251,11 +446,11 @@ export async function deleteNotarial(id: number): Promise<ActionResult<void>> {
       return { success: false, error: "Notarial data not found" };
     }
 
-    if (notarial.file) {
-      await deleteGarageFile(notarial.file.key);
-    }
-
     await prisma.notarial.delete({ where: { id } });
+
+    if (notarial.file) {
+      await deleteFileIfUnreferenced(notarial.file.id, notarial.file.key);
+    }
 
     return { success: true, result: undefined };
   } catch (error) {

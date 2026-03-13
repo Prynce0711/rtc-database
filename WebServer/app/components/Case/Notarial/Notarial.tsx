@@ -1,15 +1,19 @@
 "use client";
 
+import { exportNotarialExcel } from "@/app/components/Case/Notarial/ExcelActions";
+import {
+  deleteNotarial,
+  getNotarialPage,
+  getNotarialStats,
+} from "@/app/components/Case/Notarial/NotarialActions";
+import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
+import { NotarialData } from "@/app/components/Case/Notarial/schema";
+import FileViewerModal from "@/app/components/Popup/FileViewerModal";
 import TipCell from "@/app/components/Table/TipCell";
+import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -21,7 +25,6 @@ import {
   FiDownload,
   FiEdit,
   FiEdit3,
-  FiExternalLink,
   FiEye,
   FiFileText,
   FiFolder,
@@ -31,12 +34,15 @@ import {
   FiSave,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
-import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../../Filter/FilterTypes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +53,8 @@ type NotarialRecord = {
   atty: string;
   date: string;
   link: string;
+  fileName?: string;
+  mimeType?: string;
 };
 
 type NotarialFilterValues = {
@@ -55,51 +63,6 @@ type NotarialFilterValues = {
   atty?: string;
   date?: { start?: string; end?: string };
 };
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_RECORDS: NotarialRecord[] = [
-  {
-    id: 1,
-    title: "NO ENTRY REPORT (NOTARY)",
-    name: "ATTY. MELBA G. AGUSTIN-DAVID",
-    atty: "ATTY. JUSTIN G. SAMBILE",
-    date: "",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. SAMBILE-NOTARIAL REPORT\\2025-09 - No Entry Report (Notary).pdf",
-  },
-  {
-    id: 2,
-    title: "NOTARIAL REGISTER",
-    name: "ATTY. JOSE P. REYES",
-    atty: "ATTY. MARIA S. SANTOS",
-    date: "2025-08-15",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. REYES-NOTARIAL REGISTER\\2025-08 - Notarial Register.pdf",
-  },
-  {
-    id: 3,
-    title: "MONTHLY REPORT",
-    name: "ATTY. ANA L. GARCIA",
-    atty: "ATTY. CARLOS B. DELA CRUZ",
-    date: "2025-07-30",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. GARCIA-MONTHLY REPORT\\2025-07 - Monthly Report.pdf",
-  },
-  {
-    id: 4,
-    title: "NO ENTRY REPORT (NOTARY)",
-    name: "ATTY. ROBERTO M. VILLANUEVA",
-    atty: "ATTY. ELENA C. FERNANDEZ",
-    date: "2025-09-01",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. VILLANUEVA-NOTARIAL REPORT\\2025-09 - No Entry Report.pdf",
-  },
-  {
-    id: 5,
-    title: "ANNUAL NOTARIAL REPORT",
-    name: "ATTY. LOURDES P. BAUTISTA",
-    atty: "ATTY. DANTE R. MORALES",
-    date: "2024-12-31",
-    link: "RTC-Data\\Notarial Files\\Roxanne\\ATTY. BAUTISTA-ANNUAL REPORT\\2024 - Annual Notarial Report.pdf",
-  },
-];
 
 const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
   { key: "title", label: "Title", type: "text" },
@@ -750,7 +713,7 @@ const NotarialModal = ({
                                         href={entry.link}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
+                                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-50 truncate"
                                       >
                                         {entry.link}
                                       </a>
@@ -991,7 +954,11 @@ const NotarialModal = ({
 
 // ─── Sort TH ─────────────────────────────────────────────────────────────────
 
-type SortConfig = { key: keyof NotarialRecord; order: "asc" | "desc" };
+type SortKey = "title" | "name" | "atty" | "date";
+type SortConfig = { key: SortKey; order: "asc" | "desc" };
+
+const isSortKey = (key: keyof NotarialRecord): key is SortKey =>
+  key === "title" || key === "name" || key === "atty" || key === "date";
 
 const SortTh = ({
   label,
@@ -1000,9 +967,9 @@ const SortTh = ({
   onSort,
 }: {
   label: string;
-  colKey: keyof NotarialRecord;
+  colKey: SortKey;
   sortConfig: SortConfig;
-  onSort: (k: keyof NotarialRecord) => void;
+  onSort: (k: SortKey) => void;
 }) => (
   <th
     className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
@@ -1019,37 +986,6 @@ const SortTh = ({
   </th>
 );
 
-// ─── Filter Logic ─────────────────────────────────────────────────────────────
-
-const applyNotarialFilters = (
-  filters: NotarialFilterValues,
-  items: NotarialRecord[],
-): NotarialRecord[] =>
-  items.filter((r) => {
-    if (
-      filters.title &&
-      !r.title.toLowerCase().includes(filters.title.toLowerCase())
-    )
-      return false;
-    if (
-      filters.name &&
-      !r.name.toLowerCase().includes(filters.name.toLowerCase())
-    )
-      return false;
-    if (
-      filters.atty &&
-      !r.atty.toLowerCase().includes(filters.atty.toLowerCase())
-    )
-      return false;
-    if (filters.date) {
-      if (!r.date) return false;
-      const d = new Date(r.date);
-      if (filters.date.start && d < new Date(filters.date.start)) return false;
-      if (filters.date.end && d > new Date(filters.date.end)) return false;
-    }
-    return true;
-  });
-
 // ─── Row Component ────────────────────────────────────────────────────────────
 
 const NotarialRow = ({
@@ -1057,11 +993,17 @@ const NotarialRow = ({
   onEdit,
   onDelete,
   onRowClick,
+  onViewFile,
+  onDownloadFile,
+  canPreview,
 }: {
   record: NotarialRecord;
   onEdit: (r: NotarialRecord) => void;
   onDelete: (id: number) => void;
   onRowClick: (r: NotarialRecord) => void;
+  onViewFile: (r: NotarialRecord) => void;
+  onDownloadFile: (r: NotarialRecord) => void;
+  canPreview: boolean;
 }) => (
   <tr
     className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
@@ -1136,22 +1078,28 @@ const NotarialRow = ({
       onClick={(e) => e.stopPropagation()}
     >
       {record.link ? (
-        <a
-          href="#"
-          className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
-          title={record.link}
-        >
-          <FiExternalLink size={12} />
-          <span className="truncate">{record.link.split("\\").pop()}</span>
-        </a>
-      ) : (
-        <span className="text-base-content/30">—</span>
-      )}
-      {record.link && (
-        <div className="cell-tip">
-          <span className="cell-tip-label">File / Link</span>
-          <span className="cell-tip-value">{record.link}</span>
+        <div className="flex items-center justify-center gap-2">
+          {canPreview && (
+            <button
+              type="button"
+              className="btn btn-xs btn-outline"
+              onClick={() => onViewFile(record)}
+            >
+              <FiEye size={12} />
+              View
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-xs btn-primary"
+            onClick={() => onDownloadFile(record)}
+          >
+            <FiDownload size={12} />
+            Download
+          </button>
         </div>
+      ) : (
+        <span className="text-base-content/50 text-xs">No file</span>
       )}
     </td>
   </tr>
@@ -1283,7 +1231,10 @@ const Pagination: React.FC<{
 
 const NotarialPage: React.FC = () => {
   const router = useRouter();
-  const [records, setRecords] = useState<NotarialRecord[]>(MOCK_RECORDS);
+  const [records, setRecords] = useState<NotarialRecord[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "date",
@@ -1300,113 +1251,291 @@ const NotarialPage: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<NotarialFilterValues>(
     {},
   );
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<
-    NotarialRecord[]
-  >([]);
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const isAdminOrAtty = true;
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    thisMonth: 0,
+    attorneys: 0,
+    noDate: 0,
+  });
+  const [previewState, setPreviewState] = useState<{
+    open: boolean;
+    loading: boolean;
+    url: string;
+    type: "pdf" | "image" | null;
+    title: string;
+    error: string;
+    record: NotarialRecord | null;
+  }>({
+    open: false,
+    loading: false,
+    url: "",
+    type: null,
+    title: "",
+    error: "",
+    record: null,
+  });
+
+  const mapBackendRecord = (item: NotarialData): NotarialRecord => ({
+    id: item.id,
+    title: item.title ?? "",
+    name: item.name ?? "",
+    atty: item.attorney ?? "",
+    date: item.date ? new Date(item.date).toISOString().slice(0, 10) : "",
+    link: item.file?.key ?? "",
+    fileName: item.file?.fileName ?? undefined,
+    mimeType: item.file?.mimeType ?? undefined,
+  });
+
+  const getPreviewType = (record: NotarialRecord): "pdf" | "image" | null => {
+    const mime = (record.mimeType ?? "").toLowerCase();
+    if (mime === "application/pdf") return "pdf";
+    if (mime.startsWith("image/")) return "image";
+
+    const nameOrKey = (record.fileName || record.link || "").toLowerCase();
+    if (/\.pdf$/i.test(nameOrKey)) return "pdf";
+    if (/\.(png|jpg|jpeg|gif|bmp|webp|svg)$/i.test(nameOrKey)) return "image";
+    return null;
+  };
+
+  const isPreviewable = (record: NotarialRecord) => {
+    return getPreviewType(record) !== null;
+  };
+
+  const closePreview = () => {
+    setPreviewState({
+      open: false,
+      loading: false,
+      url: "",
+      type: null,
+      title: "",
+      error: "",
+      record: null,
+    });
+  };
+
+  const handleViewFile = async (record: NotarialRecord) => {
+    if (!record.link) return;
+
+    const previewType = getPreviewType(record);
+    if (!previewType) {
+      await handleDownloadFile(record);
+      return;
+    }
+
+    setPreviewState({
+      open: true,
+      loading: true,
+      url: "",
+      type: previewType,
+      title: record.fileName || record.link.split("/").pop() || "File Preview",
+      error: "",
+      record,
+    });
+
+    const result = await getGarageFileUrl(record.link, {
+      inline: true,
+      fileName: record.fileName,
+      contentType: record.mimeType,
+    });
+    if (!result.success) {
+      setPreviewState((prev) => ({
+        ...prev,
+        loading: false,
+        error: result.error || "Failed to open file",
+      }));
+      return;
+    }
+
+    setPreviewState((prev) => ({
+      ...prev,
+      loading: false,
+      url: result.result,
+      error: "",
+    }));
+  };
+
+  const handleDownloadFile = async (record: NotarialRecord) => {
+    if (!record.link) return;
+
+    const result = await getGarageFileUrl(record.link, {
+      inline: false,
+      fileName: record.fileName,
+      contentType: record.mimeType,
+    });
+    if (!result.success) {
+      alert(result.error || "Failed to download file");
+      return;
+    }
+
+    const a = document.createElement("a");
+    a.href = result.result;
+    a.download = record.fileName || record.link.split("/").pop() || "file";
+    a.click();
+  };
+
+  const toServerFilters = useCallback(
+    (filters: NotarialFilterValues) => ({
+      title: filters.title,
+      name: filters.name,
+      atty: filters.atty,
+      date: filters.date,
+    }),
+    [],
+  );
+
+  const refreshFromBackend = useCallback(
+    async (page = currentPage) => {
+      try {
+        setLoading(true);
+
+        const serverFilters = toServerFilters(appliedFilters);
+        const [listResult, statsResult] = await Promise.all([
+          getNotarialPage({
+            page,
+            pageSize: PAGE_SIZE,
+            searchTerm,
+            filters: serverFilters,
+            sortKey: sortConfig.key,
+            sortOrder: sortConfig.order,
+            exactMatchMap,
+          }),
+          getNotarialStats({
+            searchTerm,
+            filters: serverFilters,
+            exactMatchMap,
+          }),
+        ]);
+
+        if (!listResult.success) {
+          setError(listResult.error || "Failed to fetch notarial records");
+          return;
+        }
+
+        const mapped = listResult.result.items.map((item) =>
+          mapBackendRecord(item),
+        );
+        setRecords(mapped);
+        setTotalCount(listResult.result.total ?? mapped.length);
+
+        if (statsResult.success && statsResult.result) {
+          setStats({
+            total: statsResult.result.totalRecords,
+            thisMonth: statsResult.result.thisMonth,
+            attorneys: statsResult.result.uniqueAttorneys,
+            noDate: statsResult.result.noDate,
+          });
+        }
+
+        setError(null);
+      } catch (fetchError) {
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : "Failed to fetch notarial records",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      appliedFilters,
+      currentPage,
+      exactMatchMap,
+      searchTerm,
+      sortConfig,
+      toServerFilters,
+    ],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters]);
+  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
 
-  const handleSort = (key: keyof NotarialRecord) =>
+  useEffect(() => {
+    void refreshFromBackend(currentPage);
+  }, [refreshFromBackend, currentPage]);
+
+  const handleSort = (key: keyof NotarialRecord) => {
+    if (!isSortKey(key)) return;
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
+  };
 
-  const getSuggestions = (key: string, inputValue: string): string[] => {
+  const getSuggestions = async (
+    key: string,
+    inputValue: string,
+  ): Promise<string[]> => {
     const textKeys = ["title", "name", "atty"];
     if (!textKeys.includes(key)) return [];
-    const values = records
-      .map((r) => (r[key as keyof NotarialRecord] as string) || "")
-      .filter(Boolean);
-    const unique = Array.from(new Set(values)).sort();
-    if (!inputValue) return unique;
-    return unique.filter((v) =>
-      v.toLowerCase().includes(inputValue.toLowerCase()),
-    );
-  };
 
-  const handleApplyFilters = (filters: FilterValues) => {
-    const typed = filters as NotarialFilterValues;
-    setAppliedFilters(typed);
-    setFilteredByAdvanced(applyNotarialFilters(typed, records));
-  };
+    const filters: NotarialFilterValues = {
+      [key]: inputValue,
+    };
 
-  const filteredAndSorted = useMemo(() => {
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : records;
-    let filtered = baseList;
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      filtered = baseList.filter((r) =>
-        Object.values(r).some((v) =>
-          v?.toString().toLowerCase().includes(lower),
-        ),
-      );
-    }
-    return [...filtered].sort((a, b) => {
-      const aVal = a[sortConfig.key] ?? "";
-      const bVal = b[sortConfig.key] ?? "";
-      if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
-      return 0;
+    const result = await getNotarialPage({
+      page: 1,
+      pageSize: 10,
+      filters: toServerFilters(filters),
+      exactMatchMap: { [key]: false },
+      sortKey: key as SortKey,
+      sortOrder: "asc",
     });
-  }, [records, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
 
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredAndSorted.length / PAGE_SIZE),
-  );
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage]);
+    if (!result.success || !result.result) return [];
 
-  const stats = useMemo(() => {
-    const total = records.length;
-    const now = new Date();
-    const thisMonth = records.filter((r) => {
-      if (!r.date) return false;
-      const d = new Date(r.date);
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    }).length;
-    const attorneys = new Set(records.map((r) => r.atty)).size;
-    const noDate = records.filter((r) => !r.date).length;
-    return { total, thisMonth, attorneys, noDate };
-  }, [records]);
+    const values = result.result.items
+      .map((item) => {
+        const mapped = mapBackendRecord(item);
+        return (mapped[key as keyof NotarialRecord] as string) || "";
+      })
+      .filter((value) => value.length > 0);
+
+    return Array.from(new Set(values)).sort().slice(0, 10);
+  };
+
+  const handleApplyFilters = (
+    filters: FilterValues,
+    exactMatchMapParam: ExactMatchMap,
+  ) => {
+    setAppliedFilters(filters as NotarialFilterValues);
+    setExactMatchMap(exactMatchMapParam);
+    setCurrentPage(1);
+  };
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const activeFilterCount = Object.keys(appliedFilters).length;
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+    const result = await deleteNotarial(id);
+    if (!result.success) {
+      alert(result.error || "Failed to delete record");
+      return;
+    }
+    await refreshFromBackend();
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setTimeout(() => {
-      setUploading(false);
-      alert("Import complete (mock)");
-      e.target.value = "";
-    }, 1200);
-  };
-
-  const handleExport = () => {
+  const handleExport = async () => {
     setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
-      alert("Export complete (mock)");
-    }, 1000);
+    const result = await exportNotarialExcel();
+    setExporting(false);
+
+    if (!result.success) {
+      alert(result.error || "Export failed");
+      return;
+    }
+
+    const a = document.createElement("a");
+    a.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
+    a.download = result.result.fileName;
+    a.click();
   };
 
   // ── Full-page modal — same as Proceedings/CasePage ──
@@ -1427,8 +1556,43 @@ const NotarialPage: React.FC = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-base-100 p-6">
+        <div className="alert">
+          <span>Loading notarial records...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-base-100 p-6">
+        <div className="alert alert-error">
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-base-100">
+      <FileViewerModal
+        open={previewState.open}
+        loading={previewState.loading}
+        url={previewState.url}
+        type={previewState.type}
+        title={previewState.title}
+        error={previewState.error}
+        onClose={closePreview}
+        onDownload={
+          previewState.record
+            ? () =>
+                void handleDownloadFile(previewState.record as NotarialRecord)
+            : undefined
+        }
+      />
       <main className="w-full">
         {/* Header */}
         <div className="mb-8">
@@ -1497,29 +1661,13 @@ const NotarialPage: React.FC = () => {
               )}
             </button>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleImport}
-            />
-
             {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                {" "}
-                <FiUpload className="h-5 w-5" />
-                {uploading ? "Importing..." : "Import Excel"}
-              </button>
+              <NotarialExcelUploader onUploadCompleted={refreshFromBackend} />
             )}
             {isAdminOrAtty && (
               <button
                 className={`btn btn-outline ${exporting ? "loading" : ""}`}
-                onClick={handleExport}
+                onClick={() => void handleExport()}
                 disabled={exporting}
               >
                 {" "}
@@ -1666,7 +1814,7 @@ const NotarialPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {records.length === 0 ? (
                 <tr>
                   <td colSpan={6}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
@@ -1683,7 +1831,7 @@ const NotarialPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginated.map((r) => (
+                records.map((r) => (
                   <NotarialRow
                     key={r.id}
                     record={r}
@@ -1692,6 +1840,9 @@ const NotarialPage: React.FC = () => {
                       setModalType("EDIT");
                     }}
                     onDelete={handleDelete}
+                    onViewFile={(item) => void handleViewFile(item)}
+                    onDownloadFile={(item) => void handleDownloadFile(item)}
+                    canPreview={isPreviewable(r)}
                     onRowClick={(item) =>
                       router.push(`/user/cases/notarial/${item.id}`)
                     }

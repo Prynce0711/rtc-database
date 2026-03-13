@@ -68,7 +68,7 @@ const ModalBase = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.38, ease: "easeOut" }}
-          className={`fixed inset-0 min-w-0 flex items-center justify-center z-[9999] ${
+          className={`fixed inset-0 min-w-0 flex items-center justify-center z-9999 ${
             notTransparent ? `${bgColor}` : "bg-black/50"
           } ${className}`}
           onClick={() => setVisible(false)}

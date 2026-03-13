@@ -1,5 +1,5 @@
-import ExcelWithFileUpload from "./ExcelWithFileUpload";
+import NotarialTester from "./NotarialTester";
 
 export default function page() {
-  return <ExcelWithFileUpload />;
+  return <NotarialTester />;
 }

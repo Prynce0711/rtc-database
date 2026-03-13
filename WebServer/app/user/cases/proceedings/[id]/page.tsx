@@ -1,11 +1,11 @@
 "use client";
 
+import type { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
 import {
   getSpecialProceedingById,
   getSpecialProceedings,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
 import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable.tsx";
-import type { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -31,7 +31,7 @@ const Detail = ({ label, value }: { label: string; value: any }) => {
       </span>
       <div
         className={[
-          "px-5 py-4 rounded-xl border min-h-[58px] flex items-center",
+          "px-5 py-4 rounded-xl border min-h-14.5 flex items-center",
           isEmpty
             ? "bg-base-200/40 border-base-200/60"
             : "bg-base-200/70 border-base-200",
@@ -129,11 +129,11 @@ const NavButton = ({
         <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
           {isPrev ? "Previous" : "Next"}
         </p>
-        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-[200px] transition-colors leading-snug">
+        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-50 transition-colors leading-snug">
           {label}
         </p>
         {sublabel && (
-          <p className="text-[11px] text-base-content/30 truncate max-w-[200px] leading-snug mt-0.5">
+          <p className="text-[11px] text-base-content/30 truncate max-w-50 leading-snug mt-0.5">
             {sublabel}
           </p>
         )}
@@ -147,9 +147,9 @@ export default function ProceedingDetailsPage() {
   const router = useRouter();
   const params = useParams();
 
-  const [caseData, setCaseData] = useState<SpecialProceeding | null>(null);
-  const [prevCase, setPrevCase] = useState<SpecialProceeding | null>(null);
-  const [nextCase, setNextCase] = useState<SpecialProceeding | null>(null);
+  const [caseData, setCaseData] = useState<SpecialProceedingData | null>(null);
+  const [prevCase, setPrevCase] = useState<SpecialProceedingData | null>(null);
+  const [nextCase, setNextCase] = useState<SpecialProceedingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"details" | "parties">("details");
 
@@ -171,8 +171,8 @@ export default function ProceedingDetailsPage() {
 
       // Fetch all for prev/next navigation
       const allRes = await getSpecialProceedings();
-      if (allRes.success && allRes.result) {
-        const all = allRes.result;
+      if (allRes.success && allRes.result?.items) {
+        const all = allRes.result.items;
         const idx = all.findIndex((c) => c.id === numId);
         setPrevCase(idx > 0 ? all[idx - 1] : null);
         setNextCase(idx < all.length - 1 ? all[idx + 1] : null);
@@ -281,7 +281,7 @@ export default function ProceedingDetailsPage() {
             </button>
 
             {/* Counter */}
-            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-[36px] text-center">
+            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
               #{currentId}
             </span>
 
