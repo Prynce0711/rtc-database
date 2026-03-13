@@ -3,6 +3,7 @@
 import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
 import { FilterOptions } from "@/app/components/Filter/FilterUtils";
 import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
+import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
@@ -13,12 +14,14 @@ import { ReceivingLogSchema } from "./schema";
 type ReceivingLogListFilterShape = {
   bookAndPage?: string | null;
   caseNumber?: string | null;
-  caseType?: string | null;
+  caseType?: CaseType | null;
   content?: string | null;
   branchNumber?: string | null;
   notes?: string | null;
   dateRecieved?: { start?: string; end?: string };
 };
+
+const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
 
 export type ReceivingLogFilterOptions =
   FilterOptions<ReceivingLogListFilterShape> & {
@@ -47,13 +50,7 @@ function buildReceivingLogWhere(
   const conditions: Prisma.RecievingLogWhereInput[] = [];
 
   const addStringFilter = (
-    key:
-      | "bookAndPage"
-      | "caseNumber"
-      | "caseType"
-      | "content"
-      | "branchNumber"
-      | "notes",
+    key: "bookAndPage" | "caseNumber" | "content" | "branchNumber" | "notes",
     value?: string | null,
   ) => {
     if (!value) return;
@@ -67,10 +64,13 @@ function buildReceivingLogWhere(
 
   addStringFilter("bookAndPage", filters?.bookAndPage);
   addStringFilter("caseNumber", filters?.caseNumber);
-  addStringFilter("caseType", filters?.caseType);
   addStringFilter("content", filters?.content);
   addStringFilter("branchNumber", filters?.branchNumber);
   addStringFilter("notes", filters?.notes);
+
+  if (filters?.caseType && CASE_TYPE_VALUES.has(filters.caseType)) {
+    conditions.push({ caseType: filters.caseType });
+  }
 
   if (filters?.dateRecieved?.start || filters?.dateRecieved?.end) {
     conditions.push({
@@ -88,11 +88,16 @@ function buildReceivingLogWhere(
   if (options?.searchTerm) {
     const search = options.searchTerm.trim();
     if (search.length > 0) {
+      const normalizedSearch = search.toUpperCase();
+      const typeFilter = CASE_TYPE_VALUES.has(normalizedSearch as CaseType)
+        ? [{ caseType: normalizedSearch as CaseType }]
+        : [];
+
       conditions.push({
         OR: [
           { bookAndPage: { contains: search } },
           { caseNumber: { contains: search } },
-          { caseType: { contains: search } },
+          ...typeFilter,
           { content: { contains: search } },
           { branchNumber: { contains: search } },
           { notes: { contains: search } },

@@ -57,11 +57,12 @@ export const createTempId = (): number => {
 /** Form entry used by the grid UI (SpecialProceedingData + UI metadata). */
 export type SpecialProceedingEntry = Omit<
   SpecialProceedingData,
-  "date" | "dateFiled" | "createdAt"
+  "date" | "dateFiled" | "createdAt" | "updatedAt"
 > & {
   date: string | Date | null;
   dateFiled: string | Date | null;
   createdAt?: Date;
+  updatedAt?: Date | null;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
@@ -97,9 +98,19 @@ export const initialSpecialProceedingFormData: Omit<
 
 /** Create an empty entry based on schema defaults. */
 export const createEmptyEntry = (): SpecialProceedingEntry => ({
-  ...initialSpecialProceedingFormData,
+  branch: initialSpecialProceedingFormData.branch ?? null,
+  assistantBranch: initialSpecialProceedingFormData.assistantBranch ?? null,
+  caseNumber: initialSpecialProceedingFormData.caseNumber,
+  caseType: initialSpecialProceedingFormData.caseType,
+  petitioner: initialSpecialProceedingFormData.petitioner ?? null,
+  raffledTo: initialSpecialProceedingFormData.raffledTo ?? null,
+  date: initialSpecialProceedingFormData.date ?? null,
+  nature: initialSpecialProceedingFormData.nature ?? null,
+  respondent: initialSpecialProceedingFormData.respondent ?? null,
+  dateFiled: initialSpecialProceedingFormData.dateFiled ?? null,
   id: createTempId(),
   createdAt: new Date(),
+  updatedAt: null,
   errors: {},
   collapsed: false,
   saved: false,
