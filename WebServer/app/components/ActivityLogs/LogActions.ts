@@ -82,6 +82,7 @@ export async function getLogs(): Promise<ActionResult<CompleteLogData[]>> {
   }
 }
 
+// TODO: Move createLog to server-only file and import it in other action files to log actions like case creation, deletion, etc.
 export async function createLog(
   logData: CreateLogData,
 ): Promise<ActionResult<void>> {

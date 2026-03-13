@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import { SpecialProceeding } from "@/app/generated/prisma/browser";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -27,6 +26,7 @@ import {
   deleteSpecialProceeding,
   getSpecialProceedings,
 } from "./SpecialProceedingsActions";
+import { SpecialProceedingData } from "./schema";
 
 type SPFilterValues = {
   spcNo?: string;
@@ -60,8 +60,8 @@ const PAGE_SIZE = 25;
 
 const applySPFilters = (
   filters: SPFilterValues,
-  items: SpecialProceeding[],
-): SpecialProceeding[] =>
+  items: SpecialProceedingData[],
+): SpecialProceedingData[] =>
   items.filter((c) => {
     if (
       filters.spcNo &&
@@ -273,7 +273,7 @@ const Pagination: React.FC<{
 const Proceedings: React.FC = () => {
   const router = useRouter();
   const popup = usePopup();
-  const [cases, setCases] = useState<SpecialProceeding[]>([]);
+  const [cases, setCases] = useState<SpecialProceedingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -284,9 +284,8 @@ const Proceedings: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<SPFilterValues>({});
   const [drawerType, setDrawerType] = useState<DrawerType | null>(null);
-  const [selectedCase, setSelectedCase] = useState<SpecialProceeding | null>(
-    null,
-  );
+  const [selectedCase, setSelectedCase] =
+    useState<SpecialProceedingData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -304,7 +303,7 @@ const Proceedings: React.FC = () => {
       setError(result.error || "Failed to fetch cases");
       setCases([]);
     } else {
-      setCases(result.result || []);
+      setCases(result.result?.items || []);
     }
     setLoading(false);
   };
@@ -322,7 +321,7 @@ const Proceedings: React.FC = () => {
   };
 
   const getSuggestions = (key: string, partial: string) => {
-    const fieldMap: Record<string, keyof SpecialProceeding> = {
+    const fieldMap: Record<string, keyof SpecialProceedingData> = {
       spcNo: "caseNumber",
       raffledToBranch: "raffledTo",
       petitioners: "petitioner",
@@ -351,8 +350,8 @@ const Proceedings: React.FC = () => {
     );
 
     return [...filtered].sort((a, b) => {
-      const aVal = a[sortConfig.key as keyof SpecialProceeding];
-      const bVal = b[sortConfig.key as keyof SpecialProceeding];
+      const aVal = a[sortConfig.key as keyof SpecialProceedingData];
+      const bVal = b[sortConfig.key as keyof SpecialProceedingData];
 
       if (aVal == null || bVal == null) return 0;
       const aStr = aVal instanceof Date ? aVal.getTime() : String(aVal);
@@ -440,12 +439,16 @@ const Proceedings: React.FC = () => {
           setDrawerType(null);
           setSelectedCase(null);
         }}
-        onCreate={(newProc) => setCases((prev) => [...prev, newProc])}
-        onUpdate={(updatedProc) =>
-          setCases((prev) =>
-            prev.map((c) => (c.id === updatedProc.id ? updatedProc : c)),
-          )
-        }
+        onCreate={() => {
+          setDrawerType(null);
+          setSelectedCase(null);
+          void fetchCases();
+        }}
+        onUpdate={() => {
+          setDrawerType(null);
+          setSelectedCase(null);
+          void fetchCases();
+        }}
       />
     );
   }

@@ -10,17 +10,36 @@ import {
   getPetitions,
   updatePetition,
 } from "@/app/components/Case/Petition/PetitionActions";
-import {
-  PetitionEntry,
-  createEmptyEntry,
-  petitionToEntry,
-} from "@/app/components/Case/Petition/schema";
-import { Petition } from "@/app/generated/prisma/client";
+import { PetitionCaseData } from "@/app/components/Case/Petition/schema";
 import { useEffect, useState } from "react";
 
+type PetitionFormEntry = {
+  caseNumber: string;
+  petitioner: string;
+  raffledTo: string;
+  date: string;
+  nature: string;
+};
+
+const createEmptyForm = (): PetitionFormEntry => ({
+  caseNumber: "",
+  petitioner: "",
+  raffledTo: "",
+  date: "",
+  nature: "",
+});
+
+const toInputDate = (value?: Date | string | null): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
 export default function PetitionTester() {
-  const [petitions, setPetitions] = useState<Petition[]>([]);
-  const [formData, setFormData] = useState<PetitionEntry>(createEmptyEntry());
+  const [petitions, setPetitions] = useState<PetitionCaseData[]>([]);
+  const [formData, setFormData] =
+    useState<PetitionFormEntry>(createEmptyForm());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +57,7 @@ export default function PetitionTester() {
     setLoading(true);
     const result = await getPetitions();
     if (result.success) {
-      setPetitions(result.result);
+      setPetitions(result.result?.items || []);
       setMessage({ type: "success", text: "Petitions loaded successfully" });
     } else {
       setMessage({
@@ -91,7 +110,7 @@ export default function PetitionTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyForm());
         setIsEditing(false);
         setEditingId(null);
         await loadPetitions();
@@ -103,9 +122,14 @@ export default function PetitionTester() {
     setLoading(false);
   };
 
-  const handleEdit = (petition: Petition) => {
-    const formEntry = petitionToEntry(petition);
-    setFormData(formEntry);
+  const handleEdit = (petition: PetitionCaseData) => {
+    setFormData({
+      caseNumber: petition.caseNumber || "",
+      petitioner: petition.petitioner || "",
+      raffledTo: petition.raffledTo || "",
+      date: toInputDate(petition.date),
+      nature: petition.nature || "",
+    });
     setIsEditing(true);
     setEditingId(petition.id);
   };
@@ -128,7 +152,7 @@ export default function PetitionTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyForm());
     setIsEditing(false);
     setEditingId(null);
   };
@@ -196,7 +220,6 @@ export default function PetitionTester() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form */}
           <div className="lg:col-span-1">
-            1
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold mb-4">
                 {isEditing ? "Edit Petition" : "Add Petition"}

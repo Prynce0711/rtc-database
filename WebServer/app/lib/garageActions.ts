@@ -1,5 +1,9 @@
 "use server";
 
+// TODO: Make this server-only and users must first validate session and
+// if they are authorized to use file management before calling these functions.
+// This will prevent unauthorized users from even being able to call these functions and
+// will simplify the code by not having to validate session in each function.
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -8,6 +12,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createHash } from "crypto";
 import ActionResult from "../components/ActionResult";
 import { FileData } from "../generated/prisma/browser";
 import { garage } from "../lib/garage";
@@ -72,6 +77,27 @@ export async function uploadFileToGarage(
     }
 
     const buffer = await file.arrayBuffer();
+    const fileHash = createHash("sha256")
+      .update(Buffer.from(buffer))
+      .digest("hex");
+
+    const existingFile = await prisma.fileData.findUnique({
+      where: { key },
+    });
+
+    if (existingFile) {
+      if (existingFile.fileHash === fileHash) {
+        return {
+          success: true,
+          result: existingFile,
+        };
+      }
+
+      return {
+        success: false,
+        error: `A different file already exists for key: ${key}`,
+      };
+    }
 
     const command = new PutObjectCommand({
       Bucket: process.env.GARAGE_BUCKET || "uploads",
@@ -84,6 +110,7 @@ export async function uploadFileToGarage(
 
     const fileData = await prisma.fileData.create({
       data: {
+        fileHash,
         fileName,
         path: folderPath,
         key: key,
@@ -152,6 +179,11 @@ export async function listGarageFiles(): Promise<
 
 export async function getGarageFileUrl(
   key: string,
+  options?: {
+    inline?: boolean;
+    fileName?: string;
+    contentType?: string;
+  },
 ): Promise<ActionResult<string>> {
   try {
     const sessionValidation = await validateSession();
@@ -159,9 +191,22 @@ export async function getGarageFileUrl(
       return sessionValidation;
     }
 
+    const inline = options?.inline ?? false;
+    const normalizedFileName = (
+      options?.fileName ||
+      key.split("/").pop() ||
+      "file"
+    )
+      .replace(/[\r\n"]/g, "")
+      .trim();
+
     const command = new GetObjectCommand({
       Bucket: process.env.GARAGE_BUCKET || "uploads",
       Key: key,
+      ResponseContentDisposition: `${inline ? "inline" : "attachment"}; filename="${normalizedFileName}"`,
+      ...(options?.contentType
+        ? { ResponseContentType: options.contentType }
+        : {}),
     });
 
     // Generate a presigned URL valid for 1 hour

@@ -1,6 +1,5 @@
 "use client";
 
-import { Petition } from "@/app/generated/prisma/client";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -20,6 +19,7 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import { createPetition, updatePetition } from "./PetitionActions";
+import { PetitionCaseData } from "./schema";
 
 export enum ReceiveDrawerType {
   ADD = "ADD",
@@ -289,7 +289,7 @@ const PetitionEntryPage = ({
 }: {
   type: ReceiveDrawerType;
   onClose: () => void;
-  selectedLog?: Petition | null;
+  selectedLog?: PetitionCaseData | null;
   onCreate?: (log: any) => void;
   onUpdate?: (log: any) => void;
 }) => {

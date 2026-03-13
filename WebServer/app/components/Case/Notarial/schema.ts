@@ -30,7 +30,12 @@ export const NotarialSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Date Filed", "Filing Date"])),
-  file: z.file().nullable().optional(),
+  file: z.file(),
+  path: z
+    .string()
+    .optional()
+    .nullable()
+    .describe(excelHeaders(["Link", "Path", "File Path"])),
   removeFile: z
     .boolean()
     .optional()
@@ -38,13 +43,22 @@ export const NotarialSchema = z.object({
 });
 export type NotarialSchema = z.infer<typeof NotarialSchema>;
 
-export function generateFileKey(data: NotarialSchema): string {
+export type NotarialFileKeyInput = {
+  title?: string | null;
+  name?: string | null;
+  attorney?: string | null;
+  date?: Date | null;
+  fileHash?: string | null;
+};
+
+export function generateFileKey(data: NotarialFileKeyInput): string {
   const titleStr = data.title ? `${data.title}-` : "";
   const attyStr = data.attorney ? `${data.attorney}-` : "";
   const nameStr = data.name ? `${data.name}-` : "";
   const dateStr = data.date ? `${data.date.toISOString().split("T")[0]}` : "";
+  const hashStr = data.fileHash ? `-${data.fileHash.slice(0, 12)}` : "";
 
-  const fileName = `${titleStr}${attyStr}${nameStr}${dateStr}`;
+  const fileName = `${titleStr}${attyStr}${nameStr}${dateStr}${hashStr}`;
 
   const year = data.date ? data.date.getFullYear() : "unknown-year";
   const folderPath = data.attorney ? `${data.attorney}/${year}` : "";

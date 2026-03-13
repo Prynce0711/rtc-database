@@ -9,6 +9,8 @@ import {
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { useEffect, useMemo, useState } from "react";
+import { deleteAllNotarial } from "./TestActions";
+import NotarialExcelUploader from "../components/Case/Notarial/NotarialExcelUploader";
 
 type NotarialFormState = {
   title: string;
@@ -78,6 +80,7 @@ export default function NotarialTester() {
       name: formData.name || null,
       attorney: formData.attorney || null,
       date: formData.date ? new Date(formData.date) : null,
+      path: undefined,
       removeFile: formData.removeFile || undefined,
       file: formData.file ?? undefined,
     };
@@ -155,6 +158,29 @@ export default function NotarialTester() {
     setLoading(false);
   };
 
+  const handleDeleteAll = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL notarial entries? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    const result = await deleteAllNotarial();
+    if (result.success) {
+      setMessage({ type: "success", text: "All notarial entries deleted." });
+      await loadItems();
+    } else {
+      setMessage({
+        type: "error",
+        text: result.error || "Failed to delete all notarial entries.",
+      });
+    }
+    setLoading(false);
+  };
+
   const handleEdit = (item: NotarialData) => {
     setFormData({
       title: item.title ?? "",
@@ -186,14 +212,24 @@ export default function NotarialTester() {
               Total entries: {formattedCount}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={loadItems}
-            className="rounded bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            disabled={loading}
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={loadItems}
+              className="rounded bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              disabled={loading}
+            >
+              {loading ? "Loading..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteAll()}
+              className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              disabled={loading || items.length === 0}
+            >
+              Delete All
+            </button>
+          </div>
         </div>
 
         {message && (
@@ -305,6 +341,7 @@ export default function NotarialTester() {
                 </div>
               </form>
             </div>
+            <NotarialExcelUploader onUploadCompleted={loadItems} />
           </div>
 
           <div className="lg:col-span-2">

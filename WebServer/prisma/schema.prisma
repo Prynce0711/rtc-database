@@ -331,6 +331,7 @@ model Notarial {
 model FileData {
   id        Int      @id @default(autoincrement())
   key      String @unique
+  fileHash String
   fileName  String
   path      String
   size      Int

@@ -1,6 +1,5 @@
 "use client";
 
-import { SpecialProceeding } from "@/app/generated/prisma/client";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,10 +22,26 @@ import {
   createSpecialProceeding,
   updateSpecialProceeding,
 } from "./SpecialProceedingsActions";
-import { createEmptyEntry, SpecialProceedingEntry } from "./schema";
+import {
+  createEmptyEntry,
+  SpecialProceedingData,
+  SpecialProceedingEntry,
+} from "./schema";
 
 type ColDef = {
-  key: keyof Omit<SpecialProceeding, "id" | "createdAt">;
+  key: keyof Omit<
+    SpecialProceedingEntry,
+    | "id"
+    | "createdAt"
+    | "errors"
+    | "collapsed"
+    | "saved"
+    | "branch"
+    | "assistantBranch"
+    | "dateFiled"
+    | "caseType"
+    | "updatedAt"
+  >;
   label: string;
   placeholder: string;
   type: "text" | "date";
@@ -251,10 +266,10 @@ const SpecialProceedingDrawer = ({
   onUpdate,
 }: {
   type: ModalType;
-  selectedCase?: SpecialProceeding | null;
+  selectedCase?: SpecialProceedingData | null;
   onClose: () => void;
-  onCreate?: (data: SpecialProceeding) => void;
-  onUpdate?: (data: SpecialProceeding) => void;
+  onCreate?: () => void;
+  onUpdate?: () => void;
 }) => {
   const isEdit = type === "EDIT";
   const popup = usePopup();
@@ -411,7 +426,7 @@ const SpecialProceedingDrawer = ({
           return;
         }
         popup.showSuccess("Case updated successfully");
-        onUpdate?.(result.result as any);
+        onUpdate?.();
       } else {
         for (const e of entries) {
           const result = await createSpecialProceeding({
@@ -426,8 +441,8 @@ const SpecialProceedingDrawer = ({
             popup.showError(result.error || "Create failed");
             return;
           }
-          onCreate?.(result.result as any);
         }
+        onCreate?.();
         popup.showSuccess(
           `${entries.length} case${entries.length > 1 ? "s" : ""} created successfully`,
         );

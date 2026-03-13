@@ -1,4 +1,4 @@
-import { Petition } from "@/app/generated/prisma/client";
+import { PetitionCaseData } from "./schema";
 
 export interface PetitionStats {
   total: number;
@@ -8,7 +8,7 @@ export interface PetitionStats {
 }
 
 export const calculatePetitionStats = (
-  petitions: Petition[],
+  petitions: PetitionCaseData[],
 ): PetitionStats => {
   const today = new Date().toISOString().slice(0, 10);
   const thisMonth = today.slice(0, 7);
@@ -35,10 +35,10 @@ export const calculatePetitionStats = (
 };
 
 export const sortPetitions = (
-  petitions: Petition[],
-  sortBy: keyof Petition,
+  petitions: PetitionCaseData[],
+  sortBy: keyof PetitionCaseData,
   order: "asc" | "desc",
-): Petition[] => {
+): PetitionCaseData[] => {
   return [...petitions].sort((a, b) => {
     const aVal = a[sortBy];
     const bVal = b[sortBy];
