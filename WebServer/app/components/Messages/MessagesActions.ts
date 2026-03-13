@@ -52,6 +52,7 @@ export async function getChats(): Promise<ActionResult<ChatData[]>> {
           },
           take: 1,
           select: {
+            fileId: true,
             userId: true,
             content: true,
             createdAt: true,
@@ -96,6 +97,7 @@ export async function getChats(): Promise<ActionResult<ChatData[]>> {
           latestMessage: chat.messages[0]
             ? ({
                 ...chat.messages[0],
+                fileId: chat.messages[0].fileId ?? null,
                 name: member?.name || member?.email || "Unknown",
                 src: member?.image || undefined,
               } as Message)
@@ -252,6 +254,7 @@ export async function getChatById(
       id: msg.id,
       chatId: msg.chatId,
       userId: msg.userId,
+      fileId: msg.fileId ?? null,
       content: msg.content,
       createdAt: msg.createdAt,
       updatedAt: msg.updatedAt,

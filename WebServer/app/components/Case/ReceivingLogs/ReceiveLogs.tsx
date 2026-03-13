@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { RecievingLog } from "@/app/generated/prisma/client";
+import { CaseType } from "@/app/generated/prisma/enums";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -139,12 +140,28 @@ const ReceiveRow = ({
 type ReceiveLogFilterValues = {
   bookAndPage?: string;
   caseNumber?: string;
-  caseType?: string;
+  caseType?: CaseType | null;
   content?: string;
   branchNumber?: string;
   notes?: string;
   dateRecieved?: { start?: string; end?: string };
 };
+
+const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
+
+const normalizeCaseType = (value: unknown): CaseType | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return undefined;
+  return CASE_TYPE_VALUES.has(normalized as CaseType)
+    ? (normalized as CaseType)
+    : undefined;
+};
+
+const toReceiveFilters = (filters: FilterValues): ReceiveLogFilterValues => ({
+  ...filters,
+  caseType: normalizeCaseType(filters.caseType),
+});
 
 const ReceiveLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<ReceiveLog[]>([]);
@@ -263,7 +280,7 @@ const ReceiveLogsPage: React.FC = () => {
     filters: FilterValues,
     exactMap: ExactMatchMap,
   ) => {
-    setAppliedFilters(filters as ReceiveLogFilterValues);
+    setAppliedFilters(toReceiveFilters(filters));
     setExactMatchMap(exactMap);
     setCurrentPage(1);
   };
@@ -285,9 +302,9 @@ const ReceiveLogsPage: React.FC = () => {
     const result = await getRecievingLogsPage({
       page: 1,
       pageSize: 10,
-      filters: {
-        [key]: inputValue,
-      } as ReceiveLogFilterValues,
+      filters: toReceiveFilters({
+        [key]: key === "caseType" ? normalizeCaseType(inputValue) : inputValue,
+      }),
       exactMatchMap: { [key]: false },
       sortKey: key as ReceiveSortKey,
       sortOrder: "asc",

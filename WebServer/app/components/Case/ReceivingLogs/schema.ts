@@ -17,11 +17,12 @@ export type ReceivingLogSchema = z.infer<typeof ReceivingLogSchema>;
 /** Form entry used by the grid UI (RecievingLog + UI metadata). */
 export type ReceivingLogEntry = Omit<
   RecievingLog,
-  "id" | "dateRecieved" | "createdAt"
+  "id" | "dateRecieved" | "createdAt" | "updatedAt"
 > & {
   id: number;
   dateRecieved: string | Date | null;
   createdAt?: Date;
+  updatedAt?: Date | null;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
@@ -37,7 +38,7 @@ export const receivingLogToEntry = (log: RecievingLog): ReceivingLogEntry => ({
 
 export const initialReceivingLogFormData: Omit<
   RecievingLog,
-  "id" | "createdAt"
+  "id" | "createdAt" | "updatedAt"
 > = {
   bookAndPage: null,
   dateRecieved: null,
@@ -53,6 +54,7 @@ export const createEmptyEntry = (): ReceivingLogEntry => ({
   ...initialReceivingLogFormData,
   id: 0,
   createdAt: new Date(),
+  updatedAt: null,
   errors: {},
   collapsed: false,
   saved: false,

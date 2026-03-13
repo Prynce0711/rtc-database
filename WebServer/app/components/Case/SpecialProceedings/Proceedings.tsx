@@ -1,5 +1,9 @@
 ﻿"use client";
 
+import {
+  exportSpecialProceedingsExcel,
+  uploadSpecialProceedingExcel,
+} from "@/app/components/Case/SpecialProceedings/ExcelActions";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -15,11 +19,7 @@ import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
 import { FilterOption } from "../../Filter/FilterTypes";
 import { usePopup } from "../../Popup/PopupProvider";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable.tsx";
-import {
-  exportSpecialProceedingsExcel,
-  uploadSpecialProceedingExcel,
-} from "./ExcelActions";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 import {

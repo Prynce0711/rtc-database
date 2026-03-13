@@ -2,20 +2,20 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import {
-    ExportExcelData,
-    findColumnValue,
-    isMappedRowEmpty,
-    processExcelUpload,
-    UploadExcelResult,
+  ExportExcelData,
+  findColumnValue,
+  isMappedRowEmpty,
+  processExcelUpload,
+  UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
 import ActionResult from "../../ActionResult";
 import {
-    MTCJudgementRow,
-    MTCJudgementRowSchema,
-    RTCJudgementRow,
-    RTCJudgementRowSchema,
+  MTCJudgementRow,
+  MTCJudgementRowSchema,
+  RTCJudgementRow,
+  RTCJudgementRowSchema,
 } from "./Schema";
 
 const toNumber = (value: unknown): number => {
@@ -256,10 +256,9 @@ export async function uploadMunicipalJudgementExcel(
       requiredHeaders: {
         "Branch No": ["Branches No.", "Branch No", "Branch"],
       },
+      getCells: getMtcCells,
       schema: MTCJudgementRowSchema,
-      skipRowsWithoutCell: {
-        getCells: getMtcCells,
-      },
+      skipRowsWithoutCell: ["branchNoCell"],
       mapRow: (row) => {
         const cells = getMtcCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -403,10 +402,9 @@ export async function uploadRegionalJudgementExcel(
       requiredHeaders: {
         "Branch No": ["Branches No.", "Branch No", "Branch"],
       },
+      getCells: getRtcCells,
       schema: RTCJudgementRowSchema,
-      skipRowsWithoutCell: {
-        getCells: getRtcCells,
-      },
+      skipRowsWithoutCell: ["branchNoCell"],
       mapRow: (row) => {
         const cells = getRtcCells(row);
         if (isMappedRowEmpty(cells)) {

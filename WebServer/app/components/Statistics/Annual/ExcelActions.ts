@@ -139,10 +139,9 @@ export async function uploadMunicipalTrialCourtExcel(
       requiredHeaders: {
         Branch: ["Branch", "Branches", "Branch No"],
       },
+      getCells: getCourtCells,
       schema: CaseSchema,
-      skipRowsWithoutCell: {
-        getCells: getCourtCells,
-      },
+      skipRowsWithoutCell: ["branchCell"],
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -240,10 +239,9 @@ export async function uploadRegionalTrialCourtExcel(
       requiredHeaders: {
         Branch: ["Branch", "Branches", "Branch No"],
       },
+      getCells: getCourtCells,
       schema: CaseSchema,
-      skipRowsWithoutCell: {
-        getCells: getCourtCells,
-      },
+      skipRowsWithoutCell: ["branchCell"],
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -349,10 +347,15 @@ export async function uploadInventoryDocumentExcel(
         ],
         Branch: ["Branch", "Branch No"],
       },
+      getCells: getInventoryCells,
       schema: InventoryDocumentSchema,
-      skipRowsWithoutCell: {
-        getCells: getInventoryCells,
-      },
+      skipRowsWithoutCell: [
+        "regionCell",
+        "provinceCell",
+        "courtCell",
+        "cityMunicipalityCell",
+        "branchCell",
+      ],
       mapRow: (row) => {
         const cells = getInventoryCells(row);
         if (isMappedRowEmpty(cells)) {

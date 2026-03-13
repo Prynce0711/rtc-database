@@ -2,11 +2,11 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import {
-    ExportExcelData,
-    findColumnValue,
-    isMappedRowEmpty,
-    processExcelUpload,
-    UploadExcelResult,
+  ExportExcelData,
+  findColumnValue,
+  isMappedRowEmpty,
+  processExcelUpload,
+  UploadExcelResult,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -64,19 +64,10 @@ export async function uploadMonthlyExcel(
         Category: ["Category", "Case Category"],
         Branch: ["Branch", "Branch/Station", "Station"],
       },
+      getCells: getMonthlyCells,
       schema: MonthlyRowSchema,
-      skipRowsWithoutCell: {
-        getCells: getMonthlyCells,
-      },
+      skipRowsWithoutCell: ["categoryCell", "branchCell"],
       uniqueKeyLabel: "Monthly row (month + category + branch)",
-      extractUniqueKey: (row) => {
-        const cells = getMonthlyCells(row);
-        const month = normalizeText(cells.monthCell || fallbackMonth);
-        const category = normalizeText(cells.categoryCell);
-        const branch = normalizeText(cells.branchCell);
-        if (!month || !category || !branch) return undefined;
-        return `${month}|${category}|${branch}`;
-      },
       checkExistingUniqueKeys: async () => {
         const where = fallbackMonth ? { month: fallbackMonth } : undefined;
         const existing = await prisma.monthlyStatistics.findMany({

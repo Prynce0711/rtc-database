@@ -1,6 +1,11 @@
 "use client";
 
-import { getCriminalCases } from "@/app/components/Case/Criminal/CriminalCasesActions";
+import {
+  getCaseStats,
+  getCases,
+  type UnifiedCaseData,
+  type UnifiedCaseStats,
+} from "@/app/components/CaseActions";
 import {
   BarChart3,
   Calendar,
@@ -11,6 +16,7 @@ import {
   Server,
   TrendingUp,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -27,37 +33,45 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Case } from "../../generated/prisma/client";
-import DashboardLayout from "../Dashboard/DashboardLayout";
+import DashboardLayout from "../DashboardLayout";
 import { RecentCases } from "./AttorneyCard";
 
 interface Props {
   onNavigate?: (view: string) => void;
 }
 
-const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
+const AttorneyDashboard: React.FC<Props> = () => {
   const [loading, setLoading] = useState(true);
-  const [cases, setCases] = useState<Case[]>([]);
+  const [cases, setCases] = useState<UnifiedCaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
     "overview",
   );
   const [isVisible, setIsVisible] = useState(false);
+  const router = useRouter();
   const getCssVar = (name: string) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   useEffect(() => {
     async function fetchCases() {
       try {
-        const res = await getCriminalCases();
+        const [res, statsRes] = await Promise.all([
+          getCases({
+            page: 1,
+            pageSize: 20,
+            sortKey: "dateFiled",
+            sortOrder: "desc",
+          }),
+          getCaseStats(),
+        ]);
+
         if (res.success) {
-          const result: any = res.result;
-          let items: Case[] = [];
-          if (Array.isArray(result)) {
-            items = result as Case[];
-          } else if (result && Array.isArray(result.items)) {
-            items = result.items as Case[];
-          }
-          setCases(items);
+          setCases(res.result.items);
+          setTimeout(() => setIsVisible(true), 100);
+        }
+
+        if (statsRes.success) {
+          setCaseStats(statsRes.result);
           setTimeout(() => setIsVisible(true), 100);
         }
       } finally {
@@ -70,16 +84,23 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
   const stats = useMemo(() => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const base: UnifiedCaseStats = caseStats ?? {
+      totalCases: 0,
+      detainedCases: 0,
+      pendingCases: 0,
+      recentlyFiled: 0,
+    };
 
-    const total = cases.length;
-    const detained = cases.filter((c) => c.detained).length;
-    const pendingRaffle = cases.filter((c) => !c.raffleDate).length;
+    const total = base.totalCases;
+    const detained = base.detainedCases;
+    const pendingRaffle = base.pendingCases;
 
     const thisMonth = cases.filter(
-      (c) => new Date(c.dateFiled) >= thirtyDaysAgo,
+      (c) => c.dateFiled && new Date(c.dateFiled) >= thirtyDaysAgo,
     ).length;
 
     const lastMonth = cases.filter((c) => {
+      if (!c.dateFiled) return false;
       const date = new Date(c.dateFiled);
       const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
       return date >= sixtyDaysAgo && date < thirtyDaysAgo;
@@ -97,7 +118,7 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
       growth,
       detainedPercentage: total > 0 ? (detained / total) * 100 : 0,
     };
-  }, [cases]);
+  }, [caseStats, cases]);
 
   const monthlyTrends = useMemo(() => {
     const monthMap: Record<string, number> = {};
@@ -113,6 +134,7 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
     }
 
     cases.forEach((c) => {
+      if (!c.dateFiled) return;
       const key = new Date(c.dateFiled).toLocaleString("default", {
         month: "short",
         year: "2-digit",
@@ -428,7 +450,7 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
                 <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
                   <RecentCases
                     cases={cases.slice(0, 5)}
-                    onViewAll={() => onNavigate?.("cases")}
+                    onViewAll={() => router.push("/user/cases/criminal")}
                   />
                 </section>
               </div>
@@ -465,7 +487,7 @@ const AttorneyDashboard: React.FC<Props> = ({ onNavigate }) => {
                           dataKey="value"
                           outerRadius={110}
                           label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
+                            `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
                           }
                         >
                           <Cell fill={getCssVar("--color-warning")} />

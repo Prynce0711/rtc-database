@@ -1,23 +1,23 @@
 "use client";
 
 import {
-    mtcLeafColumns,
-    rtcLeafColumns,
+  mtcLeafColumns,
+  rtcLeafColumns,
 } from "@/app/components/Statistics/Judgement/JudgementColumnDef";
 import {
-    MTCJudgementRow,
-    RTCJudgementRow,
+  MTCJudgementRow,
+  RTCJudgementRow,
 } from "@/app/components/Statistics/Judgement/Schema";
 import { useEffect, useState } from "react";
 import {
-    createMunicipalJudgement,
-    createRegionalJudgement,
-    deleteMunicipalJudgement,
-    deleteRegionalJudgement,
-    getMunicipalJudgements,
-    getRegionalJudgements,
-    updateMunicipalJudgement,
-    updateRegionalJudgement,
+  createMunicipalJudgement,
+  createRegionalJudgement,
+  deleteMunicipalJudgement,
+  deleteRegionalJudgement,
+  getMunicipalJudgements,
+  getRegionalJudgements,
+  updateMunicipalJudgement,
+  updateRegionalJudgement,
 } from "../components/Statistics/Judgement/judgementActions";
 
 export default function JudgementTester() {
@@ -864,16 +864,16 @@ export default function JudgementTester() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      Total Disposed
+                      Cases Disposed
                     </label>
                     <input
                       type="number"
                       className="w-full border rounded px-3 py-2"
-                      value={(formRtc.totalDisposed as any) || 0}
+                      value={(formRtc.casesDisposed as any) || 0}
                       onChange={(e) =>
                         setFormRtc({
                           ...formRtc,
-                          totalDisposed: Number(e.target.value),
+                          casesDisposed: Number(e.target.value),
                         })
                       }
                     />
