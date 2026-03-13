@@ -9,13 +9,14 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import type { Case } from "../../generated/prisma/client";
 import {
-  getCriminalCaseStats,
-  getCriminalCases,
-  type CriminalCaseStats,
-} from "../Case/Criminal/CriminalCasesActions";
+  getCaseStats,
+  getCases,
+  type UnifiedCaseData,
+  type UnifiedCaseStats,
+} from "../CaseActions";
 import { usePopup } from "../Popup/PopupProvider";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
@@ -25,11 +26,12 @@ interface Props {
 }
 
 const StaffDashboard: React.FC<Props> = ({ staffId }) => {
-  const [cases, setCases] = useState<Case[]>([]);
-  const [caseStats, setCaseStats] = useState<CriminalCaseStats | null>(null);
+  const [cases, setCases] = useState<UnifiedCaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const statusPopup = usePopup();
+  const router = useRouter();
 
   useEffect(() => {
     fetchCases();
@@ -39,13 +41,13 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
     try {
       setLoading(true);
       const [casesRes, statsRes] = await Promise.all([
-        getCriminalCases({
+        getCases({
           page: 1,
           pageSize: 15,
           sortKey: "dateFiled",
           sortOrder: "desc",
         }),
-        getCriminalCaseStats(),
+        getCaseStats(),
       ]);
 
       if (!casesRes.success) {
@@ -69,7 +71,7 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
   };
 
   const stats = useMemo(() => {
-    const base: CriminalCaseStats = caseStats ?? {
+    const base: UnifiedCaseStats = caseStats ?? {
       totalCases: 0,
       detainedCases: 0,
       pendingCases: 0,
@@ -300,7 +302,11 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
 
             {/* RECENT CASES */}
             <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-              <RecentCasesCard cases={stats.recent} view="table" />
+              <RecentCasesCard
+                cases={stats.recent}
+                view="table"
+                onViewAll={() => router.push("/user/cases/criminal")}
+              />
             </section>
           </div>
         </div>

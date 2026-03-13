@@ -446,11 +446,11 @@ function createDetailText(
   switch (action) {
     case LogAction.CREATE_CASE: {
       const caseItem = cases.find((c) => c.id === detailsObj.id);
-      return `Case created: ${caseItem?.caseNumber || `#${detailsObj.id}`} - "${caseItem?.name || "Unknown"}"`;
+      return `Case created: ${caseItem?.caseNumber || `#${detailsObj.id}`}"`;
     }
     case LogAction.DELETE_CASE: {
       const caseItem = cases.find((c) => c.id === detailsObj.id);
-      return `Case deleted: ${caseItem?.caseNumber || `#${detailsObj.id}`} - "${caseItem?.name || "Unknown"}"`;
+      return `Case deleted: ${caseItem?.caseNumber || `#${detailsObj.id}`}"`;
     }
     case LogAction.CREATE_EMPLOYEE: {
       const employee = employees.find((e) => e.id === detailsObj.id);

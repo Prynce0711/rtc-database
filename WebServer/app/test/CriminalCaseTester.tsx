@@ -189,7 +189,7 @@ export default function CriminalCaseTester() {
     if (!file) return;
 
     setLoading(true);
-    const result = await uploadExcel(file, caseType);
+    const result = await uploadExcel(file);
     if (result.success) {
       setMessage({
         type: "success",

@@ -2,10 +2,11 @@
 
 import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
 import {
-  getCriminalCaseStats,
-  getCriminalCases,
-  type CriminalCaseStats,
-} from "@/app/components/Case/Criminal/CriminalCasesActions";
+  getCaseStats,
+  getCases,
+  type UnifiedCaseData,
+  type UnifiedCaseStats,
+} from "@/app/components/CaseActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
@@ -43,7 +44,6 @@ import {
 } from "recharts";
 
 import { useRouter } from "next/navigation";
-import type { Case } from "../../generated/prisma/client";
 import { RecentCases } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";
 
@@ -71,8 +71,8 @@ interface AuditLog {
 
 const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
-  const [cases, setCases] = useState<Case[]>([]);
-  const [caseStats, setCaseStats] = useState<CriminalCaseStats | null>(null);
+  const [cases, setCases] = useState<UnifiedCaseData[]>([]);
+  const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
@@ -87,13 +87,13 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
     async function fetchAll() {
       try {
         const [c, s, e, a] = await Promise.all([
-          getCriminalCases({
+          getCases({
             page: 1,
             pageSize: 20,
             sortKey: "dateFiled",
             sortOrder: "desc",
           }),
-          getCriminalCaseStats(),
+          getCaseStats(),
           getEmployees(),
           getAccounts(),
         ]);
@@ -114,7 +114,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   const stats = useMemo(() => {
-    const base: CriminalCaseStats = caseStats ?? {
+    const base: UnifiedCaseStats = caseStats ?? {
       totalCases: 0,
       detainedCases: 0,
       pendingCases: 0,
@@ -157,7 +157,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         title: "Cases Missing Raffle Date",
         message: `${stats.pendingRaffle} cases require immediate raffle date assignment`,
         count: stats.pendingRaffle,
-        action: () => onNavigate?.("cases"),
+        action: () => router.push("/user/cases/criminal"),
       });
     }
     if (stats.employeesMissing > 0) {
@@ -171,7 +171,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       });
     }
     return alertList;
-  }, [stats, onNavigate, router]);
+  }, [stats, router]);
 
   const auditLogs = useMemo((): AuditLog[] => {
     const logs: AuditLog[] = [];
@@ -199,7 +199,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
         branchMap[c.branch] = { cases: 0, detained: 0, pending: 0 };
       }
       branchMap[c.branch].cases++;
-      if (c.detained) branchMap[c.branch].detained++;
+      if (c.isDetained) branchMap[c.branch].detained++;
       if (!c.raffleDate) branchMap[c.branch].pending++;
     });
     return Object.entries(branchMap)
@@ -459,7 +459,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                     className={`alert ${alert.type === "error" ? "alert-error" : alert.type === "warning" ? "alert-warning" : "alert-info"} shadow-lg animate-in slide-in-from-left duration-500`}
                     style={{ animationDelay: `${idx * 100}ms` }}
                   >
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       {alert.type === "error" && (
                         <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
                       )}
@@ -753,7 +753,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                   <RecentCases
                     cases={cases}
                     view="table"
-                    onViewAll={() => onNavigate?.("cases")}
+                    onViewAll={() => router.push("/user/cases/criminal")}
                   />
                 </section>
               </div>

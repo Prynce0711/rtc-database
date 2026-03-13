@@ -1,5 +1,5 @@
-import AttorneyDashboard from "@/app/components/Attorney/AttorneyDashboard";
 import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
+import AttorneyDashboard from "@/app/components/Dashboard/Attorney/AttorneyDashboard";
 import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
 import StatisticsDashboard from "@/app/components/Dashboard/StatisticsDashboard";
 import { auth } from "@/app/lib/auth";

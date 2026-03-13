@@ -5,7 +5,7 @@ import {
   getSpecialProceedingById,
   getSpecialProceedings,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
-import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable.tsx";
+import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
