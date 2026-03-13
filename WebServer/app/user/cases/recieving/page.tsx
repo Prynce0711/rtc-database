@@ -1,10 +1,7 @@
 "use client";
 
 import ReceiveLogsPage from "@/app/components/Case/ReceivingLogs/ReceiveLogs";
-import React from "react";
 
-const Page: React.FC = () => {
+export default function Page() {
   return <ReceiveLogsPage />;
-};
-
-export default Page;
+}
