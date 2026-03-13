@@ -1,7 +1,7 @@
 "use client";
 
-import { getCriminalCaseById } from "@/app/components/Case/Criminal/CriminalCasesActions";
-import type { Case } from "@/app/generated/prisma/browser";
+import { getCivilCaseById } from "@/app/components/Case/Civil/CivilActions";
+import type { CivilCaseData } from "@/app/components/Case/Civil/schema";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -66,11 +66,11 @@ const NavButton = ({
         <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
           {isPrev ? "Previous" : "Next"}
         </p>
-        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-[160px] transition-colors leading-snug">
+        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-40 transition-colors leading-snug">
           {label}
         </p>
         {sublabel && (
-          <p className="text-[11px] text-base-content/30 truncate max-w-[160px] leading-snug mt-0.5">
+          <p className="text-[11px] text-base-content/30 truncate max-w-40 leading-snug mt-0.5">
             {sublabel}
           </p>
         )}
@@ -106,7 +106,7 @@ const Detail = ({
       </span>
       <div
         className={[
-          "px-5 py-4 rounded-xl border min-h-[58px] flex items-center",
+          "px-5 py-4 rounded-xl border min-h-14.5 flex items-center",
           isEmpty
             ? "bg-base-200/40 border-base-200/60"
             : "bg-base-200/70 border-base-200",
@@ -148,9 +148,9 @@ export default function CivilCaseDetailsPage() {
   const router = useRouter();
   const params = useParams();
 
-  const [caseData, setCaseData] = useState<Case | any | null>(null);
-  const [prevCase, setPrevCase] = useState<Case | null>(null);
-  const [nextCase, setNextCase] = useState<Case | null>(null);
+  const [caseData, setCaseData] = useState<CivilCaseData | null>(null);
+  const [prevCase, setPrevCase] = useState<CivilCaseData | null>(null);
+  const [nextCase, setNextCase] = useState<CivilCaseData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -160,74 +160,26 @@ export default function CivilCaseDetailsPage() {
         const id = Array.isArray(params.id) ? params.id[0] : params.id;
         const numId = Number(id);
 
-        let storedList: any[] = [];
-        try {
-          const rawList = localStorage.getItem("__temp_cases");
-          if (rawList) storedList = JSON.parse(rawList || "[]");
-        } catch (err) {
-          storedList = [];
-        }
-
         const [current, prev, next] = await Promise.allSettled([
-          getCriminalCaseById(numId),
-          getCriminalCaseById(numId - 1),
-          getCriminalCaseById(numId + 1),
+          getCivilCaseById(numId),
+          getCivilCaseById(numId - 1),
+          getCivilCaseById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
           setCaseData(current.value.result);
         } else {
-          const idx = storedList.findIndex(
-            (it: any) =>
-              String(it?.id) === String(id) || String(it?.id) === String(numId),
-          );
-          if (idx >= 0) {
-            setCaseData(storedList[idx]);
-            setPrevCase(idx > 0 ? storedList[idx - 1] : null);
-            setNextCase(
-              idx < storedList.length - 1 ? storedList[idx + 1] : null,
-            );
-          } else {
-            try {
-              const raw = localStorage.getItem("__temp_case");
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                const parsedId = parsed?.id ?? parsed?.ID ?? null;
-                if (parsedId && String(parsedId) === String(id))
-                  setCaseData(parsed);
-                else setCaseData(null);
-              } else setCaseData(null);
-            } catch (err) {
-              console.error("Fallback parse error", err);
-              setCaseData(null);
-            }
-          }
+          setCaseData(null);
         }
 
         if (prev.status === "fulfilled" && prev.value.success) {
           setPrevCase(prev.value.result);
-        } else if (storedList.length) {
-          const idx = storedList.findIndex(
-            (it: any) =>
-              String(it?.id) === String(id) || String(it?.id) === String(numId),
-          );
-          setPrevCase(idx > 0 ? storedList[idx - 1] : null);
         } else {
           setPrevCase(null);
         }
 
         if (next.status === "fulfilled" && next.value.success) {
           setNextCase(next.value.result);
-        } else if (storedList.length) {
-          const idx = storedList.findIndex(
-            (it: any) =>
-              String(it?.id) === String(id) || String(it?.id) === String(numId),
-          );
-          setNextCase(
-            idx >= 0 && idx < storedList.length - 1
-              ? storedList[idx + 1]
-              : null,
-          );
         } else {
           setNextCase(null);
         }
@@ -301,7 +253,7 @@ export default function CivilCaseDetailsPage() {
             <span>Cases</span>
             <span className="opacity-40">/</span>
             <span className="text-base-content/55 font-bold">
-              {caseData.title ?? caseData.caseNumber ?? `#${caseData.id}`}
+              {caseData.caseNumber ?? `#${caseData.id}`}
             </span>
           </div>
 
@@ -313,7 +265,7 @@ export default function CivilCaseDetailsPage() {
               disabled={!prevCase}
               title={
                 prevCase
-                  ? `Previous: ${prevCase.title ?? prevCase.caseNumber}`
+                  ? `Previous: ${prevCase.caseNumber}`
                   : "No previous case"
               }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
@@ -335,7 +287,7 @@ export default function CivilCaseDetailsPage() {
               </svg>
             </button>
 
-            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-[36px] text-center">
+            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
               #{Array.isArray(params.id) ? params.id[0] : params.id}
             </span>
 
@@ -344,11 +296,7 @@ export default function CivilCaseDetailsPage() {
                 nextCase && router.push(`/user/cases/civil/${nextCase.id}`)
               }
               disabled={!nextCase}
-              title={
-                nextCase
-                  ? `Next: ${nextCase.title ?? nextCase.caseNumber}`
-                  : "No next case"
-              }
+              title={nextCase ? `Next: ${nextCase.caseNumber}` : "No next case"}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
             >
               <svg
@@ -377,15 +325,15 @@ export default function CivilCaseDetailsPage() {
             Civil Case
           </p>
           <h1 className="text-[34px] font-bold text-base-content tracking-tight leading-tight">
-            {caseData.title ?? caseData.caseNumber ?? `#${caseData.id}`}
+            {caseData.caseNumber ?? `#${caseData.id}`}
           </h1>
           <div className="flex items-center gap-4 flex-wrap">
             <p className="text-[15px] text-base-content/45 font-medium">
-              Filed {formatDate(caseData.date ?? caseData.dateFiled)}
+              Filed {formatDate(caseData.dateFiled)}
             </p>
-            {caseData.name && (
+            {caseData.branch && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-base-200 text-base-content/50 border border-base-200">
-                Branch {caseData.name}
+                Branch {caseData.branch}
               </span>
             )}
           </div>
@@ -402,19 +350,13 @@ export default function CivilCaseDetailsPage() {
         <div className="space-y-10 animate-slide-up">
           <Section label="Case Overview">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              <Detail
-                label="Case Number"
-                value={caseData.title ?? caseData.caseNumber}
-              />
-              <Detail label="Branch" value={caseData.name ?? caseData.branch} />
-              <Detail
-                label="Petitioner/s"
-                value={caseData.atty ?? caseData.petitioner}
-              />
-              <Detail label="Defendant/s" value={caseData.defendant} />
+              <Detail label="Case Number" value={caseData.caseNumber} />
+              <Detail label="Branch" value={caseData.branch} />
+              <Detail label="Petitioner/s" value={caseData.petitioners} />
+              <Detail label="Defendant/s" value={caseData.defendants} />
               <Detail
                 label="Date Filed"
-                value={formatDate(caseData.date ?? caseData.dateFiled)}
+                value={formatDate(caseData.dateFiled)}
               />
               <Detail label="Notes/Appealed" value={caseData.notes} />
               <Detail label="Nature of Petition" value={caseData.nature} />
@@ -426,8 +368,8 @@ export default function CivilCaseDetailsPage() {
         <div className="flex items-stretch justify-between gap-3">
           <NavButton
             direction="prev"
-            label={prevCase?.title ?? prevCase?.caseNumber ?? "—"}
-            sublabel={prevCase?.name ?? undefined}
+            label={prevCase?.caseNumber ?? "—"}
+            sublabel={prevCase?.petitioners ?? undefined}
             onClick={() =>
               prevCase && router.push(`/user/cases/civil/${prevCase.id}`)
             }
@@ -435,8 +377,8 @@ export default function CivilCaseDetailsPage() {
           />
           <NavButton
             direction="next"
-            label={nextCase?.title ?? nextCase?.caseNumber ?? "—"}
-            sublabel={nextCase?.name ?? undefined}
+            label={nextCase?.caseNumber ?? "—"}
+            sublabel={nextCase?.petitioners ?? undefined}
             onClick={() =>
               nextCase && router.push(`/user/cases/civil/${nextCase.id}`)
             }
@@ -450,7 +392,7 @@ export default function CivilCaseDetailsPage() {
             Case Filing System
           </p>
           <p className="text-[11px] text-base-content/20 font-semibold select-none">
-            Filed {formatDate(caseData.date ?? caseData.dateFiled)}
+            Filed {formatDate(caseData.dateFiled)}
           </p>
         </div>
       </main>

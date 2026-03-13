@@ -1,12 +1,108 @@
 "use server";
 
-import { LogAction, RecievingLog } from "@/app/generated/prisma/client";
+import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
+import { FilterOptions } from "@/app/components/Filter/FilterUtils";
+import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../../ActionResult";
-import { ReceivingLogSchema } from "./schema";
 import { createLog } from "../../ActivityLogs/LogActions";
+import { ReceivingLogSchema } from "./schema";
+
+type ReceivingLogListFilterShape = {
+  bookAndPage?: string | null;
+  caseNumber?: string | null;
+  caseType?: string | null;
+  content?: string | null;
+  branchNumber?: string | null;
+  notes?: string | null;
+  dateRecieved?: { start?: string; end?: string };
+};
+
+export type ReceivingLogFilterOptions =
+  FilterOptions<ReceivingLogListFilterShape> & {
+    sortKey?:
+      | "bookAndPage"
+      | "dateRecieved"
+      | "caseType"
+      | "caseNumber"
+      | "content"
+      | "branchNumber"
+      | "notes";
+  };
+
+export type ReceivingLogStats = {
+  total: number;
+  today: number;
+  thisMonth: number;
+  docTypes: number;
+};
+
+function buildReceivingLogWhere(
+  options?: ReceivingLogFilterOptions,
+): Prisma.RecievingLogWhereInput {
+  const filters = options?.filters;
+  const exactMatchMap = options?.exactMatchMap ?? {};
+  const conditions: Prisma.RecievingLogWhereInput[] = [];
+
+  const addStringFilter = (
+    key:
+      | "bookAndPage"
+      | "caseNumber"
+      | "caseType"
+      | "content"
+      | "branchNumber"
+      | "notes",
+    value?: string | null,
+  ) => {
+    if (!value) return;
+    const exactMatch = exactMatchMap[key] ?? true;
+    conditions.push({
+      [key]: {
+        [exactMatch ? "equals" : "contains"]: value,
+      },
+    });
+  };
+
+  addStringFilter("bookAndPage", filters?.bookAndPage);
+  addStringFilter("caseNumber", filters?.caseNumber);
+  addStringFilter("caseType", filters?.caseType);
+  addStringFilter("content", filters?.content);
+  addStringFilter("branchNumber", filters?.branchNumber);
+  addStringFilter("notes", filters?.notes);
+
+  if (filters?.dateRecieved?.start || filters?.dateRecieved?.end) {
+    conditions.push({
+      dateRecieved: {
+        gte: filters.dateRecieved.start
+          ? new Date(filters.dateRecieved.start)
+          : undefined,
+        lte: filters.dateRecieved.end
+          ? new Date(filters.dateRecieved.end)
+          : undefined,
+      },
+    });
+  }
+
+  if (options?.searchTerm) {
+    const search = options.searchTerm.trim();
+    if (search.length > 0) {
+      conditions.push({
+        OR: [
+          { bookAndPage: { contains: search } },
+          { caseNumber: { contains: search } },
+          { caseType: { contains: search } },
+          { content: { contains: search } },
+          { branchNumber: { contains: search } },
+          { notes: { contains: search } },
+        ],
+      });
+    }
+  }
+
+  return conditions.length > 0 ? { AND: conditions } : {};
+}
 
 export async function getRecievingLogs(): Promise<
   ActionResult<RecievingLog[]>
@@ -27,6 +123,121 @@ export async function getRecievingLogs(): Promise<
   } catch (error) {
     console.error("Error fetching receiving logs:", error);
     return { success: false, error: "Failed to fetch receiving logs" };
+  }
+}
+
+export async function getRecievingLogsPage(
+  options?: ReceivingLogFilterOptions,
+): Promise<ActionResult<PaginatedResult<RecievingLog>>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const page = options?.page && options.page > 0 ? options.page : 1;
+    const pageSize =
+      options?.pageSize && options.pageSize > 0 ? options.pageSize : 25;
+
+    const where = buildReceivingLogWhere(options);
+    const orderBy: Prisma.RecievingLogOrderByWithRelationInput = {
+      [options?.sortKey ?? "dateRecieved"]: options?.sortOrder ?? "desc",
+    };
+
+    const [items, total] = await prisma.$transaction([
+      prisma.recievingLog.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.recievingLog.count({ where }),
+    ]);
+
+    return {
+      success: true,
+      result: {
+        items,
+        total,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching receiving logs page:", error);
+    return { success: false, error: "Failed to fetch receiving logs" };
+  }
+}
+
+export async function getRecievingLogsStats(
+  options?: ReceivingLogFilterOptions,
+): Promise<ActionResult<ReceivingLogStats>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const where = buildReceivingLogWhere(options);
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const tomorrowStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+    );
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const [total, today, thisMonth, distinctTypes] = await prisma.$transaction([
+      prisma.recievingLog.count({ where }),
+      prisma.recievingLog.count({
+        where: {
+          AND: [
+            where,
+            {
+              dateRecieved: {
+                gte: todayStart,
+                lt: tomorrowStart,
+              },
+            },
+          ],
+        },
+      }),
+      prisma.recievingLog.count({
+        where: {
+          AND: [
+            where,
+            {
+              dateRecieved: {
+                gte: monthStart,
+                lt: nextMonthStart,
+              },
+            },
+          ],
+        },
+      }),
+      prisma.recievingLog.findMany({
+        where,
+        select: { caseType: true },
+        distinct: ["caseType"],
+      }),
+    ]);
+
+    return {
+      success: true,
+      result: {
+        total,
+        today,
+        thisMonth,
+        docTypes: distinctTypes.length,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching receiving log stats:", error);
+    return { success: false, error: "Failed to fetch receiving log stats" };
   }
 }
 

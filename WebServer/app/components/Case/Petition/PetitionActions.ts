@@ -174,6 +174,10 @@ export async function updatePetition(
       petitionData.data,
     );
 
+    if (casePayload.caseType && casePayload.caseType !== CaseType.PETITION) {
+      throw new Error("Case type cannot be changed to non-petition");
+    }
+
     const originalCase = await prisma.case.findUnique({
       where: { id: caseId },
       include: { petition: true },

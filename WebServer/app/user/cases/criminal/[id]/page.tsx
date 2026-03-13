@@ -1,7 +1,7 @@
 "use client";
 
 import { getCriminalCaseById } from "@/app/components/Case/Criminal/CriminalCasesActions";
-import type { Case } from "@/app/generated/prisma/browser";
+import type { CriminalCaseData } from "@/app/components/Case/Criminal/schema";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -69,11 +69,11 @@ const NavButton = ({
         <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
           {isPrev ? "Previous" : "Next"}
         </p>
-        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-[160px] transition-colors leading-snug">
+        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-40 transition-colors leading-snug">
           {label}
         </p>
         {sublabel && (
-          <p className="text-[11px] text-base-content/30 truncate max-w-[160px] leading-snug mt-0.5">
+          <p className="text-[11px] text-base-content/30 truncate max-w-40 leading-snug mt-0.5">
             {sublabel}
           </p>
         )}
@@ -112,7 +112,7 @@ const Detail = ({
       </span>
       <div
         className={[
-          "px-5 py-4 rounded-xl border min-h-[58px] flex items-center",
+          "px-5 py-4 rounded-xl border min-h-14.5 flex items-center",
           isEmpty
             ? "bg-base-200/40 border-base-200/60"
             : "bg-base-200/70 border-base-200",
@@ -156,9 +156,9 @@ export default function CaseDetailsPage() {
   const router = useRouter();
   const params = useParams();
 
-  const [caseData, setCaseData] = useState<Case | null>(null);
-  const [prevCase, setPrevCase] = useState<Case | null>(null);
-  const [nextCase, setNextCase] = useState<Case | null>(null);
+  const [caseData, setCaseData] = useState<CriminalCaseData | null>(null);
+  const [prevCase, setPrevCase] = useState<CriminalCaseData | null>(null);
+  const [nextCase, setNextCase] = useState<CriminalCaseData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"details" | "additional">(
     "details",
@@ -218,7 +218,7 @@ export default function CaseDetailsPage() {
             Case not found
           </p>
           <button
-            onClick={() => router.push("/user/cases")}
+            onClick={() => router.push("/user/cases/criminal")}
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -238,7 +238,7 @@ export default function CaseDetailsPage() {
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           {/* Back */}
           <button
-            onClick={() => router.push("/user/cases")}
+            onClick={() => router.push("/user/cases/criminal")}
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             <svg
@@ -272,7 +272,7 @@ export default function CaseDetailsPage() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() =>
-                prevCase && router.push(`/user/cases/${prevCase.id}`)
+                prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
               }
               disabled={!prevCase}
               title={
@@ -300,13 +300,13 @@ export default function CaseDetailsPage() {
             </button>
 
             {/* ID counter */}
-            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-[36px] text-center">
+            <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
               #{Array.isArray(params.id) ? params.id[0] : params.id}
             </span>
 
             <button
               onClick={() =>
-                nextCase && router.push(`/user/cases/${nextCase.id}`)
+                nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
               }
               disabled={!nextCase}
               title={nextCase ? `Next: ${nextCase.caseNumber}` : "No next case"}
@@ -496,7 +496,7 @@ export default function CaseDetailsPage() {
             label={prevCase?.caseNumber ?? "—"}
             sublabel={prevCase?.name ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/${prevCase.id}`)
+              prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
             }
             disabled={!prevCase}
           />
@@ -505,7 +505,7 @@ export default function CaseDetailsPage() {
             label={nextCase?.caseNumber ?? "—"}
             sublabel={nextCase?.name ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/${nextCase.id}`)
+              nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
             }
             disabled={!nextCase}
           />

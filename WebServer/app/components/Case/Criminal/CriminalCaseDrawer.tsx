@@ -38,7 +38,7 @@ export enum CriminalCaseModalType {
 
 type Step = "entry" | "review";
 
-const REQUIRED_FIELDS = ["name", "caseNumber", "caseType"] as const;
+const REQUIRED_FIELDS = ["name", "caseNumber"] as const;
 
 type ColDef = {
   key: string;
@@ -132,22 +132,6 @@ const TAB_GROUPS: TabGroup[] = [
         placeholder: "N/A",
         type: "text",
         width: 135,
-      },
-      {
-        key: "caseType",
-        label: "Case Type",
-        placeholder: "Select case type",
-        type: "select",
-        width: 150,
-        options: [
-          { value: "CRIMINAL", label: "Criminal" },
-          { value: "CIVIL", label: "Civil" },
-          { value: "LAND_REGISTRATION_CASE", label: "Land Registration" },
-          { value: "PETITION", label: "Petition" },
-          { value: "ELECTION", label: "Election" },
-          { value: "SCA", label: "SCA" },
-          { value: "UNKNOWN", label: "Unknown" },
-        ],
       },
     ],
   },
@@ -711,8 +695,6 @@ const NewCriminalCaseModal = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  console.log(isEdit, selectedCase);
-
   const makeFromCase = (sc: CriminalCaseData): CaseEntry =>
     caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
@@ -823,7 +805,10 @@ const NewCriminalCaseModal = ({
 
   const buildPayload = (e: CaseEntry) => {
     const { id, errors, collapsed, saved, ...caseInput } = e;
-    return CriminalCaseSchema.safeParse(caseInput);
+    return CriminalCaseSchema.safeParse({
+      ...caseInput,
+      caseType: "CRIMINAL",
+    });
   };
 
   const handleSubmit = async () => {
@@ -839,6 +824,9 @@ const NewCriminalCaseModal = ({
     );
     try {
       if (isEdit && selectedCase) {
+        if (entries[0].caseNumber.trim() !== selectedCase.caseNumber.trim()) {
+          throw new Error("Case number cannot be changed");
+        }
         const parsed = buildPayload(entries[0]);
         if (!parsed.success) throw new Error("Invalid data");
         const payload = parsed.data;

@@ -13,7 +13,6 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { CaseType } from "../../../generated/prisma/client";
 import FilterModal from "../../Filter/FilterModal";
 import {
   ExactMatchMap,
@@ -30,8 +29,8 @@ import NewCriminalCaseModal, {
 import CriminalCaseRow from "./CriminalCaseRow";
 import {
   deleteCriminalCase,
-  getCriminalCaseStats,
   getCriminalCases,
+  getCriminalCaseStats,
 } from "./CriminalCasesActions";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import {
@@ -71,7 +70,6 @@ const CriminalCasePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [caseTypeFilter, setCaseTypeFilter] = useState<"ALL" | CaseType>("ALL");
   const statusPopup = usePopup();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -87,7 +85,6 @@ const CriminalCasePage: React.FC = () => {
     { key: "branch", label: "Branch", type: "text" },
     { key: "assistantBranch", label: "Assistant Branch", type: "text" },
     { key: "caseNumber", label: "Case Number", type: "text" },
-    { key: "caseType", label: "Case Type", type: "text" },
     { key: "name", label: "Name", type: "text" },
     { key: "charge", label: "Charge", type: "text" },
     { key: "infoSheet", label: "Info Sheet", type: "text" },
@@ -125,26 +122,6 @@ const CriminalCasePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, appliedFilters]);
-
-  // Sync caseTypeFilter → appliedFilters.caseType
-  useEffect(() => {
-    setAppliedFilters((prev) => {
-      const next = { ...prev };
-      if (caseTypeFilter === "ALL") {
-        delete next.caseType;
-      } else {
-        next.caseType = caseTypeFilter;
-      }
-      return next;
-    });
-    setExactMatchMap((prev) => {
-      if (caseTypeFilter === "ALL") {
-        const { caseType: _, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, caseType: true };
-    });
-  }, [caseTypeFilter]);
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
@@ -291,10 +268,7 @@ const CriminalCasePage: React.FC = () => {
 
     setUploading(true);
     try {
-      const result = await uploadExcel(
-        file,
-        (caseTypeFilter !== "ALL" ? caseTypeFilter : "UNKNOWN") as CaseType,
-      );
+      const result = await uploadExcel(file);
       if (!result.success) {
         statusPopup.showError(result.error || "Failed to import cases");
       } else {
@@ -453,23 +427,6 @@ const CriminalCasePage: React.FC = () => {
               className="hidden"
               onChange={handleImportExcel}
             />
-            <select
-              value={caseTypeFilter}
-              onChange={(e) => {
-                const value = e.target.value as "ALL" | CaseType;
-                setCaseTypeFilter(value);
-              }}
-              className="select select-bordered"
-            >
-              <option value="ALL">All Types</option>
-              <option value="CRIMINAL">Criminal</option>
-              <option value="CIVIL">Civil</option>
-              <option value="LAND_REGISTRATION_CASE">Land Registration</option>
-              <option value="PETITION">Petition</option>
-              <option value="ELECTION">Election</option>
-              <option value="SCA">SCA</option>
-              <option value="UNKNOWN">Unknown</option>
-            </select>
             <button
               className="btn btn-outline flex items-center gap-2"
               onClick={() => setFilterModalOpen((prev) => !prev)}
@@ -689,6 +646,10 @@ const CriminalCasePage: React.FC = () => {
                 key={caseItem.id}
                 caseItem={caseItem}
                 handleDeleteCase={handleDeleteCase}
+                onEdit={(item) => {
+                  setSelectedCase(item);
+                  setModalType(CriminalCaseModalType.EDIT);
+                }}
               />
             )}
           />

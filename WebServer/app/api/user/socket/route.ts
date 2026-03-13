@@ -16,9 +16,6 @@ export async function UPGRADE(client: WebSocket, server: WebSocketServer) {
   if (!sessionResult.success) {
     return client.close(1008, "Unauthorized");
   }
-  console.log(sessionResult.result);
-
-  console.log("WebSocket connection by user:", sessionResult.result.email);
 
   new ClientSocketServer(client, server, sessionResult.result);
 }

@@ -200,7 +200,7 @@ export const initialCaseFormData: Omit<CriminalCaseSchema, "id" | "createdAt"> =
     assistantBranch: null,
     caseNumber: "",
     dateFiled: new Date(),
-    caseType: "UNKNOWN",
+    caseType: "CRIMINAL",
     name: "",
     charge: null,
     infoSheet: null,
