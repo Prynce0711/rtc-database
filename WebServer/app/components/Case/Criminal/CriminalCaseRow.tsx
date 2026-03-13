@@ -32,9 +32,11 @@ export type CaseSortConfig = {
 const CriminalCaseRow = ({
   caseItem,
   handleDeleteCase,
+  onEdit,
 }: {
   caseItem: CriminalCaseData;
   handleDeleteCase: (caseId: number) => void;
+  onEdit: (caseItem: CriminalCaseData) => void;
 }) => {
   const session = useSession();
   const router = useRouter();
@@ -45,7 +47,7 @@ const CriminalCaseRow = ({
   return (
     <tr
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
-      onClick={() => router.push(`/user/cases/${caseItem.id}`)}
+      onClick={() => router.push(`/user/cases/criminal/${caseItem.id}`)}
     >
       {/* ACTIONS */}
       {isAdminOrAtty && (
@@ -68,7 +70,7 @@ const CriminalCaseRow = ({
                     className="flex items-center gap-3 text-info"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/user/cases/${caseItem.id}`);
+                      router.push(`/user/cases/criminal/${caseItem.id}`);
                     }}
                   >
                     <FiEye size={16} />
@@ -80,7 +82,7 @@ const CriminalCaseRow = ({
                     className="flex items-center gap-3 text-warning"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/user/cases/${caseItem.id}/edit`);
+                      onEdit(caseItem);
                     }}
                   >
                     <FiEdit size={16} />
@@ -194,9 +196,11 @@ const CriminalCaseRow = ({
 export const CaseTable = ({
   data,
   handleDeleteCase,
+  onEdit,
 }: {
   data: CriminalCaseData[];
   handleDeleteCase: (caseId: number) => void;
+  onEdit: (caseItem: CriminalCaseData) => void;
 }) => {
   const session = useSession();
   const isAdminOrAtty =
@@ -383,6 +387,7 @@ export const CaseTable = ({
           key={item.id}
           caseItem={item}
           handleDeleteCase={handleDeleteCase}
+          onEdit={onEdit}
         />
       )}
       rowsPerPage={25}

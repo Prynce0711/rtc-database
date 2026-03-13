@@ -179,6 +179,10 @@ export async function updateSpecialProceeding(
       specialProceedingData.data,
     );
 
+    if (casePayload.caseType && casePayload.caseType !== CaseType.SCA) {
+      throw new Error("Case type cannot be changed to non-special proceeding");
+    }
+
     const originalCase = await prisma.case.findUnique({
       where: { id: caseId },
       include: { specialProceeding: true },

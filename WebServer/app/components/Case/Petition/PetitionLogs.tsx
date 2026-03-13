@@ -20,7 +20,7 @@ import {
 } from "../../Filter/FilterTypes";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable.tsx";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
 import { deletePetition, getPetitions } from "./PetitionActions";
 import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";

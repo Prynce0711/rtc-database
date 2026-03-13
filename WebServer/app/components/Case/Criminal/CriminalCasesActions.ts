@@ -184,6 +184,7 @@ export async function createCriminalCase(
     const newCase = await prisma.case.create({
       data: {
         ...casePayload,
+        caseType: CaseType.CRIMINAL,
         criminalCase: {
           create: detailData as Prisma.CriminalCaseCreateWithoutCaseInput,
         },
@@ -222,6 +223,10 @@ export async function updateCriminalCase(
     const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
+
+    if (casePayload.caseType && casePayload.caseType !== CaseType.CRIMINAL) {
+      throw new Error("Case type cannot be changed to non-criminal");
+    }
 
     const originalCase = await prisma.case.findUnique({
       where: { id: caseId },
@@ -327,6 +332,9 @@ export async function getCriminalCaseById(
       criminalCase.caseType !== CaseType.CRIMINAL ||
       !criminalCase.criminalCase
     ) {
+      console.error(
+        `Case with ID ${id} is not a criminal case or missing criminal case details`,
+      );
       return { success: false, error: "Case is not a criminal case" };
     }
 

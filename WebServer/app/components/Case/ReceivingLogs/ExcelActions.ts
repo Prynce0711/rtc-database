@@ -62,6 +62,25 @@ const convertCaseType = (abbreviation: string | undefined): string => {
   return caseTypeMap[abbrev] || "UNKNOWN";
 };
 
+const parseDateCell = (value: unknown): Date | undefined => {
+  if (value == null || value === "") return undefined;
+
+  if (typeof value === "number") {
+    return excelDateToJSDate(value);
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  return undefined;
+};
+
 export async function uploadReceiveExcel(
   file: File,
 ): Promise<ActionResult<void>> {
@@ -134,19 +153,7 @@ export async function uploadReceiveExcel(
         "Remarks",
       ]);
 
-      let dateRecieved: Date | undefined;
-
-      // Handle different date formats
-      if (typeof dateRecievedCell === "number") {
-        // Excel serial date
-        dateRecieved = excelDateToJSDate(dateRecievedCell);
-      } else if (dateRecievedCell) {
-        // Try parsing as text date
-        const parsedDate = new Date(dateRecievedCell);
-        if (!isNaN(parsedDate.getTime())) {
-          dateRecieved = parsedDate;
-        }
-      }
+      let dateRecieved: Date | undefined = parseDateCell(dateRecievedCell);
 
       // Combine date and time if both exist
       if (dateRecieved && timeCell) {

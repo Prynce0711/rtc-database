@@ -183,6 +183,7 @@ export async function createCivilCase(
     const newCase = await prisma.case.create({
       data: {
         ...casePayload,
+        caseType: CaseType.CIVIL,
         civilCase: {
           create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
         },
@@ -221,6 +222,10 @@ export async function updateCivilCase(
     const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
+
+    if (casePayload.caseType && casePayload.caseType !== CaseType.CIVIL) {
+      throw new Error("Case type cannot be changed to non-civil");
+    }
 
     const originalCase = await prisma.case.findUnique({
       where: { id: caseId },

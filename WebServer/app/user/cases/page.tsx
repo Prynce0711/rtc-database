@@ -1,7 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import CriminalCasePage from "@/app/components/Case/Criminal/CriminalCasePage";
+const page = () => {
+  redirect("/user/cases/criminal");
+};
 
-export default function Page() {
-  return <CriminalCasePage />;
-}
+export default page;

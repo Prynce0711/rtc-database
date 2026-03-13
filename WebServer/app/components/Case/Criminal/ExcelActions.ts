@@ -33,7 +33,6 @@ import { BaseCaseSchema } from "../schema";
 
 export async function uploadExcel(
   file: File,
-  caseType: CaseType,
 ): Promise<ActionResult<UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -94,7 +93,7 @@ export async function uploadExcel(
         const hydrated = {
           ...cells,
           assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
-          caseType,
+          caseType: CaseType.CRIMINAL,
         };
 
         const validation = CriminalCaseSchema.safeParse(hydrated);

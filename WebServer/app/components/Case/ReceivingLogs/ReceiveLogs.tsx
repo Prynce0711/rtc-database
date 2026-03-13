@@ -3,7 +3,7 @@
 import { RecievingLog } from "@/app/generated/prisma/client";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
   FiDownload,
@@ -24,46 +24,25 @@ import {
 } from "../../Filter/FilterTypes";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable.tsx";
+import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
-import { deleteRecievingLog, getRecievingLogs } from "./RecievingLogsActions";
+import {
+  deleteRecievingLog,
+  getRecievingLogsPage,
+  getRecievingLogsStats,
+} from "./RecievingLogsActions";
 
-type ReceiveLog = RecievingLog & {
-  time?: string;
-};
-
-const calculateReceiveLogStats = (logs: ReceiveLog[]) => {
-  const today = new Date().toDateString();
-  const thisMonth = new Date().getMonth();
-  return {
-    total: logs.length,
-    today: logs.filter(
-      (l) => new Date(l.dateRecieved || 0).toDateString() === today,
-    ).length,
-    thisMonth: logs.filter(
-      (l) => new Date(l.dateRecieved || 0).getMonth() === thisMonth,
-    ).length,
-    docTypes: new Set(logs.map((l) => l.caseType)).size,
-  };
-};
-
-const sortReceiveLogs = (
-  logs: ReceiveLog[],
-  key: keyof ReceiveLog,
-  order: "asc" | "desc",
-) => {
-  return [...logs].sort((a, b) => {
-    const aVal = a[key];
-    const bVal = b[key];
-    if (aVal === null || aVal === undefined) return 1;
-    if (bVal === null || bVal === undefined) return -1;
-    if (aVal < bVal) return order === "asc" ? -1 : 1;
-    if (aVal > bVal) return order === "asc" ? 1 : -1;
-    return 0;
-  });
-};
+type ReceiveLog = RecievingLog;
+type ReceiveSortKey =
+  | "bookAndPage"
+  | "dateRecieved"
+  | "caseType"
+  | "caseNumber"
+  | "content"
+  | "branchNumber"
+  | "notes";
 
 const formatDate = (date: Date | string | null | undefined): string => {
   if (!date) return "";
@@ -161,12 +140,15 @@ type ReceiveLogFilterValues = {
   bookAndPage?: string;
   caseNumber?: string;
   caseType?: string;
+  content?: string;
   branchNumber?: string;
+  notes?: string;
   dateRecieved?: { start?: string; end?: string };
 };
 
 const ReceiveLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<ReceiveLog[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -186,17 +168,20 @@ const ReceiveLogsPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof ReceiveLog;
+    key: ReceiveSortKey;
     order: "asc" | "desc";
   }>({ key: "dateRecieved", order: "desc" });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<ReceiveLogFilterValues>(
     {},
   );
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<ReceiveLog[]>(
-    [],
-  );
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
+  const [stats, setStats] = useState({
+    total: 0,
+    today: 0,
+    thisMonth: 0,
+    docTypes: 0,
+  });
 
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
@@ -213,134 +198,80 @@ const ReceiveLogsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters]);
+  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
+
+  const refreshFromBackend = useCallback(
+    async (page = currentPage) => {
+      try {
+        setLoading(true);
+
+        const [listResult, statsResult] = await Promise.all([
+          getRecievingLogsPage({
+            page,
+            pageSize: PAGE_SIZE,
+            searchTerm,
+            filters: appliedFilters,
+            sortKey: sortConfig.key,
+            sortOrder: sortConfig.order,
+            exactMatchMap,
+          }),
+          getRecievingLogsStats({
+            searchTerm,
+            filters: appliedFilters,
+            exactMatchMap,
+          }),
+        ]);
+
+        if (!listResult.success) {
+          setError(listResult.error || "Failed to fetch receiving logs");
+          return;
+        }
+
+        setLogs(listResult.result.items);
+        setTotalCount(
+          listResult.result.total ?? listResult.result.items.length,
+        );
+
+        if (statsResult.success && statsResult.result) {
+          setStats(statsResult.result);
+        }
+
+        setError(null);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch receiving logs",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [appliedFilters, currentPage, exactMatchMap, searchTerm, sortConfig],
+  );
 
   useEffect(() => {
-    fetchLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void refreshFromBackend(currentPage);
+  }, [refreshFromBackend, currentPage]);
 
-  const fetchLogs = async () => {
-    try {
-      setLoading(true);
-      const response = await getRecievingLogs();
-      if (!response.success) {
-        statusPopup.showError(
-          response.error || "Failed to fetch receiving logs",
-        );
-        return;
-      }
-      const logsWithTime = response.result.map((log) => ({
-        ...log,
-        time: extractTime(log.dateRecieved),
-      }));
-      setLogs(logsWithTime as ReceiveLog[]);
-      setError(null);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch receiving logs",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const stats = useMemo(() => calculateReceiveLogStats(logs), [logs]);
-
-  const filteredAndSorted = useMemo(() => {
-    const baseList =
-      Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : logs;
-
-    let filtered = baseList;
-    if (searchTerm) {
-      filtered = baseList.filter((log) =>
-        Object.values(log).some((value) =>
-          value?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
-      );
-    }
-    return sortReceiveLogs(filtered, sortConfig.key, sortConfig.order);
-  }, [logs, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredAndSorted.length / PAGE_SIZE),
-  );
-  const paginatedLogs = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage, PAGE_SIZE]);
-
-  const handleSort = (key: keyof ReceiveLog) => {
+  const handleSort = (key: ReceiveSortKey) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
   };
 
-  const applyReceiveFilters = (
-    filters: ReceiveLogFilterValues,
-    items: ReceiveLog[],
-    exactMap: ExactMatchMap = {},
-  ): ReceiveLog[] => {
-    return items.filter((log) => {
-      const matchesText = (
-        itemVal: string | null | undefined,
-        filterVal: string,
-        key: string,
-      ): boolean => {
-        if (!itemVal) return false;
-        const isExact = exactMap[key] ?? true;
-        const itemStr = itemVal.toString().toLowerCase();
-        const filterStr = filterVal.toLowerCase();
-        return isExact ? itemStr === filterStr : itemStr.includes(filterStr);
-      };
-
-      if (
-        filters.bookAndPage &&
-        !matchesText(log.bookAndPage, filters.bookAndPage, "bookAndPage")
-      )
-        return false;
-      if (
-        filters.caseNumber &&
-        !matchesText(log.caseNumber, filters.caseNumber, "caseNumber")
-      )
-        return false;
-      if (
-        filters.caseType &&
-        !matchesText(log.caseType, filters.caseType, "caseType")
-      )
-        return false;
-      if (
-        filters.branchNumber &&
-        !matchesText(log.branchNumber, filters.branchNumber, "branchNumber")
-      )
-        return false;
-
-      if (filters.dateRecieved) {
-        const d = new Date(log.dateRecieved || 0);
-        if (
-          filters.dateRecieved.start &&
-          d < new Date(filters.dateRecieved.start)
-        )
-          return false;
-        if (filters.dateRecieved.end && d > new Date(filters.dateRecieved.end))
-          return false;
-      }
-      return true;
-    });
-  };
-
   const handleApplyFilters = (
     filters: FilterValues,
     exactMap: ExactMatchMap,
   ) => {
-    const typed = filters as ReceiveLogFilterValues;
-    setAppliedFilters(typed);
-    setFilteredByAdvanced(applyReceiveFilters(typed, logs, exactMap));
+    setAppliedFilters(filters as ReceiveLogFilterValues);
     setExactMatchMap(exactMap);
+    setCurrentPage(1);
   };
 
-  const getSuggestions = (key: string, inputValue: string): string[] => {
+  const getSuggestions = async (
+    key: string,
+    inputValue: string,
+  ): Promise<string[]> => {
     const textFields = [
       "bookAndPage",
       "caseNumber",
@@ -350,12 +281,27 @@ const ReceiveLogsPage: React.FC = () => {
       "notes",
     ];
     if (!textFields.includes(key)) return [];
-    const values = logs
+
+    const result = await getRecievingLogsPage({
+      page: 1,
+      pageSize: 10,
+      filters: {
+        [key]: inputValue,
+      } as ReceiveLogFilterValues,
+      exactMatchMap: { [key]: false },
+      sortKey: key as ReceiveSortKey,
+      sortOrder: "asc",
+    });
+
+    if (!result.success || !result.result) return [];
+
+    const values = result.result.items
       .map((l) => {
         const val = l[key as keyof ReceiveLog];
         return val ? val.toString() : "";
       })
       .filter((v) => v.length > 0);
+
     const unique = Array.from(new Set(values)).sort();
     if (!inputValue) return unique;
     return unique.filter((v) =>
@@ -375,9 +321,11 @@ const ReceiveLogsPage: React.FC = () => {
       statusPopup.showError(result.error || "Failed to delete");
       return;
     }
-    setLogs((prev) => prev.filter((l) => l.id !== logId));
+    await refreshFromBackend();
     statusPopup.showSuccess("Entry deleted successfully");
   };
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={8} tableRows={8} />;
@@ -488,7 +436,8 @@ const ReceiveLogsPage: React.FC = () => {
                     statusPopup.showSuccess(
                       "Receiving logs imported successfully",
                     );
-                    await fetchLogs();
+                    setCurrentPage(1);
+                    await refreshFromBackend(1);
                   }
                 } finally {
                   setUploading(false);
@@ -728,14 +677,14 @@ const ReceiveLogsPage: React.FC = () => {
               { key: "time", label: "Time", sortable: false, align: "center" },
               { key: "notes", label: "Notes", sortable: true, align: "center" },
             ]}
-            data={paginatedLogs as unknown as Record<string, unknown>[]}
+            data={logs as unknown as Record<string, unknown>[]}
             sortConfig={
               {
                 key: sortConfig.key,
                 order: sortConfig.order,
               } as { key: string; order: "asc" | "desc" }
             }
-            onSort={(k) => handleSort(k as keyof ReceiveLog)}
+            onSort={(k) => handleSort(k as ReceiveSortKey)}
             showPagination={false}
             renderRow={(log) => (
               <ReceiveRow
