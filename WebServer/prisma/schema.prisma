@@ -107,7 +107,7 @@ model CriminalCase{
   court           String?
   detained        String?
   consolidation   String?
-  eqcNumber       Int?
+  eqcNumber       String?
   bond            String?
   raffleDate      DateTime?
   committee1      String?

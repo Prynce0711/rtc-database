@@ -37,10 +37,10 @@ const FilterModal: React.FC<FilterModalProps> = ({
       next.delete(key);
     } else {
       next.add(key);
-      // Set default exact match to true for text filters when first enabled
+      // Default text filters to partial match when first enabled
       const filterOption = options.find((opt) => opt.key === key);
       if (filterOption?.type === "text" && exactMatchMap[key] === undefined) {
-        setExactMatchMap((prev) => ({ ...prev, [key]: true }));
+        setExactMatchMap((prev) => ({ ...prev, [key]: false }));
       }
     }
     setEnabledFilters(next);
@@ -158,7 +158,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
                   suggestions={focusedFilter === option.key ? suggestions : []}
                   onSuggestionClick={handleSuggestionClick}
-                  exactMatch={exactMatchMap[option.key] ?? true}
+                  exactMatch={exactMatchMap[option.key] ?? false}
                   onExactMatchChange={(key, exact) =>
                     setExactMatchMap((prev) => ({ ...prev, [key]: exact }))
                   }

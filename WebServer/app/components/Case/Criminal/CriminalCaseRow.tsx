@@ -47,7 +47,10 @@ const CriminalCaseRow = ({
   return (
     <tr
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
-      onClick={() => router.push(`/user/cases/criminal/${caseItem.id}`)}
+      onClick={() => {
+        console.log(caseItem);
+        router.push(`/user/cases/criminal/${caseItem.id}`);
+      }}
     >
       {/* ACTIONS */}
       {isAdminOrAtty && (
