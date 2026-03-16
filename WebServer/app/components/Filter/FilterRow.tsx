@@ -49,7 +49,7 @@ const FilterRow: React.FC<FilterRowProps> = ({
   onBlur,
   suggestions,
   onSuggestionClick,
-  exactMatch = true,
+  exactMatch = false,
   onExactMatchChange,
 }) => {
   return (

@@ -45,9 +45,8 @@ const CriminalCaseObjectSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Consolidation"])),
-  eqcNumber: z.coerce
-    .number()
-    .int()
+  eqcNumber: z
+    .string()
     .nullable()
     .optional()
     .describe(excelHeaders(["EQC No", "EQ Number"])),

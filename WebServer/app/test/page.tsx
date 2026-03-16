@@ -1,5 +1,5 @@
-import NotarialTester from "./NotarialTester";
+import CriminalCaseTester from "./CriminalCaseTester";
 
 export default function page() {
-  return <NotarialTester />;
+  return <CriminalCaseTester />;
 }
