@@ -12,7 +12,7 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { BRANCH_OPTIONS, CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
+import { CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
 
@@ -601,9 +601,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                             setActiveCell({ rowIdx: idx, col: "branch" })
                           }
                         >
-                          <select
+                          <input
+                            type="text"
                             className="xls-input"
                             value={row.branch}
+                            placeholder="Type branch…"
                             onChange={(e) =>
                               updateCell(row.id, "branch", e.target.value)
                             }
@@ -611,16 +613,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               setActiveCell({ rowIdx: idx, col: "branch" })
                             }
                             onKeyDown={(e) => handleKeyDown(e, idx, "branch")}
-                          >
-                            <option value="" disabled>
-                              Select branch…
-                            </option>
-                            {BRANCH_OPTIONS.map((b) => (
-                              <option key={b} value={b}>
-                                {b}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </td>
 
                         {/* Criminal */}
