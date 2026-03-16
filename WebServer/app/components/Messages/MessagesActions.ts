@@ -13,6 +13,8 @@ import Roles from "@/app/lib/Roles";
 
 // only returns latest message for each chat
 // useMessaging will fetch all messages for the selected chat
+
+// TODO: make it so you must add people to chat directly
 export async function getChats(): Promise<ActionResult<ChatData[]>> {
   try {
     const sessionResult = await validateSession();
