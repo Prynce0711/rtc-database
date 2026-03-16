@@ -28,8 +28,6 @@ export const buildCaseFind = <T extends z.ZodType>(
   const filters = options?.filters;
   const exactMatchMap = options?.exactMatchMap ?? {};
 
-  console.log("Building case find with options:", options);
-
   type Filters = FilterOptions<z.infer<T>>["filters"];
 
   const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {

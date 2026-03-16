@@ -144,8 +144,6 @@ const CriminalCasePage: React.FC = () => {
           }),
         ]);
 
-        console.log("Cases response:", casesRes);
-
         if (!casesRes.success) {
           statusPopup.showError(casesRes.error || "Failed to fetch cases");
           return;

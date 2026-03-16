@@ -11,7 +11,6 @@ import {
   FiEdit,
   FiFileText,
   FiLock,
-  FiMoreHorizontal,
   FiSearch,
   FiTrash2,
   FiUpload,
@@ -26,6 +25,7 @@ import {
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
+import ActionDropdown from "../../Table/ActionDropdown";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
@@ -74,6 +74,15 @@ const ReceiveRow = ({
 }) => {
   const time = extractTime(log.dateRecieved);
   const date = formatDate(log.dateRecieved);
+  const popoverId = `receive-logs-actions-popover-${log.id}`;
+  const anchorName = `--receive-logs-actions-anchor-${log.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
 
   return (
     <tr className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm">
@@ -82,43 +91,34 @@ const ReceiveRow = ({
           className="relative text-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-center">
-            <div className="dropdown dropdown-start">
-              <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-                <FiMoreHorizontal size={18} />
-              </button>
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-                style={{ zIndex: 9999 }}
+          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+            <li>
+              <button
+                className="flex items-center gap-3 text-warning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onEdit(log);
+                }}
               >
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-warning"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(log);
-                    }}
-                  >
-                    <FiEdit size={16} />
-                    <span>Edit</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(log);
-                    }}
-                  >
-                    <FiTrash2 size={16} />
-                    <span>Delete</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
+                <FiEdit size={16} />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onDelete(log);
+                }}
+              >
+                <FiTrash2 size={16} />
+                <span>Delete</span>
+              </button>
+            </li>
+          </ActionDropdown>
         </td>
       )}
       <td className="font-semibold text-center whitespace-nowrap">

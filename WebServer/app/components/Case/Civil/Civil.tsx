@@ -1,5 +1,6 @@
 "use client";
 
+import ActionDropdown from "@/app/components/Table/ActionDropdown";
 import TipCell from "@/app/components/Table/TipCell";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { useSession } from "@/app/lib/authClient";
@@ -22,7 +23,6 @@ import {
   FiFileText,
   FiFolder,
   FiLock,
-  FiMoreHorizontal,
   FiPlus,
   FiSave,
   FiSearch,
@@ -1047,80 +1047,84 @@ const NotarialRow = ({
   onEdit: (r: NotarialRecord) => void;
   onDelete: (id: number) => void;
   onRowClick: (r: NotarialRecord) => void;
-}) => (
-  <tr
-    className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-    onClick={() => onRowClick(record)}
-  >
-    <td onClick={(e) => e.stopPropagation()} className="text-center">
-      <div className="flex justify-center">
-        <div className="dropdown dropdown-start">
-          <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-            <FiMoreHorizontal size={18} />
-          </button>
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-            style={{ zIndex: 9999 }}
-          >
-            <li>
-              <button
-                className="flex items-center gap-3 text-info"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRowClick(record);
-                }}
-              >
-                <FiEye size={16} />
-                <span>View</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-warning"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(record);
-                }}
-              >
-                <FiEdit size={16} />
-                <span>Edit</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(record.id);
-                }}
-              >
-                <FiTrash2 size={16} />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </td>
-    <TipCell
-      label="Case Number"
-      value={record.title}
-      truncate
-      className="font-semibold"
-    />
-    <TipCell label="Branch" value={record.name} truncate />
-    <TipCell label="Petitioner/s" value={record.atty} truncate />
-    <TipCell label="Defendant/s" value={record.defendant} truncate />
-    <TipCell
-      label="Date Filed"
-      value={formatDate(record.date)}
-      className="text-base-content/70"
-    />
-    <TipCell label="Notes/Appealed" value={record.notes} />
-    <TipCell label="Nature of Petition" value={record.nature} />
-  </tr>
-);
+}) => {
+  const popoverId = `civil-actions-popover-${record.id}`;
+  const anchorName = `--civil-actions-anchor-${record.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
+
+  return (
+    <tr
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      onClick={() => onRowClick(record)}
+    >
+      <td onClick={(e) => e.stopPropagation()} className="text-center">
+        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+          <li>
+            <button
+              className="flex items-center gap-3 text-info"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onRowClick(record);
+              }}
+            >
+              <FiEye size={16} />
+              <span>View</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-warning"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onEdit(record);
+              }}
+            >
+              <FiEdit size={16} />
+              <span>Edit</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-error"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onDelete(record.id);
+              }}
+            >
+              <FiTrash2 size={16} />
+              <span>Delete</span>
+            </button>
+          </li>
+        </ActionDropdown>
+      </td>
+      <TipCell
+        label="Case Number"
+        value={record.title}
+        truncate
+        className="font-semibold"
+      />
+      <TipCell label="Branch" value={record.name} truncate />
+      <TipCell label="Petitioner/s" value={record.atty} truncate />
+      <TipCell label="Defendant/s" value={record.defendant} truncate />
+      <TipCell
+        label="Date Filed"
+        value={formatDate(record.date)}
+        className="text-base-content/70"
+      />
+      <TipCell label="Notes/Appealed" value={record.notes} />
+      <TipCell label="Nature of Petition" value={record.nature} />
+    </tr>
+  );
+};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
