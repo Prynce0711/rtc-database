@@ -10,7 +10,7 @@ import {
   deleteSpecialProceeding,
   getSpecialProceedings,
   updateSpecialProceeding,
-} from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
+} from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
 import { useEffect, useState } from "react";
 
 type SpecialProceedingFormEntry = {

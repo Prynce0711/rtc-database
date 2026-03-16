@@ -9,6 +9,7 @@ import {
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import FileViewerModal from "@/app/components/Popup/FileViewerModal";
+import ActionDropdown from "@/app/components/Table/ActionDropdown";
 import TipCell from "@/app/components/Table/TipCell";
 import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { AnimatePresence, motion } from "framer-motion";
@@ -29,7 +30,6 @@ import {
   FiFileText,
   FiFolder,
   FiLock,
-  FiMoreHorizontal,
   FiPlus,
   FiSave,
   FiSearch,
@@ -1004,106 +1004,110 @@ const NotarialRow = ({
   onViewFile: (r: NotarialRecord) => void;
   onDownloadFile: (r: NotarialRecord) => void;
   canPreview: boolean;
-}) => (
-  <tr
-    className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-    onClick={() => onRowClick(record)}
-  >
-    <td onClick={(e) => e.stopPropagation()} className="text-center">
-      <div className="flex justify-center">
-        <div className="dropdown dropdown-start">
-          <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-            <FiMoreHorizontal size={18} />
-          </button>
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-            style={{ zIndex: 9999 }}
-          >
-            <li>
-              <button
-                className="flex items-center gap-3 text-info"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRowClick(record);
-                }}
-              >
-                <FiEye size={16} />
-                <span>View</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-warning"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(record);
-                }}
-              >
-                <FiEdit size={16} />
-                <span>Edit</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(record.id);
-                }}
-              >
-                <FiTrash2 size={16} />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </td>
-    <TipCell
-      label="Title"
-      value={record.title}
-      truncate
-      className="font-semibold"
-    />
-    <TipCell label="Name" value={record.name} truncate />
-    <TipCell label="Attorney" value={record.atty} truncate />
-    <TipCell
-      label="Date"
-      value={formatDate(record.date)}
-      className="text-base-content/70"
-    />
-    <td
-      className="text-center relative group/tip"
-      onClick={(e) => e.stopPropagation()}
+}) => {
+  const popoverId = `notarial-actions-popover-${record.id}`;
+  const anchorName = `--notarial-actions-anchor-${record.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
+
+  return (
+    <tr
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      onClick={() => onRowClick(record)}
     >
-      {record.link ? (
-        <div className="flex items-center justify-center gap-2">
-          {canPreview && (
+      <td onClick={(e) => e.stopPropagation()} className="text-center">
+        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+          <li>
+            <button
+              className="flex items-center gap-3 text-info"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onRowClick(record);
+              }}
+            >
+              <FiEye size={16} />
+              <span>View</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-warning"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onEdit(record);
+              }}
+            >
+              <FiEdit size={16} />
+              <span>Edit</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-error"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onDelete(record.id);
+              }}
+            >
+              <FiTrash2 size={16} />
+              <span>Delete</span>
+            </button>
+          </li>
+        </ActionDropdown>
+      </td>
+      <TipCell
+        label="Title"
+        value={record.title}
+        truncate
+        className="font-semibold"
+      />
+      <TipCell label="Name" value={record.name} truncate />
+      <TipCell label="Attorney" value={record.atty} truncate />
+      <TipCell
+        label="Date"
+        value={formatDate(record.date)}
+        className="text-base-content/70"
+      />
+      <td
+        className="text-center relative group/tip"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {record.link ? (
+          <div className="flex items-center justify-center gap-2">
+            {canPreview && (
+              <button
+                type="button"
+                className="btn btn-xs btn-outline"
+                onClick={() => onViewFile(record)}
+              >
+                <FiEye size={12} />
+                View
+              </button>
+            )}
             <button
               type="button"
-              className="btn btn-xs btn-outline"
-              onClick={() => onViewFile(record)}
+              className="btn btn-xs btn-primary"
+              onClick={() => onDownloadFile(record)}
             >
-              <FiEye size={12} />
-              View
+              <FiDownload size={12} />
+              Download
             </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-xs btn-primary"
-            onClick={() => onDownloadFile(record)}
-          >
-            <FiDownload size={12} />
-            Download
-          </button>
-        </div>
-      ) : (
-        <span className="text-base-content/50 text-xs">No file</span>
-      )}
-    </td>
-  </tr>
-);
+          </div>
+        ) : (
+          <span className="text-base-content/50 text-xs">No file</span>
+        )}
+      </td>
+    </tr>
+  );
+};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -1235,7 +1239,6 @@ const NotarialPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "date",
     order: "desc",
@@ -1397,14 +1400,12 @@ const NotarialPage: React.FC = () => {
           getNotarialPage({
             page,
             pageSize: PAGE_SIZE,
-            searchTerm,
             filters: serverFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getNotarialStats({
-            searchTerm,
             filters: serverFilters,
             exactMatchMap,
           }),
@@ -1441,19 +1442,12 @@ const NotarialPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [
-      appliedFilters,
-      currentPage,
-      exactMatchMap,
-      searchTerm,
-      sortConfig,
-      toServerFilters,
-    ],
+    [appliedFilters, currentPage, exactMatchMap, sortConfig, toServerFilters],
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
+  }, [appliedFilters, sortConfig, exactMatchMap]);
 
   useEffect(() => {
     void refreshFromBackend(currentPage);
@@ -1630,10 +1624,15 @@ const NotarialPage: React.FC = () => {
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
               <input
                 type="text"
-                placeholder="Search by title, name, attorney..."
+                placeholder="Search by title..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={appliedFilters?.title || ""}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
+                }
               />
             </div>
 

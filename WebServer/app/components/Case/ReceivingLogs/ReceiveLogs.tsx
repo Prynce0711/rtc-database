@@ -11,7 +11,6 @@ import {
   FiEdit,
   FiFileText,
   FiLock,
-  FiMoreHorizontal,
   FiSearch,
   FiTrash2,
   FiUpload,
@@ -26,6 +25,7 @@ import {
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
+import ActionDropdown from "../../Table/ActionDropdown";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
@@ -74,6 +74,15 @@ const ReceiveRow = ({
 }) => {
   const time = extractTime(log.dateRecieved);
   const date = formatDate(log.dateRecieved);
+  const popoverId = `receive-logs-actions-popover-${log.id}`;
+  const anchorName = `--receive-logs-actions-anchor-${log.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
 
   return (
     <tr className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm">
@@ -82,43 +91,34 @@ const ReceiveRow = ({
           className="relative text-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-center">
-            <div className="dropdown dropdown-start">
-              <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-                <FiMoreHorizontal size={18} />
-              </button>
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-                style={{ zIndex: 9999 }}
+          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+            <li>
+              <button
+                className="flex items-center gap-3 text-warning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onEdit(log);
+                }}
               >
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-warning"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(log);
-                    }}
-                  >
-                    <FiEdit size={16} />
-                    <span>Edit</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(log);
-                    }}
-                  >
-                    <FiTrash2 size={16} />
-                    <span>Delete</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
+                <FiEdit size={16} />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onDelete(log);
+                }}
+              >
+                <FiTrash2 size={16} />
+                <span>Delete</span>
+              </button>
+            </li>
+          </ActionDropdown>
         </td>
       )}
       <td className="font-semibold text-center whitespace-nowrap">
@@ -183,7 +183,6 @@ const ReceiveLogsPage: React.FC = () => {
 
   const statusPopup = usePopup();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: ReceiveSortKey;
     order: "asc" | "desc";
@@ -215,7 +214,7 @@ const ReceiveLogsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
+  }, [appliedFilters, sortConfig, exactMatchMap]);
 
   const refreshFromBackend = useCallback(
     async (page = currentPage) => {
@@ -226,14 +225,12 @@ const ReceiveLogsPage: React.FC = () => {
           getRecievingLogsPage({
             page,
             pageSize: PAGE_SIZE,
-            searchTerm,
             filters: appliedFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getRecievingLogsStats({
-            searchTerm,
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -262,7 +259,7 @@ const ReceiveLogsPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [appliedFilters, currentPage, exactMatchMap, searchTerm, sortConfig],
+    [appliedFilters, currentPage, exactMatchMap, sortConfig],
   );
 
   useEffect(() => {
@@ -429,10 +426,15 @@ const ReceiveLogsPage: React.FC = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search receiving logs..."
+              placeholder="Search case number..."
               className="input input-bordered input-lg w-full pl-12 text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
             <input
               ref={fileInputRef}

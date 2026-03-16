@@ -10,7 +10,7 @@ import {
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import {
-  buildCaseWhereForRelation,
+  buildCaseFind,
   DEFAULT_PAGE_SIZE,
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
@@ -42,37 +42,33 @@ export async function getCivilCases(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where = buildCaseWhereForRelation(
-      CivilCaseSchema,
-      "civilCase",
-      options,
-    );
-
-    const orderBy: Prisma.CaseOrderByWithRelationInput = {
-      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
-    } as Prisma.CaseOrderByWithRelationInput;
-
+    const find = buildCaseFind(CivilCaseSchema, "civilCase", options);
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
     const [cases, total] = await prisma.$transaction([
       prisma.case.findMany({
-        where,
-        orderBy,
+        where: find.where,
+        orderBy: find.orderBy,
         skip,
         take,
         include: {
-          civilCase: true,
+          civilCase: {
+            // Omit the 'id' field from the included civilCase to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
-      prisma.case.count({ where }),
+      prisma.case.count({ where: find.where }),
     ]);
 
     const caseCombined: CivilCaseData[] = cases
       .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
       .map((c) => ({
-        ...c,
         ...c.civilCase,
+        ...c,
       }));
 
     return {
@@ -97,20 +93,16 @@ export async function getCivilCaseStats(
       return sessionResult;
     }
 
-    const where = buildCaseWhereForRelation(
-      CivilCaseSchema,
-      "civilCase",
-      options,
-    );
+    const find = buildCaseFind(CivilCaseSchema, "civilCase", options);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [total, reRaffleCount, remandedCount, recentCount] =
       await prisma.$transaction([
-        prisma.case.count({ where }),
+        prisma.case.count({ where: find.where }),
         prisma.case.count({
           where: {
             AND: [
-              where,
+              find.where ?? {},
               {
                 civilCase: {
                   is: {
@@ -124,7 +116,7 @@ export async function getCivilCaseStats(
         prisma.case.count({
           where: {
             AND: [
-              where,
+              find.where ?? {},
               {
                 civilCase: {
                   is: {
@@ -137,7 +129,7 @@ export async function getCivilCaseStats(
         }),
         prisma.case.count({
           where: {
-            AND: [where, { dateFiled: { gte: thirtyDaysAgo } }],
+            AND: [find.where ?? {}, { dateFiled: { gte: thirtyDaysAgo } }],
           },
         }),
       ]);

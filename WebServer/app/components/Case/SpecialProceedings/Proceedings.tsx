@@ -4,8 +4,9 @@ import {
   exportSpecialProceedingsExcel,
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
+import { isTextFieldKey } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   FiBarChart2,
   FiDownload,
@@ -17,92 +18,51 @@ import {
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
 import FilterModal from "../../Filter/FilterModal";
-import { FilterOption } from "../../Filter/FilterTypes";
+import {
+  ExactMatchMap,
+  FilterOption,
+  FilterValues,
+} from "../../Filter/FilterTypes";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
+import {
+  deleteSpecialProceeding,
+  getSpecialProceedingStats,
+  getSpecialProceedings,
+} from "./SpecialProceedingActions";
 import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 import {
-  deleteSpecialProceeding,
-  getSpecialProceedings,
-} from "./SpecialProceedingsActions";
-import { SpecialProceedingData } from "./schema";
+  SpecialProceedingData,
+  SpecialProceedingStats,
+  SpecialProceedingsFilterOptions,
+  calculateSpecialProceedingStats,
+} from "./schema";
 
 type SPFilterValues = {
-  spcNo?: string;
-  raffledToBranch?: string;
-  petitioners?: string;
+  caseNumber?: string;
+  raffledTo?: string;
+  petitioner?: string;
   nature?: string;
   respondent?: string;
-  dateFiled?: { start?: string; end?: string };
+  date?: { start?: string; end?: string };
 };
 
-type SortableSPKey =
-  | "caseNumber"
-  | "raffledTo"
-  | "date"
-  | "petitioner"
-  | "nature"
-  | "respondent";
+type SortableSPKey = NonNullable<SpecialProceedingsFilterOptions["sortKey"]>;
 type SortConfig = { key: SortableSPKey; order: "asc" | "desc" };
+type SPFilters = NonNullable<SpecialProceedingsFilterOptions["filters"]>;
 type DrawerType = "ADD" | "EDIT";
 
 const SP_FILTER_OPTIONS: FilterOption[] = [
-  { key: "spcNo", label: "SPC. No.", type: "text" },
-  { key: "raffledToBranch", label: "Raffled to Branch", type: "text" },
-  { key: "petitioners", label: "Petitioners", type: "text" },
+  { key: "caseNumber", label: "SPC. No.", type: "text" },
+  { key: "raffledTo", label: "Raffled to Branch", type: "text" },
+  { key: "petitioner", label: "Petitioners", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
   { key: "respondent", label: "Respondent", type: "text" },
-  { key: "dateFiled", label: "Date Filed", type: "daterange" },
+  { key: "date", label: "Date Filed", type: "daterange" },
 ];
 
 const PAGE_SIZE = 25;
-
-const applySPFilters = (
-  filters: SPFilterValues,
-  items: SpecialProceedingData[],
-): SpecialProceedingData[] =>
-  items.filter((c) => {
-    if (
-      filters.spcNo &&
-      !(c.caseNumber || "").toLowerCase().includes(filters.spcNo.toLowerCase())
-    )
-      return false;
-    if (
-      filters.raffledToBranch &&
-      !(c.raffledTo || "")
-        .toLowerCase()
-        .includes(filters.raffledToBranch.toLowerCase())
-    )
-      return false;
-    if (
-      filters.petitioners &&
-      !(c.petitioner || "")
-        .toLowerCase()
-        .includes(filters.petitioners.toLowerCase())
-    )
-      return false;
-    if (
-      filters.nature &&
-      !(c.nature || "").toLowerCase().includes(filters.nature.toLowerCase())
-    )
-      return false;
-    if (
-      filters.respondent &&
-      !(c.respondent || "")
-        .toLowerCase()
-        .includes(filters.respondent.toLowerCase())
-    )
-      return false;
-    if (filters.dateFiled && c.date) {
-      const d = new Date(c.date);
-      if (filters.dateFiled.start && d < new Date(filters.dateFiled.start))
-        return false;
-      if (filters.dateFiled.end && d > new Date(filters.dateFiled.end))
-        return false;
-    }
-    return true;
-  });
 
 const SortTh = ({
   label,
@@ -274,15 +234,16 @@ const Proceedings: React.FC = () => {
   const router = useRouter();
   const popup = usePopup();
   const [cases, setCases] = useState<SpecialProceedingData[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "date",
     order: "desc",
   });
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<SPFilterValues>({});
+  const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
   const [drawerType, setDrawerType] = useState<DrawerType | null>(null);
   const [selectedCase, setSelectedCase] =
     useState<SpecialProceedingData | null>(null);
@@ -290,101 +251,130 @@ const Proceedings: React.FC = () => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [stats, setStats] = useState<SpecialProceedingStats>({
+    totalCases: 0,
+    thisMonth: 0,
+    caseTypes: 0,
+    branches: 0,
+  });
 
   useEffect(() => {
-    fetchCases();
-  }, []);
+    setCurrentPage(1);
+  }, [appliedFilters]);
 
-  const fetchCases = async () => {
-    setLoading(true);
-    setError(null);
-    const result = await getSpecialProceedings();
-    if (!result.success) {
-      setError(result.error || "Failed to fetch cases");
-      setCases([]);
-    } else {
-      setCases(result.result?.items || []);
-    }
-    setLoading(false);
-  };
+  const fetchCases = useCallback(
+    async (page = currentPage) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [listResult, statsResult] = await Promise.all([
+          getSpecialProceedings({
+            page,
+            pageSize: PAGE_SIZE,
+            filters: appliedFilters,
+            sortKey: sortConfig.key,
+            sortOrder: sortConfig.order,
+            exactMatchMap,
+          }),
+          getSpecialProceedingStats({
+            filters: appliedFilters,
+            exactMatchMap,
+          }),
+        ]);
+
+        if (!listResult.success) {
+          popup.showError(listResult.error || "Failed to fetch cases");
+          setError(listResult.error || "Failed to fetch cases");
+          setCases([]);
+          setTotalCount(0);
+          return;
+        }
+
+        const result = listResult.result;
+        setCases(result?.items || []);
+        setTotalCount(result?.total ?? result?.items?.length ?? 0);
+        setStats(calculateSpecialProceedingStats(result?.items || []));
+
+        if (statsResult.success && statsResult.result) {
+          setStats(statsResult.result);
+        } else if (!statsResult.success) {
+          console.error(
+            "Failed to fetch special proceeding stats",
+            statsResult.error,
+          );
+        }
+
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch cases");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [appliedFilters, currentPage, exactMatchMap, popup, sortConfig],
+  );
+
+  useEffect(() => {
+    void fetchCases(currentPage);
+  }, [fetchCases, currentPage]);
 
   const handleSort = (key: SortableSPKey) => {
     setSortConfig((prev) => ({
       key,
       order: prev.key === key && prev.order === "asc" ? "desc" : "asc",
     }));
-  };
-
-  const handleApplyFilters = (filters: SPFilterValues) => {
-    setAppliedFilters(filters);
     setCurrentPage(1);
   };
 
-  const getSuggestions = (key: string, partial: string) => {
-    const fieldMap: Record<string, keyof SpecialProceedingData> = {
-      spcNo: "caseNumber",
-      raffledToBranch: "raffledTo",
-      petitioners: "petitioner",
-      nature: "nature",
-      respondent: "respondent",
-    };
-    const field = fieldMap[key];
-    if (!field) return [];
-    return Array.from(
-      new Set(
-        cases
-          .map((c) => String(c[field] ?? ""))
-          .filter((v) => v.toLowerCase().includes(partial.toLowerCase())),
-      ),
-    ).slice(0, 10);
+  const handleApplyFilters = (
+    filters: FilterValues,
+    exactMap: ExactMatchMap,
+  ) => {
+    setAppliedFilters(filters as SPFilterValues);
+    setExactMatchMap(exactMap);
+    setCurrentPage(1);
   };
 
-  const filteredAndSorted = useMemo(() => {
-    const filtered = applySPFilters(
-      appliedFilters,
-      cases.filter((c) =>
-        Object.values(c).some((v) =>
-          String(v).toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
+  const getSuggestions = async (
+    key: string,
+    inputValue: string,
+  ): Promise<string[]> => {
+    const isTextField = isTextFieldKey(
+      SP_FILTER_OPTIONS.reduce(
+        (acc, opt) => {
+          acc[opt.key] = opt.type;
+          return acc;
+        },
+        {} as Record<string, string>,
       ),
+      key,
     );
 
-    return [...filtered].sort((a, b) => {
-      const aVal = a[sortConfig.key as keyof SpecialProceedingData];
-      const bVal = b[sortConfig.key as keyof SpecialProceedingData];
+    if (!isTextField) return [];
 
-      if (aVal == null || bVal == null) return 0;
-      const aStr = aVal instanceof Date ? aVal.getTime() : String(aVal);
-      const bStr = bVal instanceof Date ? bVal.getTime() : String(bVal);
-      if (aStr < bStr) return sortConfig.order === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortConfig.order === "asc" ? 1 : -1;
-      return 0;
+    const result = await getSpecialProceedings({
+      page: 1,
+      pageSize: 10,
+      filters: { [key]: inputValue } as SPFilters,
+      exactMatchMap: { [key]: false },
+      sortKey: key as SortableSPKey,
+      sortOrder: "asc",
     });
-  }, [cases, searchTerm, sortConfig, appliedFilters]);
 
-  const pageCount = Math.max(
-    1,
-    Math.ceil(filteredAndSorted.length / PAGE_SIZE),
-  );
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredAndSorted.slice(start, start + PAGE_SIZE);
-  }, [filteredAndSorted, currentPage]);
+    if (!result.success || !result.result) return [];
 
-  const stats = useMemo(() => {
-    const total = cases.length;
-    const now = new Date();
-    const thisMonth = cases.filter((c) => {
-      if (!c.date) return false;
-      const d = new Date(c.date);
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    }).length;
-    const natures = new Set(cases.map((c) => c.nature)).size;
-    const branches = new Set(cases.map((c) => c.raffledTo)).size;
-    return { total, thisMonth, natures, branches };
-  }, [cases]);
+    const values = result.result.items
+      .map((c) => {
+        const val = c[key as keyof SpecialProceedingData];
+        return val ? String(val) : "";
+      })
+      .filter((v) => v.length > 0);
+
+    return Array.from(new Set(values)).sort().slice(0, 10);
+  };
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const activeFilterCount = Object.keys(appliedFilters).length;
 
@@ -395,7 +385,7 @@ const Proceedings: React.FC = () => {
       popup.showError(result.error || "Failed to delete");
       return;
     }
-    setCases((prev) => prev.filter((c) => c.id !== id));
+    await fetchCases(currentPage);
     popup.showSuccess("Case deleted successfully");
   };
 
@@ -408,7 +398,7 @@ const Proceedings: React.FC = () => {
       popup.showError(result.error || "Upload failed");
     } else {
       popup.showSuccess("Cases imported successfully");
-      await fetchCases();
+      await fetchCases(currentPage);
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -506,8 +496,13 @@ const Proceedings: React.FC = () => {
                 type="text"
                 placeholder="Search cases..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={appliedFilters?.caseNumber || ""}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    caseNumber: e.target.value,
+                  }))
+                }
               />
             </div>
 
@@ -606,6 +601,7 @@ const Proceedings: React.FC = () => {
             options={SP_FILTER_OPTIONS}
             onApply={handleApplyFilters}
             initialValues={appliedFilters}
+            initialExactMatchMap={exactMatchMap}
             getSuggestions={getSuggestions}
           />
         </div>
@@ -615,7 +611,7 @@ const Proceedings: React.FC = () => {
           {[
             {
               label: "Total Cases",
-              value: stats.total ?? 0,
+              value: stats.totalCases ?? 0,
               subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
               icon: FiBarChart2,
               delay: 0,
@@ -629,7 +625,7 @@ const Proceedings: React.FC = () => {
             },
             {
               label: "Case Types",
-              value: stats.natures ?? 0,
+              value: stats.caseTypes ?? 0,
               subtitle: "Distinct types",
               icon: FiUsers,
               delay: 200,
@@ -725,7 +721,7 @@ const Proceedings: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {cases.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
@@ -742,7 +738,7 @@ const Proceedings: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginated.map((c) => (
+                cases.map((c) => (
                   <SpecialProceedingRow
                     key={c.id}
                     caseItem={c}

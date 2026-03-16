@@ -15,12 +15,16 @@ type CaseRelationKey =
   | "petition"
   | "specialProceeding";
 
-export const buildCaseWhereForRelation = <T extends z.ZodType>(
+export const buildCaseFind = <T extends z.ZodType>(
   schema: T,
   relationKey: CaseRelationKey,
   options?: FilterOptions<z.infer<T>>,
-): Prisma.CaseWhereInput => {
+): {
+  where?: Prisma.CaseWhereInput;
+  orderBy?: Prisma.CaseOrderByWithRelationInput;
+} => {
   const conditions: Prisma.CaseWhereInput[] = [];
+  const sortBy: Prisma.CaseOrderByWithRelationInput = {};
   const filters = options?.filters;
   const exactMatchMap = options?.exactMatchMap ?? {};
 
@@ -36,11 +40,27 @@ export const buildCaseWhereForRelation = <T extends z.ZodType>(
     dateKeys: [...baseCaseFieldKeys.dateKeys],
   });
 
+  const isSortForBaseCaseField = baseCaseFieldKeys.allKeys.includes(
+    options?.sortKey as string,
+  );
+  const isSortForRelatedCaseField = caseFieldKeys.allKeys.includes(
+    options?.sortKey as string,
+  );
+
+  if (isSortForBaseCaseField) {
+    sortBy[options?.sortKey as keyof Prisma.CaseOrderByWithRelationInput] =
+      options?.sortOrder ?? "desc";
+  } else if (isSortForRelatedCaseField) {
+    sortBy[relationKey] = {
+      [options?.sortKey as string]: options?.sortOrder ?? "desc",
+    } as Prisma.CaseOrderByWithRelationInput[CaseRelationKey];
+  }
+
   conditions.push({ [relationKey]: { isNot: null } });
 
   const addCaseStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
-    const isExact = exactMatchMap[key] ?? true;
+    const isExact = exactMatchMap[key] ?? false;
     const filter: Prisma.StringNullableFilter = {
       [isExact ? "equals" : "contains"]: value,
     };
@@ -49,7 +69,7 @@ export const buildCaseWhereForRelation = <T extends z.ZodType>(
 
   const addRelatedStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
-    const isExact = exactMatchMap[key] ?? true;
+    const isExact = exactMatchMap[key] ?? false;
     const filter: Prisma.StringNullableFilter = {
       [isExact ? "equals" : "contains"]: value,
     };
@@ -139,49 +159,11 @@ export const buildCaseWhereForRelation = <T extends z.ZodType>(
     } as Prisma.CaseWhereInput);
   });
 
-  if (options?.searchTerm) {
-    const search = options.searchTerm.trim();
-    if (search.length > 0) {
-      const orConditions: Prisma.CaseWhereInput[] = [
-        ...baseCaseFieldKeys.stringKeys.map((field) => ({
-          [field]: { contains: search },
-        })),
-        ...caseFieldKeys.stringKeys.map((field) => ({
-          [relationKey]: {
-            is: {
-              [field]: { contains: search },
-            },
-          },
-        })),
-      ];
-      const asNumber = Number(search);
-      if (!Number.isNaN(asNumber)) {
-        caseFieldKeys.numberKeys.forEach((field) => {
-          orConditions.push({
-            [relationKey]: {
-              is: {
-                [field]: asNumber,
-              },
-            },
-          });
-        });
-      }
-      conditions.push({ OR: orConditions });
-    }
-  }
-
   if (conditions.length === 0) return {};
-  return { AND: conditions };
+  return { where: { AND: conditions }, orderBy: sortBy };
 };
 
-export const buildCaseWhere = <T extends z.ZodType>(
-  schema: T,
-  options?: FilterOptions<z.infer<T>>,
-): Prisma.CaseWhereInput =>
-  buildCaseWhereForRelation(schema, "criminalCase", options);
-
 type BaseCaseData = Omit<BaseCaseSchemaType, "id">;
-type CriminalData = Prisma.CriminalCaseCreateWithoutCaseInput;
 
 const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, { all: ["id"] });
 const baseCaseKeySet = new Set([

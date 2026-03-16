@@ -1,6 +1,7 @@
 "use client";
 
 import Pagination from "@/app/components/Pagination/Pagination";
+import ActionDropdown from "@/app/components/Table/ActionDropdown";
 import TipCell from "@/app/components/Table/TipCell";
 import type { Employee } from "@/app/generated/prisma/browser";
 import {
@@ -11,13 +12,7 @@ import {
 } from "@/app/lib/utils";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
-import {
-  FiEdit,
-  FiEye,
-  FiMoreHorizontal,
-  FiTrash2,
-  FiUsers,
-} from "react-icons/fi";
+import { FiEdit, FiEye, FiTrash2, FiUsers } from "react-icons/fi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -287,37 +282,44 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                 </td>
               </tr>
             ) : (
-              paginated.map((emp) => (
-                <tr
-                  key={emp.id}
-                  onClick={() => router.push(`/user/employees/${emp.id}`)}
-                  className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100 cursor-pointer text-center"
-                >
-                  {/* ACTIONS */}
-                  <td
-                    className="py-4 px-5 text-center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex justify-center">
-                      <div className="dropdown dropdown-start">
-                        <button
-                          tabIndex={0}
-                          className="btn btn-ghost btn-xs px-2 text-base-content/40 hover:text-base-content"
-                          aria-label="Open actions"
-                        >
-                          <FiMoreHorizontal size={16} />
-                        </button>
-                        <ul
-                          tabIndex={0}
-                          className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-xl w-44 border border-base-200"
-                          style={{ zIndex: 9999 }}
+              paginated.map((emp) =>
+                (() => {
+                  const popoverId = `employee-actions-popover-${emp.id}`;
+                  const anchorName = `--employee-actions-anchor-${emp.id}`;
+
+                  const closeActionsPopover = () => {
+                    const popoverEl = document.getElementById(popoverId) as
+                      | (HTMLElement & { hidePopover?: () => void })
+                      | null;
+                    popoverEl?.hidePopover?.();
+                  };
+
+                  return (
+                    <tr
+                      key={emp.id}
+                      onClick={() => router.push(`/user/employees/${emp.id}`)}
+                      className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100 cursor-pointer text-center"
+                    >
+                      {/* ACTIONS */}
+                      <td
+                        className="py-4 px-5 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ActionDropdown
+                          popoverId={popoverId}
+                          anchorName={anchorName}
+                          buttonClassName="btn btn-ghost btn-xs px-2 text-base-content/40 hover:text-base-content"
+                          menuClassName="dropdown menu p-2 shadow-lg bg-base-100 rounded-xl w-44 border border-base-200"
+                          iconSize={16}
                         >
                           <li>
                             <button
                               className="flex items-center gap-3 text-info text-sm py-2"
-                              onClick={() =>
-                                router.push(`/user/employees/${emp.id}`)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                closeActionsPopover();
+                                router.push(`/user/employees/${emp.id}`);
+                              }}
                             >
                               <FiEye size={14} />
                               View
@@ -328,6 +330,7 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                               className="flex items-center gap-3 text-warning text-sm py-2"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                closeActionsPopover();
                                 onEdit(emp);
                               }}
                             >
@@ -340,6 +343,7 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                               className="flex items-center gap-3 text-error text-sm py-2"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                closeActionsPopover();
                                 onDelete(emp.id);
                               }}
                             >
@@ -347,95 +351,95 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                               Delete
                             </button>
                           </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </td>
+                        </ActionDropdown>
+                      </td>
 
-                  {/* Data cells with hover tooltip */}
-                  <TipCell
-                    label="Branch"
-                    value={emp.branch}
-                    className="py-4 px-5 text-base-content/80"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Full Name"
-                    value={emp.employeeName}
-                    className="py-4 px-5 font-semibold text-base-content"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Position"
-                    value={emp.position}
-                    className="py-4 px-5 text-base-content/80"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Employee Number"
-                    value={emp.employeeNumber}
-                    className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Contact Number"
-                    value={emp.contactNumber}
-                    className="py-4 px-5 text-center text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Email Address"
-                    value={emp.email}
-                    className="py-4 px-5 text-base-content/60"
-                    truncate
-                    clickHint
-                  />
-                  <TipCell
-                    label="Birthdate"
-                    value={formatDate(emp.birthDate)}
-                    className="py-4 px-5 text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Age"
-                    value={getAgeFromDate(emp.birthDate)}
-                    className="py-4 px-5 text-center text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Date Hired"
-                    value={formatDate(emp.dateHired)}
-                    className="py-4 px-5 text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Employment"
-                    value={
-                      emp.employmentType
-                        ? enumToText(emp.employmentType)
-                        : undefined
-                    }
-                    className="py-4 px-5 text-base-content/80"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Years in Service"
-                    value={getYearsInService(emp.dateHired)}
-                    className="py-4 px-5 text-center text-base-content/70"
-                    clickHint
-                  />
-                  <TipCell
-                    label="Retirement Eligibility"
-                    value={
-                      isRetirementEligible(emp.birthDate)
-                        ? "Eligible"
-                        : "Not Eligible"
-                    }
-                    className="py-4 px-5 text-base-content/80"
-                    clickHint
-                  />
-                </tr>
-              ))
+                      {/* Data cells with hover tooltip */}
+                      <TipCell
+                        label="Branch"
+                        value={emp.branch}
+                        className="py-4 px-5 text-base-content/80"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Full Name"
+                        value={emp.employeeName}
+                        className="py-4 px-5 font-semibold text-base-content"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Position"
+                        value={emp.position}
+                        className="py-4 px-5 text-base-content/80"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Employee Number"
+                        value={emp.employeeNumber}
+                        className="py-4 px-5 text-center font-mono text-[13px] text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Contact Number"
+                        value={emp.contactNumber}
+                        className="py-4 px-5 text-center text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Email Address"
+                        value={emp.email}
+                        className="py-4 px-5 text-base-content/60"
+                        truncate
+                        clickHint
+                      />
+                      <TipCell
+                        label="Birthdate"
+                        value={formatDate(emp.birthDate)}
+                        className="py-4 px-5 text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Age"
+                        value={getAgeFromDate(emp.birthDate)}
+                        className="py-4 px-5 text-center text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Date Hired"
+                        value={formatDate(emp.dateHired)}
+                        className="py-4 px-5 text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Employment"
+                        value={
+                          emp.employmentType
+                            ? enumToText(emp.employmentType)
+                            : undefined
+                        }
+                        className="py-4 px-5 text-base-content/80"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Years in Service"
+                        value={getYearsInService(emp.dateHired)}
+                        className="py-4 px-5 text-center text-base-content/70"
+                        clickHint
+                      />
+                      <TipCell
+                        label="Retirement Eligibility"
+                        value={
+                          isRetirementEligible(emp.birthDate)
+                            ? "Eligible"
+                            : "Not Eligible"
+                        }
+                        className="py-4 px-5 text-base-content/80"
+                        clickHint
+                      />
+                    </tr>
+                  );
+                })(),
+              )
             )}
           </tbody>
         </table>

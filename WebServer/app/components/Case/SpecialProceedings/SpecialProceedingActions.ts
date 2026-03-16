@@ -10,7 +10,7 @@ import {
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import {
-  buildCaseWhereForRelation,
+  buildCaseFind,
   DEFAULT_PAGE_SIZE,
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
@@ -23,6 +23,7 @@ import {
   SpecialProceedingData,
   SpecialProceedingSchema,
   SpecialProceedingsFilterOptions,
+  SpecialProceedingStats,
 } from "./schema";
 
 export async function getSpecialProceedings(
@@ -41,30 +42,30 @@ export async function getSpecialProceedings(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where = buildCaseWhereForRelation(
+    const find = buildCaseFind(
       SpecialProceedingSchema,
       "specialProceeding",
       options,
     );
-
-    const orderBy: Prisma.CaseOrderByWithRelationInput = {
-      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
-    } as Prisma.CaseOrderByWithRelationInput;
-
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
     const [cases, total] = await prisma.$transaction([
       prisma.case.findMany({
-        where,
-        orderBy,
+        where: find.where,
+        orderBy: find.orderBy,
         skip,
         take,
         include: {
-          specialProceeding: true,
+          specialProceeding: {
+            // Omit the 'id' field from the included specialProceeding to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
-      prisma.case.count({ where }),
+      prisma.case.count({ where: find.where }),
     ]);
 
     const specialProceedings: SpecialProceedingData[] = cases
@@ -73,6 +74,7 @@ export async function getSpecialProceedings(
           !!c.specialProceeding,
       )
       .map((c) => ({
+        // BaseCase must come second to ensure id and caseNumber from Case are used instead of any potential fields in SpecialProceeding
         ...c.specialProceeding,
         ...c,
       }));
@@ -87,6 +89,79 @@ export async function getSpecialProceedings(
   } catch (error) {
     console.error("Error fetching special proceedings:", error);
     return { success: false, error: "Error fetching special proceedings" };
+  }
+}
+
+export async function getSpecialProceedingStats(
+  options?: SpecialProceedingsFilterOptions,
+): Promise<ActionResult<SpecialProceedingStats>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const find = buildCaseFind(
+      SpecialProceedingSchema,
+      "specialProceeding",
+      options,
+    );
+
+    const [totalCases, thisMonth, distinctNatures, distinctBranches] =
+      await prisma.$transaction([
+        prisma.case.count({ where: find.where }),
+        prisma.case.count({
+          where: {
+            AND: [
+              find.where ?? {},
+              {
+                specialProceeding: {
+                  is: {
+                    date: {
+                      gte: new Date(
+                        new Date().getFullYear(),
+                        new Date().getMonth(),
+                        1,
+                      ),
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+        prisma.specialProceeding.findMany({
+          where: {
+            case: find.where,
+          },
+          select: {
+            nature: true,
+          },
+          distinct: ["nature"],
+        }),
+        prisma.specialProceeding.findMany({
+          where: {
+            case: find.where,
+          },
+          select: {
+            raffledTo: true,
+          },
+          distinct: ["raffledTo"],
+        }),
+      ]);
+
+    return {
+      success: true,
+      result: {
+        totalCases,
+        thisMonth,
+        caseTypes: distinctNatures.length,
+        branches: distinctBranches.length,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching special proceeding stats:", error);
+    return { success: false, error: "Error fetching special proceeding stats" };
   }
 }
 

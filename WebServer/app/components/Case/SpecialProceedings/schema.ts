@@ -10,6 +10,13 @@ export type SpecialProceedingsFilterOptions =
 export type SpecialProceedingFilters =
   SpecialProceedingsFilterOptions["filters"];
 
+export type SpecialProceedingStats = {
+  totalCases: number;
+  thisMonth: number;
+  caseTypes: number;
+  branches: number;
+};
+
 const SpecialProceedingObjectSchema = z.object({
   caseNumber: z
     .string()
@@ -115,3 +122,24 @@ export const createEmptyEntry = (): SpecialProceedingEntry => ({
   collapsed: false,
   saved: false,
 });
+
+export const calculateSpecialProceedingStats = (
+  cases: SpecialProceedingData[],
+): SpecialProceedingStats => {
+  const now = new Date();
+
+  const thisMonth = cases.filter((c) => {
+    if (!c.date) return false;
+    const d = new Date(c.date);
+    return (
+      d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    );
+  }).length;
+
+  return {
+    totalCases: cases.length,
+    thisMonth,
+    caseTypes: new Set(cases.map((c) => c.nature)).size,
+    branches: new Set(cases.map((c) => c.raffledTo)).size,
+  };
+};

@@ -4,7 +4,8 @@ import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
+import ActionDropdown from "../../Table/ActionDropdown";
 import Table from "../../Table/Table";
 import TipCell from "../../Table/TipCell";
 import type { CriminalCaseData } from "./schema";
@@ -43,6 +44,15 @@ const CriminalCaseRow = ({
   const isAdminOrAtty =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.ATTY;
+  const popoverId = `criminal-actions-popover-${caseItem.id}`;
+  const anchorName = `--criminal-actions-anchor-${caseItem.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
 
   return (
     <tr
@@ -58,55 +68,47 @@ const CriminalCaseRow = ({
           onClick={(e) => e.stopPropagation()}
           className="relative text-center"
         >
-          <div className="flex justify-center">
-            <div className="dropdown dropdown-start">
-              <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-                <FiMoreHorizontal size={18} />
-              </button>
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-                style={{ zIndex: 9999 }}
+          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+            <li>
+              <button
+                className="flex items-center gap-3 text-info"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  router.push(`/user/cases/criminal/${caseItem.id}`);
+                }}
               >
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-info"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/user/cases/criminal/${caseItem.id}`);
-                    }}
-                  >
-                    <FiEye size={16} />
-                    <span>View</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-warning"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(caseItem);
-                    }}
-                  >
-                    <FiEdit size={16} />
-                    <span>Edit</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="flex items-center gap-3 text-error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteCase(caseItem.id);
-                    }}
-                  >
-                    <FiTrash2 size={16} />
-                    <span>Delete</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
+                <FiEye size={16} />
+                <span>View</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-warning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onEdit(caseItem);
+                }}
+              >
+                <FiEdit size={16} />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  handleDeleteCase(caseItem.id);
+                }}
+              >
+                <FiTrash2 size={16} />
+                <span>Delete</span>
+              </button>
+            </li>
+          </ActionDropdown>
         </td>
       )}
 

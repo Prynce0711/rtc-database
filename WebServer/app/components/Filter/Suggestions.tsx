@@ -10,6 +10,7 @@ interface SuggestionsProps {
 
 const Suggestions: React.FC<SuggestionsProps> = ({ suggestions, onClick }) => {
   if (!suggestions || suggestions.length === 0) return null;
+
   return (
     <div className="absolute z-20 w-full mt-1.5 bg-base-100 border border-base-300/80 rounded-xl shadow-(--shadow-md) overflow-hidden max-h-56 overflow-y-auto">
       <div className="px-3 py-1.5 border-b border-base-200 bg-base-200/40">

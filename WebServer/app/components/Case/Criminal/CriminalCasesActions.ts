@@ -10,7 +10,7 @@ import {
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import {
-  buildCaseWhere,
+  buildCaseFind,
   DEFAULT_PAGE_SIZE,
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
@@ -42,26 +42,26 @@ export async function getCriminalCases(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where = buildCaseWhere(CriminalCaseSchema, options);
-
-    const orderBy: Prisma.CaseOrderByWithRelationInput = {
-      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
-    } as Prisma.CaseOrderByWithRelationInput;
-
+    const find = buildCaseFind(CriminalCaseSchema, "criminalCase", options);
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
     const [cases, total] = await prisma.$transaction([
       prisma.case.findMany({
-        where,
-        orderBy,
         skip,
         take,
         include: {
-          criminalCase: true,
+          criminalCase: {
+            // Omit the 'id' field from the included criminalCase to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
+        where: find.where,
+        orderBy: find.orderBy,
       }),
-      prisma.case.count({ where }),
+      prisma.case.count({ where: find.where }),
     ]);
 
     const caseCombined: CriminalCaseData[] = cases
@@ -69,8 +69,9 @@ export async function getCriminalCases(
         (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
       )
       .map((c) => ({
-        ...c,
+        // BaseCase must come second to ensure id and caseNumber from Case are used instead of any potential fields in CriminalCase
         ...c.criminalCase,
+        ...c,
       }));
 
     return {
@@ -95,16 +96,16 @@ export async function getCriminalCaseStats(
       return sessionResult;
     }
 
-    const where = buildCaseWhere(CriminalCaseSchema, options);
+    const find = buildCaseFind(CriminalCaseSchema, "criminalCase", options);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [total, detainedCount, pendingCount, recentCount] =
       await prisma.$transaction([
-        prisma.case.count({ where }),
+        prisma.case.count({ where: find.where }),
         prisma.case.count({
           where: {
             AND: [
-              where,
+              find.where ?? {},
               {
                 criminalCase: {
                   is: {
@@ -125,7 +126,7 @@ export async function getCriminalCaseStats(
         prisma.case.count({
           where: {
             AND: [
-              where,
+              find.where ?? {},
               {
                 criminalCase: {
                   is: {
@@ -138,7 +139,7 @@ export async function getCriminalCaseStats(
         }),
         prisma.case.count({
           where: {
-            AND: [where, { dateFiled: { gte: thirtyDaysAgo } }],
+            AND: [find.where ?? {}, { dateFiled: { gte: thirtyDaysAgo } }],
           },
         }),
       ]);

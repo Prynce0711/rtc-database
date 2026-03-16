@@ -5,7 +5,8 @@ import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FiEdit, FiEye, FiMoreHorizontal, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
+import ActionDropdown from "../../Table/ActionDropdown";
 import { ReceiveLog } from "./ReceiveRecord";
 
 function ExpandableContent({
@@ -79,6 +80,15 @@ const ReceiveRow = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const popoverId = `receive-actions-popover-${log.id}`;
+  const anchorName = `--receive-actions-anchor-${log.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
 
   const openModal = (e?: React.SyntheticEvent) => {
     e?.stopPropagation();
@@ -113,52 +123,47 @@ const ReceiveRow = ({
 
             {/* Admin dropdown (keeps Edit/Delete) */}
             {isAdminOrAtty && (
-              <div className="dropdown dropdown-start">
-                <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-                  <FiMoreHorizontal size={18} />
-                </button>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-                  style={{ zIndex: 9999 }}
-                >
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-info"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <FiEye size={16} />
-                      <span>View</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-warning"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEdit(log);
-                      }}
-                    >
-                      <FiEdit size={16} />
-                      <span>Edit</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-error"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(log);
-                      }}
-                    >
-                      <FiTrash2 size={16} />
-                      <span>Delete</span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
+              <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-info"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeActionsPopover();
+                      router.push(`/user/cases/proceedings/${log.id}`);
+                    }}
+                  >
+                    <FiEye size={16} />
+                    <span>View</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-warning"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeActionsPopover();
+                      onEdit(log);
+                    }}
+                  >
+                    <FiEdit size={16} />
+                    <span>Edit</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className="flex items-center gap-3 text-error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeActionsPopover();
+                      onDelete(log);
+                    }}
+                  >
+                    <FiTrash2 size={16} />
+                    <span>Delete</span>
+                  </button>
+                </li>
+              </ActionDropdown>
             )}
           </div>
         </td>

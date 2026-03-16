@@ -51,7 +51,6 @@ const ReceiveLogsPage: React.FC = () => {
 
   const statusPopup = usePopup();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PetitionCaseData;
     order: "asc" | "desc";
@@ -78,7 +77,7 @@ const ReceiveLogsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters]);
+  }, [appliedFilters]);
 
   useEffect(() => {
     fetchLogs();
@@ -112,15 +111,8 @@ const ReceiveLogsPage: React.FC = () => {
       Object.keys(appliedFilters).length > 0 ? filteredByAdvanced : logs;
 
     let filtered = baseList;
-    if (searchTerm) {
-      filtered = baseList.filter((log) =>
-        Object.values(log).some((value) =>
-          value?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
-      );
-    }
     return sortPetitions(filtered, sortConfig.key, sortConfig.order);
-  }, [logs, searchTerm, sortConfig, appliedFilters, filteredByAdvanced]);
+  }, [logs, sortConfig, appliedFilters, filteredByAdvanced]);
   const pageCount = Math.max(
     1,
     Math.ceil(filteredAndSorted.length / PAGE_SIZE),
@@ -352,10 +344,15 @@ const ReceiveLogsPage: React.FC = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search petition logs..."
+              placeholder="Search case number..."
               className="input input-bordered input-lg w-full pl-12 text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
             <button
               className="btn btn-outline flex items-center gap-2"

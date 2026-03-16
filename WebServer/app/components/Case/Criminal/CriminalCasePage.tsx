@@ -41,6 +41,9 @@ import {
   type CriminalCasesFilterOptions,
 } from "./schema";
 
+// TODO: Fix search bar
+// TODO: Fix actions dropdown
+
 type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
 type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
@@ -72,7 +75,7 @@ const CriminalCasePage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const statusPopup = usePopup();
 
-  const [searchTerm, setSearchTerm] = useState("");
+  // const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     order: "asc" | "desc";
@@ -121,24 +124,21 @@ const CriminalCasePage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters]);
+  }, [appliedFilters]);
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
       try {
-        setLoading(true);
         const [casesRes, statsRes] = await Promise.all([
           getCriminalCases({
             page,
             pageSize,
-            searchTerm,
             filters: appliedFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getCriminalCaseStats({
-            searchTerm,
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -172,7 +172,6 @@ const CriminalCasePage: React.FC = () => {
       currentPage,
       exactMatchMap,
       pageSize,
-      searchTerm,
       sortConfig,
       statusPopup,
     ],
@@ -415,10 +414,15 @@ const CriminalCasePage: React.FC = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search Criminal cases..."
+              placeholder="Search Case Number..."
               className="input input-bordered input-lg w-full pl-12 text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
             <input
               ref={fileInputRef}

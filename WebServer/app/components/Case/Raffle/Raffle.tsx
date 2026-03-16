@@ -1,5 +1,6 @@
 "use client";
 
+import ActionDropdown from "@/app/components/Table/ActionDropdown";
 import TipCell from "@/app/components/Table/TipCell";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -26,7 +27,6 @@ import {
   FiFileText,
   FiFolder,
   FiLock,
-  FiMoreHorizontal,
   FiPlus,
   FiSave,
   FiSearch,
@@ -1062,100 +1062,104 @@ const NotarialRow = ({
   onEdit: (r: NotarialRecord) => void;
   onDelete: (id: number) => void;
   onRowClick: (r: NotarialRecord) => void;
-}) => (
-  <tr
-    className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-    onClick={() => onRowClick(record)}
-  >
-    <td onClick={(e) => e.stopPropagation()} className="text-center">
-      <div className="flex justify-center">
-        <div className="dropdown dropdown-start">
-          <button tabIndex={0} className="btn btn-ghost btn-sm px-2">
-            <FiMoreHorizontal size={18} />
-          </button>
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
-            style={{ zIndex: 9999 }}
-          >
-            <li>
-              <button
-                className="flex items-center gap-3 text-info"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRowClick(record);
-                }}
-              >
-                <FiEye size={16} />
-                <span>View</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-warning"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(record);
-                }}
-              >
-                <FiEdit size={16} />
-                <span>Edit</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(record.id);
-                }}
-              >
-                <FiTrash2 size={16} />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </td>
-    <TipCell
-      label="Title"
-      value={record.title}
-      truncate
-      className="font-semibold"
-    />
-    <TipCell label="Name" value={record.name} truncate />
-    <TipCell label="Attorney" value={record.atty} truncate />
-    <TipCell
-      label="Date"
-      value={formatDate(record.date)}
-      className="text-base-content/70"
-    />
-    <td
-      className="text-center relative group/tip"
-      onClick={(e) => e.stopPropagation()}
+}) => {
+  const popoverId = `raffle-actions-popover-${record.id}`;
+  const anchorName = `--raffle-actions-anchor-${record.id}`;
+
+  const closeActionsPopover = () => {
+    const popoverEl = document.getElementById(popoverId) as
+      | (HTMLElement & { hidePopover?: () => void })
+      | null;
+    popoverEl?.hidePopover?.();
+  };
+
+  return (
+    <tr
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      onClick={() => onRowClick(record)}
     >
-      {record.link ? (
-        <a
-          href="#"
-          className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
-          title={record.link}
-        >
-          <FiExternalLink size={12} />
-          <span className="truncate">{record.link.split("\\").pop()}</span>
-        </a>
-      ) : (
-        <span className="text-base-content/30">—</span>
-      )}
-      {record.link && (
-        <div className="cell-tip">
-          <span className="cell-tip-label">File / Link</span>
-          <span className="cell-tip-value">{record.link}</span>
-        </div>
-      )}
-    </td>
-  </tr>
-);
+      <td onClick={(e) => e.stopPropagation()} className="text-center">
+        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+          <li>
+            <button
+              className="flex items-center gap-3 text-info"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onRowClick(record);
+              }}
+            >
+              <FiEye size={16} />
+              <span>View</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-warning"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onEdit(record);
+              }}
+            >
+              <FiEdit size={16} />
+              <span>Edit</span>
+            </button>
+          </li>
+          <li>
+            <button
+              className="flex items-center gap-3 text-error"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeActionsPopover();
+                onDelete(record.id);
+              }}
+            >
+              <FiTrash2 size={16} />
+              <span>Delete</span>
+            </button>
+          </li>
+        </ActionDropdown>
+      </td>
+      <TipCell
+        label="Title"
+        value={record.title}
+        truncate
+        className="font-semibold"
+      />
+      <TipCell label="Name" value={record.name} truncate />
+      <TipCell label="Attorney" value={record.atty} truncate />
+      <TipCell
+        label="Date"
+        value={formatDate(record.date)}
+        className="text-base-content/70"
+      />
+      <td
+        className="text-center relative group/tip"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {record.link ? (
+          <a
+            href="#"
+            className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
+            title={record.link}
+          >
+            <FiExternalLink size={12} />
+            <span className="truncate">{record.link.split("\\").pop()}</span>
+          </a>
+        ) : (
+          <span className="text-base-content/30">—</span>
+        )}
+        {record.link && (
+          <div className="cell-tip">
+            <span className="cell-tip-label">File / Link</span>
+            <span className="cell-tip-value">{record.link}</span>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 

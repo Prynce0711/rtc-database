@@ -10,7 +10,7 @@ import {
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import {
-  buildCaseWhereForRelation,
+  buildCaseFind,
   DEFAULT_PAGE_SIZE,
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
@@ -41,30 +41,26 @@ export async function getPetitions(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where = buildCaseWhereForRelation(
-      PetitionSchema,
-      "petition",
-      options,
-    );
-
-    const orderBy: Prisma.CaseOrderByWithRelationInput = {
-      [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
-    } as Prisma.CaseOrderByWithRelationInput;
-
+    const find = buildCaseFind(PetitionSchema, "petition", options);
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
     const [cases, total] = await prisma.$transaction([
       prisma.case.findMany({
-        where,
-        orderBy,
+        where: find.where,
+        orderBy: find.orderBy,
         skip,
         take,
         include: {
-          petition: true,
+          petition: {
+            // Omit the 'id' field from the included petition to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
-      prisma.case.count({ where }),
+      prisma.case.count({ where: find.where }),
     ]);
 
     const petitionCases: PetitionCaseData[] = cases
