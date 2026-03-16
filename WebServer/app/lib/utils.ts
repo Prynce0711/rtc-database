@@ -244,6 +244,7 @@ export const getSchemaFieldKeys = <T extends z.ZodType>(
   dateKeys: string[];
   numberKeys: string[];
   enumKeys: string[];
+  allKeys: string[];
 } => {
   const shapes = collectZodShapes(schema);
   const stringKeys = new Set<string>();
@@ -287,6 +288,9 @@ export const getSchemaFieldKeys = <T extends z.ZodType>(
     dateKeys: Array.from(dateKeys),
     numberKeys: Array.from(numberKeys),
     enumKeys: Array.from(enumKeys),
+    allKeys: Array.from(
+      new Set([...stringKeys, ...dateKeys, ...numberKeys, ...enumKeys]),
+    ),
   };
 };
 

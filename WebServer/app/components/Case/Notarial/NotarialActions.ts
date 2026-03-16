@@ -68,19 +68,6 @@ function buildNotarialWhere(
     });
   }
 
-  if (options?.searchTerm) {
-    const search = options.searchTerm.trim();
-    if (search.length > 0) {
-      conditions.push({
-        OR: [
-          { title: { contains: search } },
-          { name: { contains: search } },
-          { attorney: { contains: search } },
-        ],
-      });
-    }
-  }
-
   return conditions.length > 0 ? { AND: conditions } : {};
 }
 

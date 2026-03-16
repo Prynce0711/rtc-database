@@ -55,18 +55,19 @@ const FilterModal: React.FC<FilterModalProps> = ({
     setSuggestions([]);
   };
 
-  const fetchSuggestions = (key: string, overrideValue?: string) => {
-    if (!getSuggestions) return;
-    const value = overrideValue ?? (filters[key] as string) ?? "";
-    Promise.resolve(getSuggestions(key, value))
-      .then((sugs) => {
-        if (focusedFilter !== key) return;
-        setSuggestions((sugs || []).slice(0, 8));
-      })
-      .catch(() => {
-        if (focusedFilter === key) setSuggestions([]);
-      });
-  };
+  useEffect(() => {
+    if (!focusedFilter || !getSuggestions) return;
+
+    const value = (filters[focusedFilter] as string) ?? "";
+
+    const id = setTimeout(() => {
+      Promise.resolve(getSuggestions(focusedFilter, value))
+        .then((sugs) => setSuggestions((sugs || []).slice(0, 8)))
+        .catch(() => setSuggestions([]));
+    }, 200); // debounce
+
+    return () => clearTimeout(id);
+  }, [focusedFilter, filters, getSuggestions]);
 
   const resetFilters = () => {
     setEnabledFilters(new Set());
@@ -148,12 +149,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   onChange={handleFilterChange}
                   onInputChange={(k, v) => {
                     setFocusedFilter(k);
-                    fetchSuggestions(k, v);
+                    handleFilterChange(k, v);
                   }}
                   focused={focusedFilter === option.key}
                   onFocus={(k) => {
                     setFocusedFilter(k);
-                    fetchSuggestions(k);
                   }}
                   onBlur={() => setTimeout(() => setFocusedFilter(null), 200)}
                   suggestions={focusedFilter === option.key ? suggestions : []}

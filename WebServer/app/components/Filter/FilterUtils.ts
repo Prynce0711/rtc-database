@@ -10,7 +10,6 @@ export type ConvertToFilter<T> = {
 export type FilterOptions<T> = {
   page?: number;
   pageSize?: number;
-  searchTerm?: string;
   filters?: ConvertToFilter<T>;
   sortKey?: keyof T;
   sortOrder?: "asc" | "desc";

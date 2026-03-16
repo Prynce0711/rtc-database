@@ -1265,7 +1265,6 @@ const Civil: React.FC = () => {
     remandedCases: 0,
     recentlyFiled: 0,
   });
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "dateFiled",
     order: "desc",
@@ -1285,7 +1284,7 @@ const Civil: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters]);
+  }, [appliedFilters]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
@@ -1303,14 +1302,12 @@ const Civil: React.FC = () => {
           getCivilCases({
             page,
             pageSize: PAGE_SIZE,
-            searchTerm,
             filters: appliedFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getCivilCaseStats({
-            searchTerm,
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -1349,7 +1346,6 @@ const Civil: React.FC = () => {
       appliedFilters,
       currentPage,
       exactMatchMap,
-      searchTerm,
       sortConfig.key,
       sortConfig.order,
       statusPopup,
@@ -1582,8 +1578,13 @@ const Civil: React.FC = () => {
                 type="text"
                 placeholder="Search by case number, branch, petitioner..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={appliedFilters?.caseNumber || ""}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    caseNumber: e.target.value,
+                  }))
+                }
               />
             </div>
 

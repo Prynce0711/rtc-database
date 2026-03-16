@@ -52,6 +52,10 @@ const FilterRow: React.FC<FilterRowProps> = ({
   exactMatch = false,
   onExactMatchChange,
 }) => {
+  if (focused && suggestions.length > 0) {
+    console.log(`Showing suggestions for ${option.key}:`, suggestions);
+  }
+
   return (
     <div
       className={[
@@ -104,7 +108,7 @@ const FilterRow: React.FC<FilterRowProps> = ({
           enabled ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         ].join(" ")}
       >
-        <div className="overflow-hidden">
+        <div className={enabled ? "" : "overflow-hidden"}>
           <div className="px-4 pb-4 pt-1 space-y-3">
             {/* Exact / Partial match toggle for text filters */}
             {option.type === "text" && onExactMatchChange && (

@@ -1235,7 +1235,6 @@ const NotarialPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "date",
     order: "desc",
@@ -1397,14 +1396,12 @@ const NotarialPage: React.FC = () => {
           getNotarialPage({
             page,
             pageSize: PAGE_SIZE,
-            searchTerm,
             filters: serverFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getNotarialStats({
-            searchTerm,
             filters: serverFilters,
             exactMatchMap,
           }),
@@ -1441,19 +1438,12 @@ const NotarialPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [
-      appliedFilters,
-      currentPage,
-      exactMatchMap,
-      searchTerm,
-      sortConfig,
-      toServerFilters,
-    ],
+    [appliedFilters, currentPage, exactMatchMap, sortConfig, toServerFilters],
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
+  }, [appliedFilters, sortConfig, exactMatchMap]);
 
   useEffect(() => {
     void refreshFromBackend(currentPage);
@@ -1630,10 +1620,15 @@ const NotarialPage: React.FC = () => {
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
               <input
                 type="text"
-                placeholder="Search by title, name, attorney..."
+                placeholder="Search by title..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={appliedFilters?.title || ""}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
+                }
               />
             </div>
 

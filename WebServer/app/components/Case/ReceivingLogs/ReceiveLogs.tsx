@@ -183,7 +183,6 @@ const ReceiveLogsPage: React.FC = () => {
 
   const statusPopup = usePopup();
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: ReceiveSortKey;
     order: "asc" | "desc";
@@ -215,7 +214,7 @@ const ReceiveLogsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, appliedFilters, sortConfig, exactMatchMap]);
+  }, [appliedFilters, sortConfig, exactMatchMap]);
 
   const refreshFromBackend = useCallback(
     async (page = currentPage) => {
@@ -226,14 +225,12 @@ const ReceiveLogsPage: React.FC = () => {
           getRecievingLogsPage({
             page,
             pageSize: PAGE_SIZE,
-            searchTerm,
             filters: appliedFilters,
             sortKey: sortConfig.key,
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
           getRecievingLogsStats({
-            searchTerm,
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -262,7 +259,7 @@ const ReceiveLogsPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [appliedFilters, currentPage, exactMatchMap, searchTerm, sortConfig],
+    [appliedFilters, currentPage, exactMatchMap, sortConfig],
   );
 
   useEffect(() => {
@@ -429,10 +426,15 @@ const ReceiveLogsPage: React.FC = () => {
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search receiving logs..."
+              placeholder="Search case number..."
               className="input input-bordered input-lg w-full pl-12 text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
             <input
               ref={fileInputRef}
