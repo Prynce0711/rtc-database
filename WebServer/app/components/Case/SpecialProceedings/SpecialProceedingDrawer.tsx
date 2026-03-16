@@ -21,7 +21,7 @@ import { usePopup } from "../../Popup/PopupProvider";
 import {
   createSpecialProceeding,
   updateSpecialProceeding,
-} from "./SpecialProceedingsActions";
+} from "./SpecialProceedingActions";
 import {
   createEmptyEntry,
   SpecialProceedingData,

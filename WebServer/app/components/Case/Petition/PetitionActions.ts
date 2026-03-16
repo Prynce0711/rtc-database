@@ -52,7 +52,12 @@ export async function getPetitions(
         skip,
         take,
         include: {
-          petition: true,
+          petition: {
+            // Omit the 'id' field from the included petition to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
       prisma.case.count({ where: find.where }),

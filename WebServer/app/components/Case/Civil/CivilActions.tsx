@@ -53,7 +53,12 @@ export async function getCivilCases(
         skip,
         take,
         include: {
-          civilCase: true,
+          civilCase: {
+            // Omit the 'id' field from the included civilCase to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
       prisma.case.count({ where: find.where }),
@@ -62,8 +67,8 @@ export async function getCivilCases(
     const caseCombined: CivilCaseData[] = cases
       .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
       .map((c) => ({
-        ...c,
         ...c.civilCase,
+        ...c,
       }));
 
     return {

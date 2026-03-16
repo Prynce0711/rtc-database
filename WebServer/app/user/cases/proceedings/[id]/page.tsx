@@ -4,7 +4,7 @@ import type { SpecialProceedingData } from "@/app/components/Case/SpecialProceed
 import {
   getSpecialProceedingById,
   getSpecialProceedings,
-} from "@/app/components/Case/SpecialProceedings/SpecialProceedingsActions";
+} from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
 import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

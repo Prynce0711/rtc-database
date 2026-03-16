@@ -57,7 +57,12 @@ export async function getSpecialProceedings(
         skip,
         take,
         include: {
-          specialProceeding: true,
+          specialProceeding: {
+            // Omit the 'id' field from the included specialProceeding to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
       }),
       prisma.case.count({ where: find.where }),
@@ -69,6 +74,7 @@ export async function getSpecialProceedings(
           !!c.specialProceeding,
       )
       .map((c) => ({
+        // BaseCase must come second to ensure id and caseNumber from Case are used instead of any potential fields in SpecialProceeding
         ...c.specialProceeding,
         ...c,
       }));

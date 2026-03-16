@@ -25,13 +25,13 @@ import {
 } from "../../Filter/FilterTypes";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
-import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
-import SpecialProceedingRow from "./SpecialProceedingRow";
 import {
   deleteSpecialProceeding,
   getSpecialProceedingStats,
   getSpecialProceedings,
-} from "./SpecialProceedingsActions";
+} from "./SpecialProceedingActions";
+import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
+import SpecialProceedingRow from "./SpecialProceedingRow";
 import {
   SpecialProceedingData,
   SpecialProceedingStats,

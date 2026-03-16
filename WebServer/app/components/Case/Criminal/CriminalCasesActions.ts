@@ -51,7 +51,12 @@ export async function getCriminalCases(
         skip,
         take,
         include: {
-          criminalCase: true,
+          criminalCase: {
+            // Omit the 'id' field from the included criminalCase to avoid conflicts with the Case's 'id'
+            omit: {
+              id: true,
+            },
+          },
         },
         where: find.where,
         orderBy: find.orderBy,
@@ -64,8 +69,9 @@ export async function getCriminalCases(
         (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
       )
       .map((c) => ({
-        ...c,
+        // BaseCase must come second to ensure id and caseNumber from Case are used instead of any potential fields in CriminalCase
         ...c.criminalCase,
+        ...c,
       }));
 
     return {
