@@ -1,13 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  FiCalendar,
-  FiDownload,
-  FiFileText,
-  FiPlus,
-  FiUpload,
-} from "react-icons/fi";
+import { useEffect, useMemo, useState } from "react";
+import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
 import {
@@ -66,7 +60,6 @@ export default function MonthlyPage() {
   const [activeCategoryView, setActiveCategoryView] =
     useState<MonthlyCategoryView>("New Cases Filed");
   const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [showAddPage, setShowAddPage] = useState(false);
   const [showViewPage, setShowViewPage] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -74,8 +67,6 @@ export default function MonthlyPage() {
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -192,43 +183,6 @@ export default function MonthlyPage() {
     XLSX.writeFile(workbook, `Monthly-Report-${selectedMonth}.xlsx`);
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawData =
-        XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-
-      const parsed: MonthlyRow[] = rawData.map((row) => ({
-        month: selectedMonth,
-        category: String(row["Category"] ?? ""),
-        branch: String(row["Branch"] ?? ""),
-        criminal: Number(row["Criminal"] ?? 0),
-        civil: Number(row["Civil"] ?? 0),
-        total: Number(row["Total"] ?? 0),
-      }));
-
-      const res = await upsertMonthlyStatistics(parsed);
-      if (res.success) {
-        // Reload from DB to get authoritative data
-        const fresh = await getMonthlyStatistics(selectedMonth);
-        if (fresh.success) setImportedData(fresh.result);
-      } else {
-        console.error("Import failed to save:", res.error);
-      }
-    } catch (err) {
-      console.error("Import failed:", err);
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
-
   if (showAddPage) {
     return (
       <AddReportPage
@@ -286,26 +240,11 @@ export default function MonthlyPage() {
               <div className="flex flex-col items-end gap-3">
                 <input
                   type="month"
-                  className="input input-bordered input-md w-72"
+                  className="input input-bordered input-md w-66"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                 />
                 <div className="flex items-center gap-2 flex-nowrap">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={handleImport}
-                  />
-                  <button
-                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import"}
-                  </button>
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
                     onClick={handleExport}
