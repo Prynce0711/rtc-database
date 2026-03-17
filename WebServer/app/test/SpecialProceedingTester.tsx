@@ -12,6 +12,7 @@ import {
   updateSpecialProceeding,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
 import { useEffect, useState } from "react";
+import { deleteAllSpecialProceedings } from "./TestActions";
 
 type SpecialProceedingFormEntry = {
   caseNumber: string;
@@ -215,6 +216,31 @@ export default function SpecialProceedingTester() {
     setLoading(false);
   };
 
+  const handleDeleteAll = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete ALL special proceedings? This cannot be undone.",
+      )
+    )
+      return;
+
+    setLoading(true);
+    const result = await deleteAllSpecialProceedings();
+    if (result.success) {
+      setMessage({
+        type: "success",
+        text: "All special proceedings deleted successfully",
+      });
+      await loadSpecialProceedings();
+    } else {
+      setMessage({
+        type: "error",
+        text: result.error || "Failed to delete all special proceedings",
+      });
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
@@ -358,6 +384,13 @@ export default function SpecialProceedingTester() {
                   className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 disabled:opacity-50"
                 >
                   Export Excel
+                </button>
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={loading}
+                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 disabled:opacity-50"
+                >
+                  Delete All
                 </button>
                 <label className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 cursor-pointer">
                   Import Excel

@@ -36,15 +36,31 @@ const SpecialProceedingObjectSchema = z.object({
         "SPC No.",
       ]),
     ),
-  petitioner: z.string().nullable().optional(),
-  raffledTo: z.string().nullable().optional(),
+  petitioner: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Petitioner", "Petitioner Name", "Petitioner/s"])),
+  raffledTo: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Raffled To", "Raffled Judge", "Raffled"])),
   date: z.coerce
     .date()
     .nullable()
     .optional()
     .describe(excelHeaders(["Date", "DATE", "Date Filed", "Filing Date"])),
-  nature: z.string().nullable().optional(),
-  respondent: z.string().nullable().optional(),
+  nature: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Nature", "Nature of Case"])),
+  respondent: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Respondent", "Respondent Name", "Respondent/s"])),
 });
 
 export const SpecialProceedingSchema = BaseCaseSchema.merge(

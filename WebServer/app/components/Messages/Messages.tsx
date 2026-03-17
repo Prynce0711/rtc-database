@@ -76,44 +76,6 @@ interface Conversation {
   isTyping?: boolean;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const CURRENT_USER_ID = "me";
-
-const mockUsers: User[] = [
-  { id: "u1", name: "Atty. Maria Santos", role: "atty", isOnline: true },
-  { id: "u2", name: "Juan Dela Cruz", role: "user", isOnline: true },
-  {
-    id: "u3",
-    name: "Admin Rodriguez",
-    role: "admin",
-    isOnline: false,
-    lastSeen: "2026-02-27T08:30:00",
-  },
-  {
-    id: "u4",
-    name: "Atty. Carlos Reyes",
-    role: "atty",
-    isOnline: false,
-    lastSeen: "2026-02-27T07:15:00",
-  },
-  { id: "u5", name: "Elena Garcia", role: "user", isOnline: true },
-  {
-    id: "u6",
-    name: "Atty. Sofia Mendoza",
-    role: "atty",
-    isOnline: false,
-    lastSeen: "2026-02-26T18:45:00",
-  },
-  { id: "u7", name: "Roberto Tan", role: "user", isOnline: true },
-  {
-    id: "u8",
-    name: "Admin Patricia Lim",
-    role: "admin",
-    isOnline: false,
-    lastSeen: "2026-02-27T09:00:00",
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatTime = (iso: string) => {
   const d = new Date(iso);
@@ -345,7 +307,7 @@ const Messages: React.FC = () => {
   const session = useSession();
   const statusPopup = usePopup();
   const currentUserId = session.data?.user?.id ?? "";
-  const viewerId = currentUserId || CURRENT_USER_ID;
+  const viewerId = currentUserId;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -674,7 +636,7 @@ const Messages: React.FC = () => {
   }, [groupMembers, groupName, loadChats, statusPopup]);
 
   // ── Online users scroll ─────────────────────────────────────────────────
-  const onlineUsers = useMemo(() => mockUsers.filter((u) => u.isOnline), []);
+  const onlineUsers: User[] = [];
   const ONLINE_VISIBLE = 4;
   const canScrollOnlineLeft = onlineScrollOffset > 0;
   const canScrollOnlineRight =
