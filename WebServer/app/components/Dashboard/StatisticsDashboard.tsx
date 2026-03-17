@@ -293,7 +293,7 @@ const StatisticsDashboard: React.FC = () => {
             className="btn btn-sm btn-ghost gap-2 text-base-content/60 hover:text-base-content"
             onClick={fetchAll}
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={25} />
             Refresh
           </button>
         </motion.div>

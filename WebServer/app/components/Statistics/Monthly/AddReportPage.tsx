@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FiArrowLeft,
   FiCheck,
@@ -11,8 +11,10 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
-import { BRANCH_OPTIONS, CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
+import * as XLSX from "xlsx";
+import { CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
 
@@ -79,6 +81,65 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   const [step, setStep] = useState<"edit" | "review">("edit");
 
   const tableRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!importFeedback) return;
+    const t = setTimeout(() => setImportFeedback(null), 4000);
+    return () => clearTimeout(t);
+  }, [importFeedback]);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+
+      // Case-insensitive column lookup
+      const findCol = (row: Record<string, unknown>, name: string) => {
+        const key = Object.keys(row).find(
+          (k) => k.trim().toLowerCase() === name.toLowerCase(),
+        );
+        return key !== undefined ? row[key] : undefined;
+      };
+
+      const imported: EditableRow[] = rawData.map((excelRow) => ({
+        id: crypto.randomUUID(),
+        category: String(findCol(excelRow, "Category") ?? ""),
+        branch: String(findCol(excelRow, "Branch") ?? ""),
+        criminal: Number(findCol(excelRow, "Criminal") ?? 0),
+        civil: Number(findCol(excelRow, "Civil") ?? 0),
+      }));
+
+      if (imported.length > 0) {
+        setRows((prev) => {
+          const hasData = prev.some(
+            (r) => r.category || r.branch || r.criminal || r.civil,
+          );
+          return hasData ? [...prev, ...imported] : imported;
+        });
+        setImportFeedback(
+          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel`,
+        );
+      } else {
+        setImportFeedback(
+          "No data found. Make sure columns are: Category, Branch, Criminal, Civil",
+        );
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      setImportFeedback("Import failed. Check that the file is a valid Excel file.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   const monthLabel = new Date(month + "-01").toLocaleDateString("en-US", {
     month: "long",
@@ -435,6 +496,46 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
               }}
             />
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <button
+              className={`btn btn-outline btn-info gap-2${uploading ? " loading" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <FiUpload size={15} />
+              {uploading ? "Importing..." : "Import"}
+            </button>
+
+            {importFeedback && (
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: importFeedback.startsWith("✓")
+                    ? "var(--color-success, #22c55e)"
+                    : "var(--color-error, #ef4444)",
+                  maxWidth: 280,
+                }}
+              >
+                {importFeedback}
+              </span>
+            )}
+
+            <div
+              style={{
+                width: 1,
+                height: 28,
+                background: "var(--surface-border)",
+                margin: "0 4px",
+              }}
+            />
+
             <button
               className="btn btn-info btn-outline gap-2"
               onClick={duplicateSelectedRows}
@@ -601,9 +702,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                             setActiveCell({ rowIdx: idx, col: "branch" })
                           }
                         >
-                          <select
+                          <input
+                            type="text"
                             className="xls-input"
                             value={row.branch}
+                            placeholder="Type branch…"
                             onChange={(e) =>
                               updateCell(row.id, "branch", e.target.value)
                             }
@@ -611,16 +714,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               setActiveCell({ rowIdx: idx, col: "branch" })
                             }
                             onKeyDown={(e) => handleKeyDown(e, idx, "branch")}
-                          >
-                            <option value="" disabled>
-                              Select branch…
-                            </option>
-                            {BRANCH_OPTIONS.map((b) => (
-                              <option key={b} value={b}>
-                                {b}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </td>
 
                         {/* Criminal */}

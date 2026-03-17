@@ -1,7 +1,7 @@
 "use client";
 
-import { BarChart3, Trophy } from "lucide-react";
-import React, { useMemo } from "react";
+import { BarChart3, FileText, LayoutList } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { FiArrowLeft, FiCalendar } from "react-icons/fi";
 
 import type { MonthlyRow } from "./Schema";
@@ -15,8 +15,6 @@ export interface ViewReportPageProps {
   month: string;
   onBack: () => void;
 }
-
-import { CATEGORY_BADGE } from "./MonthlyUtils";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -32,16 +30,6 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
     year: "numeric",
   });
 
-  /* ---- Grouped data ---- */
-  const grouped = useMemo(() => {
-    const map = new Map<string, MonthlyRow[]>();
-    data.forEach((r) => {
-      if (!map.has(r.category)) map.set(r.category, []);
-      map.get(r.category)!.push(r);
-    });
-    return map;
-  }, [data]);
-
   /* ---- Totals ---- */
   const totals = useMemo(
     () => ({
@@ -51,18 +39,6 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
     }),
     [data],
   );
-
-  /* ---- Per-category summaries ---- */
-  const categorySummaries = useMemo(() => {
-    return Array.from(grouped.entries()).map(([category, rows]) => {
-      const criminal = rows.reduce((s, r) => s + r.criminal, 0);
-      const civil = rows.reduce((s, r) => s + r.civil, 0);
-      const total = rows.reduce((s, r) => s + r.total, 0);
-      const pct =
-        totals.total > 0 ? ((total / totals.total) * 100).toFixed(1) : "0";
-      return { category, rows, criminal, civil, total, pct };
-    });
-  }, [grouped, totals]);
 
   /* ---- Branch breakdown ---- */
   const branchBreakdown = useMemo(() => {
@@ -83,9 +59,164 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
       .sort((a, b) => b.total - a.total);
   }, [data]);
 
+  type BranchSummaryRow = {
+    branch: string;
+    criminal: number;
+    civil: number;
+    total: number;
+  };
+  const [selectedRow, setSelectedRow] = useState<BranchSummaryRow | null>(null);
+
+  const selectedBranchCategories = useMemo(() => {
+    if (!selectedRow) return [];
+    return data.filter((r) => r.branch === selectedRow.branch);
+  }, [selectedRow, data]);
+
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
+
+  /* ── DETAIL VIEW ── */
+  if (selectedRow) {
+    const pct =
+      totals.total > 0
+        ? ((selectedRow.total / totals.total) * 100).toFixed(1)
+        : "0";
+
+    return (
+      <div className="space-y-5">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => setSelectedRow(null)}
+            className="flex items-center gap-1.5 text-base-content/40 hover:text-primary transition-colors font-medium"
+          >
+            <FiArrowLeft className="h-3.5 w-3.5" />
+            <span>Report Details</span>
+          </button>
+          <span className="text-base-content/20 select-none">›</span>
+          <span className="text-base-content/70 font-semibold truncate max-w-[240px]">
+            {selectedRow.branch}
+          </span>
+        </nav>
+
+        {/* Identity card */}
+        <div className="card bg-base-100 border border-base-200 overflow-hidden">
+          <div className="h-[3px] bg-gradient-to-r from-primary via-primary/50 to-transparent" />
+          <div className="p-6 sm:p-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-base-content/30 mb-3">
+              Monthly Report · {monthLabel}
+            </p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-base-content leading-tight">
+              {selectedRow.branch}
+            </h1>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-base-content/30">
+            Statistics
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="card bg-base-100 border border-base-200">
+              <div className="card-body p-4 sm:p-5 gap-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-base-content/35">
+                  Criminal Cases
+                </p>
+                <p className="text-2xl sm:text-3xl font-black tabular-nums text-base-content leading-none mt-1">
+                  {selectedRow.criminal.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="card bg-base-100 border border-base-200">
+              <div className="card-body p-4 sm:p-5 gap-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-base-content/35">
+                  Civil Cases
+                </p>
+                <p className="text-2xl sm:text-3xl font-black tabular-nums text-base-content leading-none mt-1">
+                  {selectedRow.civil.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="card bg-primary/5 border border-primary/20">
+              <div className="card-body p-4 sm:p-5 gap-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/50">
+                  Total Cases
+                </p>
+                <p className="text-3xl sm:text-4xl font-black tabular-nums text-primary leading-none mt-1">
+                  {selectedRow.total.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <div className="card bg-base-100 border border-base-200">
+              <div className="card-body p-4 sm:p-5 gap-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-base-content/35">
+                  Share of Total
+                </p>
+                <p className="text-2xl sm:text-3xl font-black tabular-nums text-base-content leading-none mt-1">
+                  {pct}%
+                </p>
+                <p className="text-xs text-base-content/25 mt-0.5">
+                  of all cases
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Breakdown */}
+        {selectedBranchCategories.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-base-content/30">
+              Category Breakdown
+            </p>
+            <div className="card bg-base-100 border border-base-200 overflow-hidden">
+              <table className="table table-sm w-full">
+                <thead>
+                  <tr className="bg-base-200/50 border-b border-base-200">
+                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-base-content/50">
+                      Category
+                    </th>
+                    <th className="px-5 py-3 text-center text-xs font-bold uppercase tracking-wider text-base-content/50">
+                      Criminal
+                    </th>
+                    <th className="px-5 py-3 text-center text-xs font-bold uppercase tracking-wider text-base-content/50">
+                      Civil
+                    </th>
+                    <th className="px-5 py-3 text-center text-xs font-bold uppercase tracking-wider text-base-content/50">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedBranchCategories.map((r) => (
+                    <tr
+                      key={r.category}
+                      className="border-b border-base-200/60 hover:bg-base-200/30 transition-colors"
+                    >
+                      <td className="px-5 py-3 font-semibold text-base-content">
+                        {r.category}
+                      </td>
+                      <td className="px-5 py-3 text-center tabular-nums">
+                        {r.criminal.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 text-center tabular-nums">
+                        {r.civil.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 text-center tabular-nums font-bold text-base-content">
+                        {r.total.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -125,134 +256,141 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
         </div>
       </header>
 
-      {/* ── KPI CARDS ──
-      <MonthlyKPI
-        totalCriminal={totals.criminal}
-        totalCivil={totals.civil}
-        grandTotal={totals.total}
-        branches={branchBreakdown.length}
-        icons={{
-          totalCriminal: Gavel,
-          totalCivil: Scale,
-          grandTotal: BarChart3,
-          branches: LayoutList,
-        }}
-      /> */}
+      {/* ── KPI CARDS ── */}
+      <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
+        {/* Branches */}
+        <div
+          className="transform hover:scale-105 card surface-card-hover group"
+          style={{ transition: "all 400ms cubic-bezier(0.4,0,0.2,1)" }}
+        >
+          <div
+            className="card-body relative overflow-hidden"
+            style={{ padding: "var(--space-card-padding)" }}
+          >
+            <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+              <LayoutList className="h-full w-full" />
+            </div>
+            <div className="relative">
+              <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                Branches
+              </p>
+            </div>
+            <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+              {branchBreakdown.length.toLocaleString()}
+            </p>
+            <p className="text-sm sm:text-base font-semibold text-muted">
+              Active branches
+            </p>
+          </div>
+        </div>
 
-      {/* ── CATEGORY BREAKDOWN ── */}
-      <section className="space-y-4">
-        <h3 className="text-2xl font-bold text-base-content flex items-center gap-2.5">
-          <BarChart3 className="h-6 w-6 text-primary" />
-          Category Breakdown
-        </h3>
+        {/* Criminal Cases */}
+        <div
+          className="transform hover:scale-105 card surface-card-hover group"
+          style={{
+            transitionDelay: "100ms",
+            transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+          }}
+        >
+          <div
+            className="card-body relative overflow-hidden"
+            style={{ padding: "var(--space-card-padding)" }}
+          >
+            <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+              <FileText className="h-full w-full" />
+            </div>
+            <div className="relative">
+              <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                Criminal Cases
+              </p>
+            </div>
+            <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+              {totals.criminal.toLocaleString()}
+            </p>
+            <p className="text-sm sm:text-base font-semibold text-muted">
+              {totals.total > 0
+                ? ((totals.criminal / totals.total) * 100).toFixed(1)
+                : "0"}
+              % of total
+            </p>
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {categorySummaries.map(
-            ({ category, rows, criminal, civil, total, pct }) => {
-              const badge = CATEGORY_BADGE[category] ?? {
-                bg: "bg-neutral/10 text-neutral",
-                ring: "ring-neutral/20",
-              };
-              return (
-                <div
-                  key={category}
-                  className="card bg-base-100 border border-base-200 hover:shadow-md transition-all"
-                >
-                  <div className="card-body p-5 gap-4">
-                    {/* Category header */}
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${badge.bg}`}
-                      >
-                        {category}
-                      </span>
-                      <span className="text-sm font-semibold text-base-content/40 tabular-nums">
-                        {pct}%
-                      </span>
-                    </div>
+        {/* Civil Cases */}
+        <div
+          className="transform hover:scale-105 card surface-card-hover group"
+          style={{
+            transitionDelay: "200ms",
+            transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+          }}
+        >
+          <div
+            className="card-body relative overflow-hidden"
+            style={{ padding: "var(--space-card-padding)" }}
+          >
+            <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+              <FileText className="h-full w-full" />
+            </div>
+            <div className="relative">
+              <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                Civil Cases
+              </p>
+            </div>
+            <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+              {totals.civil.toLocaleString()}
+            </p>
+            <p className="text-sm sm:text-base font-semibold text-muted">
+              {totals.total > 0
+                ? ((totals.civil / totals.total) * 100).toFixed(1)
+                : "0"}
+              % of total
+            </p>
+          </div>
+        </div>
 
-                    {/* Stats row */}
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <p className="text-xs text-base-content/40 font-medium uppercase tracking-wider">
-                          Criminal
-                        </p>
-                        <p className="text-2xl font-bold text-base-content tabular-nums">
-                          {criminal.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-base-content/40 font-medium uppercase tracking-wider">
-                          Civil
-                        </p>
-                        <p className="text-2xl font-bold text-base-content tabular-nums">
-                          {civil.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-base-content/40 font-medium uppercase tracking-wider">
-                          Total
-                        </p>
-                        <p className="text-2xl font-black text-base-content tabular-nums">
-                          {total.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Branch list */}
-                    <div className="border-t border-base-200 pt-3 space-y-1">
-                      {rows.map((r) => (
-                        <div
-                          key={r.branch}
-                          className="flex items-center justify-between text-sm px-2 py-1.5 rounded-lg hover:bg-base-200/50 transition-colors"
-                        >
-                          <span className="font-medium text-base-content/70">
-                            {r.branch}
-                          </span>
-                          <div className="flex items-center gap-4 tabular-nums text-base-content/50">
-                            <span className="w-14 text-right">
-                              {r.criminal.toLocaleString()}
-                            </span>
-                            <span className="w-14 text-right">
-                              {r.civil.toLocaleString()}
-                            </span>
-                            <span className="font-bold text-base-content w-14 text-right">
-                              {r.total.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            },
-          )}
+        {/* Grand Total */}
+        <div
+          className="transform hover:scale-105 card bg-primary/10 shadow-lg hover:shadow-xl transition-shadow ring-1 ring-primary/20 group"
+          style={{
+            transitionDelay: "300ms",
+            transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+          }}
+        >
+          <div
+            className="card-body relative overflow-hidden"
+            style={{ padding: "var(--space-card-padding)" }}
+          >
+            <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+              <BarChart3 className="h-full w-full" />
+            </div>
+            <div className="relative">
+              <p className="font-extrabold uppercase text-sm tracking-wide text-primary/70 mb-3">
+                Grand Total
+              </p>
+            </div>
+            <p className="text-4xl sm:text-5xl font-black text-primary mb-2">
+              {totals.total.toLocaleString()}
+            </p>
+            <p className="text-sm sm:text-base font-semibold text-primary/50">
+              All cases combined
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* ── BRANCH PERFORMANCE ── */}
+      {/* ── ALL RECORDS ── */}
       <section className="space-y-4">
         <h3 className="text-2xl font-bold text-base-content flex items-center gap-2.5">
-          <Trophy className="h-6 w-6 text-primary" />
-          Branch Performance
+          <LayoutList className="h-6 w-6 text-primary" />
+          All Records
         </h3>
-
         <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200">
           <div className="overflow-x-auto">
             <table className="table table-sm w-full">
-              <colgroup>
-                <col className="w-[8%]" />
-                <col className="w-[28%]" />
-                <col className="w-[18%]" />
-                <col className="w-[18%]" />
-                <col className="w-[18%]" />
-                <col className="w-[10%]" />
-              </colgroup>
               <thead>
                 <tr className="bg-base-200/50 border-b border-base-200">
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Rank
+                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 w-12">
+                    #
                   </th>
                   <th className="py-4 px-4 text-left text-sm font-bold uppercase tracking-wider text-base-content/50">
                     Branch
@@ -266,69 +404,32 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
                     Total
                   </th>
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Share
-                  </th>
                 </tr>
               </thead>
               <tbody>
-                {branchBreakdown.map((b, i) => {
-                  const pct =
-                    totals.total > 0
-                      ? ((b.total / totals.total) * 100).toFixed(1)
-                      : "0";
-                  return (
-                    <tr
-                      key={b.branch}
-                      className="border-b border-base-200/60 hover:bg-base-200/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-center">
-                        {i < 3 ? (
-                          <span
-                            className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-black ${
-                              i === 0
-                                ? "bg-warning/20 text-warning"
-                                : i === 1
-                                  ? "bg-base-300 text-base-content/60"
-                                  : "bg-warning/10 text-warning/60"
-                            }`}
-                          >
-                            {i + 1}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-base-content/40 tabular-nums">
-                            {i + 1}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-base-content">
-                        {b.branch}
-                      </td>
-                      <td className="px-4 py-3 text-center tabular-nums">
-                        {b.criminal.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center tabular-nums">
-                        {b.civil.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center tabular-nums font-bold text-base-content">
-                        {b.total.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs font-bold text-base-content/50 tabular-nums">
-                            {pct}%
-                          </span>
-                          <div className="w-full bg-base-200 rounded-full h-1.5">
-                            <div
-                              className="h-1.5 rounded-full bg-primary transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {branchBreakdown.map((b, i) => (
+                  <tr
+                    key={b.branch}
+                    className="border-b border-base-200/60 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={() => setSelectedRow(b)}
+                  >
+                    <td className="px-4 py-3 text-center text-sm text-base-content/40 tabular-nums">
+                      {i + 1}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-base-content">
+                      {b.branch}
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums">
+                      {b.criminal.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums">
+                      {b.civil.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center tabular-nums font-bold text-base-content">
+                      {b.total.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
               <tfoot>
                 <tr className="bg-primary/80 text-primary-content">
@@ -346,9 +447,6 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
                   </td>
                   <td className="px-4 py-3.5 text-center font-black tabular-nums text-2xl">
                     {totals.total.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3.5 text-center font-black text-lg">
-                    100%
                   </td>
                 </tr>
               </tfoot>

@@ -1,7 +1,7 @@
 "use client";
 
-import { BarChart3, FileText, LayoutList, Trophy } from "lucide-react";
-import React, { useMemo } from "react";
+import { BarChart3, FileText, LayoutList } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { FiArrowLeft, FiCalendar } from "react-icons/fi";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
 import type { AnnualVariant } from "./AnnualTable";
@@ -169,49 +169,132 @@ const AnnualViewPage: React.FC<AnnualViewPageProps> = ({
     };
   }, [data, variant]);
 
-  /* ---- Branch breakdown ---- */
-  const branchBreakdown = useMemo((): Record<string, string | number>[] => {
-    const map = new Map<string, Record<string, number>>();
-
-    for (const row of data) {
-      const branch = String(row.branch ?? "Unknown");
-      const prev = map.get(branch) ?? {};
-      for (const col of leafColumns) {
-        if (col.computeValue) {
-          prev[col.key] = (prev[col.key] ?? 0) + col.computeValue(row);
-        } else {
-          const v = Number(row[col.key]);
-          if (!Number.isNaN(v)) prev[col.key] = (prev[col.key] ?? 0) + v;
-        }
-      }
-      map.set(branch, prev);
-    }
-
-    return Array.from(map.entries())
-      .map(
-        ([branch, vals]) =>
-          ({ branch, ...vals }) as Record<string, string | number>,
-      )
-      .sort((a, b) => (Number(b._total) || 0) - (Number(a._total) || 0));
-  }, [data, leafColumns]);
-
-  /* ---- Numeric leaf columns (for branch table) ---- */
-  const numericCols = useMemo(
-    () =>
-      leafColumns.filter(
-        (c) =>
-          c.key !== "branch" &&
-          c.key !== "region" &&
-          c.key !== "province" &&
-          c.key !== "court" &&
-          c.key !== "cityMunicipality",
-      ),
-    [leafColumns],
-  );
+  const [selectedRow, setSelectedRow] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
+
+  /* ── DETAIL VIEW ── */
+  if (selectedRow) {
+    const rowTitle = selectedRow.branch
+      ? String(selectedRow.branch)
+      : selectedRow.court
+        ? String(selectedRow.court)
+        : "Record Detail";
+
+    const identityKeys = new Set([
+      "branch",
+      "court",
+      "region",
+      "province",
+      "cityMunicipality",
+    ]);
+    const locationCols = leafColumns.filter(
+      (c) =>
+        identityKeys.has(c.key) &&
+        c.key !== "branch" &&
+        c.key !== "court" &&
+        c.render(selectedRow) != null &&
+        c.render(selectedRow) !== "",
+    );
+    const metricCols = leafColumns.filter((c) => !identityKeys.has(c.key));
+
+    return (
+      <div className="space-y-5">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => setSelectedRow(null)}
+            className="flex items-center gap-1.5 text-base-content/40 hover:text-primary transition-colors font-medium"
+          >
+            <FiArrowLeft className="h-3.5 w-3.5" />
+            <span>Report Details</span>
+          </button>
+          <span className="text-base-content/20 select-none">›</span>
+          <span className="text-base-content/70 font-semibold truncate max-w-[240px]">
+            {rowTitle}
+          </span>
+        </nav>
+
+        {/* Identity card */}
+        <div className="card bg-base-100 border border-base-200 overflow-hidden">
+          <div className="h-[3px] bg-gradient-to-r from-primary via-primary/50 to-transparent" />
+          <div className="p-6 sm:p-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-base-content/30 mb-3">
+              {title} · {yearLabel}
+            </p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-base-content leading-tight mb-4">
+              {rowTitle}
+            </h1>
+            {locationCols.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {locationCols.map((col) => (
+                  <span
+                    key={col.key}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-base-200 px-3 py-1 text-xs font-semibold text-base-content/60"
+                  >
+                    <span className="text-base-content/30 font-normal">
+                      {col.label}:
+                    </span>
+                    {col.render(selectedRow)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Metrics */}
+        {metricCols.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-base-content/30">
+              Statistics
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {metricCols.map((col, i) => {
+                const isHighlight = i === metricCols.length - 1;
+                return (
+                  <div
+                    key={col.key}
+                    className={`card border transition-all ${
+                      isHighlight
+                        ? "bg-primary/5 border-primary/20 col-span-2 sm:col-span-1"
+                        : "bg-base-100 border-base-200"
+                    }`}
+                  >
+                    <div className="card-body p-4 sm:p-5 gap-1">
+                      <p
+                        className={`text-[10px] font-black uppercase tracking-[0.18em] leading-snug ${
+                          isHighlight
+                            ? "text-primary/50"
+                            : "text-base-content/35"
+                        }`}
+                      >
+                        {col.label}
+                      </p>
+                      <p
+                        className={`font-black tabular-nums leading-none mt-1 ${
+                          isHighlight
+                            ? "text-3xl sm:text-4xl text-primary"
+                            : "text-2xl sm:text-3xl text-base-content"
+                        }`}
+                      >
+                        {col.render(selectedRow) ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -340,124 +423,6 @@ const AnnualViewPage: React.FC<AnnualViewPageProps> = ({
         </div>
       </section>
 
-      {/* ── BRANCH PERFORMANCE ── */}
-      <section className="space-y-4">
-        <h3 className="text-2xl font-bold text-base-content flex items-center gap-2.5">
-          <Trophy className="h-6 w-6 text-primary" />
-          Branch Performance
-        </h3>
-
-        <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200">
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full">
-              <thead>
-                <tr className="bg-base-200/50 border-b border-base-200">
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Rank
-                  </th>
-                  <th className="py-4 px-4 text-left text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Branch
-                  </th>
-                  {numericCols.map((col) => (
-                    <th
-                      key={col.key}
-                      className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50"
-                    >
-                      {col.label}
-                    </th>
-                  ))}
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Share
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {branchBreakdown.map((b, i) => {
-                  const total = Number(b._total) || 0;
-                  const pct =
-                    summary.grandTotal > 0
-                      ? ((total / summary.grandTotal) * 100).toFixed(1)
-                      : "0";
-                  return (
-                    <tr
-                      key={String(b.branch)}
-                      className="border-b border-base-200/60 hover:bg-base-200/30 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-center">
-                        {i < 3 ? (
-                          <span
-                            className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-black ${
-                              i === 0
-                                ? "bg-warning/20 text-warning"
-                                : i === 1
-                                  ? "bg-base-300 text-base-content/60"
-                                  : "bg-warning/10 text-warning/60"
-                            }`}
-                          >
-                            {i + 1}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-base-content/40 font-mono">
-                            {i + 1}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-base text-base-content">
-                        {b.branch}
-                      </td>
-                      {numericCols.map((col) => (
-                        <td
-                          key={col.key}
-                          className="px-4 py-3 text-center tabular-nums text-base"
-                        >
-                          {(Number(b[col.key]) || 0).toLocaleString()}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs font-bold text-base-content/60">
-                            {pct}%
-                          </span>
-                          <div className="w-full bg-base-200 rounded-full h-1.5">
-                            <div
-                              className="h-1.5 rounded-full bg-primary transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-primary/80 text-primary-content">
-                  <td
-                    colSpan={2}
-                    className="px-6 py-3.5 text-left font-black text-[15px] uppercase tracking-widest"
-                  >
-                    Total :
-                  </td>
-                  {numericCols.map((col, i) => (
-                    <td
-                      key={col.key}
-                      className={`px-4 py-3.5 text-center font-black tabular-nums ${
-                        i === numericCols.length - 1 ? "text-2xl" : "text-lg"
-                      }`}
-                    >
-                      {(columnTotals[col.key] ?? 0).toLocaleString()}
-                    </td>
-                  ))}
-                  <td className="px-4 py-3.5 text-center font-black text-lg">
-                    100%
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </section>
-
       {/* ── FULL DATA TABLE ── */}
       <section className="space-y-4">
         <h3 className="text-2xl font-bold text-base-content flex items-center gap-2.5">
@@ -529,9 +494,10 @@ const AnnualViewPage: React.FC<AnnualViewPageProps> = ({
                 {data.map((row, idx) => (
                   <tr
                     key={(row.id as number) ?? idx}
-                    className={`transition-colors duration-100 hover:bg-primary/5 ${
+                    className={`transition-colors duration-100 hover:bg-primary/5 cursor-pointer ${
                       idx % 2 === 0 ? "bg-base-100" : "bg-base-200/25"
                     }`}
+                    onClick={() => setSelectedRow(row)}
                   >
                     <td className="px-4 py-3 text-center text-sm font-mono text-base-content/40">
                       {idx + 1}

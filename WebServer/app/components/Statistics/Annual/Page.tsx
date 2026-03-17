@@ -7,7 +7,6 @@ import {
   FiFileText,
   FiGrid,
   FiPlus,
-  FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
@@ -71,10 +70,8 @@ export default function AnnualPage() {
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7),
   );
-  const [uploading, setUploading] = useState(false);
   const [requestAdd, setRequestAdd] = useState(0);
   const [isChildActive, setIsChildActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSwitchView = (view: string) => {
     setActiveView(view as AnnualView);
@@ -148,25 +145,6 @@ export default function AnnualPage() {
     XLSX.writeFile(workbook, `Annual-${activeView}-Report-${yearLabel}.xlsx`);
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawData =
-        XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-      console.log("Imported data:", rawData);
-    } catch (err) {
-      console.error("Import failed:", err);
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
-
   // Generate year options (10 years back, 2 years forward)
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 13 }, (_, i) =>
@@ -203,7 +181,7 @@ export default function AnnualPage() {
               <div className="flex flex-col items-end gap-3">
                 <div className="flex items-center gap-2">
                   <select
-                    className="select select-bordered select-md w-72"
+                    className="select select-bordered select-md w-66"
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
                   >
@@ -215,21 +193,6 @@ export default function AnnualPage() {
                   </select>
                 </div>
                 <div className="flex items-center gap-2 flex-nowrap">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={handleImport}
-                  />
-                  <button
-                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import"}
-                  </button>
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
                     onClick={handleExport}

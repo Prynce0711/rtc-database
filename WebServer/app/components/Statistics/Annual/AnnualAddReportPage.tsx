@@ -19,7 +19,9 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
+import * as XLSX from "xlsx";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
 import { FieldConfig } from "./AnnualFieldConfig";
 
@@ -296,6 +298,71 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [step, setStep] = useState<"edit" | "review">("edit");
   const tableRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!importFeedback) return;
+    const t = setTimeout(() => setImportFeedback(null), 4000);
+    return () => clearTimeout(t);
+  }, [importFeedback]);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      const imported = rawData.map((excelRow) => {
+        const row = buildEmptyRow(fields);
+        const excelKeys = Object.keys(excelRow);
+        for (const f of editableFields) {
+          const matchKey = excelKeys.find(
+            (k) =>
+              k.trim().toLowerCase() === f.name.toLowerCase() ||
+              k.trim().toLowerCase() === (f.label ?? "").toLowerCase(),
+          );
+          if (matchKey !== undefined) {
+            const v = excelRow[matchKey];
+            const numVal = Number(v);
+            row[f.name] =
+              !Number.isNaN(numVal) && v !== "" && v !== null
+                ? numVal
+                : String(v ?? "");
+          }
+        }
+        return row;
+      });
+      if (imported.length > 0) {
+        setRows((prev) => {
+          const hasData = prev.some((r) =>
+            editableFields.some((f) => {
+              const v = r[f.name];
+              return v != null && v !== "" && v !== 0;
+            }),
+          );
+          return hasData ? [...prev, ...imported] : imported;
+        });
+        setImportFeedback(
+          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel`,
+        );
+      } else {
+        setImportFeedback(
+          "No data found. Check the Excel file has data rows with matching column headers.",
+        );
+      }
+    } catch (err) {
+      console.error("Import failed:", err);
+      setImportFeedback("Import failed. Check that the file is a valid Excel file.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   /* ---------------------------------------------------------------- */
   /*  Row helpers                                                      */
@@ -644,6 +711,46 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               <FiPlus size={15} />
               +10 Rows
             </button>
+
+            <div
+              style={{
+                width: 1,
+                height: 28,
+                background: "var(--surface-border)",
+                margin: "0 4px",
+              }}
+            />
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <button
+              className={`btn btn-outline btn-info gap-2${uploading ? " loading" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <FiUpload size={15} />
+              {uploading ? "Importing..." : "Import"}
+            </button>
+
+            {importFeedback && (
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: importFeedback.startsWith("✓")
+                    ? "var(--color-success, #22c55e)"
+                    : "var(--color-error, #ef4444)",
+                  maxWidth: 300,
+                }}
+              >
+                {importFeedback}
+              </span>
+            )}
 
             <div
               style={{

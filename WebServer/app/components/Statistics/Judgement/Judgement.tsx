@@ -1,13 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import {
-    FiCalendar,
-    FiDownload,
-    FiFileText,
-    FiPlus,
-    FiUpload,
-} from "react-icons/fi";
+import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
 import JudgementMTC from "./JudgementMTC";
@@ -40,10 +34,8 @@ export default function Judgement() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [uploading, setUploading] = useState(false);
   const [requestAdd, setRequestAdd] = useState(0);
   const [isChildActive, setIsChildActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSwitchView = (view: string) => {
     setActiveView(view as JudgementView);
@@ -83,25 +75,6 @@ export default function Judgement() {
     );
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawData =
-        XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-      console.log("Imported data:", rawData);
-    } catch (err) {
-      console.error("Import failed:", err);
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
-
   // yearOptions no longer needed — selection is by full date
 
   return (
@@ -126,26 +99,11 @@ export default function Judgement() {
               <div className="flex flex-col items-end gap-3">
                 <input
                   type="date"
-                  className="input input-bordered input-md w-72"
+                  className="input input-bordered input-md w-66"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
                 <div className="flex items-center gap-2 flex-nowrap">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={handleImport}
-                  />
-                  <button
-                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import"}
-                  </button>
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
                     onClick={handleExport}
