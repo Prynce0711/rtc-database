@@ -70,8 +70,8 @@ const MTC = ({
 
   return (
     <AnnualTable<CourtLog & Record<string, unknown>>
-      // title="MTC Receiving Log"
-      // su   btitle="Municipal Trial Court — Track all received documents and case filings"
+      title="MTC Receiving Log"
+      subtitle="Municipal Trial Court — Track all received documents and case filings"
       variant="court"
       data={records as (CourtLog & Record<string, unknown>)[]}
       columns={courtColumns}

@@ -85,27 +85,6 @@ function buildReceivingLogWhere(
     });
   }
 
-  if (options?.searchTerm) {
-    const search = options.searchTerm.trim();
-    if (search.length > 0) {
-      const normalizedSearch = search.toUpperCase();
-      const typeFilter = CASE_TYPE_VALUES.has(normalizedSearch as CaseType)
-        ? [{ caseType: normalizedSearch as CaseType }]
-        : [];
-
-      conditions.push({
-        OR: [
-          { bookAndPage: { contains: search } },
-          { caseNumber: { contains: search } },
-          ...typeFilter,
-          { content: { contains: search } },
-          { branchNumber: { contains: search } },
-          { notes: { contains: search } },
-        ],
-      });
-    }
-  }
-
   return conditions.length > 0 ? { AND: conditions } : {};
 }
 

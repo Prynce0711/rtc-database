@@ -47,8 +47,8 @@ const JudgementRTC = ({
 
   return (
     <JudgementTable<RTCJudgementLog & Record<string, unknown>>
-      // title="RTC Judgment Week"
-      // subtitle="Regional Trial Court — Nationwide Judgment Week Summary Report"
+      title="RTC Judgment Week"
+      subtitle="Regional Trial Court — Nationwide Judgment Week Summary Report"
       data={records as (RTCJudgementLog & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}
