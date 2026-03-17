@@ -55,7 +55,7 @@ export interface AnnualAddReportPageProps {
 /* ------------------------------------------------------------------ */
 
 const buildEmptyRow = (fields: FieldConfig[]): EditableRow => {
-  const row: EditableRow = { _rowId: crypto.randomUUID() };
+  const row: EditableRow = { _rowId: createRowId() };
   for (const f of fields) {
     if (f.type === "date") {
       row[f.name] = new Date().toISOString().slice(0, 10);
@@ -64,6 +64,17 @@ const buildEmptyRow = (fields: FieldConfig[]): EditableRow => {
     }
   }
   return row;
+};
+
+const createRowId = (): string => {
+  if (typeof globalThis !== "undefined") {
+    const cryptoApi = globalThis.crypto as Crypto | undefined;
+    if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
+      return cryptoApi.randomUUID();
+    }
+  }
+
+  return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
 /* ------------------------------------------------------------------ */
@@ -275,7 +286,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   const [rows, setRows] = useState<EditableRow[]>(() => {
     if (initialData && initialData.length > 0) {
       return initialData.map((r) => {
-        const row: EditableRow = { _rowId: crypto.randomUUID() };
+        const row: EditableRow = { _rowId: createRowId() };
         for (const f of fields) {
           const val = r[f.name];
           if (f.type === "date" && val) {
@@ -357,7 +368,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       }
     } catch (err) {
       console.error("Import failed:", err);
-      setImportFeedback("Import failed. Check that the file is a valid Excel file.");
+      setImportFeedback(
+        "Import failed. Check that the file is a valid Excel file.",
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -385,7 +398,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     if (selectedRows.size === 0) return;
     const dupes = rows
       .filter((r) => selectedRows.has(r._rowId))
-      .map((r) => ({ ...r, _rowId: crypto.randomUUID() }));
+      .map((r) => ({ ...r, _rowId: createRowId() }));
     setRows((prev) => [...prev, ...dupes]);
     setSelectedRows(new Set());
   };

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FiArrowLeft,
   FiCheck,
@@ -43,8 +49,19 @@ export interface AddReportPageProps {
 
 // category and branch options are defined in MonthlyFieldConfig
 
+const createRowId = (): string => {
+  if (typeof globalThis !== "undefined") {
+    const cryptoApi = globalThis.crypto as Crypto | undefined;
+    if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
+      return cryptoApi.randomUUID();
+    }
+  }
+
+  return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const emptyRow = (): EditableRow => ({
-  id: crypto.randomUUID(),
+  id: createRowId(),
   category: "",
   branch: "",
   criminal: 0,
@@ -64,7 +81,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   const [rows, setRows] = useState<EditableRow[]>(() => {
     if (initialData && initialData.length > 0) {
       return initialData.map((r) => ({
-        id: crypto.randomUUID(),
+        id: createRowId(),
         category: r.category,
         branch: r.branch,
         criminal: r.criminal,
@@ -110,7 +127,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       };
 
       const imported: EditableRow[] = rawData.map((excelRow) => ({
-        id: crypto.randomUUID(),
+        id: createRowId(),
         category: String(findCol(excelRow, "Category") ?? ""),
         branch: String(findCol(excelRow, "Branch") ?? ""),
         criminal: Number(findCol(excelRow, "Criminal") ?? 0),
@@ -134,7 +151,9 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       }
     } catch (err) {
       console.error("Import failed:", err);
-      setImportFeedback("Import failed. Check that the file is a valid Excel file.");
+      setImportFeedback(
+        "Import failed. Check that the file is a valid Excel file.",
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -164,7 +183,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     if (selectedRows.size === 0) return;
     const dupes = rows
       .filter((r) => selectedRows.has(r.id))
-      .map((r) => ({ ...r, id: crypto.randomUUID() }));
+      .map((r) => ({ ...r, id: createRowId() }));
     setRows((prev) => [...prev, ...dupes]);
     setSelectedRows(new Set());
   };
@@ -288,7 +307,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       .map((line) => {
         const cells = line.split("\t");
         return {
-          id: crypto.randomUUID(),
+          id: createRowId(),
           category: (cells[0] ?? "").trim(),
           branch: (cells[1] ?? "").trim(),
           criminal: Number(cells[2]) || 0,
