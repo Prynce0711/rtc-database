@@ -38,6 +38,10 @@ export async function uploadPetitionExcel(
     }
 
     console.log(
+      `📥 Received petition Excel file: ${file.name} (${file.size} bytes)`,
+    );
+
+    console.log(
       `✓ Petition Excel file received: ${file.name} (${file.size} bytes)`,
     );
 

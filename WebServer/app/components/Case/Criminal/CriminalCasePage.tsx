@@ -41,8 +41,7 @@ import {
   type CriminalCasesFilterOptions,
 } from "./schema";
 
-// TODO: Fix search bar
-// TODO: Fix actions dropdown
+// TODO: Move import excel here instead of server action and just call createCase
 
 type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;

@@ -1393,8 +1393,6 @@ const NotarialPage: React.FC = () => {
   const refreshFromBackend = useCallback(
     async (page = currentPage) => {
       try {
-        setLoading(true);
-
         const serverFilters = toServerFilters(appliedFilters);
         const [listResult, statsResult] = await Promise.all([
           getNotarialPage({
