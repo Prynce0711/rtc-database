@@ -22,6 +22,7 @@ import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
+import { uploadPetitionExcel } from "./ExcelActions";
 import { deletePetition, getPetitions } from "./PetitionActions";
 import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
@@ -86,7 +87,6 @@ const ReceiveLogsPage: React.FC = () => {
 
   const fetchLogs = async () => {
     try {
-      setLoading(true);
       const response = await getPetitions();
       if (!response.success) {
         statusPopup.showError(response.error || "Failed to fetch petitions");
@@ -226,51 +226,73 @@ const ReceiveLogsPage: React.FC = () => {
     }
   };
 
-  /* Import handler */
-  useEffect(() => {
-    const el = document.getElementById(
-      "petition-import-input",
-    ) as HTMLInputElement | null;
-    const handleChange = async (e: Event) => {
-      const input = e.target as HTMLInputElement;
-      if (!input.files || input.files.length === 0) return;
-      const file = input.files[0];
-      const maxSize = 5 * 1024 * 1024;
-      if (file.size > maxSize) {
-        statusPopup.showError("File too large. Max 5 MB allowed.");
-        input.value = "";
-        return;
-      }
-      const okExt = ["xlsx", "xls"];
-      const name = file.name || "";
-      const ext = name.split(".").pop()?.toLowerCase() || "";
-      if (!okExt.includes(ext)) {
-        statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const maxSize = 25 * 1024 * 1024;
+    if (file.size > maxSize) {
+      statusPopup.showError("File too large. Max 25 MB allowed.");
+      input.value = "";
+      return;
+    }
+
+    const okExt = ["xlsx", "xls"];
+    const name = file.name || "";
+    const ext = name.split(".").pop()?.toLowerCase() || "";
+    if (!okExt.includes(ext)) {
+      statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+      input.value = "";
+      return;
+    }
+
+    try {
+      statusPopup.showLoading("Importing... Please wait.");
+      const result = await uploadPetitionExcel(file);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Import failed");
         input.value = "";
         return;
       }
 
-      try {
-        statusPopup.showLoading("Importing... Please wait.");
-        const { uploadPetitionExcel } = await import("./ExcelActions");
-        const result = await uploadPetitionExcel(file);
-        if (!result.success) {
-          statusPopup.showError(result.error || "Import failed");
-          input.value = "";
-          return;
+      statusPopup.showSuccess("Import successful!");
+
+      if (result.result?.failedExcel) {
+        const { fileName, base64 } = result.result.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
-        statusPopup.showSuccess("Import successful!");
-        await fetchLogs();
-      } catch (err) {
-        statusPopup.showError("Import failed. See console for details.");
-        console.error(err);
-      } finally {
-        (e.target as HTMLInputElement).value = "";
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        statusPopup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
       }
-    };
-    el?.addEventListener("change", handleChange);
-    return () => el?.removeEventListener("change", handleChange);
-  }, [statusPopup]);
+
+      await fetchLogs();
+    } catch (err) {
+      statusPopup.showError("Import failed. See console for details.");
+      console.error(err);
+    } finally {
+      input.value = "";
+    }
+  };
 
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={6} tableRows={8} />;
@@ -379,6 +401,7 @@ const ReceiveLogsPage: React.FC = () => {
                   accept=".xlsx,.xls"
                   className="hidden"
                   id="petition-import-input"
+                  onChange={handleImportExcel}
                 />
 
                 <button

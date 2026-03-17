@@ -438,10 +438,7 @@ export default function CriminalCaseTester() {
                     type="number"
                     value={formData.eqcNumber ?? ""}
                     onChange={(e) =>
-                      handleInputChange(
-                        "eqcNumber",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
+                      handleInputChange("eqcNumber", e.target.value)
                     }
                     className="w-full border rounded px-2 py-1"
                   />

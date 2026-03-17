@@ -264,7 +264,6 @@ const Proceedings: React.FC = () => {
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
-      setLoading(true);
       setError(null);
 
       try {

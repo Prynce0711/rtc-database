@@ -1301,7 +1301,6 @@ const Civil: React.FC = () => {
   const fetchCases = useCallback(
     async (page = currentPage) => {
       try {
-        setLoading(true);
         const [casesRes, statsRes] = await Promise.all([
           getCivilCases({
             page,

@@ -219,8 +219,6 @@ const ReceiveLogsPage: React.FC = () => {
   const refreshFromBackend = useCallback(
     async (page = currentPage) => {
       try {
-        setLoading(true);
-
         const [listResult, statsResult] = await Promise.all([
           getRecievingLogsPage({
             page,
