@@ -2,9 +2,11 @@
 
 import { exportNotarialExcel } from "@/app/components/Case/Notarial/ExcelActions";
 import {
+  createNotarial,
   deleteNotarial,
   getNotarialPage,
   getNotarialStats,
+  updateNotarial,
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
@@ -43,6 +45,8 @@ import {
   FilterOption,
   FilterValues,
 } from "../../Filter/FilterTypes";
+import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -345,9 +349,11 @@ const NotarialModal = ({
   type: ModalType;
   selectedRecord?: NotarialRecord | null;
   onClose: () => void;
-  onCreate?: (data: NotarialRecord) => void;
-  onUpdate?: (data: NotarialRecord) => void;
+  onCreate?: (entries: FormEntry[]) => Promise<string | null>;
+  onUpdate?: (entry: FormEntry) => Promise<string | null>;
 }) => {
+  const statusPopup = usePopup();
+  const toast = useToast();
   const isEdit = type === "EDIT";
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -455,7 +461,9 @@ const NotarialModal = ({
     });
     setEntries(validated);
     if (anyError) {
-      alert("Please fill in all required fields before reviewing.");
+      statusPopup.showError(
+        "Please fill in all required fields before reviewing.",
+      );
       return;
     }
     setReviewIdx(0);
@@ -469,31 +477,31 @@ const NotarialModal = ({
       : entries.length === 1
         ? "Create this record?"
         : `Create ${entries.length} records?`;
-    if (!confirm(label)) return;
+    const isConfirmed = await statusPopup.showConfirm(label);
+    if (!isConfirmed) return;
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
+    let errorMessage: string | null = null;
+
     if (isEdit && selectedRecord) {
       const e = entries[0];
-      onUpdate?.({
-        ...selectedRecord,
-        title: e.title,
-        name: e.name,
-        atty: e.atty,
-        date: e.date,
-        link: e.link,
-      });
+      errorMessage = (await onUpdate?.(e)) ?? null;
     } else {
-      entries.forEach((e, i) => {
-        onCreate?.({
-          id: Date.now() + i,
-          title: e.title,
-          name: e.name,
-          atty: e.atty,
-          date: e.date,
-          link: e.link,
-        });
-      });
+      errorMessage = (await onCreate?.(entries)) ?? null;
     }
+
+    if (errorMessage) {
+      statusPopup.showError(errorMessage);
+      setIsSubmitting(false);
+      return;
+    }
+
+    toast.success(
+      isEdit
+        ? "Notarial entry updated."
+        : entries.length === 1
+          ? "Notarial entry created."
+          : `${entries.length} notarial entries created.`,
+    );
     setIsSubmitting(false);
     onClose();
   };
@@ -1235,6 +1243,8 @@ const Pagination: React.FC<{
 
 const NotarialPage: React.FC = () => {
   const router = useRouter();
+  const statusPopup = usePopup();
+  const toast = useToast();
   const [records, setRecords] = useState<NotarialRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -1370,7 +1380,7 @@ const NotarialPage: React.FC = () => {
       contentType: record.mimeType,
     });
     if (!result.success) {
-      alert(result.error || "Failed to download file");
+      statusPopup.showError(result.error || "Failed to download file");
       return;
     }
 
@@ -1505,13 +1515,17 @@ const NotarialPage: React.FC = () => {
   const activeFilterCount = Object.keys(appliedFilters).length;
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this record?")) return;
+    const isConfirmed = await statusPopup.showConfirm(
+      "Are you sure you want to delete this record?",
+    );
+    if (!isConfirmed) return;
     const result = await deleteNotarial(id);
     if (!result.success) {
-      alert(result.error || "Failed to delete record");
+      statusPopup.showError(result.error || "Failed to delete record");
       return;
     }
     await refreshFromBackend();
+    toast.success("Notarial entry deleted.");
   };
 
   const handleExport = async () => {
@@ -1520,7 +1534,7 @@ const NotarialPage: React.FC = () => {
     setExporting(false);
 
     if (!result.success) {
-      alert(result.error || "Export failed");
+      statusPopup.showError(result.error || "Export failed");
       return;
     }
 
@@ -1528,6 +1542,7 @@ const NotarialPage: React.FC = () => {
     a.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
     a.download = result.result.fileName;
     a.click();
+    toast.success("Notarial records exported.");
   };
 
   // ── Full-page modal — same as Proceedings/CasePage ──
@@ -1540,10 +1555,52 @@ const NotarialPage: React.FC = () => {
           setModalType(null);
           setSelectedRecord(null);
         }}
-        onCreate={(r) => setRecords((prev) => [r, ...prev])}
-        onUpdate={(r) =>
-          setRecords((prev) => prev.map((x) => (x.id === r.id ? r : x)))
-        }
+        onCreate={async (entries) => {
+          for (const entry of entries) {
+            const payload: Record<string, unknown> = {
+              title: entry.title || null,
+              name: entry.name || null,
+              attorney: entry.atty || null,
+              date: entry.date ? new Date(entry.date) : null,
+              path: undefined,
+              removeFile: undefined,
+              file: entry.file ?? undefined,
+            };
+
+            const result = await createNotarial(payload);
+            console.log("Create result:", result);
+            if (!result.success) {
+              return result.error || "Failed to create notarial entry.";
+            }
+          }
+
+          await refreshFromBackend(1);
+          setCurrentPage(1);
+          return null;
+        }}
+        onUpdate={async (entry) => {
+          if (!selectedRecord) {
+            return "No record selected for update.";
+          }
+
+          const payload: Record<string, unknown> = {
+            title: entry.title || null,
+            name: entry.name || null,
+            attorney: entry.atty || null,
+            date: entry.date ? new Date(entry.date) : null,
+            path: undefined,
+            removeFile: undefined,
+            file: entry.file ?? undefined,
+          };
+
+          const result = await updateNotarial(selectedRecord.id, payload);
+          if (!result.success) {
+            return result.error || "Failed to update notarial entry.";
+          }
+
+          await refreshFromBackend();
+          return null;
+        }}
       />
     );
   }

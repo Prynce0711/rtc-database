@@ -230,6 +230,10 @@ export async function createNotarial(
       ...notarialFields
     } = parsedData.data;
 
+    if (!file) {
+      throw new Error("File is required for creating notarial data");
+    }
+
     let uploadResult;
     try {
       const fileHash = await getFileHash(file);
