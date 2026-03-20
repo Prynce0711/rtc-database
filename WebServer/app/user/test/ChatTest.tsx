@@ -9,7 +9,7 @@ import {
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
 import { useSocket } from "@/app/lib/socket/SocketProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSession } from "../lib/authClient";
+import { useSession } from "../../lib/authClient";
 
 export default function ChatTest() {
   const [chatIdInput, setChatIdInput] = useState("1");

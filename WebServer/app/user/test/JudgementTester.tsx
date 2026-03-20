@@ -18,7 +18,7 @@ import {
   getRegionalJudgements,
   updateMunicipalJudgement,
   updateRegionalJudgement,
-} from "../components/Statistics/Judgement/judgementActions";
+} from "../../components/Statistics/Judgement/judgementActions";
 
 export default function JudgementTester() {
   const [mtc, setMtc] = useState<MTCJudgementRow[]>([]);

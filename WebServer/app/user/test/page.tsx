@@ -113,7 +113,7 @@ export default function TestPage() {
   const SelectedComponent = selectedTester.Component;
 
   return (
-    <div className="min-h-screen bg-base-200 p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-6">
       <div className="mx-auto max-w-7xl space-y-5">
         <section className="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm md:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

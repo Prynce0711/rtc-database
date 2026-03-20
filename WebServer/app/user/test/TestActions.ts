@@ -1,11 +1,11 @@
 "use server";
 
-import ActionResult from "../components/ActionResult";
-import { CaseType } from "../generated/prisma/client";
-import { validateSession } from "../lib/authActions";
-import { deleteGarageFile } from "../lib/garageActions";
-import { prisma } from "../lib/prisma";
-import Roles from "../lib/Roles";
+import ActionResult from "../../components/ActionResult";
+import { CaseType } from "../../generated/prisma/client";
+import { validateSession } from "../../lib/authActions";
+import { deleteGarageFile } from "../../lib/garageActions";
+import { prisma } from "../../lib/prisma";
+import Roles from "../../lib/Roles";
 
 export async function deleteAllCases(): Promise<ActionResult<void>> {
   try {
