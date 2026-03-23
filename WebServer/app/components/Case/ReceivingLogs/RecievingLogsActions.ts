@@ -1,7 +1,6 @@
 "use server";
 
 import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
-import { FilterOptions } from "@/app/components/Filter/FilterUtils";
 import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
@@ -9,31 +8,9 @@ import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { ReceivingLogSchema } from "./schema";
-
-type ReceivingLogListFilterShape = {
-  bookAndPage?: string | null;
-  caseNumber?: string | null;
-  caseType?: CaseType | null;
-  content?: string | null;
-  branchNumber?: string | null;
-  notes?: string | null;
-  dateRecieved?: { start?: string; end?: string };
-};
+import { ReceivingLogFilterOptions, ReceivingLogSchema } from "./schema";
 
 const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
-
-export type ReceivingLogFilterOptions =
-  FilterOptions<ReceivingLogListFilterShape> & {
-    sortKey?:
-      | "bookAndPage"
-      | "dateRecieved"
-      | "caseType"
-      | "caseNumber"
-      | "content"
-      | "branchNumber"
-      | "notes";
-  };
 
 export type ReceivingLogStats = {
   total: number;

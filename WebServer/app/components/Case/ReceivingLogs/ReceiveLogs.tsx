@@ -34,6 +34,7 @@ import {
   getRecievingLogsPage,
   getRecievingLogsStats,
 } from "./RecievingLogsActions";
+import type { ReceivingLogFilterOptions } from "./schema";
 
 type ReceiveLog = RecievingLog;
 type ReceiveSortKey =
@@ -137,15 +138,7 @@ const ReceiveRow = ({
   );
 };
 
-type ReceiveLogFilterValues = {
-  bookAndPage?: string;
-  caseNumber?: string;
-  caseType?: CaseType | null;
-  content?: string;
-  branchNumber?: string;
-  notes?: string;
-  dateRecieved?: { start?: string; end?: string };
-};
+type ReceiveLogFilterValues = NonNullable<ReceivingLogFilterOptions["filters"]>;
 
 const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
 
@@ -337,6 +330,74 @@ const ReceiveLogsPage: React.FC = () => {
     statusPopup.showSuccess("Entry deleted successfully");
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const maxSize = 25 * 1024 * 1024;
+    if (file.size > maxSize) {
+      statusPopup.showError("File too large. Max 25 MB allowed.");
+      input.value = "";
+      return;
+    }
+
+    const okExt = ["xlsx", "xls"];
+    const name = file.name || "";
+    const ext = name.split(".").pop()?.toLowerCase() || "";
+    if (!okExt.includes(ext)) {
+      statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+      input.value = "";
+      return;
+    }
+
+    setUploading(true);
+    try {
+      statusPopup.showLoading("Importing... Please wait.");
+      const result = await uploadReceiveExcel(file);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Import failed");
+        input.value = "";
+        return;
+      }
+
+      statusPopup.showSuccess("Import successful!");
+
+      if (result.result?.failedExcel) {
+        const { fileName, base64 } = result.result.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        statusPopup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
+      }
+
+      setCurrentPage(1);
+      await refreshFromBackend(1);
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
+
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   if (loading) {
@@ -439,28 +500,7 @@ const ReceiveLogsPage: React.FC = () => {
               type="file"
               accept=".xlsx,.xls"
               className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setUploading(true);
-                try {
-                  const result = await uploadReceiveExcel(file);
-                  if (!result.success) {
-                    statusPopup.showError(
-                      result.error || "Failed to import receiving logs",
-                    );
-                  } else {
-                    statusPopup.showSuccess(
-                      "Receiving logs imported successfully",
-                    );
-                    setCurrentPage(1);
-                    await refreshFromBackend(1);
-                  }
-                } finally {
-                  setUploading(false);
-                  if (e.target) e.target.value = "";
-                }
-              }}
+              onChange={handleImportExcel}
             />
             <button
               className="btn btn-outline flex items-center gap-2"
