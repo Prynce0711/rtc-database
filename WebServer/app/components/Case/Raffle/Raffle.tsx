@@ -35,7 +35,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1563,12 +1563,12 @@ const Raffle: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={NOTARIAL_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>

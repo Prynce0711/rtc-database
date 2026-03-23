@@ -31,7 +31,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -1668,14 +1668,13 @@ const Civil: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={CASE_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
+            searchValue={appliedFilters}
             getSuggestions={getCaseSuggestions}
-            initialExactMatchMap={exactMatchMap}
           />
         </div>
 

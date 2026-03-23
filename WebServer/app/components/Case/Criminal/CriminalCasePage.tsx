@@ -1,9 +1,15 @@
 "use client";
 
 import { useSession } from "@/app/lib/authClient";
-// import { } from "next/navigation";
 import { isTextFieldKey } from "@/app/lib/utils";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FiBarChart2,
   FiDownload,
@@ -13,7 +19,9 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown, {
+  getFilterStateFromSearchParams,
+} from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -52,6 +60,7 @@ const CriminalCasePage: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
   const [modalType, setModalType] = useState<CriminalCaseModalType | null>(
     null,
   );
@@ -82,6 +91,28 @@ const CriminalCasePage: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
+
+  const urlFilterState = useMemo(
+    () => getFilterStateFromSearchParams(searchParams),
+    [searchParams],
+  );
+
+  useEffect(() => {
+    const nextFilters = urlFilterState.filters as CaseFilterValues;
+    const nextExactMatchMap = urlFilterState.exactMatchMap;
+
+    setAppliedFilters((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(nextFilters)) return prev;
+      return nextFilters;
+    });
+
+    setExactMatchMap((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(nextExactMatchMap)) {
+        return prev;
+      }
+      return nextExactMatchMap;
+    });
+  }, [urlFilterState]);
 
   const caseFilterOptions: FilterOption[] = [
     { key: "branch", label: "Branch", type: "text" },
@@ -236,8 +267,7 @@ const CriminalCasePage: React.FC = () => {
     filters: FilterValues,
     exactMatchMapParam: ExactMatchMap,
   ) => {
-    const typed = filters as CaseFilterValues;
-    setAppliedFilters(typed);
+    setAppliedFilters(filters as CaseFilterValues);
     setExactMatchMap(exactMatchMapParam);
     setCurrentPage(1);
   };
@@ -493,13 +523,12 @@ const CriminalCasePage: React.FC = () => {
           </div>
 
           {/* ✅ FilterModal nasa labas ng flex row — full width na ngayon */}
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={caseFilterOptions}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getCaseSuggestions}
           />
         </div>

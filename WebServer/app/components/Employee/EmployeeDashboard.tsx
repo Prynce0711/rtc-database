@@ -23,7 +23,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import FilterModal from "@/app/components/Filter/FilterModal";
+import FilterDropdown from "@/app/components/Filter/FilterDropdown";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { isRetirementEligible } from "@/app/lib/utils";
 import {
@@ -324,7 +324,7 @@ const EmployeeDashboard: React.FC = () => {
   // ── Main Dashboard ───────────────────────────────────────────
   return (
     <div className="min-h-screen bg-base-100">
-      <div className="w-full max-w-[2000px] mx-auto">
+      <div className="w-full max-w-500 mx-auto">
         {/* HEADER */}
         <div className="mb-8">
           <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
@@ -389,13 +389,12 @@ const EmployeeDashboard: React.FC = () => {
             </div>
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={employeeFilterOptions}
             onApply={handleApplyEmployeeFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getEmployeeSuggestions}
           />
         </div>

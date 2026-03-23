@@ -12,7 +12,7 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -473,13 +473,12 @@ const ReceiveLogsPage: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={petitionFilterOptions}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>

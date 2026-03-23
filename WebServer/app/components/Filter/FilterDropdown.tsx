@@ -1,35 +1,115 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { FiChevronDown, FiSliders, FiX } from "react-icons/fi";
 import FilterRow from "./FilterRow";
 import { ExactMatchMap, FilterModalProps, FilterValues } from "./FilterTypes";
 
-const FilterModal: React.FC<FilterModalProps> = ({
+export const FILTERS_SEARCH_PARAM_KEY = "filters";
+export const EXACT_MATCH_SEARCH_PARAM_KEY = "exactMatchMap";
+
+export const getFilterStateFromSearchParams = (
+  searchParams: Pick<URLSearchParams, "get">,
+): { filters: FilterValues; exactMatchMap: ExactMatchMap } => {
+  const parseObjectParam = (key: string): Record<string, unknown> => {
+    const raw = searchParams.get(key);
+    if (!raw) return {};
+
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const filters = parseObjectParam(FILTERS_SEARCH_PARAM_KEY) as FilterValues;
+  const exactRaw = parseObjectParam(EXACT_MATCH_SEARCH_PARAM_KEY);
+  const exactMatchMap = Object.entries(exactRaw).reduce<ExactMatchMap>(
+    (acc, [key, value]) => {
+      acc[key] = Boolean(value);
+      return acc;
+    },
+    {},
+  );
+
+  return { filters, exactMatchMap };
+};
+
+const FilterDropdown: React.FC<FilterModalProps> = ({
   isOpen,
   onClose,
   options,
   onApply,
-  initialValues,
+  searchValue,
   getSuggestions,
-  initialExactMatchMap,
 }) => {
   const [enabledFilters, setEnabledFilters] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
   const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      const initial = initialValues || {};
-      setFilters(initial);
-      setEnabledFilters(new Set(Object.keys(initial)));
-      setExactMatchMap(initialExactMatchMap || {});
+      const { filters: initialFilters, exactMatchMap: initialExactMatchMap } =
+        getFilterStateFromSearchParams(searchParams);
+      setFilters(initialFilters);
+      setEnabledFilters(new Set(Object.keys(initialFilters)));
+      setExactMatchMap(initialExactMatchMap);
     }
-  }, [isOpen, initialValues, initialExactMatchMap]);
+  }, [isOpen, searchParams]);
+
+  useEffect(() => {
+    if (!searchValue) return;
+
+    setFilters((prev) => {
+      const next = { ...prev };
+
+      Object.entries(searchValue).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          delete next[key];
+          return;
+        }
+
+        if (typeof value === "string" && value.trim() === "") {
+          delete next[key];
+          return;
+        }
+
+        next[key] = value;
+      });
+
+      return next;
+    });
+
+    setEnabledFilters((prev) => {
+      const next = new Set(prev);
+
+      Object.entries(searchValue).forEach(([key, value]) => {
+        if (
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+        ) {
+          next.delete(key);
+          return;
+        }
+
+        next.add(key);
+      });
+
+      return next;
+    });
+  }, [searchValue]);
 
   const toggleFilter = (key: string) => {
     const next = new Set(enabledFilters);
@@ -87,7 +167,38 @@ const FilterModal: React.FC<FilterModalProps> = ({
       }
       active[key] = value;
     });
-    onApply(active, exactMatchMap);
+
+    const activeExactMatchMap = Object.entries(
+      exactMatchMap,
+    ).reduce<ExactMatchMap>((acc, [key, value]) => {
+      if (active[key] !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (Object.keys(active).length > 0) {
+      params.set(FILTERS_SEARCH_PARAM_KEY, JSON.stringify(active));
+    } else {
+      params.delete(FILTERS_SEARCH_PARAM_KEY);
+    }
+
+    if (Object.keys(activeExactMatchMap).length > 0) {
+      params.set(
+        EXACT_MATCH_SEARCH_PARAM_KEY,
+        JSON.stringify(activeExactMatchMap),
+      );
+    } else {
+      params.delete(EXACT_MATCH_SEARCH_PARAM_KEY);
+    }
+
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+
+    onApply(active, activeExactMatchMap);
     onClose();
   };
 
@@ -190,4 +301,4 @@ const FilterModal: React.FC<FilterModalProps> = ({
   );
 };
 
-export default FilterModal;
+export default FilterDropdown;

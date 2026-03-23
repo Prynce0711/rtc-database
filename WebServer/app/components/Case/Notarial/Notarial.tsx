@@ -22,7 +22,7 @@ import {
   FiSearch,
   FiUsers,
 } from "react-icons/fi";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -617,12 +617,12 @@ const NotarialPage: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={NOTARIAL_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>

@@ -20,7 +20,7 @@ export interface FilterModalProps {
   onClose: () => void;
   options: FilterOption[];
   onApply: (filters: FilterValues, exactMatchMap: ExactMatchMap) => void;
-  initialValues?: FilterValues;
+  searchValue?: FilterValues;
   getSuggestions?: (
     key: string,
     inputValue: string,

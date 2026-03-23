@@ -21,7 +21,11 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { createCriminalCase, updateCriminalCase } from "./CriminalCasesActions";
+import {
+  createCriminalCase,
+  deleteCriminalCase,
+  updateCriminalCase,
+} from "./CriminalCasesActions";
 import {
   CaseEntry,
   CriminalCaseData,
@@ -811,6 +815,14 @@ const NewCriminalCaseModal = ({
     });
   };
 
+  const getResponseErrorMessage = (
+    response: { success: boolean; error?: string | null },
+    fallback: string,
+  ) => {
+    const msg = response.error?.trim();
+    return msg && msg.length > 0 ? msg : fallback;
+  };
+
   const handleSubmit = async () => {
     const label = isEdit
       ? "Save changes to this case?"
@@ -822,13 +834,46 @@ const NewCriminalCaseModal = ({
     statusPopup.showLoading(
       isEdit ? "Updating case..." : "Creating case(s)...",
     );
+
+    const rollbackCreatedCases = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteCriminalCase(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const msg = `Rollback failed for case ID ${createdIds[index]}`;
+          rollbackErrors.push(msg);
+          console.warn(msg, result.reason);
+        } else if (!result.value.success) {
+          const msg = `Rollback failed for case ID ${createdIds[index]}: ${result.value.error || "Unknown rollback error"}`;
+          rollbackErrors.push(msg);
+          console.warn(msg);
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       if (isEdit && selectedCase) {
         if (entries[0].caseNumber.trim() !== selectedCase.caseNumber.trim()) {
-          throw new Error("Case number cannot be changed");
+          setStep("entry");
+          statusPopup.showError("Case number cannot be changed");
+          return;
         }
         const parsed = buildPayload(entries[0]);
-        if (!parsed.success) throw new Error("Invalid data");
+        if (!parsed.success) {
+          setStep("entry");
+          statusPopup.showError("Invalid data. Please review required fields.");
+          return;
+        }
         const payload = parsed.data;
         const response = await updateCriminalCase(selectedCase.id, {
           ...payload,
@@ -839,14 +884,43 @@ const NewCriminalCaseModal = ({
             ? new Date(payload.raffleDate).toISOString()
             : null,
         });
-        if (!response.success)
-          throw new Error(response.error || "Failed to update case");
+        if (!response.success) {
+          console.error("Failed to update criminal case", {
+            caseId: selectedCase.id,
+            response,
+          });
+
+          const responseError = getResponseErrorMessage(
+            response,
+            "Failed to update case",
+          );
+
+          setStep("entry");
+          statusPopup.showError(responseError);
+          return;
+        }
         onUpdate?.();
         statusPopup.showSuccess("Case updated successfully");
       } else {
-        for (const entry of entries) {
+        const createdCaseIds: number[] = [];
+        let successfulCreates = 0;
+
+        for (let idx = 0; idx < entries.length; idx++) {
+          const entry = entries[idx];
           const parsed = buildPayload(entry);
-          if (!parsed.success) throw new Error("Invalid data");
+          if (!parsed.success) {
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Row ${idx + 1} has invalid data.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
           const payload = parsed.data;
           const response = await createCriminalCase({
             ...payload,
@@ -857,10 +931,58 @@ const NewCriminalCaseModal = ({
               ? new Date(payload.raffleDate).toISOString()
               : null,
           });
-          if (!response.success)
-            throw new Error(response.error || "Failed to create case");
-          onCreate?.();
+
+          if (!response.success) {
+            console.error("Failed to create criminal case", {
+              row: idx + 1,
+              response,
+            });
+
+            const responseError = getResponseErrorMessage(
+              response,
+              "Unknown error",
+            );
+
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${idx + 1}: ${responseError}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          successfulCreates += 1;
+
+          if (response.result?.id) {
+            createdCaseIds.push(response.result.id);
+          }
         }
+
+        if (successfulCreates !== entries.length) {
+          const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+          setStep("entry");
+          console.error(
+            `Only ${successfulCreates} of ${entries.length} cases were created successfully.`,
+            rollbackErrors,
+          );
+
+          statusPopup.showError(
+            [
+              `Only ${successfulCreates} of ${entries.length} rows were confirmed created.`,
+              rollbackErrors.length > 0
+                ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                : "Any created rows in this batch were rolled back.",
+            ].join(" "),
+          );
+          return;
+        }
+
+        onCreate?.();
         statusPopup.showSuccess(
           entries.length === 1
             ? "Case created successfully"
@@ -870,6 +992,7 @@ const NewCriminalCaseModal = ({
 
       handleClose();
     } catch (err) {
+      setStep("entry");
       statusPopup.showError(
         err instanceof Error ? err.message : "Failed to save case",
       );
