@@ -104,10 +104,7 @@ const NotarialRow = ({
         value={formatDate(record.date)}
         className="text-base-content/70"
       />
-      <td
-        className="text-center relative group/tip"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <td className="text-center relative" onClick={(e) => e.stopPropagation()}>
         {record.link ? (
           <div className="flex items-center justify-center gap-2">
             {canPreview && (

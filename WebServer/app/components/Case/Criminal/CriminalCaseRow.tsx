@@ -141,22 +141,31 @@ const CriminalCaseRow = ({
       <TipCell label="Court" value={caseItem.court} />
 
       {/* DETENTION STATUS */}
-      <td className="text-center whitespace-nowrap relative group/tip ">
-        <span
-          className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition
+      <td className="text-center whitespace-nowrap relative">
+        <div
+          className="tooltip tooltip-bottom z-50 inline-block"
+          role="presentation"
+        >
+          <div className="tooltip-content z-50">
+            <div className="flex flex-col items-center gap-1 text-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                Detention
+              </span>
+              <span className="text-xs font-medium">
+                {caseItem.detained && caseItem.detained.trim()
+                  ? caseItem.detained
+                  : "Released"}
+              </span>
+            </div>
+          </div>
+          <span
+            className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition
             ${
               caseItem.detained && caseItem.detained.trim()
                 ? "bg-gray-100 text-gray-500 border-gray-200"
                 : "bg-neutral-800 text-white border-neutral-700"
             }`}
-        >
-          {caseItem.detained && caseItem.detained.trim()
-            ? caseItem.detained
-            : "Released"}
-        </span>
-        <div className="cell-tip">
-          <span className="cell-tip-label">Detention</span>
-          <span className="cell-tip-value">
+          >
             {caseItem.detained && caseItem.detained.trim()
               ? caseItem.detained
               : "Released"}

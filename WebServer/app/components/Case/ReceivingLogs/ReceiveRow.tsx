@@ -181,30 +181,52 @@ const ReceiveRow = ({
         />
         <TipCell label="Case Type" value={caseType} />
         <TipCell label="Case No." value={caseNo} />
-        <td className="text-center relative group/tip">
-          <ExpandableContent text={content} maxChars={220} />
-          {content && content !== "—" && (
-            <div className="cell-tip">
-              <span className="cell-tip-label">Content</span>
-              <span className="cell-tip-value">
-                {String(content).slice(0, 200)}
-                {String(content).length > 200 ? "…" : ""}
-              </span>
+        <td className="text-center relative">
+          {content && content !== "—" ? (
+            <div
+              className="tooltip tooltip-bottom z-50 block w-full"
+              role="presentation"
+            >
+              <div className="tooltip-content z-50">
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                    Content
+                  </span>
+                  <span className="text-xs font-medium">
+                    {String(content).slice(0, 200)}
+                    {String(content).length > 200 ? "…" : ""}
+                  </span>
+                </div>
+              </div>
+              <ExpandableContent text={content} maxChars={220} />
             </div>
+          ) : (
+            <ExpandableContent text={content} maxChars={220} />
           )}
         </td>
         <TipCell label="Branch No." value={branchNo} />
         <TipCell label="Time" value={timeVal} />
-        <td className="text-center relative group/tip">
-          <ExpandableContent text={notes} maxChars={140} />
-          {notes && notes !== "—" && (
-            <div className="cell-tip">
-              <span className="cell-tip-label">Notes</span>
-              <span className="cell-tip-value">
-                {String(notes).slice(0, 200)}
-                {String(notes).length > 200 ? "…" : ""}
-              </span>
+        <td className="text-center relative">
+          {notes && notes !== "—" ? (
+            <div
+              className="tooltip tooltip-bottom z-50 block w-full"
+              role="presentation"
+            >
+              <div className="tooltip-content z-50">
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                    Notes
+                  </span>
+                  <span className="text-xs font-medium">
+                    {String(notes).slice(0, 200)}
+                    {String(notes).length > 200 ? "…" : ""}
+                  </span>
+                </div>
+              </div>
+              <ExpandableContent text={notes} maxChars={140} />
             </div>
+          ) : (
+            <ExpandableContent text={notes} maxChars={140} />
           )}
         </td>
       </tr>
