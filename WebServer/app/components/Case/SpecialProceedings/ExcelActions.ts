@@ -73,15 +73,6 @@ export async function uploadSpecialProceedingExcel(
       schema: SpecialProceedingSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      uniqueKeys: ["caseNumber"],
-      uniqueKeyLabel: "Case number",
-      checkExistingUniqueKeys: async (keys) => {
-        const existing = await prisma.case.findMany({
-          where: { caseNumber: { in: keys } },
-          select: { caseNumber: true },
-        });
-        return new Set(existing.map((c) => c.caseNumber.trim()));
-      },
       mapRow: (row) => {
         const cells = getMappedCells(row);
 
@@ -107,13 +98,10 @@ export async function uploadSpecialProceedingExcel(
 
         return {
           mapped: validation.data,
-          uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
         const caseRows: Prisma.CaseCreateManyInput[] = [];
-        const specialProceedingRows: Prisma.SpecialProceedingCreateManyInput[] =
-          [];
 
         rows.forEach((row) => {
           const { caseData, detailData } = splitCaseDataBySchema(row);
@@ -121,15 +109,20 @@ export async function uploadSpecialProceedingExcel(
             ...caseData,
             caseType: CaseType.SCA,
           });
-          specialProceedingRows.push({
-            ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
-            caseNumber: caseData.caseNumber,
-          });
         });
 
         const created = await prisma.case.createManyAndReturn({
           data: caseRows,
         });
+
+        const specialProceedingRows: Prisma.SpecialProceedingCreateManyInput[] =
+          rows.map((row, index) => {
+            const { detailData } = splitCaseDataBySchema(row);
+            return {
+              ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
+              baseCaseID: created[index].id,
+            };
+          });
 
         if (specialProceedingRows.length > 0) {
           await prisma.specialProceeding.createMany({

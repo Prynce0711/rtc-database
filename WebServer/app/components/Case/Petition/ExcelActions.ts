@@ -75,15 +75,6 @@ export async function uploadPetitionExcel(
       schema: PetitionSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      uniqueKeys: ["caseNumber"],
-      uniqueKeyLabel: "Case number",
-      checkExistingUniqueKeys: async (keys) => {
-        const existing = await prisma.case.findMany({
-          where: { caseNumber: { in: keys } },
-          select: { caseNumber: true },
-        });
-        return new Set(existing.map((c) => c.caseNumber.trim()));
-      },
       mapRow: (row) => {
         const cells = getMappedCells(row);
 
@@ -109,12 +100,10 @@ export async function uploadPetitionExcel(
 
         return {
           mapped: validation.data,
-          uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
         const caseRows: Prisma.CaseCreateManyInput[] = [];
-        const petitionRows: Prisma.PetitionCreateManyInput[] = [];
 
         rows.forEach((row) => {
           const { caseData, detailData } = splitCaseDataBySchema(row);
@@ -122,15 +111,21 @@ export async function uploadPetitionExcel(
             ...caseData,
             caseType: CaseType.PETITION,
           });
-          petitionRows.push({
-            ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
-            caseNumber: caseData.caseNumber,
-          });
         });
 
         const created = await prisma.case.createManyAndReturn({
           data: caseRows,
         });
+
+        const petitionRows: Prisma.PetitionCreateManyInput[] = rows.map(
+          (row, index) => {
+            const { detailData } = splitCaseDataBySchema(row);
+            return {
+              ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
+              baseCaseID: created[index].id,
+            };
+          },
+        );
 
         if (petitionRows.length > 0) {
           await prisma.petition.createMany({ data: petitionRows });

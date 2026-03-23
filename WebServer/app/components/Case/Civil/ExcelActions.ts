@@ -71,15 +71,6 @@ export async function uploadExcel(
       schema: CivilCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      uniqueKeys: ["caseNumber"],
-      uniqueKeyLabel: "Case number",
-      checkExistingUniqueKeys: async (keys) => {
-        const existing = await prisma.case.findMany({
-          where: { caseNumber: { in: keys } },
-          select: { caseNumber: true },
-        });
-        return new Set(existing.map((c) => c.caseNumber.trim()));
-      },
       mapRow: (row, rowNum) => {
         const cells = getMappedCells(row);
 
@@ -132,25 +123,29 @@ export async function uploadExcel(
 
         return {
           mapped: validation.data,
-          uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
         const caseRows: Prisma.CaseCreateManyInput[] = [];
-        const civilRows: Prisma.CivilCaseCreateManyInput[] = [];
 
         rows.forEach((row) => {
-          const { caseData, detailData } = splitCaseDataBySchema(row);
+          const { caseData } = splitCaseDataBySchema(row);
           caseRows.push(caseData);
-          civilRows.push({
-            ...detailData,
-            caseNumber: caseData.caseNumber,
-          } as Prisma.CivilCaseCreateManyInput);
         });
 
         const created = await prisma.case.createManyAndReturn({
           data: caseRows,
         });
+
+        const civilRows: Prisma.CivilCaseCreateManyInput[] = rows.map(
+          (row, index) => {
+            const { detailData } = splitCaseDataBySchema(row);
+            return {
+              ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
+              baseCaseID: created[index].id,
+            };
+          },
+        );
 
         if (civilRows.length > 0) {
           await prisma.civilCase.createMany({ data: civilRows });

@@ -267,10 +267,6 @@ export async function updateSpecialProceeding(
       throw new Error("Special proceeding not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
@@ -280,7 +276,7 @@ export async function updateSpecialProceeding(
         },
       }),
       prisma.specialProceeding.upsert({
-        where: { caseNumber: casePayload.caseNumber },
+        where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
@@ -387,8 +383,9 @@ export async function getSpecialProceedingByCaseNumber(
       return sessionResult;
     }
 
-    const result = await prisma.case.findUnique({
-      where: { caseNumber },
+    const result = await prisma.case.findFirst({
+      where: { caseNumber, specialProceeding: { isNot: null } },
+      orderBy: { id: "desc" },
       include: { specialProceeding: true },
     });
 

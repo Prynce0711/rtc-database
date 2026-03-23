@@ -183,10 +183,6 @@ export async function updatePetition(
       throw new Error("Petition not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
@@ -196,7 +192,7 @@ export async function updatePetition(
         },
       }),
       prisma.petition.upsert({
-        where: { caseNumber: casePayload.caseNumber },
+        where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
@@ -303,8 +299,9 @@ export async function getPetitionByCaseNumber(
       return sessionResult;
     }
 
-    const result = await prisma.case.findUnique({
-      where: { caseNumber },
+    const result = await prisma.case.findFirst({
+      where: { caseNumber, petition: { isNot: null } },
+      orderBy: { id: "desc" },
       include: { petition: true },
     });
 

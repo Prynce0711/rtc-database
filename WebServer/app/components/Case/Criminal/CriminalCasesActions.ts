@@ -238,17 +238,13 @@ export async function updateCriminalCase(
       throw new Error("Case not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
         data: casePayload,
       }),
       prisma.criminalCase.upsert({
-        where: { caseNumber: casePayload.caseNumber },
+        where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
