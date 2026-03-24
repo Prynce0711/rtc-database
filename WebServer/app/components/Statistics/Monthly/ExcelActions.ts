@@ -25,6 +25,17 @@ const normalizeText = (value: unknown): string =>
     .trim()
     .replace(/\s+/g, " ");
 
+const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 const getMonthlyCells = (row: Record<string, unknown>) => {
   const monthCell = findColumnValue(row, ["Month", "Period", "Report Month"]);
   const categoryCell = findColumnValue(row, ["Category", "Case Category"]);
@@ -67,16 +78,26 @@ export async function uploadMonthlyExcel(
       getCells: getMonthlyCells,
       schema: MonthlyRowSchema,
       skipRowsWithoutCell: ["categoryCell", "branchCell"],
-      checkExistingUniqueKeys: async () => {
-        const where = fallbackMonth ? { month: fallbackMonth } : undefined;
-        const existing = await prisma.monthlyStatistics.findMany({
-          where,
-          select: { month: true, category: true, branch: true },
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.monthlyStatistics.findMany({
+          where: {
+            month: mappedRow.month,
+            category: mappedRow.category,
+            branch: mappedRow.branch,
+          },
         });
 
-        return new Set(
-          existing.map((row) => `${row.month}|${row.category}|${row.branch}`),
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
         );
+
+        return { exists: hasExactMatch };
       },
       mapRow: (row) => {
         const cells = getMonthlyCells(row);

@@ -31,6 +31,17 @@ import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 import { BaseCaseSchema } from "../schema";
 
+const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 export async function uploadSpecialProceedingExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
@@ -73,6 +84,33 @@ export async function uploadSpecialProceedingExcel(
       schema: SpecialProceedingSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingCases = await prisma.case.findMany({
+          where: {
+            caseNumber: mappedRow.caseNumber,
+            caseType: mappedRow.caseType,
+          },
+          include: {
+            specialProceeding: true,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingCases.some((existingCase) => {
+          if (!existingCase.specialProceeding) return false;
+
+          const mergedCase = {
+            ...existingCase,
+            ...existingCase.specialProceeding,
+          } as Record<string, unknown>;
+
+          return mappedEntries.every(([key, value]) =>
+            valuesAreEqual(value, mergedCase[key]),
+          );
+        });
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getMappedCells(row);
 

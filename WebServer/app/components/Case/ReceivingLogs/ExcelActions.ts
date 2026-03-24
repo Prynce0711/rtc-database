@@ -21,6 +21,17 @@ import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 
+const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 // Parse time string in various formats
 const parseTime = (
   timeStr: string,
@@ -129,6 +140,28 @@ export async function uploadReceiveExcel(
         "branchNumber",
         "notes",
       ],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const where: Prisma.RecievingLogWhereInput = {
+          caseNumber: mappedRow.caseNumber,
+          caseType: mappedRow.caseType,
+          dateRecieved: mappedRow.dateRecieved,
+          bookAndPage: mappedRow.bookAndPage,
+        };
+
+        const existingLogs = await prisma.recievingLog.findMany({ where });
+        const mappedEntries = Object.entries(mappedRow);
+
+        const hasExactMatch = existingLogs.some((existingLog) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingLog as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getMappedCells(row);
         if (isMappedRowEmpty(cells, ["caseType", "dateRecieved"])) {

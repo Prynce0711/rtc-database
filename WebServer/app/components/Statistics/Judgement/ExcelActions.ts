@@ -30,6 +30,17 @@ const toBranch = (value: unknown): string | null => {
   return text.length > 0 ? text : null;
 };
 
+const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 const getMtcCells = (row: Record<string, unknown>) => {
   const branchNoCell = findColumnValue(row, [
     "Branches No.",
@@ -259,6 +270,25 @@ export async function uploadMunicipalJudgementExcel(
       getCells: getMtcCells,
       schema: MTCJudgementRowSchema,
       skipRowsWithoutCell: ["branchNoCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.judgementMunicipal.findMany({
+          where: {
+            branchNo: mappedRow.branchNo,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getMtcCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -405,6 +435,25 @@ export async function uploadRegionalJudgementExcel(
       getCells: getRtcCells,
       schema: RTCJudgementRowSchema,
       skipRowsWithoutCell: ["branchNoCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.judgementRegional.findMany({
+          where: {
+            branchNo: mappedRow.branchNo,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getRtcCells(row);
         if (isMappedRowEmpty(cells)) {

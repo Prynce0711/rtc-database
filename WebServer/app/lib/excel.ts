@@ -420,8 +420,6 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   schema: z.ZodType<T>;
   getCells: (row: Record<string, unknown>) => TCells;
   skipRowsWithoutCell?: Array<keyof TCells>;
-  uniqueKeys?: Array<keyof TCells>;
-  checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
   mapRow: (
     row: Record<string, unknown>,
     rowNum: number,
@@ -432,18 +430,23 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
     uniqueKey?: string;
   };
   onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
-};
-
-function extractUniqueKeysFromRow<TCells extends Record<string, unknown>>(
-  cells: TCells,
-  keys: Array<keyof TCells>,
-): string[] {
-  return keys
-    .map((key) => cells[key])
-    .filter((value) => hasContent(value))
-    .map((value) => String(value).trim())
-    .filter((value) => value.length > 0);
-}
+} & (
+  | {
+      uniqueKeys: Array<keyof TCells>;
+      checkExistingUniqueKeys: (keys: string[]) => Promise<Set<string>>;
+      checkExactMatch?: never;
+    }
+  | {
+      uniqueKeys?: undefined;
+      checkExistingUniqueKeys?: never;
+      checkExactMatch: (
+        cells: TCells,
+        mappedRow: T,
+        rowNum: number,
+        sheetName: string,
+      ) => Promise<{ exists: boolean; fields?: string[] }>;
+    }
+);
 
 function extractUniqueEntriesFromRow<TCells extends Record<string, unknown>>(
   cells: TCells,
@@ -486,6 +489,7 @@ export async function processExcelUpload<
     skipRowsWithoutCell: skipRows,
     uniqueKeys,
     checkExistingUniqueKeys,
+    checkExactMatch,
     mapRow,
     onBatchInsert,
   } = options;
@@ -599,6 +603,7 @@ export async function processExcelUpload<
 
     for (let index = 0; index < sheetData.length; index++) {
       const row = sheetData[index];
+      const rowCells = getCells(row);
 
       const mapResult = mapRow(row, index + 2);
       if (mapResult.skip) {
@@ -606,7 +611,7 @@ export async function processExcelUpload<
       }
 
       const rowUniqueEntries = uniqueKeys
-        ? extractUniqueEntriesFromRow(getCells(row), uniqueKeys)
+        ? extractUniqueEntriesFromRow(rowCells, uniqueKeys)
         : mapResult.uniqueKey
           ? [{ key: "uniqueKey", value: mapResult.uniqueKey }]
           : [];
@@ -674,6 +679,28 @@ export async function processExcelUpload<
       validationResults.total++;
 
       if (validated.success) {
+        if (!uniqueKeys) {
+          const exactMatch = await checkExactMatch(
+            rowCells,
+            validated.data,
+            index + 2,
+            sheetName,
+          );
+
+          if (exactMatch.exists) {
+            const message = "Already exists";
+
+            sheetFailed++;
+            sheetFailedRows.push({ ...row, __error: message });
+            validationResults.errors.push({
+              row: index + 2,
+              sheet: sheetName,
+              errors: { message },
+            });
+            continue;
+          }
+        }
+
         if (rowUniqueEntries.length > 0) {
           rowUniqueEntries.forEach(({ value }) => {
             sheetUniqueKeys.add(value);

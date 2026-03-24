@@ -20,6 +20,17 @@ const toText = (value: unknown): string | undefined => {
   return text.length > 0 ? text : undefined;
 };
 
+const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 const toIsoDateString = (value: unknown): string | undefined => {
   if (value === undefined || value === null || value === "") return undefined;
 
@@ -142,6 +153,25 @@ export async function uploadMunicipalTrialCourtExcel(
       getCells: getCourtCells,
       schema: CaseSchema,
       skipRowsWithoutCell: ["branchCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.municipalTrialCourt.findMany({
+          where: {
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -242,6 +272,25 @@ export async function uploadRegionalTrialCourtExcel(
       getCells: getCourtCells,
       schema: CaseSchema,
       skipRowsWithoutCell: ["branchCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.regionalTrialCourt.findMany({
+          where: {
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -356,6 +405,29 @@ export async function uploadInventoryDocumentExcel(
         "cityMunicipalityCell",
         "branchCell",
       ],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.inventoryDocument.findMany({
+          where: {
+            region: mappedRow.region,
+            province: mappedRow.province,
+            court: mappedRow.court,
+            cityMunicipality: mappedRow.cityMunicipality,
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getInventoryCells(row);
         if (isMappedRowEmpty(cells)) {
