@@ -1,7 +1,6 @@
 "use server";
 
 import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
-import { FilterOptions } from "@/app/components/Filter/FilterUtils";
 import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
@@ -9,31 +8,9 @@ import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { ReceivingLogSchema } from "./schema";
-
-type ReceivingLogListFilterShape = {
-  bookAndPage?: string | null;
-  caseNumber?: string | null;
-  caseType?: CaseType | null;
-  content?: string | null;
-  branchNumber?: string | null;
-  notes?: string | null;
-  dateRecieved?: { start?: string; end?: string };
-};
+import { ReceivingLogFilterOptions, ReceivingLogSchema } from "./schema";
 
 const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
-
-export type ReceivingLogFilterOptions =
-  FilterOptions<ReceivingLogListFilterShape> & {
-    sortKey?:
-      | "bookAndPage"
-      | "dateRecieved"
-      | "caseType"
-      | "caseNumber"
-      | "content"
-      | "branchNumber"
-      | "notes";
-  };
 
 export type ReceivingLogStats = {
   total: number;
@@ -85,27 +62,6 @@ function buildReceivingLogWhere(
     });
   }
 
-  if (options?.searchTerm) {
-    const search = options.searchTerm.trim();
-    if (search.length > 0) {
-      const normalizedSearch = search.toUpperCase();
-      const typeFilter = CASE_TYPE_VALUES.has(normalizedSearch as CaseType)
-        ? [{ caseType: normalizedSearch as CaseType }]
-        : [];
-
-      conditions.push({
-        OR: [
-          { bookAndPage: { contains: search } },
-          { caseNumber: { contains: search } },
-          ...typeFilter,
-          { content: { contains: search } },
-          { branchNumber: { contains: search } },
-          { notes: { contains: search } },
-        ],
-      });
-    }
-  }
-
   return conditions.length > 0 ? { AND: conditions } : {};
 }
 
@@ -127,6 +83,66 @@ export async function getRecievingLogs(): Promise<
     return { success: true, result: logs };
   } catch (error) {
     console.error("Error fetching receiving logs:", error);
+    return { success: false, error: "Failed to fetch receiving logs" };
+  }
+}
+
+export async function getRecievingLogById(
+  logId: number,
+): Promise<ActionResult<RecievingLog>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const log = await prisma.recievingLog.findUnique({ where: { id: logId } });
+
+    if (!log) {
+      return { success: false, error: "Receiving log not found" };
+    }
+
+    return { success: true, result: log };
+  } catch (error) {
+    console.error("Error fetching receiving log by id:", error);
+    return { success: false, error: "Failed to fetch receiving log" };
+  }
+}
+
+export async function getRecievingLogsByIds(
+  ids: Array<number | string>,
+): Promise<ActionResult<RecievingLog[]>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid log IDs provided" };
+    }
+
+    const logs = await prisma.recievingLog.findMany({
+      where: { id: { in: validIds } },
+    });
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    logs.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+
+    if (logs.length !== validIds.length) {
+      return {
+        success: false,
+        error: "One or more receiving logs were not found",
+      };
+    }
+
+    return { success: true, result: logs };
+  } catch (error) {
+    console.error("Error fetching receiving logs by ids:", error);
     return { success: false, error: "Failed to fetch receiving logs" };
   }
 }

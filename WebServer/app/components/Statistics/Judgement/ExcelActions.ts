@@ -7,6 +7,7 @@ import {
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -243,7 +244,7 @@ const getRtcCells = (row: Record<string, unknown>) => {
 
 export async function uploadMunicipalJudgementExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -259,6 +260,25 @@ export async function uploadMunicipalJudgementExcel(
       getCells: getMtcCells,
       schema: MTCJudgementRowSchema,
       skipRowsWithoutCell: ["branchNoCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.judgementMunicipal.findMany({
+          where: {
+            branchNo: mappedRow.branchNo,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getMtcCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -389,7 +409,7 @@ export async function exportMunicipalJudgementExcel(): Promise<
 
 export async function uploadRegionalJudgementExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -405,6 +425,25 @@ export async function uploadRegionalJudgementExcel(
       getCells: getRtcCells,
       schema: RTCJudgementRowSchema,
       skipRowsWithoutCell: ["branchNoCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.judgementRegional.findMany({
+          where: {
+            branchNo: mappedRow.branchNo,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getRtcCells(row);
         if (isMappedRowEmpty(cells)) {

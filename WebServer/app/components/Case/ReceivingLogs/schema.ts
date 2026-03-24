@@ -1,18 +1,90 @@
 import { RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
+import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
+import { FilterOptions } from "../../Filter/FilterUtils";
 
-export const ReceivingLogSchema = z.object({
-  bookAndPage: z.string().nullable().optional(),
-  dateRecieved: z.coerce.date().nullable().optional(),
-  caseType: z.enum(CaseType),
-  caseNumber: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  branchNumber: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
+const ReceivingLogObjectSchema = z.object({
+  bookAndPage: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Book and Pages",
+        "Book & Pages",
+        "BookAndPages",
+        "Book and Page",
+      ]),
+    ),
+  dateRecieved: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Date Recieve",
+        "Date Receive",
+        "Date Received",
+        "DateRecieved",
+      ]),
+    ),
+  caseType: z
+    .enum(CaseType)
+    .describe(excelHeaders(["Abbreviation", "Case Type", "CaseType", "Type"])),
+  caseNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Case no.",
+        "Case No.",
+        "Case No",
+        "Case Number",
+        "CaseNumber",
+      ]),
+    ),
+  content: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Content", "CONTENT", "Contents"])),
+  branchNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Branch no.",
+        "Branch No.",
+        "Branch No",
+        "Branch Number",
+        "BranchNumber",
+        "Branch",
+      ]),
+    ),
+  notes: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(excelHeaders(["Notes", "NOTES", "Note", "Remarks"])),
 });
 
+export const ReceivingLogSchema = ReceivingLogObjectSchema;
+
 export type ReceivingLogSchema = z.infer<typeof ReceivingLogSchema>;
+export type ReceivingLogFilterOptions = FilterOptions<ReceivingLogSchema> & {
+  sortKey?:
+    | "bookAndPage"
+    | "dateRecieved"
+    | "caseType"
+    | "caseNumber"
+    | "content"
+    | "branchNumber"
+    | "notes";
+};
+export type ReceivingLogFilters = ReceivingLogFilterOptions["filters"];
 
 /** Form entry used by the grid UI (RecievingLog + UI metadata). */
 export type ReceivingLogEntry = Omit<

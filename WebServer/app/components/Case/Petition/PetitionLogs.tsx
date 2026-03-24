@@ -2,6 +2,8 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiBarChart2,
@@ -12,7 +14,7 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -22,8 +24,8 @@ import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
+import { uploadPetitionExcel } from "./ExcelActions";
 import { deletePetition, getPetitions } from "./PetitionActions";
-import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
 import { PetitionCaseData } from "./schema";
@@ -37,12 +39,13 @@ type PetitionFilterValues = {
 };
 
 const ReceiveLogsPage: React.FC = () => {
+  const router = useRouter();
   const [logs, setLogs] = useState<PetitionCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [drawerType, setDrawerType] = useState<ReceiveDrawerType | null>(null);
-  const [selectedLog, setSelectedLog] = useState<PetitionCaseData | null>(null);
+  const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const session = useSession();
   const isAdminOrAtty =
@@ -86,7 +89,6 @@ const ReceiveLogsPage: React.FC = () => {
 
   const fetchLogs = async () => {
     try {
-      setLoading(true);
       const response = await getPetitions();
       if (!response.success) {
         statusPopup.showError(response.error || "Failed to fetch petitions");
@@ -226,51 +228,137 @@ const ReceiveLogsPage: React.FC = () => {
     }
   };
 
-  /* Import handler */
-  useEffect(() => {
-    const el = document.getElementById(
-      "petition-import-input",
-    ) as HTMLInputElement | null;
-    const handleChange = async (e: Event) => {
-      const input = e.target as HTMLInputElement;
-      if (!input.files || input.files.length === 0) return;
-      const file = input.files[0];
-      const maxSize = 5 * 1024 * 1024;
-      if (file.size > maxSize) {
-        statusPopup.showError("File too large. Max 5 MB allowed.");
-        input.value = "";
-        return;
+  const handleDeleteSelectedLogs = async () => {
+    if (selectedLogIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedLogIds.length} selected petition${selectedLogIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected petitions...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedLogIds.map((id) => deletePetition(id)),
+      );
+
+      const deletedIds: number[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = selectedLogIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(id);
+          return;
+        }
+        failedIds.push(id);
+      });
+
+      setLogs((prev) => prev.filter((log) => !deletedIds.includes(log.id)));
+      setSelectedLogIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} petition(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected petition${deletedIds.length > 1 ? "s" : ""}.`,
+        );
       }
-      const okExt = ["xlsx", "xls"];
-      const name = file.name || "";
-      const ext = name.split(".").pop()?.toLowerCase() || "";
-      if (!okExt.includes(ext)) {
-        statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+
+      await fetchLogs();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const maxSize = 25 * 1024 * 1024;
+    if (file.size > maxSize) {
+      statusPopup.showError("File too large. Max 25 MB allowed.");
+      input.value = "";
+      return;
+    }
+
+    const okExt = ["xlsx", "xls"];
+    const name = file.name || "";
+    const ext = name.split(".").pop()?.toLowerCase() || "";
+    if (!okExt.includes(ext)) {
+      statusPopup.showError("Only Excel files (.xlsx/.xls) are allowed.");
+      input.value = "";
+      return;
+    }
+
+    try {
+      statusPopup.showLoading("Importing... Please wait.");
+      const result = await uploadPetitionExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Import failed");
         input.value = "";
         return;
       }
 
-      try {
-        statusPopup.showLoading("Importing... Please wait.");
-        const { uploadPetitionExcel } = await import("./ExcelActions");
-        const result = await uploadPetitionExcel(file);
-        if (!result.success) {
-          statusPopup.showError(result.error || "Import failed");
-          input.value = "";
-          return;
-        }
-        statusPopup.showSuccess("Import successful!");
-        await fetchLogs();
-      } catch (err) {
-        statusPopup.showError("Import failed. See console for details.");
-        console.error(err);
-      } finally {
-        (e.target as HTMLInputElement).value = "";
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        input.value = "";
+        return;
       }
-    };
-    el?.addEventListener("change", handleChange);
-    return () => el?.removeEventListener("change", handleChange);
-  }, [statusPopup]);
+
+      statusPopup.showSuccess("Import successful!");
+
+      if (importPayload?.failedExcel) {
+        statusPopup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
+      }
+
+      await fetchLogs();
+    } catch (err) {
+      statusPopup.showError("Import failed. See console for details.");
+      console.error(err);
+    } finally {
+      input.value = "";
+    }
+  };
 
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={6} tableRows={8} />;
@@ -281,28 +369,6 @@ const ReceiveLogsPage: React.FC = () => {
       <div className="alert alert-error">
         <span>Error: {error}</span>
       </div>
-    );
-  }
-
-  if (drawerType) {
-    return (
-      <PetitionEntryPage
-        type={drawerType}
-        onClose={() => {
-          setDrawerType(null);
-          setSelectedLog(null);
-          fetchLogs();
-        }}
-        selectedLog={selectedLog}
-        onCreate={(newLog) => {
-          setLogs((prev) => [newLog as PetitionCaseData, ...prev]);
-        }}
-        onUpdate={(updatedLog) => {
-          setLogs((prev) =>
-            prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
-          );
-        }}
-      />
     );
   }
 
@@ -379,6 +445,7 @@ const ReceiveLogsPage: React.FC = () => {
                   accept=".xlsx,.xls"
                   className="hidden"
                   id="petition-import-input"
+                  onChange={handleImportExcel}
                 />
 
                 <button
@@ -428,8 +495,7 @@ const ReceiveLogsPage: React.FC = () => {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    setSelectedLog(null);
-                    setDrawerType(ReceiveDrawerType.ADD);
+                    router.push("/user/cases/petition/add");
                   }}
                 >
                   <svg
@@ -450,16 +516,61 @@ const ReceiveLogsPage: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={petitionFilterOptions}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>
+
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedLogIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedLogIds.length} petition
+                    {selectedLogIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/petition/edit?ids=${selectedLogIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedLogs}
+                      disabled={deletingSelected}
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedLogIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -538,6 +649,11 @@ const ReceiveLogsPage: React.FC = () => {
               ...(isAdminOrAtty
                 ? [
                     {
+                      key: "select",
+                      label: "Select",
+                      align: "center" as const,
+                    },
+                    {
                       key: "actions",
                       label: "Actions",
                       align: "center" as const,
@@ -558,11 +674,18 @@ const ReceiveLogsPage: React.FC = () => {
               <ReceiveRow
                 key={log.id}
                 log={log}
-                onEdit={(l) => {
-                  setSelectedLog(l);
-                  setDrawerType(ReceiveDrawerType.EDIT);
-                }}
+                onEdit={(l) =>
+                  router.push(`/user/cases/petition/edit?id=${l.id}`)
+                }
                 onDelete={(l) => handleDeleteLog(l.id)}
+                isSelected={selectedLogIds.includes(log.id)}
+                onToggleSelect={(id) =>
+                  setSelectedLogIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((entryId) => entryId !== id)
+                      : [...prev, id],
+                  )
+                }
               />
             )}
           />

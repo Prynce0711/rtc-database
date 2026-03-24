@@ -21,6 +21,7 @@ import {
   ProcessExcelMeta,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
@@ -34,7 +35,7 @@ import { BaseCaseSchema } from "../schema";
 export async function uploadExcel(
   file: File,
   caseType: CaseType,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
@@ -71,14 +72,36 @@ export async function uploadExcel(
       schema: CivilCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      uniqueKeys: ["caseNumber"],
-      uniqueKeyLabel: "Case number",
-      checkExistingUniqueKeys: async (keys) => {
-        const existing = await prisma.case.findMany({
-          where: { caseNumber: { in: keys } },
-          select: { caseNumber: true },
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingCases = await prisma.case.findMany({
+          where: {
+            caseNumber: mappedRow.caseNumber,
+            caseType: mappedRow.caseType,
+          },
+          include: {
+            civilCase: true,
+          },
         });
-        return new Set(existing.map((c) => c.caseNumber.trim()));
+
+        const mappedEntries = Object.entries(mappedRow);
+
+        const hasExactMatch = existingCases.some((existingCase) => {
+          if (!existingCase.civilCase) return false;
+
+          const mergedCase = {
+            ...existingCase,
+            ...existingCase.civilCase,
+          } as Record<string, unknown>;
+
+          return mappedEntries.every(([key, value]) =>
+            valuesAreEqual(value, mergedCase[key]),
+          );
+        });
+
+        return {
+          exists: hasExactMatch,
+          fields: hasExactMatch ? mappedEntries.map(([key]) => key) : [],
+        };
       },
       mapRow: (row, rowNum) => {
         const cells = getMappedCells(row);
@@ -132,25 +155,29 @@ export async function uploadExcel(
 
         return {
           mapped: validation.data,
-          uniqueKey: validation.data.caseNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
         const caseRows: Prisma.CaseCreateManyInput[] = [];
-        const civilRows: Prisma.CivilCaseCreateManyInput[] = [];
 
         rows.forEach((row) => {
-          const { caseData, detailData } = splitCaseDataBySchema(row);
+          const { caseData } = splitCaseDataBySchema(row);
           caseRows.push(caseData);
-          civilRows.push({
-            ...detailData,
-            caseNumber: caseData.caseNumber,
-          } as Prisma.CivilCaseCreateManyInput);
         });
 
         const created = await prisma.case.createManyAndReturn({
           data: caseRows,
         });
+
+        const civilRows: Prisma.CivilCaseCreateManyInput[] = rows.map(
+          (row, index) => {
+            const { detailData } = splitCaseDataBySchema(row);
+            return {
+              ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
+              baseCaseID: created[index].id,
+            };
+          },
+        );
 
         if (civilRows.length > 0) {
           await prisma.civilCase.createMany({ data: civilRows });

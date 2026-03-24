@@ -20,6 +20,11 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import { ReceiveLog } from "./ReceiveRecord";
+import {
+  createRecievingLog,
+  deleteRecievingLog,
+  updateRecievingLog,
+} from "./RecievingLogsActions";
 import { ReceivingLogEntry } from "./schema";
 
 export enum ReceiveDrawerType {
@@ -321,16 +326,24 @@ const ReceiveDrawer = ({
   type,
   onClose,
   selectedLog = null,
+  selectedLogs,
   onCreate,
   onUpdate,
 }: {
   type: ReceiveDrawerType;
   onClose: () => void;
   selectedLog?: ReceiveLog | null | any;
+  selectedLogs?: Array<ReceiveLog | any>;
   onCreate?: (log: any) => void;
   onUpdate?: (log: any) => void;
 }) => {
   const isEdit = type === ReceiveDrawerType.EDIT;
+  const editLogs =
+    selectedLogs && selectedLogs.length > 0
+      ? selectedLogs
+      : selectedLog
+        ? [selectedLog]
+        : [];
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
@@ -358,19 +371,21 @@ const ReceiveDrawer = ({
   });
 
   const [entries, setEntries] = useState<ReceivingLogEntry[]>(() => {
-    if (isEdit && selectedLog) return [makeFromLog(selectedLog)];
+    if (isEdit && editLogs.length > 0) return editLogs.map(makeFromLog);
     return [emptyEntry(nextTempIdRef.current--)];
   });
 
   useEffect(() => {
-    if (isEdit && selectedLog) {
-      setEntries([makeFromLog(selectedLog)]);
-    } else if (!isEdit) {
+    if (isEdit) {
+      if (editLogs.length > 0) {
+        setEntries(editLogs.map(makeFromLog));
+      }
+    } else {
       setEntries([emptyEntry(nextTempIdRef.current--)]);
     }
     setStep("entry");
     setActiveTab(0);
-  }, [type, selectedLog]);
+  }, [type, selectedLog, selectedLogs]);
 
   const handleChange = (id: number, field: string, value: string) => {
     setEntries((prev) =>
@@ -471,7 +486,9 @@ const ReceiveDrawer = ({
 
   const handleSubmit = async () => {
     const label = isEdit
-      ? "Save changes to this receiving log entry?"
+      ? entries.length === 1
+        ? "Save changes to this receiving log entry?"
+        : `Save changes to ${entries.length} receiving log entries?`
       : entries.length === 1
         ? "Create this receiving log entry?"
         : `Create ${entries.length} receiving log entries?`;
@@ -481,12 +498,107 @@ const ReceiveDrawer = ({
     statusPopup.showLoading(
       isEdit ? "Updating entry..." : "Creating entry(ies)...",
     );
+
+    const rollbackCreatedLogs = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteRecievingLog(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for receiving ID ${createdIds[index]}`,
+          );
+          return;
+        }
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for receiving ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
-      if (isEdit && selectedLog) {
-        onUpdate?.({ ...buildPayload(entries[0]), id: selectedLog.id });
-        statusPopup.showSuccess("Receiving log updated successfully");
+      if (isEdit) {
+        if (entries.length !== editLogs.length) {
+          statusPopup.showError("Receiving row count mismatch. Please reload.");
+          return;
+        }
+
+        for (let index = 0; index < entries.length; index++) {
+          const target = editLogs[index];
+          if (!target?.id) {
+            statusPopup.showError(`Missing receiving id for row ${index + 1}`);
+            return;
+          }
+
+          const result = await updateRecievingLog(
+            target.id,
+            buildPayload(entries[index]),
+          );
+          if (!result.success || !result.result) {
+            statusPopup.showError(`Update failed for row ${index + 1}`);
+            return;
+          }
+          onUpdate?.(result.result);
+        }
+
+        statusPopup.showSuccess(
+          entries.length === 1
+            ? "Receiving log updated successfully"
+            : `${entries.length} receiving logs updated successfully`,
+        );
       } else {
-        for (const entry of entries) onCreate?.(buildPayload(entry));
+        const createdIds: number[] = [];
+
+        for (let index = 0; index < entries.length; index++) {
+          const entry = entries[index];
+          const result = await createRecievingLog(buildPayload(entry));
+          if (!result.success) {
+            const rollbackErrors = await rollbackCreatedLogs(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+          if (!result.result) {
+            const rollbackErrors = await rollbackCreatedLogs(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          createdIds.push(result.result.id);
+          onCreate?.(result.result);
+        }
+
         statusPopup.showSuccess(
           entries.length === 1
             ? "Receiving log created successfully"
@@ -502,7 +614,6 @@ const ReceiveDrawer = ({
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -528,7 +639,11 @@ const ReceiveDrawer = ({
             <span>Receiving Log</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Entry" : "New Entries"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Entry"
+                  : "Edit Entries"
+                : "New Entries"}
             </span>
             {step === "review" && (
               <>
@@ -576,7 +691,9 @@ const ReceiveDrawer = ({
               <div>
                 <h1 className="text-5xl xls-title">
                   {isEdit
-                    ? "Edit Receiving Log Entry"
+                    ? entries.length === 1
+                      ? "Edit Receiving Log Entry"
+                      : "Edit Receiving Log Entries"
                     : "New Receiving Log Entries"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">

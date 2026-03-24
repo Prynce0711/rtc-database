@@ -12,11 +12,15 @@ const ReceiveRow = ({
   onEdit,
   onDelete,
   onView,
+  isSelected,
+  onToggleSelect,
 }: {
   log: PetitionCaseData;
   onEdit: (log: PetitionCaseData) => void;
   onDelete: (log: PetitionCaseData) => void;
   onView?: (log: PetitionCaseData) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) => {
   const session = useSession();
   const isAdminOrAtty =
@@ -46,6 +50,17 @@ const ReceiveRow = ({
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
       onClick={() => onView?.(log)}
     >
+      {isAdminOrAtty && onToggleSelect && (
+        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={Boolean(isSelected)}
+            onChange={() => onToggleSelect(log.id)}
+            aria-label={`Select petition ${log.id}`}
+          />
+        </td>
+      )}
       {/* ACTIONS */}
       {isAdminOrAtty && (
         <td

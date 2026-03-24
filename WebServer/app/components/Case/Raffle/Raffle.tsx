@@ -35,7 +35,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -750,7 +750,7 @@ const NotarialModal = ({
                                         href={entry.link}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
+                                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-50 truncate"
                                       >
                                         {entry.link}
                                       </a>
@@ -1134,27 +1134,31 @@ const NotarialRow = ({
         value={formatDate(record.date)}
         className="text-base-content/70"
       />
-      <td
-        className="text-center relative group/tip"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <td className="text-center relative" onClick={(e) => e.stopPropagation()}>
         {record.link ? (
-          <a
-            href="#"
-            className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-[200px] truncate"
-            title={record.link}
+          <div
+            className="tooltip tooltip-bottom z-50 inline-block max-w-50"
+            role="presentation"
           >
-            <FiExternalLink size={12} />
-            <span className="truncate">{record.link.split("\\").pop()}</span>
-          </a>
+            <div className="tooltip-content z-50">
+              <div className="flex flex-col items-center gap-1 text-center">
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">
+                  File / Link
+                </span>
+                <span className="text-xs font-medium">{record.link}</span>
+              </div>
+            </div>
+            <a
+              href="#"
+              className="inline-flex items-center gap-1 text-primary hover:underline text-xs font-mono max-w-50 truncate"
+              title={record.link}
+            >
+              <FiExternalLink size={12} />
+              <span className="truncate">{record.link.split("\\").pop()}</span>
+            </a>
+          </div>
         ) : (
           <span className="text-base-content/30">—</span>
-        )}
-        {record.link && (
-          <div className="cell-tip">
-            <span className="cell-tip-label">File / Link</span>
-            <span className="cell-tip-value">{record.link}</span>
-          </div>
         )}
       </td>
     </tr>
@@ -1559,12 +1563,12 @@ const Raffle: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={NOTARIAL_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>

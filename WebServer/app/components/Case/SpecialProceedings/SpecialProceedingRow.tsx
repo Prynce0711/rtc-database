@@ -21,11 +21,15 @@ const SpecialProceedingRow = ({
   onEdit,
   onDelete,
   onRowClick,
+  isSelected,
+  onToggleSelect,
 }: {
   caseItem: SpecialProceedingData;
   onEdit: (c: SpecialProceedingData) => void;
   onDelete: (id: number) => void;
   onRowClick: (c: SpecialProceedingData) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) => {
   const popoverId = `special-proceeding-actions-popover-${caseItem.id}`;
   const anchorName = `--special-proceeding-actions-anchor-${caseItem.id}`;
@@ -42,6 +46,17 @@ const SpecialProceedingRow = ({
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
       onClick={() => onRowClick(caseItem)}
     >
+      {onToggleSelect && (
+        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={Boolean(isSelected)}
+            onChange={() => onToggleSelect(caseItem.id)}
+            aria-label={`Select special proceeding ${caseItem.id}`}
+          />
+        </td>
+      )}
       <td onClick={(e) => e.stopPropagation()} className="relative text-center">
         <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
           <li>

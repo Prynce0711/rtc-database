@@ -5,6 +5,7 @@ import {
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
 import { isTextFieldKey } from "@/app/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -17,7 +18,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -30,7 +31,6 @@ import {
   getSpecialProceedingStats,
   getSpecialProceedings,
 } from "./SpecialProceedingActions";
-import SpecialProceedingDrawer from "./SpecialProceedingDrawer";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 import {
   SpecialProceedingData,
@@ -51,7 +51,6 @@ type SPFilterValues = {
 type SortableSPKey = NonNullable<SpecialProceedingsFilterOptions["sortKey"]>;
 type SortConfig = { key: SortableSPKey; order: "asc" | "desc" };
 type SPFilters = NonNullable<SpecialProceedingsFilterOptions["filters"]>;
-type DrawerType = "ADD" | "EDIT";
 
 const SP_FILTER_OPTIONS: FilterOption[] = [
   { key: "caseNumber", label: "SPC. No.", type: "text" },
@@ -244,9 +243,8 @@ const Proceedings: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<SPFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
-  const [drawerType, setDrawerType] = useState<DrawerType | null>(null);
-  const [selectedCase, setSelectedCase] =
-    useState<SpecialProceedingData | null>(null);
+  const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -264,7 +262,6 @@ const Proceedings: React.FC = () => {
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
-      setLoading(true);
       setError(null);
 
       try {
@@ -389,17 +386,108 @@ const Proceedings: React.FC = () => {
     popup.showSuccess("Case deleted successfully");
   };
 
+  const handleDeleteSelected = async () => {
+    if (selectedCaseIds.length === 0) return;
+
+    if (
+      !(await popup.showConfirm(
+        `Are you sure you want to delete ${selectedCaseIds.length} selected case${selectedCaseIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    popup.showLoading("Deleting selected cases...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedCaseIds.map((id) => deleteSpecialProceeding(id)),
+      );
+
+      const deletedIds: number[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = selectedCaseIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(id);
+          return;
+        }
+        failedIds.push(id);
+      });
+
+      setSelectedCaseIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+
+      if (failedIds.length > 0) {
+        popup.showError(
+          `Deleted ${deletedIds.length} case(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        popup.showSuccess(
+          `Deleted ${deletedIds.length} selected case${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+
+      await fetchCases(currentPage);
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     const result = await uploadSpecialProceedingExcel(file);
+    const importPayload = result.success ? result.result : result.errorResult;
+
+    if (importPayload?.failedExcel) {
+      const { fileName, base64 } = importPayload.failedExcel;
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
     if (!result.success) {
       popup.showError(result.error || "Upload failed");
     } else {
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        popup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
       popup.showSuccess("Cases imported successfully");
       await fetchCases(currentPage);
+
+      if (importPayload?.failedExcel) {
+        popup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
+      }
     }
+
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -418,30 +506,6 @@ const Proceedings: React.FC = () => {
     }
     setExporting(false);
   };
-
-  // If drawer is open, show it
-  if (drawerType) {
-    return (
-      <SpecialProceedingDrawer
-        type={drawerType}
-        selectedCase={selectedCase}
-        onClose={() => {
-          setDrawerType(null);
-          setSelectedCase(null);
-        }}
-        onCreate={() => {
-          setDrawerType(null);
-          setSelectedCase(null);
-          void fetchCases();
-        }}
-        onUpdate={() => {
-          setDrawerType(null);
-          setSelectedCase(null);
-          void fetchCases();
-        }}
-      />
-    );
-  }
 
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={7} tableRows={8} />;
@@ -575,8 +639,7 @@ const Proceedings: React.FC = () => {
             <button
               className="btn btn-primary"
               onClick={() => {
-                setSelectedCase(null);
-                setDrawerType("ADD");
+                router.push("/user/cases/proceedings/add");
               }}
             >
               <svg
@@ -595,16 +658,59 @@ const Proceedings: React.FC = () => {
             </button>
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={SP_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getSuggestions}
           />
         </div>
+
+        <AnimatePresence>
+          {selectedCaseIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="mb-4 overflow-hidden"
+            >
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-primary">
+                  {selectedCaseIds.length} case
+                  {selectedCaseIds.length > 1 ? "s" : ""} selected
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      router.push(
+                        `/user/cases/proceedings/edit?ids=${selectedCaseIds.join(",")}`,
+                      )
+                    }
+                  >
+                    Edit Selected
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                    onClick={handleDeleteSelected}
+                    disabled={deletingSelected}
+                  >
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedCaseIds([])}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -681,6 +787,7 @@ const Proceedings: React.FC = () => {
           <table className="table table-zebra w-full text-center">
             <thead className=" bg-base-300">
               <tr className="text-center">
+                <th>SELECT</th>
                 <th>ACTIONS</th>
                 <SortTh
                   label="SPC. NO."
@@ -723,7 +830,7 @@ const Proceedings: React.FC = () => {
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
                       <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
@@ -742,13 +849,20 @@ const Proceedings: React.FC = () => {
                   <SpecialProceedingRow
                     key={c.id}
                     caseItem={c}
-                    onEdit={(item) => {
-                      setSelectedCase(item);
-                      setDrawerType("EDIT");
-                    }}
+                    onEdit={(item) =>
+                      router.push(`/user/cases/proceedings/edit?id=${item.id}`)
+                    }
                     onDelete={handleDelete}
                     onRowClick={(item) =>
                       router.push(`/user/cases/proceedings/${item.id}`)
+                    }
+                    isSelected={selectedCaseIds.includes(c.id)}
+                    onToggleSelect={(id) =>
+                      setSelectedCaseIds((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((entryId) => entryId !== id)
+                          : [...prev, id],
+                      )
                     }
                   />
                 ))

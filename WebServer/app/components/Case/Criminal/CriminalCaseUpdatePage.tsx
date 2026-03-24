@@ -1,5 +1,6 @@
 "use client";
 
+import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -21,7 +22,13 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { createCriminalCase, updateCriminalCase } from "./CriminalCasesActions";
+import { useToast } from "../../Toast/ToastProvider";
+import { doesCaseExist } from "../CaseActions";
+import {
+  createCriminalCase,
+  deleteCriminalCase,
+  updateCriminalCase,
+} from "./CriminalCasesActions";
 import {
   CaseEntry,
   CriminalCaseData,
@@ -31,7 +38,7 @@ import {
   createTempId,
 } from "./schema";
 
-export enum CriminalCaseModalType {
+export enum CriminalCaseUpdateType {
   ADD = "ADD",
   EDIT = "EDIT",
 }
@@ -39,6 +46,7 @@ export enum CriminalCaseModalType {
 type Step = "entry" | "review";
 
 const REQUIRED_FIELDS = ["name", "caseNumber"] as const;
+const normalizeCaseNumber = (value: string) => value.trim();
 
 type ColDef = {
   key: string;
@@ -450,7 +458,13 @@ const CellInput = ({
 };
 
 /* ─── Review: single case card ───────────────────────────────── */
-function ReviewCard({ entry }: { entry: CaseEntry }) {
+function ReviewCard({
+  entry,
+  isExistingCase,
+}: {
+  entry: CaseEntry;
+  isExistingCase: boolean;
+}) {
   const filledAddress =
     [
       entry.houseNo,
@@ -501,6 +515,11 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 
   return (
     <div className="rv-card">
+      {isExistingCase && (
+        <div className="alert alert-warning mb-4">
+          <span>Case is already existing</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -675,23 +694,33 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────── */
-const NewCriminalCaseModal = ({
+const CriminalCaseUpdatePage = ({
   onClose,
   selectedCase = null,
+  selectedCases,
   onCreate,
   onUpdate,
 }: {
   onClose?: () => void;
   selectedCase?: CriminalCaseData | null;
+  selectedCases?: CriminalCaseData[];
   onCreate?: () => void;
   onUpdate?: () => void;
 }) => {
-  const isEdit = selectedCase !== null;
+  const editCases =
+    selectedCases && selectedCases.length > 0
+      ? selectedCases
+      : selectedCase
+        ? [selectedCase]
+        : [];
+  const isEdit = editCases.length > 0;
   const statusPopup = usePopup();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
+  const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -699,17 +728,21 @@ const NewCriminalCaseModal = ({
     caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
-    if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
+    if (isEdit) return editCases.map(makeFromCase);
     return [createEmptyEntry()];
   });
 
   useEffect(() => {
-    if (!isEdit) {
-      setEntries([createEmptyEntry()]);
-      setStep("entry");
-      setActiveTab(0);
+    setStep("entry");
+    setActiveTab(0);
+
+    if (isEdit) {
+      setEntries(editCases.map(makeFromCase));
+      return;
     }
-  }, [selectedCase, isEdit]);
+
+    setEntries([createEmptyEntry()]);
+  }, [isEdit, selectedCase, selectedCases]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -781,7 +814,65 @@ const NewCriminalCaseModal = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isCaseAlreadyExisting = useCallback(
+    (caseNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && existingCaseNumbers.includes(normalized);
+    },
+    [existingCaseNumbers, isEdit],
+  );
+
+  const existingCaseRowCount = entries.filter((entry) =>
+    isCaseAlreadyExisting(entry.caseNumber),
+  ).length;
+
+  const refreshExistingCaseNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const result = await doesCaseExist(caseNumbers, CaseType.CRIMINAL);
+    if (!result.success || !result.result) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) => normalizeCaseNumber(value));
+    setExistingCaseNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingCaseNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingCaseNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -798,6 +889,9 @@ const NewCriminalCaseModal = ({
       );
       return;
     }
+
+    await refreshExistingCaseNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -812,6 +906,19 @@ const NewCriminalCaseModal = ({
   };
 
   const handleSubmit = async () => {
+    const existingCases = await refreshExistingCaseNumbers();
+
+    if (!isEdit && existingCases.length > 0) {
+      const duplicateLabel =
+        existingCases.length === 1
+          ? `Case number ${existingCases[0]} already exists. Continue anyway?`
+          : `${existingCases.length} case numbers already exist. Continue anyway?`;
+
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? "Save changes to this case?"
       : entries.length === 1
@@ -822,31 +929,108 @@ const NewCriminalCaseModal = ({
     statusPopup.showLoading(
       isEdit ? "Updating case..." : "Creating case(s)...",
     );
-    try {
-      if (isEdit && selectedCase) {
-        if (entries[0].caseNumber.trim() !== selectedCase.caseNumber.trim()) {
-          throw new Error("Case number cannot be changed");
+
+    const rollbackCreatedCases = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteCriminalCase(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const msg = `Rollback failed for case ID ${createdIds[index]}`;
+          rollbackErrors.push(msg);
+          console.warn(msg, result.reason);
+        } else if (!result.value.success) {
+          const msg = `Rollback failed for case ID ${createdIds[index]}: ${result.value.error || "Unknown rollback error"}`;
+          rollbackErrors.push(msg);
+          console.warn(msg);
         }
-        const parsed = buildPayload(entries[0]);
-        if (!parsed.success) throw new Error("Invalid data");
-        const payload = parsed.data;
-        const response = await updateCriminalCase(selectedCase.id, {
-          ...payload,
-          dateFiled: payload.dateFiled
-            ? new Date(payload.dateFiled).toISOString()
-            : null,
-          raffleDate: payload.raffleDate
-            ? new Date(payload.raffleDate).toISOString()
-            : null,
-        });
-        if (!response.success)
-          throw new Error(response.error || "Failed to update case");
-        onUpdate?.();
-        statusPopup.showSuccess("Case updated successfully");
-      } else {
+      });
+
+      return rollbackErrors;
+    };
+
+    try {
+      if (isEdit) {
+        const originalById = new Map(editCases.map((item) => [item.id, item]));
+
         for (const entry of entries) {
+          const original = originalById.get(entry.id);
+          if (!original) {
+            setStep("entry");
+            statusPopup.showError("Invalid case selection for edit");
+            return;
+          }
+
+          if (entry.caseNumber.trim() !== original.caseNumber.trim()) {
+            setStep("entry");
+            statusPopup.showError("Case number cannot be changed");
+            return;
+          }
+
           const parsed = buildPayload(entry);
-          if (!parsed.success) throw new Error("Invalid data");
+          if (!parsed.success) {
+            setStep("entry");
+            statusPopup.showError(
+              "Invalid data. Please review required fields.",
+            );
+            return;
+          }
+
+          const payload = parsed.data;
+          const response = await updateCriminalCase(original.id, {
+            ...payload,
+            dateFiled: payload.dateFiled
+              ? new Date(payload.dateFiled).toISOString()
+              : null,
+            raffleDate: payload.raffleDate
+              ? new Date(payload.raffleDate).toISOString()
+              : null,
+          });
+
+          if (!response.success) {
+            console.error("Failed to update criminal case", {
+              caseId: original.id,
+              response,
+            });
+            setStep("entry");
+            statusPopup.showError(response.error || "Failed to update case");
+            return;
+          }
+        }
+
+        onUpdate?.();
+        toast.success(
+          entries.length === 1
+            ? "Case updated successfully"
+            : `${entries.length} cases updated successfully`,
+        );
+      } else {
+        const createdCaseIds: number[] = [];
+        let successfulCreates = 0;
+
+        for (let idx = 0; idx < entries.length; idx++) {
+          const entry = entries[idx];
+          const parsed = buildPayload(entry);
+          if (!parsed.success) {
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Row ${idx + 1} has invalid data.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
           const payload = parsed.data;
           const response = await createCriminalCase({
             ...payload,
@@ -857,11 +1041,56 @@ const NewCriminalCaseModal = ({
               ? new Date(payload.raffleDate).toISOString()
               : null,
           });
-          if (!response.success)
-            throw new Error(response.error || "Failed to create case");
-          onCreate?.();
+
+          if (!response.success) {
+            console.error("Failed to create criminal case", {
+              row: idx + 1,
+              response,
+            });
+
+            const responseError = response.error || "Unknown error";
+
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${idx + 1}: ${responseError}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          successfulCreates += 1;
+
+          if (response.result?.id) {
+            createdCaseIds.push(response.result.id);
+          }
         }
-        statusPopup.showSuccess(
+
+        if (successfulCreates !== entries.length) {
+          const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+          setStep("entry");
+          console.error(
+            `Only ${successfulCreates} of ${entries.length} cases were created successfully.`,
+            rollbackErrors,
+          );
+
+          statusPopup.showError(
+            [
+              `Only ${successfulCreates} of ${entries.length} rows were confirmed created.`,
+              rollbackErrors.length > 0
+                ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                : "Any created rows in this batch were rolled back.",
+            ].join(" "),
+          );
+          return;
+        }
+
+        onCreate?.();
+        toast.success(
           entries.length === 1
             ? "Case created successfully"
             : `${entries.length} cases created successfully`,
@@ -870,12 +1099,12 @@ const NewCriminalCaseModal = ({
 
       handleClose();
     } catch (err) {
+      setStep("entry");
       statusPopup.showError(
         err instanceof Error ? err.message : "Failed to save case",
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -984,6 +1213,20 @@ const NewCriminalCaseModal = ({
                         <span className="xls-pill-dot" />
                         {completedCount} complete
                       </span>
+                      {existingCaseRowCount > 0 && (
+                        <span
+                          className="xls-pill"
+                          style={{
+                            background: "#fef3c7",
+                            color: "#78350f",
+                            borderColor: "#fbbf24",
+                          }}
+                          title="Case is already existing"
+                        >
+                          <span className="xls-pill-dot" />
+                          {existingCaseRowCount} existing
+                        </span>
+                      )}
                       {incompleteCount > 0 && (
                         <span className="xls-pill xls-pill-err">
                           <span className="xls-pill-dot" />
@@ -1071,6 +1314,9 @@ const NewCriminalCaseModal = ({
                       <AnimatePresence initial={false}>
                         {entries.map((entry, rowIdx) => {
                           const lastColIdx = currentTabCols.length - 1;
+                          const rowHasExistingCase = isCaseAlreadyExisting(
+                            entry.caseNumber,
+                          );
                           return (
                             <motion.tr
                               key={entry.id}
@@ -1084,7 +1330,12 @@ const NewCriminalCaseModal = ({
                                 overflow: "hidden",
                               }}
                               transition={{ duration: 0.12 }}
-                              className="xls-row"
+                              className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                              title={
+                                rowHasExistingCase
+                                  ? "Case is already existing"
+                                  : undefined
+                              }
                             >
                               <td className="td-num">
                                 <span className="xls-rownum">{rowIdx + 1}</span>
@@ -1122,15 +1373,17 @@ const NewCriminalCaseModal = ({
                               ))}
                               <td className="td-actions">
                                 <div className="xls-row-actions">
-                                  <button
-                                    type="button"
-                                    className="xls-row-btn"
-                                    onClick={() => handleDuplicate(entry.id)}
-                                    title="Duplicate row"
-                                  >
-                                    <FiCopy size={13} />
-                                  </button>
-                                  {entries.length > 1 && (
+                                  {!isEdit && (
+                                    <button
+                                      type="button"
+                                      className="xls-row-btn"
+                                      onClick={() => handleDuplicate(entry.id)}
+                                      title="Duplicate row"
+                                    >
+                                      <FiCopy size={13} />
+                                    </button>
+                                  )}
+                                  {!isEdit && entries.length > 1 && (
                                     <button
                                       type="button"
                                       className="xls-row-btn del"
@@ -1219,6 +1472,12 @@ const NewCriminalCaseModal = ({
                         ? "Check the details below, then confirm your changes."
                         : "All fields validated. Confirm the details are correct."}
                     </p>
+                    {!isEdit && existingCaseRowCount > 0 && (
+                      <p className="text-sm font-semibold text-warning mt-2">
+                        {existingCaseRowCount} row
+                        {existingCaseRowCount > 1 ? "s" : ""} already exist.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1230,23 +1489,40 @@ const NewCriminalCaseModal = ({
                       {entries.length} Cases
                     </div>
                     <div className="rv-sidebar-list">
-                      {entries.map((entry, idx) => (
-                        <button
-                          key={entry.id}
-                          className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                          onClick={() => setReviewIdx(idx)}
-                        >
-                          <span className="rv-sidebar-num">{idx + 1}</span>
-                          <div className="rv-sidebar-info">
-                            <div className="rv-sidebar-casenum">
-                              {entry.caseNumber || "No case no."}
-                            </div>
-                            <div className="rv-sidebar-name">
-                              {entry.name || "No name"}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                      {entries.map((entry, idx) =>
+                        (() => {
+                          const rowHasExistingCase = isCaseAlreadyExisting(
+                            entry.caseNumber,
+                          );
+                          return (
+                            <button
+                              key={entry.id}
+                              className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                              onClick={() => setReviewIdx(idx)}
+                              title={
+                                rowHasExistingCase
+                                  ? "Case is already existing"
+                                  : undefined
+                              }
+                            >
+                              <span className="rv-sidebar-num">{idx + 1}</span>
+                              <div className="rv-sidebar-info">
+                                <div className="rv-sidebar-casenum">
+                                  {entry.caseNumber || "No case no."}
+                                </div>
+                                <div className="rv-sidebar-name">
+                                  {entry.name || "No name"}
+                                </div>
+                                {rowHasExistingCase && (
+                                  <div className="text-xs text-warning font-semibold">
+                                    Case is already existing
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })(),
+                      )}
                     </div>
                   </div>
                 )}
@@ -1259,7 +1535,12 @@ const NewCriminalCaseModal = ({
                       exit={{ opacity: 0, x: -10 }}
                       transition={{ duration: 0.12 }}
                     >
-                      <ReviewCard entry={entries[reviewIdx]} />
+                      <ReviewCard
+                        entry={entries[reviewIdx]}
+                        isExistingCase={isCaseAlreadyExisting(
+                          entries[reviewIdx]?.caseNumber ?? "",
+                        )}
+                      />
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -1336,4 +1617,4 @@ const NewCriminalCaseModal = ({
   );
 };
 
-export default NewCriminalCaseModal;
+export default CriminalCaseUpdatePage;

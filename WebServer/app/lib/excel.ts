@@ -1,3 +1,5 @@
+"server-only";
+
 import * as XLSX from "xlsx";
 import z, { prettifyError } from "zod";
 import ActionResult from "../components/ActionResult";
@@ -100,6 +102,17 @@ export const hasContent = (val: unknown) => {
   if (val === undefined || val === null) return false;
   if (typeof val === "string") return val.trim() !== "";
   return true;
+};
+
+export const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
 };
 
 export const isMappedRowEmpty = <
@@ -418,9 +431,6 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   schema: z.ZodType<T>;
   getCells: (row: Record<string, unknown>) => TCells;
   skipRowsWithoutCell?: Array<keyof TCells>;
-  uniqueKeys?: Array<keyof TCells>;
-  checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
-  uniqueKeyLabel?: string;
   mapRow: (
     row: Record<string, unknown>,
     rowNum: number,
@@ -431,21 +441,44 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
     uniqueKey?: string;
   };
   onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
-};
+} & (
+  | {
+      uniqueKeys: Array<keyof TCells>;
+      checkExistingUniqueKeys: (keys: string[]) => Promise<Set<string>>;
+      checkExactMatch?: never;
+    }
+  | {
+      uniqueKeys?: undefined;
+      checkExistingUniqueKeys?: never;
+      checkExactMatch: (
+        cells: TCells,
+        mappedRow: T,
+        rowNum: number,
+        sheetName: string,
+      ) => Promise<{ exists: boolean; fields?: string[] }>;
+    }
+);
 
-function extractUniqueKeyFromRow<TCells extends Record<string, unknown>>(
+function extractUniqueEntriesFromRow<TCells extends Record<string, unknown>>(
   cells: TCells,
   keys: Array<keyof TCells>,
-): string | undefined {
-  const values = keys
-    .map((key) => cells[key])
-    .filter((value) => hasContent(value));
+): Array<{ key: string; value: string }> {
+  return keys
+    .map((key) => ({ key: String(key), raw: cells[key] }))
+    .filter(({ raw }) => hasContent(raw))
+    .map(({ key, raw }) => ({ key, value: String(raw).trim() }))
+    .filter(({ value }) => value.length > 0);
+}
 
-  if (values.length === 0) {
-    return undefined;
+function buildUniqueConflictMessage(
+  keys: string[],
+  suffix: "already exists" | "duplicated in this file",
+): string {
+  const uniqueKeys = Array.from(new Set(keys)).filter((key) => key.length > 0);
+  if (uniqueKeys.length === 0 || uniqueKeys.includes("uniqueKey")) {
+    return `Unique value ${suffix}`;
   }
-
-  return values.map((value) => String(value).trim()).join(" ");
+  return `${uniqueKeys.join(", ")} ${suffix}`;
 }
 
 export type UploadExcelResult = {
@@ -458,7 +491,7 @@ export async function processExcelUpload<
   TCells extends Record<string, unknown> = Record<string, unknown>,
 >(
   options: ProcessExcelOptions<T, TCells>,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   const {
     file,
     requiredHeaders,
@@ -467,7 +500,7 @@ export async function processExcelUpload<
     skipRowsWithoutCell: skipRows,
     uniqueKeys,
     checkExistingUniqueKeys,
-    uniqueKeyLabel = "Unique value",
+    checkExactMatch,
     mapRow,
     onBatchInsert,
   } = options;
@@ -569,9 +602,11 @@ export async function processExcelUpload<
     // Pre-check existing unique keys in DB if provided
     let existingUniqueKeys = new Set<string>();
     if (uniqueKeys && checkExistingUniqueKeys) {
-      const keys = sheetData
-        .map((row) => extractUniqueKeyFromRow(getCells(row), uniqueKeys))
-        .filter((val): val is string => !!val);
+      const keys = sheetData.flatMap((row) =>
+        extractUniqueEntriesFromRow(getCells(row), uniqueKeys).map(
+          ({ value }) => value,
+        ),
+      );
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
       }
@@ -579,45 +614,61 @@ export async function processExcelUpload<
 
     for (let index = 0; index < sheetData.length; index++) {
       const row = sheetData[index];
+      const rowCells = getCells(row);
 
       const mapResult = mapRow(row, index + 2);
       if (mapResult.skip) {
         continue;
       }
 
-      const uniqueKey =
-        mapResult.uniqueKey ??
-        (uniqueKeys
-          ? extractUniqueKeyFromRow(getCells(row), uniqueKeys)
-          : undefined);
-      if (uniqueKey) {
-        if (
-          existingUniqueKeys.has(uniqueKey) ||
-          globalUniqueKeys.has(uniqueKey)
-        ) {
+      const rowUniqueEntries = uniqueKeys
+        ? extractUniqueEntriesFromRow(rowCells, uniqueKeys)
+        : mapResult.uniqueKey
+          ? [{ key: "uniqueKey", value: mapResult.uniqueKey }]
+          : [];
+
+      if (rowUniqueEntries.length > 0) {
+        const existingConflicts = rowUniqueEntries.filter(
+          ({ value }) =>
+            existingUniqueKeys.has(value) || globalUniqueKeys.has(value),
+        );
+
+        if (existingConflicts.length > 0) {
+          const message = buildUniqueConflictMessage(
+            existingConflicts.map(({ key }) => key),
+            "already exists",
+          );
           sheetFailed++;
           sheetFailedRows.push({
             ...row,
-            __error: `${uniqueKeyLabel} already exists`,
+            __error: message,
           });
           validationResults.errors.push({
             row: index + 2,
             sheet: sheetName,
-            errors: { message: `${uniqueKeyLabel} already exists` },
+            errors: { message },
           });
           continue;
         }
 
-        if (sheetUniqueKeys.has(uniqueKey)) {
+        const sheetConflicts = rowUniqueEntries.filter(({ value }) =>
+          sheetUniqueKeys.has(value),
+        );
+
+        if (sheetConflicts.length > 0) {
+          const message = buildUniqueConflictMessage(
+            sheetConflicts.map(({ key }) => key),
+            "duplicated in this file",
+          );
           sheetFailed++;
           sheetFailedRows.push({
             ...row,
-            __error: `${uniqueKeyLabel} duplicated in this file`,
+            __error: message,
           });
           validationResults.errors.push({
             row: index + 2,
             sheet: sheetName,
-            errors: { message: `${uniqueKeyLabel} duplicated in this file` },
+            errors: { message },
           });
           continue;
         }
@@ -639,9 +690,33 @@ export async function processExcelUpload<
       validationResults.total++;
 
       if (validated.success) {
-        if (uniqueKey) {
-          sheetUniqueKeys.add(uniqueKey);
-          globalUniqueKeys.add(uniqueKey);
+        if (!uniqueKeys) {
+          const exactMatch = await checkExactMatch(
+            rowCells,
+            validated.data,
+            index + 2,
+            sheetName,
+          );
+
+          if (exactMatch.exists) {
+            const message = "Already exists";
+
+            sheetFailed++;
+            sheetFailedRows.push({ ...row, __error: message });
+            validationResults.errors.push({
+              row: index + 2,
+              sheet: sheetName,
+              errors: { message },
+            });
+            continue;
+          }
+        }
+
+        if (rowUniqueEntries.length > 0) {
+          rowUniqueEntries.forEach(({ value }) => {
+            sheetUniqueKeys.add(value);
+            globalUniqueKeys.add(value);
+          });
         }
         sheetValidRows.push(validated.data);
         validationResults.valid++;
@@ -712,13 +787,44 @@ export async function processExcelUpload<
   }
 
   if (validationResults.valid === 0) {
+    const existingRowCount = validationResults.errors.filter((error) => {
+      if ("message" in error.errors) {
+        return error.errors.message.toLowerCase().includes("already exists");
+      }
+      return false;
+    }).length;
+
+    const allFailedRowsAlreadyExist =
+      validationResults.errors.length > 0 &&
+      existingRowCount === validationResults.errors.length;
+
+    const noValidRowsMessage = allFailedRowsAlreadyExist
+      ? "All rows already exists."
+      : existingRowCount > 0
+        ? `No valid rows to import. ${existingRowCount} row(s) already exist in the database.`
+        : "No valid rows to import";
+
+    if (allFailedRowsAlreadyExist) {
+      return { success: false, error: noValidRowsMessage };
+    }
+
     return failedExcelData
       ? {
           success: false,
-          error:
-            "No valid rows to import. Download failed rows file to review errors.",
+          error: noValidRowsMessage,
+          errorResult: {
+            failedExcel: failedExcelData,
+            meta: {
+              importedIds: validationResults.importedIds,
+              importedCount: validationResults.imported,
+              errorCount: validationResults.errors.length,
+              sheetSummary: validationResults.sheetSummary,
+              totalRows: validationResults.total,
+              validRows: validationResults.valid,
+            },
+          },
         }
-      : { success: false, error: "No valid rows to import" };
+      : { success: false, error: noValidRowsMessage };
   }
 
   return {

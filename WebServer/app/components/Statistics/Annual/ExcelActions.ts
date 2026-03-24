@@ -9,6 +9,7 @@ import {
   isValidDate,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -126,7 +127,7 @@ const getInventoryCells = (row: Record<string, unknown>) => {
 
 export async function uploadMunicipalTrialCourtExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -142,6 +143,25 @@ export async function uploadMunicipalTrialCourtExcel(
       getCells: getCourtCells,
       schema: CaseSchema,
       skipRowsWithoutCell: ["branchCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.municipalTrialCourt.findMany({
+          where: {
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -226,7 +246,7 @@ export async function exportMunicipalTrialCourtExcel(): Promise<
 
 export async function uploadRegionalTrialCourtExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -242,6 +262,25 @@ export async function uploadRegionalTrialCourtExcel(
       getCells: getCourtCells,
       schema: CaseSchema,
       skipRowsWithoutCell: ["branchCell"],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.regionalTrialCourt.findMany({
+          where: {
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getCourtCells(row);
         if (isMappedRowEmpty(cells)) {
@@ -326,7 +365,7 @@ export async function exportRegionalTrialCourtExcel(): Promise<
 
 export async function uploadInventoryDocumentExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -356,6 +395,29 @@ export async function uploadInventoryDocumentExcel(
         "cityMunicipalityCell",
         "branchCell",
       ],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.inventoryDocument.findMany({
+          where: {
+            region: mappedRow.region,
+            province: mappedRow.province,
+            court: mappedRow.court,
+            cityMunicipality: mappedRow.cityMunicipality,
+            branch: mappedRow.branch,
+          },
+        });
+
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
       mapRow: (row) => {
         const cells = getInventoryCells(row);
         if (isMappedRowEmpty(cells)) {

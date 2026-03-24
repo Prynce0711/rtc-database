@@ -11,6 +11,10 @@ export const formatDate = (date?: Date | string | null) =>
     : "—";
 
 export function isDarkMode(): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+
   return document.documentElement.getAttribute("data-theme") === "dim";
 }
 

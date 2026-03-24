@@ -1,5 +1,6 @@
 "use client";
 
+import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,8 +19,10 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
+import { doesCaseExist } from "../CaseActions";
 import {
   createSpecialProceeding,
+  deleteSpecialProceeding,
   updateSpecialProceeding,
 } from "./SpecialProceedingActions";
 import {
@@ -112,6 +115,7 @@ const TAB_GROUP_COLS: ColDef[] = [
 const REQUIRED_FIELDS: Array<
   keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
 > = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
+const normalizeCaseNumber = (value: string) => value.trim();
 
 function validateEntry(entry: SpecialProceedingEntry): Record<string, string> {
   const errs: Record<string, string> = {};
@@ -160,7 +164,13 @@ const toInputValue = (value: Date | string | null | undefined): string => {
   return value;
 };
 
-function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
+function ReviewCard({
+  entry,
+  isExistingCase,
+}: {
+  entry: SpecialProceedingEntry;
+  isExistingCase: boolean;
+}) {
   const fmtDate = (value: Date | string | null | undefined) => {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
@@ -174,6 +184,11 @@ function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
 
   return (
     <div className="rv-card">
+      {isExistingCase && (
+        <div className="alert alert-warning mb-4">
+          <span>Case is already existing</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -261,34 +276,41 @@ function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
 const SpecialProceedingDrawer = ({
   type,
   selectedCase,
+  selectedCases,
   onClose,
   onCreate,
   onUpdate,
 }: {
   type: ModalType;
   selectedCase?: SpecialProceedingData | null;
+  selectedCases?: SpecialProceedingData[];
   onClose: () => void;
   onCreate?: () => void;
   onUpdate?: () => void;
 }) => {
   const isEdit = type === "EDIT";
+  const editCases =
+    selectedCases && selectedCases.length > 0
+      ? selectedCases
+      : selectedCase
+        ? [selectedCase]
+        : [];
   const popup = usePopup();
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
   const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
-    if (isEdit && selectedCase) {
-      return [
-        {
-          ...selectedCase,
-          errors: {},
-          collapsed: false,
-          saved: false,
-        },
-      ];
+    if (isEdit && editCases.length > 0) {
+      return editCases.map((item) => ({
+        ...item,
+        errors: {},
+        collapsed: false,
+        saved: false,
+      }));
     }
     return [
       {
@@ -299,16 +321,29 @@ const SpecialProceedingDrawer = ({
   });
 
   useEffect(() => {
-    if (!isEdit) {
-      setEntries([
-        {
-          ...createEmptyEntry(),
-          id: nextTempIdRef.current--,
-        },
-      ]);
-      setStep("entry");
+    setStep("entry");
+
+    if (isEdit) {
+      if (editCases.length > 0) {
+        setEntries(
+          editCases.map((item) => ({
+            ...item,
+            errors: {},
+            collapsed: false,
+            saved: false,
+          })),
+        );
+      }
+      return;
     }
-  }, [type, selectedCase, isEdit]);
+
+    setEntries([
+      {
+        ...createEmptyEntry(),
+        id: nextTempIdRef.current--,
+      },
+    ]);
+  }, [type, selectedCase, selectedCases, isEdit]);
 
   const handleChange = (id: number, field: string, value: string) => {
     setEntries((prev) =>
@@ -381,7 +416,65 @@ const SpecialProceedingDrawer = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isCaseAlreadyExisting = useCallback(
+    (caseNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && existingCaseNumbers.includes(normalized);
+    },
+    [existingCaseNumbers, isEdit],
+  );
+
+  const existingCaseRowCount = entries.filter((entry) =>
+    isCaseAlreadyExisting(entry.caseNumber),
+  ).length;
+
+  const refreshExistingCaseNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const result = await doesCaseExist(caseNumbers, CaseType.SCA);
+    if (!result.success || !result.result) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) => normalizeCaseNumber(value));
+    setExistingCaseNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingCaseNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingCaseNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -396,39 +489,114 @@ const SpecialProceedingDrawer = ({
       popup.showError("Please fill in all required fields before reviewing.");
       return;
     }
+
+    await refreshExistingCaseNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async () => {
+    const existingCases = await refreshExistingCaseNumbers();
+
+    if (!isEdit && existingCases.length > 0) {
+      const duplicateLabel =
+        existingCases.length === 1
+          ? `Case number ${existingCases[0]} already exists. Continue anyway?`
+          : `${existingCases.length} case numbers already exist. Continue anyway?`;
+
+      if (!(await popup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
-      ? "Save changes to this case?"
+      ? entries.length === 1
+        ? "Save changes to this case?"
+        : `Save changes to ${entries.length} cases?`
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
     if (!(await popup.showConfirm(label))) return;
     setIsSubmitting(true);
     popup.showLoading(isEdit ? "Updating case..." : "Creating case(s)...");
-    try {
-      if (isEdit && selectedCase) {
-        const e = entries[0];
-        const result = await updateSpecialProceeding(selectedCase.id, {
-          caseNumber: e.caseNumber,
-          raffledTo: e.raffledTo ?? null,
-          date: e.date ? new Date(e.date) : null,
-          petitioner: e.petitioner ?? null,
-          nature: e.nature,
-          respondent: e.respondent ?? null,
-        });
-        if (!result.success) {
-          popup.showError(result.error || "Update failed");
+
+    const rollbackCreatedCases = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteSpecialProceeding(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for case ID ${createdIds[index]}`,
+          );
           return;
         }
-        popup.showSuccess("Case updated successfully");
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for case ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
+    try {
+      if (isEdit) {
+        if (entries.length !== editCases.length) {
+          popup.showError("Proceedings row count mismatch. Please reload.");
+          return;
+        }
+
+        for (let index = 0; index < entries.length; index++) {
+          const e = entries[index];
+          const target = editCases[index];
+
+          if (!target?.id) {
+            popup.showError(`Missing case id for row ${index + 1}`);
+            return;
+          }
+
+          const result = await updateSpecialProceeding(target.id, {
+            caseNumber: e.caseNumber,
+            raffledTo: e.raffledTo ?? null,
+            date: e.date ? new Date(e.date) : null,
+            petitioner: e.petitioner ?? null,
+            nature: e.nature,
+            respondent: e.respondent ?? null,
+          });
+          if (!result.success) {
+            popup.showError(
+              result.error || `Update failed for row ${index + 1}`,
+            );
+            return;
+          }
+        }
+
+        popup.showSuccess(
+          entries.length === 1
+            ? "Case updated successfully"
+            : `${entries.length} cases updated successfully`,
+        );
         onUpdate?.();
       } else {
-        for (const e of entries) {
+        const createdIds: number[] = [];
+        for (let index = 0; index < entries.length; index++) {
+          const e = entries[index];
           const result = await createSpecialProceeding({
             caseNumber: e.caseNumber,
             raffledTo: e.raffledTo ?? null,
@@ -438,8 +606,20 @@ const SpecialProceedingDrawer = ({
             respondent: e.respondent ?? null,
           });
           if (!result.success) {
-            popup.showError(result.error || "Create failed");
+            const rollbackErrors = await rollbackCreatedCases(createdIds);
+            setStep("entry");
+            popup.showError(
+              [
+                `Failed to create row ${index + 1}: ${result.error || "Create failed"}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
+          }
+          if (result.result?.id) {
+            createdIds.push(result.result.id);
           }
         }
         onCreate?.();
@@ -455,7 +635,6 @@ const SpecialProceedingDrawer = ({
       console.error(error);
     } finally {
       setIsSubmitting(false);
-      popup.hidePopup();
     }
   };
 
@@ -479,7 +658,11 @@ const SpecialProceedingDrawer = ({
             <span>Proceedings</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Petition" : "New Proceedings Entries"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Petition"
+                  : "Edit Petitions"
+                : "New Proceedings Entries"}
             </span>
             {step === "review" && (
               <>
@@ -525,7 +708,11 @@ const SpecialProceedingDrawer = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Petition" : "New Proceedings Entries"}
+                  {isEdit
+                    ? entries.length === 1
+                      ? "Edit Petition"
+                      : "Edit Petitions"
+                    : "New Proceedings Entries"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (
@@ -550,6 +737,20 @@ const SpecialProceedingDrawer = ({
                       <span className="xls-pill-dot" />
                       {completedCount} complete
                     </span>
+                    {existingCaseRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#78350f",
+                          borderColor: "#fbbf24",
+                        }}
+                        title="Case is already existing"
+                      >
+                        <span className="xls-pill-dot" />
+                        {existingCaseRowCount} existing
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
                       <span className="xls-pill xls-pill-err">
                         <span className="xls-pill-dot" />
@@ -624,6 +825,9 @@ const SpecialProceedingDrawer = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = allCols.length - 1;
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.caseNumber,
+                        );
                         return (
                           <motion.tr
                             key={entry.id}
@@ -633,7 +837,12 @@ const SpecialProceedingDrawer = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                             transition={{ duration: 0.12 }}
-                            className="xls-row"
+                            className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
                           >
                             <td className="td-num">
                               <span className="xls-rownum">{rowIdx + 1}</span>
@@ -770,6 +979,12 @@ const SpecialProceedingDrawer = ({
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
+                  {!isEdit && existingCaseRowCount > 0 && (
+                    <p className="text-sm font-semibold text-warning mt-2">
+                      {existingCaseRowCount} row
+                      {existingCaseRowCount > 1 ? "s" : ""} already exist.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -779,23 +994,40 @@ const SpecialProceedingDrawer = ({
                 <div className="rv-sidebar">
                   <div className="rv-sidebar-head">{entries.length} Cases</div>
                   <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.caseNumber || "No case no."}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.petitioner || "No petitioner"}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {entries.map((entry, idx) =>
+                      (() => {
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.caseNumber,
+                        );
+                        return (
+                          <button
+                            key={entry.id}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                            onClick={() => setReviewIdx(idx)}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
+                          >
+                            <span className="rv-sidebar-num">{idx + 1}</span>
+                            <div className="rv-sidebar-info">
+                              <div className="rv-sidebar-casenum">
+                                {entry.caseNumber || "No case no."}
+                              </div>
+                              <div className="rv-sidebar-name">
+                                {entry.petitioner || "No petitioner"}
+                              </div>
+                              {rowHasExistingCase && (
+                                <div className="text-xs text-warning font-semibold">
+                                  Case is already existing
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })(),
+                    )}
                   </div>
                 </div>
               )}
@@ -808,7 +1040,12 @@ const SpecialProceedingDrawer = ({
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.12 }}
                   >
-                    <ReviewCard entry={entries[reviewIdx]} />
+                    <ReviewCard
+                      entry={entries[reviewIdx]}
+                      isExistingCase={isCaseAlreadyExisting(
+                        entries[reviewIdx]?.caseNumber ?? "",
+                      )}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

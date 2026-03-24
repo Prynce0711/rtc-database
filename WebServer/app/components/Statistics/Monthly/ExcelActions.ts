@@ -7,6 +7,7 @@ import {
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -50,7 +51,7 @@ const getMonthlyCells = (row: Record<string, unknown>) => {
 export async function uploadMonthlyExcel(
   file: File,
   fallbackMonth?: string,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -67,17 +68,26 @@ export async function uploadMonthlyExcel(
       getCells: getMonthlyCells,
       schema: MonthlyRowSchema,
       skipRowsWithoutCell: ["categoryCell", "branchCell"],
-      uniqueKeyLabel: "Monthly row (month + category + branch)",
-      checkExistingUniqueKeys: async () => {
-        const where = fallbackMonth ? { month: fallbackMonth } : undefined;
-        const existing = await prisma.monthlyStatistics.findMany({
-          where,
-          select: { month: true, category: true, branch: true },
+      checkExactMatch: async (_cells, mappedRow) => {
+        const existingRows = await prisma.monthlyStatistics.findMany({
+          where: {
+            month: mappedRow.month,
+            category: mappedRow.category,
+            branch: mappedRow.branch,
+          },
         });
 
-        return new Set(
-          existing.map((row) => `${row.month}|${row.category}|${row.branch}`),
+        const mappedEntries = Object.entries(mappedRow);
+        const hasExactMatch = existingRows.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingRow as Record<string, unknown>)[key],
+            ),
+          ),
         );
+
+        return { exists: hasExactMatch };
       },
       mapRow: (row) => {
         const cells = getMonthlyCells(row);

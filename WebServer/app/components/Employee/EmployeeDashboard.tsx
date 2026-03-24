@@ -8,6 +8,8 @@ import {
   exportEmployeesExcel,
   uploadEmployeeExcel,
 } from "@/app/components/Employee/ExcelActions";
+import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -23,7 +25,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import FilterModal from "@/app/components/Filter/FilterModal";
+import FilterDropdown from "@/app/components/Filter/FilterDropdown";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { isRetirementEligible } from "@/app/lib/utils";
 import {
@@ -33,17 +35,13 @@ import {
 } from "../Filter/FilterTypes";
 import { usePopup } from "../Popup/PopupProvider";
 import { PageListSkeleton } from "../Skeleton/SkeletonTable";
-import EmployeeDrawer, { EmployeeDrawerType } from "./EmployeeDrawer";
 import EmployeeTable from "./EmployeeTable";
 
 const EmployeeDashboard: React.FC = () => {
+  const router = useRouter();
   const statusPopup = usePopup();
-
-  // ── Drawer state — same pattern as CasePage ──────────────────
-  const [drawerType, setDrawerType] = useState<EmployeeDrawerType | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-    null,
-  );
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
@@ -83,12 +81,46 @@ const EmployeeDashboard: React.FC = () => {
     (async () => {
       try {
         const res = await uploadEmployeeExcel(file);
+        const importPayload = res.success ? res.result : res.errorResult;
+
+        if (importPayload?.failedExcel) {
+          const { fileName, base64 } = importPayload.failedExcel;
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
         if (!res.success) {
           statusPopup.showError(res.error ?? "Failed to import employees");
           return;
         }
+
+        if ((importPayload?.meta.importedCount ?? 0) === 0) {
+          statusPopup.showError(
+            "No valid rows to import. Failed rows have been downloaded for review.",
+          );
+          return;
+        }
+
         await fetchEmployees();
-        statusPopup.showSuccess("Employees imported successfully");
+        if (importPayload?.failedExcel) {
+          statusPopup.showSuccess(
+            "Import complete. Failed rows have been downloaded for review.",
+          );
+        } else {
+          statusPopup.showSuccess("Employees imported successfully");
+        }
       } catch (err: any) {
         statusPopup.showError(err?.message ?? "Error importing employees");
       } finally {
@@ -130,8 +162,7 @@ const EmployeeDashboard: React.FC = () => {
   }
 
   function handleEdit(emp: Employee) {
-    setSelectedEmployee(emp);
-    setDrawerType(EmployeeDrawerType.EDIT);
+    router.push(`/user/employees/edit?id=${emp.id}`);
   }
 
   async function handleDelete(id: number) {
@@ -148,6 +179,58 @@ const EmployeeDashboard: React.FC = () => {
       statusPopup.showSuccess("Employee deleted successfully");
     } catch (error: any) {
       statusPopup.showError(error.message);
+    }
+  }
+
+  async function handleDeleteSelectedEmployees() {
+    if (selectedEmployeeIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedEmployeeIds.length} selected employee${selectedEmployeeIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected employees...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedEmployeeIds.map((id) => deleteEmployee(id)),
+      );
+
+      const deletedIds: number[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = selectedEmployeeIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(id);
+          return;
+        }
+        failedIds.push(id);
+      });
+
+      setEmployees((prev) =>
+        prev.filter((emp) => !deletedIds.includes(emp.id)),
+      );
+      setSelectedEmployeeIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} employee(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected employee${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+    } finally {
+      setDeletingSelected(false);
     }
   }
 
@@ -298,33 +381,10 @@ const EmployeeDashboard: React.FC = () => {
     );
   }
 
-  // ── Full-page drawer — replaces entire page (same as CasePage) ──
-  if (drawerType) {
-    return (
-      <EmployeeDrawer
-        type={drawerType}
-        onClose={() => {
-          setDrawerType(null);
-          setSelectedEmployee(null);
-          fetchEmployees();
-        }}
-        selectedEmployee={selectedEmployee}
-        onCreate={(newEmp) => {
-          setEmployees((prev) => [newEmp, ...prev]);
-        }}
-        onUpdate={(updatedEmp) => {
-          setEmployees((prev) =>
-            prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)),
-          );
-        }}
-      />
-    );
-  }
-
   // ── Main Dashboard ───────────────────────────────────────────
   return (
     <div className="min-h-screen bg-base-100">
-      <div className="w-full max-w-[2000px] mx-auto">
+      <div className="w-full max-w-500 mx-auto">
         {/* HEADER */}
         <div className="mb-8">
           <h1 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
@@ -379,8 +439,7 @@ const EmployeeDashboard: React.FC = () => {
               <button
                 className="btn btn-md btn-primary flex items-center gap-2"
                 onClick={() => {
-                  setSelectedEmployee(null);
-                  setDrawerType(EmployeeDrawerType.ADD);
+                  router.push("/user/employees/add");
                 }}
               >
                 <FiPlus size={18} />
@@ -389,13 +448,12 @@ const EmployeeDashboard: React.FC = () => {
             </div>
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={employeeFilterOptions}
             onApply={handleApplyEmployeeFilters}
-            initialValues={appliedFilters}
-            initialExactMatchMap={exactMatchMap}
+            searchValue={appliedFilters}
             getSuggestions={getEmployeeSuggestions}
           />
         </div>
@@ -471,12 +529,64 @@ const EmployeeDashboard: React.FC = () => {
             })}
           </div>
 
+          <AnimatePresence>
+            {selectedEmployeeIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedEmployeeIds.length} employee
+                    {selectedEmployeeIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/employees/edit?ids=${selectedEmployeeIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedEmployees}
+                      disabled={deletingSelected}
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedEmployeeIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* TABLE */}
           <div className="rounded-2xl shadow-lg border border-base-100 overflow-visible">
             <EmployeeTable
               employees={filtered}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              selectedIds={selectedEmployeeIds}
+              onToggleSelect={(id) =>
+                setSelectedEmployeeIds((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((entryId) => entryId !== id)
+                    : [...prev, id],
+                )
+              }
             />
           </div>
         </div>

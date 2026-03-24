@@ -1,7 +1,5 @@
 "use client";
 
-import ActionDropdown from "@/app/components/Table/ActionDropdown";
-import TipCell from "@/app/components/Table/TipCell";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { useSession } from "@/app/lib/authClient";
 import { isTextFieldKey } from "@/app/lib/utils";
@@ -10,28 +8,17 @@ import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
-  FiArrowLeft,
   FiBarChart2,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
   FiDownload,
-  FiEdit,
-  FiEdit3,
-  FiEye,
   FiFileText,
-  FiFolder,
   FiLock,
-  FiPlus,
-  FiSave,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterModal from "../../Filter/FilterModal";
+import FilterDropdown from "../../Filter/FilterDropdown";
 import {
   ExactMatchMap,
   FilterOption,
@@ -40,34 +27,20 @@ import {
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {
-  createCivilCase,
   deleteCivilCase,
   getCivilCases,
   getCivilCaseStats,
-  updateCivilCase,
 } from "./CivilActions";
+import CivilCaseRow from "./CivilCaseRow";
+import { caseToRecord, type NotarialRecord } from "./CivilTypes";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import {
   calculateCivilCaseStats,
-  CivilCaseSchema,
   type CivilCaseData,
   type CivilCaseFilters,
   type CivilCasesFilterOptions,
   type CivilCaseStats,
 } from "./schema";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type NotarialRecord = {
-  id: number;
-  title: string;
-  name: string;
-  atty: string;
-  defendant?: string;
-  date: string;
-  notes?: string;
-  nature?: string;
-};
 
 type CaseFilterValues = CivilCaseFilters;
 type SortKey = NonNullable<CivilCasesFilterOptions["sortKey"]>;
@@ -83,928 +56,7 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
   { key: "notes", label: "Notes", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
 ];
-
-// ─── Form Types ───────────────────────────────────────────────────────────────
-
-type FormEntry = {
-  id: string;
-  title: string;
-  name: string;
-  atty: string;
-  defendant?: string;
-  date: string;
-  notes?: string;
-  nature?: string;
-
-  file?: File | null;
-
-  errors: Record<string, string>;
-  saved: boolean;
-};
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-const createEmptyEntry = (id: string): FormEntry => ({
-  id,
-  title: "",
-  name: "",
-  atty: "",
-  defendant: "",
-  date: "",
-  notes: "",
-  nature: "",
-  file: null,
-
-  errors: {},
-  saved: false,
-});
-
-const recordToEntry = (id: string, r: NotarialRecord): FormEntry => ({
-  id,
-  title: r.title,
-  name: r.name,
-  atty: r.atty,
-  defendant: r.defendant ?? "",
-  date: r.date,
-  notes: r.notes ?? "",
-  nature: r.nature ?? "",
-
-  errors: {},
-  saved: false,
-});
-
-const caseToRecord = (c: CivilCaseData): NotarialRecord => ({
-  id: c.id,
-  title: c.caseNumber ?? "",
-  name: c.branch ?? "",
-  atty: c.petitioners ?? "",
-  defendant: c.defendants ?? "",
-  date: c.dateFiled ? new Date(c.dateFiled).toISOString().slice(0, 10) : "",
-  notes: c.notes ?? "",
-  nature: c.nature ?? "",
-});
-
-// ─── Column Definitions ───────────────────────────────────────────────────────
-
-type ColDef = {
-  key: keyof Omit<FormEntry, "id" | "errors" | "saved">;
-  label: string;
-  placeholder: string;
-  type: "text" | "date";
-  width: number;
-  required?: boolean;
-  mono?: boolean;
-};
-
-const FROZEN_COLS: ColDef[] = [
-  {
-    key: "title",
-    label: "Case Number",
-    placeholder: "01-M-2006",
-    type: "text",
-    width: 260,
-    required: true,
-  },
-  {
-    key: "name",
-    label: "Branch",
-    placeholder: "18",
-    type: "text",
-    width: 240,
-    required: true,
-  },
-];
-
-const DETAIL_COLS: ColDef[] = [
-  {
-    key: "atty",
-    label: "Petitioner/s",
-    placeholder: "MARICEL L. PINEDA",
-    type: "text",
-    width: 300,
-    required: true,
-  },
-  {
-    key: "defendant",
-    label: "Defendant/s",
-    placeholder: "MUNER JAHER",
-    type: "text",
-    width: 300,
-  },
-  {
-    key: "date",
-    label: "Date Filed",
-    placeholder: "",
-    type: "date",
-    width: 148,
-    mono: true,
-  },
-  {
-    key: "notes",
-    label: "Notes/Appealed",
-    placeholder: "Appealed",
-    type: "text",
-    width: 240,
-    mono: true,
-  },
-  {
-    key: "nature",
-    label: "Nature of Petition",
-    placeholder: "Support",
-    type: "text",
-    width: 360,
-    mono: true,
-  },
-];
-
-const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
-  ["title", "name", "atty"];
-
-function validateEntry(entry: FormEntry): Record<string, string> {
-  const errs: Record<string, string> = {};
-  REQUIRED_FIELDS.forEach((k) => {
-    if (!entry[k] || String(entry[k]).trim() === "")
-      errs[k as string] = "Required";
-  });
-  return errs;
-}
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-PH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
-
 const PAGE_SIZE = 15;
-
-// ─── Cell Input ───────────────────────────────────────────────────────────────
-
-const CellInput = ({
-  col,
-  value,
-  error,
-  onChange,
-  onKeyDown,
-}: {
-  col: ColDef;
-  value: string;
-  error?: string;
-  onChange: (v: string) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-}) => (
-  <div style={{ display: "flex", flexDirection: "column" }}>
-    <input
-      type={col.type === "date" ? "date" : "text"}
-      value={value}
-      placeholder={col.placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      title={error || col.label}
-      className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
-    />
-    {error && (
-      <span className="xls-cell-err">
-        <FiAlertCircle size={10} />
-        {error}
-      </span>
-    )}
-  </div>
-);
-
-// ─── Review Card ──────────────────────────────────────────────────────────────
-
-function ReviewCard({ entry }: { entry: FormEntry }) {
-  const fmtDate = (d: string) =>
-    d
-      ? new Date(d).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
-
-  return (
-    <div className="rv-card">
-      <div className="rv-hero">
-        <div className="rv-hero-left">
-          <div className="rv-hero-casenum">
-            {entry.title || (
-              <span style={{ opacity: 0.4 }}>No case number</span>
-            )}
-          </div>
-          <div className="rv-hero-name">
-            {entry.atty || (
-              <span style={{ opacity: 0.4, fontSize: 18 }}>No petitioners</span>
-            )}
-          </div>
-          {entry.name && <div className="rv-hero-charge">{entry.name}</div>}
-        </div>
-        <div className="rv-hero-badges">
-          {entry.date && (
-            <span className="rv-badge rv-badge-court">
-              {fmtDate(entry.date)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="rv-body">
-        <div className="rv-body-main">
-          <div className="rv-section">
-            <div className="rv-section-header">
-              <FiFileText size={13} />
-              <span>Record Details</span>
-            </div>
-            <div className="rv-grid rv-grid-3">
-              <div className="rv-field">
-                <div className="rv-field-label">Case Number</div>
-                <div className="rv-field-value">
-                  {entry.title || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Branch</div>
-                <div className="rv-field-value">
-                  {entry.name || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Petitioner/s</div>
-                <div className="rv-field-value">
-                  {entry.atty || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Date Filed</div>
-                <div className="rv-field-value rv-mono">
-                  {fmtDate(entry.date) || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rv-section">
-            <div className="rv-section-header">
-              <FiFolder size={13} />
-              <span>File</span>
-            </div>
-            <div className="rv-grid rv-grid-2">
-              <div className="rv-field" style={{ gridColumn: "1 / -1" }}>
-                <div className="rv-field-label">Attachment</div>
-                <div
-                  className="rv-field-value rv-mono"
-                  style={{ fontSize: 12, wordBreak: "break-all" }}
-                >
-                  {entry.file ? (
-                    <span>{entry.file.name}</span>
-                  ) : (
-                    <span className="rv-empty">—</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Add/Edit Full-Page Modal ─────────────────────────────────────────────────
-
-type ModalType = "ADD" | "EDIT";
-type Step = "entry" | "review";
-
-const NotarialModal = ({
-  type,
-  selectedRecord,
-  onClose,
-  onCreate,
-  onUpdate,
-}: {
-  type: ModalType;
-  selectedRecord?: NotarialRecord | null;
-  onClose: () => void;
-  onCreate?: () => void;
-  onUpdate?: () => void;
-}) => {
-  const statusPopup = usePopup();
-  const isEdit = type === "EDIT";
-  const [step, setStep] = useState<Step>("entry");
-  const [reviewIdx, setReviewIdx] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const handleFileChange = (id: string, file: File | null) => {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              file,
-            }
-          : e,
-      ),
-    );
-  };
-  const [entries, setEntries] = useState<FormEntry[]>(() => {
-    if (isEdit && selectedRecord) return [recordToEntry(uid(), selectedRecord)];
-    return [createEmptyEntry(uid())];
-  });
-
-  useEffect(() => {
-    if (!isEdit) {
-      setEntries([createEmptyEntry(uid())]);
-      setStep("entry");
-    }
-  }, [type, selectedRecord, isEdit]);
-
-  const handleChange = (id: string, field: string, value: string) => {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
-          : e,
-      ),
-    );
-  };
-
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
-    setTimeout(() => {
-      scrollAreaRef.current?.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 60);
-  }, []);
-
-  const handleRemove = (id: string) =>
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-
-  const handleDuplicate = (id: string) => {
-    const source = entries.find((e) => e.id === id);
-    if (!source) return;
-    const dup: FormEntry = {
-      ...source,
-      id: uid(),
-      title: "",
-      errors: {},
-      saved: false,
-    };
-    setEntries((prev) => {
-      const idx = prev.findIndex((e) => e.id === id);
-      const next = [...prev];
-      next.splice(idx + 1, 0, dup);
-      return next;
-    });
-  };
-
-  const handleCellKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: string,
-    isLastCol: boolean,
-  ) => {
-    if (e.key === "Tab" && !e.shiftKey && isLastCol) {
-      const isLastRow = entries[entries.length - 1]?.id === entryId;
-      if (isLastRow && !isEdit) {
-        e.preventDefault();
-        handleAddEntry();
-        setTimeout(() => {
-          const rows = scrollAreaRef.current?.querySelectorAll("[data-row]");
-          const lastRow = rows?.[rows.length - 1];
-          (lastRow?.querySelector("input") as HTMLInputElement)?.focus();
-        }, 80);
-      }
-    }
-  };
-
-  const completedCount = entries.filter((e) =>
-    REQUIRED_FIELDS.every((k) => e[k] && String(e[k]).trim() !== ""),
-  ).length;
-  const incompleteCount = entries.length - completedCount;
-
-  const handleGoToReview = () => {
-    let anyError = false;
-    const validated = entries.map((e) => {
-      const errs = validateEntry(e);
-      if (Object.keys(errs).length > 0) {
-        anyError = true;
-        return { ...e, errors: errs };
-      }
-      return e;
-    });
-    setEntries(validated);
-    if (anyError) {
-      statusPopup.showError(
-        "Please fill in all required fields before reviewing.",
-      );
-      return;
-    }
-    setReviewIdx(0);
-    setStep("review");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const buildPayload = (entry: FormEntry) => {
-    const payload = {
-      caseNumber: entry.title.trim(),
-      branch: entry.name.trim() || null,
-      assistantBranch: entry.name.trim() || null,
-      dateFiled: entry.date ? new Date(entry.date).toISOString() : null,
-      caseType: CaseType.CIVIL,
-      petitioners: entry.atty.trim() || null,
-      defendants: entry.defendant?.trim() || null,
-      notes: entry.notes?.trim() || null,
-      nature: entry.nature?.trim() || null,
-      originCaseNumber: null,
-      reRaffleDate: null,
-      reRaffleBranch: null,
-      consolitationDate: null,
-      consolidationBranch: null,
-      dateRemanded: null,
-      remandedNote: null,
-    };
-
-    return CivilCaseSchema.safeParse(payload);
-  };
-
-  const handleSubmit = async () => {
-    const label = isEdit
-      ? "Save changes to this case?"
-      : entries.length === 1
-        ? "Create this case?"
-        : `Create ${entries.length} cases?`;
-    if (!(await statusPopup.showConfirm(label))) return;
-    setIsSubmitting(true);
-    statusPopup.showLoading(
-      isEdit ? "Updating case..." : "Creating case(s)...",
-    );
-    try {
-      if (isEdit && selectedRecord) {
-        const entry = entries[0];
-        if (entry.title.trim() !== selectedRecord.title.trim()) {
-          throw new Error("Case number cannot be changed");
-        }
-        const parsed = buildPayload(entry);
-        if (!parsed.success) throw new Error("Invalid case data");
-        const response = await updateCivilCase(selectedRecord.id, parsed.data);
-        if (!response.success)
-          throw new Error(response.error || "Failed to update case");
-        onUpdate?.();
-        statusPopup.showSuccess("Case updated successfully");
-      } else {
-        for (const entry of entries) {
-          const parsed = buildPayload(entry);
-          if (!parsed.success) throw new Error("Invalid case data");
-          const response = await createCivilCase(parsed.data);
-          if (!response.success)
-            throw new Error(response.error || "Failed to create case");
-          onCreate?.();
-        }
-        statusPopup.showSuccess(
-          entries.length === 1
-            ? "Case created successfully"
-            : `${entries.length} cases created successfully`,
-        );
-      }
-
-      onClose();
-    } catch (err) {
-      statusPopup.showError(
-        err instanceof Error ? err.message : "Failed to save case",
-      );
-    } finally {
-      setIsSubmitting(false);
-      statusPopup.hidePopup();
-    }
-  };
-
-  const ROW_NUM_W = 48;
-  const ACTION_W = 72;
-
-  return (
-    <div className="xls-root">
-      {/* ══ TOPBAR ══ */}
-      <div className="bg-base-100 xls-topbar">
-        <div className="xls-topbar-left">
-          <button
-            className="xls-back-btn"
-            onClick={step === "review" ? () => setStep("entry") : onClose}
-            title="Back"
-          >
-            <FiArrowLeft size={16} />
-          </button>
-          <nav className="xls-breadcrumb">
-            <span>Civil Cases</span>
-            <FiChevronRight size={12} className="xls-breadcrumb-sep" />
-            <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Civil Case" : "New Civil Case"}
-            </span>
-            {step === "review" && (
-              <>
-                <FiChevronRight size={12} className="xls-breadcrumb-sep" />
-                <span className="xls-breadcrumb-current">Review</span>
-              </>
-            )}
-          </nav>
-        </div>
-        <div className="xls-topbar-right">
-          <div className="xls-stepper">
-            <div className={`xls-step ${step === "entry" ? "active" : "done"}`}>
-              <span className="xls-step-dot">
-                {step === "review" ? (
-                  <FiCheck size={10} strokeWidth={3} />
-                ) : (
-                  <FiEdit3 size={10} />
-                )}
-              </span>
-              Data Entry
-            </div>
-            <div className={`xls-step ${step === "review" ? "active" : ""}`}>
-              <span className="xls-step-dot">
-                <FiEye size={10} />
-              </span>
-              Review
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ══ BODY ══ */}
-      <AnimatePresence mode="wait">
-        {step === "entry" ? (
-          <motion.div
-            key="entry"
-            className="bg-base-100 xls-main"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
-          >
-            <div className="xls-title-row">
-              <div>
-                <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Civil Case" : "New Civil Case"}
-                </h1>
-                <p className="text-lg mb-9 xls-subtitle">
-                  {isEdit ? (
-                    "Update record details. Required fields are marked *."
-                  ) : (
-                    <>
-                      Fill rows like a spreadsheet —{" "}
-                      <kbd className="xls-kbd">Tab</kbd> past the last cell to
-                      add a new row.
-                    </>
-                  )}
-                </p>
-                {!isEdit && (
-                  <div className="xls-pills" style={{ marginTop: 10 }}>
-                    <span className="xls-pill xls-pill-neutral">
-                      <span className="xls-pill-dot" />
-                      {entries.length} {entries.length === 1 ? "row" : "rows"}
-                    </span>
-                    <span
-                      className={`xls-pill ${completedCount > 0 ? "xls-pill-ok" : "xls-pill-neutral"}`}
-                    >
-                      <span className="xls-pill-dot" />
-                      {completedCount} complete
-                    </span>
-                    {incompleteCount > 0 && (
-                      <span className="xls-pill xls-pill-err">
-                        <span className="xls-pill-dot" />
-                        {incompleteCount} incomplete
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {!isEdit && (
-              <div className="xls-progress">
-                <div
-                  className="xls-progress-fill"
-                  style={{
-                    width: `${entries.length ? (completedCount / entries.length) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            )}
-
-            <div className="xls-sheet-wrap">
-              <div className="xls-tab-bar">
-                <button className="xls-tab active">
-                  <FiFileText size={13} />
-                  Civil Case Info
-                </button>
-              </div>
-
-              <div className="xls-table-outer" ref={scrollAreaRef}>
-                <table className="xls-table">
-                  <colgroup>
-                    <col style={{ width: ROW_NUM_W }} />
-                    {FROZEN_COLS.map((c) => (
-                      <col key={c.key} style={{ width: c.width }} />
-                    ))}
-                    {DETAIL_COLS.map((c) => (
-                      <col key={c.key} style={{ width: c.width }} />
-                    ))}
-                    <col style={{ width: ACTION_W }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="xls-thead-group">
-                      <th style={{ width: ROW_NUM_W }} />
-                      <th colSpan={FROZEN_COLS.length}>
-                        <div className="xls-group-label">Identity</div>
-                      </th>
-                      <th colSpan={DETAIL_COLS.length}>
-                        <div className="xls-group-label">Civil Case Info</div>
-                      </th>
-                      <th />
-                    </tr>
-                    <tr className="xls-thead-cols">
-                      <th style={{ textAlign: "center" }}>#</th>
-                      {FROZEN_COLS.map((col) => (
-                        <th
-                          key={col.key}
-                          className={col.required ? "req-col" : ""}
-                        >
-                          {col.label}
-                        </th>
-                      ))}
-                      {DETAIL_COLS.map((col) => (
-                        <th
-                          key={col.key}
-                          className={col.required ? "req-col" : ""}
-                        >
-                          {col.label}
-                        </th>
-                      ))}
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
-                        const lastColIdx = DETAIL_COLS.length - 1;
-                        return (
-                          <motion.tr
-                            key={entry.id}
-                            data-row
-                            layout
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-                            transition={{ duration: 0.12 }}
-                            className="xls-row"
-                          >
-                            <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
-                            </td>
-                            {FROZEN_COLS.map((col) => (
-                              <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={entry[col.key] as string}
-                                  error={entry.errors[col.key as string]}
-                                  onChange={(v) =>
-                                    handleChange(entry.id, col.key as string, v)
-                                  }
-                                />
-                              </td>
-                            ))}
-                            {DETAIL_COLS.map((col, colIdx) => (
-                              <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={entry[col.key] as string}
-                                  error={entry.errors[col.key as string]}
-                                  onChange={(v) =>
-                                    handleChange(entry.id, col.key as string, v)
-                                  }
-                                  onKeyDown={(e) =>
-                                    handleCellKeyDown(
-                                      e,
-                                      entry.id,
-                                      colIdx === lastColIdx,
-                                    )
-                                  }
-                                />
-                              </td>
-                            ))}
-                            <td className="td-actions">
-                              <div className="xls-row-actions">
-                                <button
-                                  type="button"
-                                  className="xls-row-btn"
-                                  onClick={() => handleDuplicate(entry.id)}
-                                  title="Duplicate row"
-                                >
-                                  <FiCopy size={13} />
-                                </button>
-                                {entries.length > 1 && (
-                                  <button
-                                    type="button"
-                                    className="xls-row-btn del"
-                                    onClick={() => handleRemove(entry.id)}
-                                    title="Remove row"
-                                  >
-                                    <FiTrash2 size={13} />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-
-              {!isEdit && (
-                <button
-                  type="button"
-                  className="xls-add-row"
-                  onClick={handleAddEntry}
-                >
-                  <FiPlus size={14} strokeWidth={2.5} />
-                  Add Row
-                </button>
-              )}
-            </div>
-
-            <div className="xls-footer">
-              <div className="xls-footer-meta">
-                {!isEdit && entries.length > 1 && (
-                  <span>
-                    <strong>{completedCount}</strong> of{" "}
-                    <strong>{entries.length}</strong> rows ready
-                  </span>
-                )}
-                <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
-                  Fields marked{" "}
-                  <span style={{ color: "var(--color-error)" }}>*</span> are
-                  required
-                </span>
-              </div>
-              <div className="xls-footer-right">
-                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
-                  Cancel
-                </button>
-                <button
-                  className="xls-btn xls-btn-primary"
-                  onClick={handleGoToReview}
-                >
-                  <FiEye size={15} />
-                  Review
-                  {!isEdit && entries.length > 1 ? ` (${entries.length})` : ""}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          /* ══ REVIEW ══ */
-          <motion.div
-            key="review"
-            className="xls-main"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-          >
-            <div className="border-none rv-summary">
-              <div className="rv-summary-left">
-                <div>
-                  <p className="text-4xl font-black">
-                    {isEdit
-                      ? "Review your edits"
-                      : entries.length === 1
-                        ? "Review before saving"
-                        : `Review ${entries.length} records before saving`}
-                  </p>
-                  <p className="font-light text-md mt-1">
-                    {isEdit
-                      ? "Check the details below, then confirm your changes."
-                      : "All fields validated. Confirm the details are correct."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rv-layout">
-              {entries.length > 1 && (
-                <div className="rv-sidebar">
-                  <div className="rv-sidebar-head">
-                    {entries.length} Records
-                  </div>
-                  <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.title || "No case number"}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.atty || "No petitioners"}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="rv-panel">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={reviewIdx}
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.12 }}
-                  >
-                    <ReviewCard entry={entries[reviewIdx]} />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </div>
-
-            <div className="xls-footer">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button
-                  className="xls-btn xls-btn-ghost"
-                  onClick={() => setStep("entry")}
-                >
-                  <FiArrowLeft size={14} />
-                  Back to Edit
-                </button>
-                {entries.length > 1 && (
-                  <div className="rv-pager">
-                    <button
-                      className="xls-btn-icon"
-                      onClick={() => setReviewIdx((i) => Math.max(0, i - 1))}
-                      disabled={reviewIdx === 0}
-                    >
-                      <FiChevronLeft size={15} />
-                    </button>
-                    <span className="rv-pager-info">
-                      {reviewIdx + 1} / {entries.length}
-                    </span>
-                    <button
-                      className="xls-btn-icon"
-                      onClick={() =>
-                        setReviewIdx((i) => Math.min(entries.length - 1, i + 1))
-                      }
-                      disabled={reviewIdx === entries.length - 1}
-                    >
-                      <FiChevronRight size={15} />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button
-                className="xls-btn xls-btn-success"
-                style={{
-                  height: 50,
-                  paddingLeft: 30,
-                  paddingRight: 30,
-                  fontSize: 16,
-                }}
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="xls-spinner" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <FiSave size={17} />
-                    {isEdit
-                      ? "Save Changes"
-                      : entries.length === 1
-                        ? "Confirm & Save"
-                        : `Save All ${entries.length} Records`}
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
 // ─── Sort TH ─────────────────────────────────────────────────────────────────
 
 type SortConfig = { key: SortKey; order: "asc" | "desc" };
@@ -1034,97 +86,6 @@ const SortTh = ({
     )}
   </th>
 );
-
-// ─── Row Component ────────────────────────────────────────────────────────────
-
-const NotarialRow = ({
-  record,
-  onEdit,
-  onDelete,
-  onRowClick,
-}: {
-  record: NotarialRecord;
-  onEdit: (r: NotarialRecord) => void;
-  onDelete: (id: number) => void;
-  onRowClick: (r: NotarialRecord) => void;
-}) => {
-  const popoverId = `civil-actions-popover-${record.id}`;
-  const anchorName = `--civil-actions-anchor-${record.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
-
-  return (
-    <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onRowClick(record)}
-    >
-      <td onClick={(e) => e.stopPropagation()} className="text-center">
-        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-          <li>
-            <button
-              className="flex items-center gap-3 text-info"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onRowClick(record);
-              }}
-            >
-              <FiEye size={16} />
-              <span>View</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-warning"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onEdit(record);
-              }}
-            >
-              <FiEdit size={16} />
-              <span>Edit</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-error"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onDelete(record.id);
-              }}
-            >
-              <FiTrash2 size={16} />
-              <span>Delete</span>
-            </button>
-          </li>
-        </ActionDropdown>
-      </td>
-      <TipCell
-        label="Case Number"
-        value={record.title}
-        truncate
-        className="font-semibold"
-      />
-      <TipCell label="Branch" value={record.name} truncate />
-      <TipCell label="Petitioner/s" value={record.atty} truncate />
-      <TipCell label="Defendant/s" value={record.defendant} truncate />
-      <TipCell
-        label="Date Filed"
-        value={formatDate(record.date)}
-        className="text-base-content/70"
-      />
-      <TipCell label="Notes/Appealed" value={record.notes} />
-      <TipCell label="Nature of Petition" value={record.nature} />
-    </tr>
-  );
-};
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -1259,10 +220,7 @@ const Civil: React.FC = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<ModalType | null>(null);
-  const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
-    null,
-  );
+  const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
   const [stats, setStats] = useState<CivilCaseStats>({
     totalCases: 0,
     reRaffledCases: 0,
@@ -1285,10 +243,21 @@ const Civil: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [appliedFilters]);
+
+  const handleToggleRecordSelection = (id: number, checked: boolean) => {
+    setSelectedRecordIds((prev) => {
+      if (checked) {
+        if (prev.includes(id)) return prev;
+        return [...prev, id];
+      }
+      return prev.filter((item) => item !== id);
+    });
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
@@ -1301,7 +270,6 @@ const Civil: React.FC = () => {
   const fetchCases = useCallback(
     async (page = currentPage) => {
       try {
-        setLoading(true);
         const [casesRes, statsRes] = await Promise.all([
           getCivilCases({
             page,
@@ -1429,6 +397,56 @@ const Civil: React.FC = () => {
     await fetchCases();
   };
 
+  const handleDeleteSelectedRecords = async () => {
+    if (selectedRecordIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedRecordIds.length} selected case${selectedRecordIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected cases...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedRecordIds.map((id) => deleteCivilCase(id)),
+      );
+
+      const failedIds: number[] = [];
+      const deletedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const caseId = selectedRecordIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(caseId);
+          return;
+        }
+        failedIds.push(caseId);
+      });
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} case(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected case${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+
+      setSelectedRecordIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+      await fetchCases();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1436,15 +454,10 @@ const Civil: React.FC = () => {
     setUploading(true);
     try {
       const result = await uploadExcel(file, CaseType.CIVIL);
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to import cases");
-      } else {
-        statusPopup.showSuccess("Cases imported successfully");
-        await fetchCases();
-      }
+      const importPayload = result.success ? result.result : result.errorResult;
 
-      if (result.success && result.result?.failedExcel) {
-        const { fileName, base64 } = result.result.failedExcel;
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -1463,10 +476,26 @@ const Civil: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+      }
 
-        statusPopup.showSuccess(
-          "Import complete. Failed rows have been downloaded for review.",
-        );
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+      } else {
+        if ((importPayload?.meta.importedCount ?? 0) === 0) {
+          statusPopup.showError(
+            "No valid rows to import. Failed rows have been downloaded for review.",
+          );
+          return;
+        }
+
+        statusPopup.showSuccess("Cases imported successfully");
+        await fetchCases();
+
+        if (importPayload?.failedExcel) {
+          statusPopup.showSuccess(
+            "Import complete. Failed rows have been downloaded for review.",
+          );
+        }
       }
     } finally {
       setUploading(false);
@@ -1522,22 +551,6 @@ const Civil: React.FC = () => {
         <FiAlertCircle className="w-5 h-5" />
         <span>{error}</span>
       </div>
-    );
-  }
-
-  if (modalType) {
-    return (
-      <NotarialModal
-        type={modalType}
-        selectedRecord={selectedRecord}
-        onClose={() => {
-          setModalType(null);
-          setSelectedRecord(null);
-          fetchCases();
-        }}
-        onCreate={() => fetchCases()}
-        onUpdate={() => fetchCases()}
-      />
     );
   }
 
@@ -1647,10 +660,7 @@ const Civil: React.FC = () => {
             {isAdminOrAtty && (
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  setSelectedRecord(null);
-                  setModalType("ADD");
-                }}
+                onClick={() => router.push("/user/cases/civil/add")}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1669,14 +679,13 @@ const Civil: React.FC = () => {
             )}
           </div>
 
-          <FilterModal
+          <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             options={CASE_FILTER_OPTIONS}
             onApply={handleApplyFilters}
-            initialValues={appliedFilters}
+            searchValue={appliedFilters}
             getSuggestions={getCaseSuggestions}
-            initialExactMatchMap={exactMatchMap}
           />
         </div>
 
@@ -1751,6 +760,53 @@ const Civil: React.FC = () => {
         </div>
 
         {/* Table */}
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedRecordIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedRecordIds.length} case
+                    {selectedRecordIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/civil/edit?ids=${selectedRecordIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedRecords}
+                      disabled={deletingSelected}
+                    >
+                      <FiTrash2 className="h-4 w-4" />
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedRecordIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
         <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <table className="table table-zebra w-full text-center">
             <thead className="bg-base-300">
@@ -1809,12 +865,11 @@ const Civil: React.FC = () => {
                 </tr>
               ) : (
                 records.map((r) => (
-                  <NotarialRow
+                  <CivilCaseRow
                     key={r.id}
                     record={r}
                     onEdit={(item) => {
-                      setSelectedRecord(item);
-                      setModalType("EDIT");
+                      router.push(`/user/cases/civil/edit?id=${item.id}`);
                     }}
                     onDelete={handleDelete}
                     onRowClick={(item) => {
@@ -1832,6 +887,8 @@ const Civil: React.FC = () => {
                       }
                       router.push(`/user/cases/civil/${item.id}`);
                     }}
+                    selected={selectedRecordIds.includes(r.id)}
+                    onToggleSelect={handleToggleRecordSelection}
                   />
                 ))
               )}

@@ -47,8 +47,8 @@ const JudgementMTC = ({
 
   return (
     <JudgementTable<MTCJudgementLog & Record<string, unknown>>
-      // title="MTC Judgment Week"
-      // subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
+      title="MTC Judgment Week"
+      subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
       data={records as (MTCJudgementLog & Record<string, unknown>)[]}
       columns={mtcColumns}
       fields={mtcJudgementFields}

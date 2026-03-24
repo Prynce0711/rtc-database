@@ -89,7 +89,7 @@ model Case {
   caseType        CaseType  @default(UNKNOWN)
   branch          String?
   assistantBranch String?
-  caseNumber      String    @unique
+  caseNumber          String
   dateFiled       DateTime?
   
   criminalCase     CriminalCase?
@@ -100,7 +100,7 @@ model Case {
 
 model CriminalCase{
   id              Int       @id @default(autoincrement())
-  caseNumber         String       @unique
+  baseCaseID      Int @unique
   name            String
   charge          String?
   infoSheet       String?
@@ -134,12 +134,12 @@ model CriminalCase{
   createdAt       DateTime  @default(now())
   updatedAt       DateTime?  @updatedAt
 
-  case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+  case            Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model CivilCase{
   id              Int       @id @default(autoincrement())
-  caseNumber         String       @unique
+  baseCaseID         Int       @unique
   petitioners    String?
   defendants    String?
   notes         String?
@@ -156,12 +156,12 @@ model CivilCase{
   createdAt       DateTime  @default(now())
   updatedAt       DateTime?  @updatedAt
 
-  case            Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+  case            Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model Petition {
   id         Int       @id @default(autoincrement())
-  caseNumber String    @unique
+  baseCaseID Int    @unique
   petitioner String?
   raffledTo  String?
   date       DateTime?
@@ -170,12 +170,12 @@ model Petition {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime?  @updatedAt
 
-  case     Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+  case     Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model SpecialProceeding {
   id         Int       @id @default(autoincrement())
-  caseNumber String    @unique
+  baseCaseID Int    @unique
   petitioner String?
   raffledTo  String?
   date       DateTime?
@@ -185,7 +185,7 @@ model SpecialProceeding {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime?  @updatedAt
 
-  case      Case      @relation(fields: [caseNumber], references: [caseNumber], onDelete: Cascade)
+  case      Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model Employee {
@@ -235,6 +235,7 @@ model User {
   banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
+  branch        String?
   darkMode       Boolean?  @default(false)
 
   sessions      Session[]

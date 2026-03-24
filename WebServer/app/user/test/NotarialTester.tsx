@@ -9,8 +9,8 @@ import {
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { useEffect, useMemo, useState } from "react";
+import NotarialExcelUploader from "../../components/Case/Notarial/NotarialExcelUploader";
 import { deleteAllNotarial } from "./TestActions";
-import NotarialExcelUploader from "../components/Case/Notarial/NotarialExcelUploader";
 
 type NotarialFormState = {
   title: string;

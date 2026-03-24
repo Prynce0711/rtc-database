@@ -1,10 +1,11 @@
 "use server";
 
-import ActionResult from "../components/ActionResult";
-import { validateSession } from "../lib/authActions";
-import { deleteGarageFile } from "../lib/garageActions";
-import { prisma } from "../lib/prisma";
-import Roles from "../lib/Roles";
+import ActionResult from "../../components/ActionResult";
+import { CaseType } from "../../generated/prisma/client";
+import { validateSession } from "../../lib/authActions";
+import { deleteGarageFile } from "../../lib/garageActions";
+import { prisma } from "../../lib/prisma";
+import Roles from "../../lib/Roles";
 
 export async function deleteAllCases(): Promise<ActionResult<void>> {
   try {
@@ -70,5 +71,27 @@ export async function deleteAllNotarial(): Promise<ActionResult<void>> {
   } catch (error) {
     console.error("Error deleting notarial entries:", error);
     return { success: false, error: "Error deleting notarial entries" };
+  }
+}
+
+export async function deleteAllSpecialProceedings(): Promise<
+  ActionResult<void>
+> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    await prisma.case.deleteMany({
+      where: {
+        caseType: CaseType.SCA,
+      },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error deleting special proceedings:", error);
+    return { success: false, error: "Error deleting special proceedings" };
   }
 }

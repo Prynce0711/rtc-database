@@ -30,7 +30,7 @@ export const NotarialSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Date Filed", "Filing Date"])),
-  file: z.file(),
+  file: z.file().nullable().optional(),
   path: z
     .string()
     .optional()

@@ -228,18 +228,14 @@ export async function updateCivilCase(
       throw new Error("Case not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
         data: casePayload,
       }),
       prisma.civilCase.upsert({
-        where: { caseNumber: casePayload.caseNumber },
-        update: detailData as Prisma.CivilCaseUpdateWithoutCaseInput,
+        where: { baseCaseID: caseId },
+        update: detailData,
         create: {
           ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
@@ -312,7 +308,13 @@ export async function getCivilCaseById(
 
     const civilCase = await prisma.case.findUnique({
       where: { id: Number(id), civilCase: { isNot: null } },
-      include: { civilCase: true },
+      include: {
+        civilCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!civilCase) {
@@ -324,13 +326,67 @@ export async function getCivilCaseById(
     }
 
     const caseCombined: CivilCaseData = {
-      ...civilCase,
       ...civilCase.civilCase,
+      ...civilCase,
     };
 
     return { success: true, result: caseCombined };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch case" };
+  }
+}
+
+export async function getCivilCasesByIds(
+  ids: (string | number)[],
+): Promise<ActionResult<CivilCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        civilCase: { isNot: null },
+      },
+      include: {
+        civilCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const caseCombined: CivilCaseData[] = cases
+      .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
+      .map((c) => ({
+        ...c.civilCase,
+        ...c,
+      }));
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    const sortedCases = caseCombined.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (sortedCases.length !== validIds.length) {
+      return { success: false, error: "One or more cases were not found" };
+    }
+
+    return { success: true, result: sortedCases };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases" };
   }
 }

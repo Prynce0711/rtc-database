@@ -183,10 +183,6 @@ export async function updatePetition(
       throw new Error("Petition not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
@@ -196,7 +192,7 @@ export async function updatePetition(
         },
       }),
       prisma.petition.upsert({
-        where: { caseNumber: casePayload.caseNumber },
+        where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
@@ -294,6 +290,54 @@ export async function getPetitionById(
   }
 }
 
+export async function getPetitionsByIds(
+  ids: Array<number | string>,
+): Promise<ActionResult<PetitionCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const results = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        petition: { isNot: null },
+      },
+      include: { petition: true },
+    });
+
+    const petitionCases: PetitionCaseData[] = results
+      .filter((c): c is Case & { petition: Petition } => !!c.petition)
+      .map((c) => ({
+        ...c.petition,
+        ...c,
+      }));
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    petitionCases.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (petitionCases.length !== validIds.length) {
+      return { success: false, error: "One or more petitions were not found" };
+    }
+
+    return { success: true, result: petitionCases };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch petitions" };
+  }
+}
+
 export async function getPetitionByCaseNumber(
   caseNumber: string,
 ): Promise<ActionResult<PetitionCaseData>> {
@@ -303,8 +347,9 @@ export async function getPetitionByCaseNumber(
       return sessionResult;
     }
 
-    const result = await prisma.case.findUnique({
-      where: { caseNumber },
+    const result = await prisma.case.findFirst({
+      where: { caseNumber, petition: { isNot: null } },
+      orderBy: { id: "desc" },
       include: { petition: true },
     });
 

@@ -3,7 +3,7 @@
 import { EmploymentType } from "@/app/generated/prisma/enums";
 import { enumToText } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -20,6 +20,12 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { usePopup } from "../Popup/PopupProvider";
+import {
+  createEmployee,
+  deleteEmployee,
+  doesEmployeeExist,
+  updateEmployee,
+} from "./EmployeeActions";
 /* ─── Types ──────────────────────────────────────────────────── */
 export enum EmployeeDrawerType {
   ADD = "ADD",
@@ -45,6 +51,7 @@ interface EntryForm {
 
 const today = new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 9);
+const normalizeEmployeeNumber = (value: string) => value.trim();
 
 const emptyEntry = (id: string): EntryForm => ({
   id,
@@ -242,7 +249,13 @@ const CellInput = ({
 };
 
 /* ─── ReviewCard ─────────────────────────────────────────────── */
-function ReviewCard({ entry }: { entry: EntryForm }) {
+function ReviewCard({
+  entry,
+  isExistingEmployee,
+}: {
+  entry: EntryForm;
+  isExistingEmployee: boolean;
+}) {
   const fmtDate = (d: string) =>
     d
       ? new Date(d).toLocaleDateString("en-PH", {
@@ -254,6 +267,11 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
 
   return (
     <div className="rv-card">
+      {isExistingEmployee && (
+        <div className="alert alert-warning mb-4">
+          <span>Employee number already exists</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -364,43 +382,78 @@ const EmployeeDrawer = ({
   type,
   onClose,
   selectedEmployee = null,
+  selectedEmployees,
   onCreate,
   onUpdate,
 }: {
   type: EmployeeDrawerType;
   onClose: () => void;
   selectedEmployee?: Record<string, any> | null;
+  selectedEmployees?: Array<Record<string, any>>;
   onCreate?: (employee: any) => void;
   onUpdate?: (employee: any) => void;
 }) => {
   const isEdit = type === EmployeeDrawerType.EDIT;
+  const editEmployees =
+    selectedEmployees && selectedEmployees.length > 0
+      ? selectedEmployees
+      : selectedEmployee
+        ? [selectedEmployee]
+        : [];
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState<TabKey>("personal");
   const [reviewIdx, setReviewIdx] = useState(0);
+  const [existingEmployeeNumbers, setExistingEmployeeNumbers] = useState<
+    string[]
+  >([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
-    if (isEdit && selectedEmployee) {
-      const e = selectedEmployee;
-      return [
-        {
-          ...emptyEntry(uid()),
-          employeeName: e.employeeName ?? "",
-          employeeNumber: e.employeeNumber ?? "",
-          position: e.position ?? "",
-          branch: e.branch ?? "",
-          birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
-          dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
-          employmentType: e.employmentType ?? "",
-          contactNumber: e.contactNumber ?? "",
-          email: e.email ?? "",
-        },
-      ];
+    if (isEdit && editEmployees.length > 0) {
+      return editEmployees.map((e) => ({
+        ...emptyEntry(uid()),
+        employeeName: e.employeeName ?? "",
+        employeeNumber: e.employeeNumber ?? "",
+        position: e.position ?? "",
+        branch: e.branch ?? "",
+        birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
+        dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
+        employmentType: e.employmentType ?? "",
+        contactNumber: e.contactNumber ?? "",
+        email: e.email ?? "",
+      }));
     }
     return [emptyEntry(uid())];
   });
+
+  useEffect(() => {
+    setStep("entry");
+    setActiveTab("personal");
+
+    if (isEdit) {
+      if (editEmployees.length > 0) {
+        setEntries(
+          editEmployees.map((e) => ({
+            ...emptyEntry(uid()),
+            employeeName: e.employeeName ?? "",
+            employeeNumber: e.employeeNumber ?? "",
+            position: e.position ?? "",
+            branch: e.branch ?? "",
+            birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
+            dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
+            employmentType: e.employmentType ?? "",
+            contactNumber: e.contactNumber ?? "",
+            email: e.email ?? "",
+          })),
+        );
+      }
+      return;
+    }
+
+    setEntries([emptyEntry(uid())]);
+  }, [type, selectedEmployee, selectedEmployees, isEdit]);
 
   const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
@@ -472,7 +525,67 @@ const EmployeeDrawer = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isEmployeeNumberExisting = useCallback(
+    (employeeNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeEmployeeNumber(employeeNumber);
+      return !!normalized && existingEmployeeNumbers.includes(normalized);
+    },
+    [existingEmployeeNumbers, isEdit],
+  );
+
+  const existingEmployeeRowCount = entries.filter((entry) =>
+    isEmployeeNumberExisting(entry.employeeNumber),
+  ).length;
+
+  const refreshExistingEmployeeNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
+    if (isEdit) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const employeeNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeEmployeeNumber(entry.employeeNumber))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (employeeNumbers.length === 0) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const result = await doesEmployeeExist(employeeNumbers);
+    if (!result.success || !result.result) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) =>
+      normalizeEmployeeNumber(value),
+    );
+    setExistingEmployeeNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingEmployeeNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingEmployeeNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingEmployeeNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -489,14 +602,32 @@ const EmployeeDrawer = ({
       );
       return;
     }
+
+    await refreshExistingEmployeeNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async () => {
+    const existingEmployees = await refreshExistingEmployeeNumbers();
+
+    if (!isEdit && existingEmployees.length > 0) {
+      const duplicateLabel =
+        existingEmployees.length === 1
+          ? `Employee number ${existingEmployees[0]} already exists. Continue anyway?`
+          : `${existingEmployees.length} employee numbers already exist. Continue anyway?`;
+
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
-      ? "Save changes to this employee?"
+      ? entries.length === 1
+        ? "Save changes to this employee?"
+        : `Save changes to ${entries.length} employees?`
       : entries.length === 1
         ? "Create this employee?"
         : `Create ${entries.length} employees?`;
@@ -508,9 +639,41 @@ const EmployeeDrawer = ({
       isEdit ? "Updating employee..." : "Creating employee(s)...",
     );
 
+    const rollbackCreatedEmployees = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteEmployee(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for employee ID ${createdIds[index]}`,
+          );
+          return;
+        }
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for employee ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       const payloads = entries.map((e) => ({
-        id: isEdit ? (selectedEmployee?.id ?? 0) : 0,
         employeeName: e.employeeName,
         employeeNumber: e.employeeNumber || undefined,
         position: e.position,
@@ -522,29 +685,95 @@ const EmployeeDrawer = ({
         email: e.email?.trim() || undefined,
       }));
 
-      const resp = await fetch("/api/employees/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloads),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.success)
-        throw new Error(json.error || "Save failed");
-
-      const created = json.result || [];
       if (isEdit) {
-        if (created[0]) {
-          onUpdate?.(created[0]);
-          statusPopup.showSuccess("Employee updated successfully");
-        } else {
-          statusPopup.showError("Update failed");
+        if (entries.length !== editEmployees.length) {
+          statusPopup.showError("Employee row count mismatch. Please reload.");
+          return;
         }
-      } else {
-        created.forEach((c: any) => onCreate?.(c));
+
+        for (let index = 0; index < payloads.length; index++) {
+          const target = editEmployees[index];
+
+          if (!target?.id) {
+            statusPopup.showError(
+              `Employee id is missing for row ${index + 1}`,
+            );
+            return;
+          }
+
+          const result = await updateEmployee(target.id, payloads[index]);
+          if (!result.success) {
+            const message = "error" in result ? result.error : undefined;
+            statusPopup.showError(
+              message || `Update failed for row ${index + 1}`,
+            );
+            return;
+          }
+          if (!result.result) {
+            statusPopup.showError(`Update failed for row ${index + 1}`);
+            return;
+          }
+
+          onUpdate?.(result.result);
+        }
+
         statusPopup.showSuccess(
-          created.length === 1
+          payloads.length === 1
+            ? "Employee updated successfully"
+            : `${payloads.length} employees updated successfully`,
+        );
+      } else {
+        const createdEmployees: any[] = [];
+        const createdIds: number[] = [];
+
+        for (let index = 0; index < payloads.length; index++) {
+          const payload = payloads[index];
+          const result = await createEmployee(payload);
+          if (!result.success) {
+            const message = "error" in result ? result.error : undefined;
+            const rollbackErrors = await rollbackCreatedEmployees(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}: ${message || "Create failed"}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          if (!result.result) {
+            const rollbackErrors = await rollbackCreatedEmployees(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}: Create failed.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          if (result.result.id) {
+            createdIds.push(result.result.id);
+          }
+          createdEmployees.push(result.result);
+          onCreate?.(result.result);
+        }
+
+        if (createdEmployees.length === 0) {
+          statusPopup.showError("Update failed");
+          return;
+        }
+
+        statusPopup.showSuccess(
+          createdEmployees.length === 1
             ? "Employee created successfully"
-            : `${created.length} employees created successfully`,
+            : `${createdEmployees.length} employees created successfully`,
         );
       }
       onClose();
@@ -556,7 +785,6 @@ const EmployeeDrawer = ({
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -579,7 +807,11 @@ const EmployeeDrawer = ({
             <span>Employees</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Employee" : "New Employees"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Employee"
+                  : "Edit Employees"
+                : "New Employees"}
             </span>
             {step === "review" && (
               <>
@@ -627,7 +859,11 @@ const EmployeeDrawer = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Employee" : "New Employees"}
+                  {isEdit
+                    ? entries.length === 1
+                      ? "Edit Employee"
+                      : "Edit Employees"
+                    : "New Employees"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (
@@ -652,6 +888,20 @@ const EmployeeDrawer = ({
                       <span className="xls-pill-dot" />
                       {completedCount} complete
                     </span>
+                    {existingEmployeeRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#78350f",
+                          borderColor: "#fbbf24",
+                        }}
+                        title="Employee number already exists"
+                      >
+                        <span className="xls-pill-dot" />
+                        {existingEmployeeRowCount} existing
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
                       <span className="xls-pill xls-pill-err">
                         <span className="xls-pill-dot" />
@@ -744,6 +994,9 @@ const EmployeeDrawer = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = activeCols.length - 1;
+                        const rowHasExistingEmployee = isEmployeeNumberExisting(
+                          entry.employeeNumber,
+                        );
                         return (
                           <motion.tr
                             key={entry.id}
@@ -753,7 +1006,12 @@ const EmployeeDrawer = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                             transition={{ duration: 0.12 }}
-                            className="xls-row"
+                            className={`xls-row ${rowHasExistingEmployee ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            title={
+                              rowHasExistingEmployee
+                                ? "Employee number already exists"
+                                : undefined
+                            }
                           >
                             <td className="td-num">
                               <span className="xls-rownum">{rowIdx + 1}</span>
@@ -937,6 +1195,12 @@ const EmployeeDrawer = ({
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
+                  {!isEdit && existingEmployeeRowCount > 0 && (
+                    <p className="text-sm font-semibold text-warning mt-2">
+                      {existingEmployeeRowCount} row
+                      {existingEmployeeRowCount > 1 ? "s" : ""} already exist.
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -956,23 +1220,40 @@ const EmployeeDrawer = ({
                     {entries.length} Employees
                   </div>
                   <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.employeeName || "No name"}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.position || "No position"}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {entries.map((entry, idx) =>
+                      (() => {
+                        const rowHasExistingEmployee = isEmployeeNumberExisting(
+                          entry.employeeNumber,
+                        );
+                        return (
+                          <button
+                            key={entry.id}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingEmployee ? " bg-yellow-100/60" : ""}`}
+                            onClick={() => setReviewIdx(idx)}
+                            title={
+                              rowHasExistingEmployee
+                                ? "Employee number already exists"
+                                : undefined
+                            }
+                          >
+                            <span className="rv-sidebar-num">{idx + 1}</span>
+                            <div className="rv-sidebar-info">
+                              <div className="rv-sidebar-casenum">
+                                {entry.employeeName || "No name"}
+                              </div>
+                              <div className="rv-sidebar-name">
+                                {entry.position || "No position"}
+                              </div>
+                              {rowHasExistingEmployee && (
+                                <div className="text-xs text-warning font-semibold">
+                                  Employee number already exists
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })(),
+                    )}
                   </div>
                 </div>
               )}
@@ -985,7 +1266,12 @@ const EmployeeDrawer = ({
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.12 }}
                   >
-                    <ReviewCard entry={entries[reviewIdx]} />
+                    <ReviewCard
+                      entry={entries[reviewIdx]}
+                      isExistingEmployee={isEmployeeNumberExisting(
+                        entries[reviewIdx]?.employeeNumber ?? "",
+                      )}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

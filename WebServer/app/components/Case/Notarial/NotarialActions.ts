@@ -106,6 +106,69 @@ export async function getNotarial(): Promise<ActionResult<NotarialData[]>> {
   }
 }
 
+export async function getNotarialById(
+  id: number,
+): Promise<ActionResult<NotarialData>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const notarial = await prisma.notarial.findUnique({
+      where: { id },
+      include: { file: true },
+    });
+
+    if (!notarial) {
+      return { success: false, error: "Notarial data not found" };
+    }
+
+    return { success: true, result: notarial };
+  } catch (error) {
+    console.error("Error fetching notarial data by id:", error);
+    return { success: false, error: "Error fetching notarial data" };
+  }
+}
+
+export async function getNotarialByIds(
+  ids: Array<number | string>,
+): Promise<ActionResult<NotarialData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid ids provided" };
+    }
+
+    const items = await prisma.notarial.findMany({
+      where: { id: { in: validIds } },
+      include: { file: true },
+    });
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    const sortedItems = items.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (sortedItems.length !== validIds.length) {
+      return { success: false, error: "One or more records were not found" };
+    }
+
+    return { success: true, result: sortedItems };
+  } catch (error) {
+    console.error("Error fetching notarial data by ids:", error);
+    return { success: false, error: "Error fetching notarial data" };
+  }
+}
+
 export async function getNotarialPage(
   options?: NotarialFilterOptions,
 ): Promise<ActionResult<PaginatedResult<NotarialData>>> {
@@ -229,6 +292,10 @@ export async function createNotarial(
       removeFile: _removeFile,
       ...notarialFields
     } = parsedData.data;
+
+    if (!file) {
+      throw new Error("File is required for creating notarial data");
+    }
 
     let uploadResult;
     try {

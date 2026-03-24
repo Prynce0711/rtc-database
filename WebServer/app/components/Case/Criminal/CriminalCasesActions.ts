@@ -238,17 +238,13 @@ export async function updateCriminalCase(
       throw new Error("Case not found");
     }
 
-    if (originalCase.caseNumber !== casePayload.caseNumber) {
-      throw new Error("Case number cannot be changed");
-    }
-
     const [, , updatedCase] = await prisma.$transaction([
       prisma.case.update({
         where: { id: caseId },
         data: casePayload,
       }),
       prisma.criminalCase.upsert({
-        where: { caseNumber: casePayload.caseNumber },
+        where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
@@ -322,7 +318,13 @@ export async function getCriminalCaseById(
 
     const criminalCase = await prisma.case.findUnique({
       where: { id: Number(id), criminalCase: { isNot: null } },
-      include: { criminalCase: true },
+      include: {
+        criminalCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!criminalCase) {
@@ -340,13 +342,60 @@ export async function getCriminalCaseById(
     }
 
     const caseCombined: CriminalCaseData = {
-      ...criminalCase,
       ...criminalCase.criminalCase,
+      ...criminalCase,
     };
 
     return { success: true, result: caseCombined };
   } catch (error) {
     console.error(error);
     return { success: false, error: "Failed to fetch case" };
+  }
+}
+
+export async function getCriminalCasesByIds(
+  ids: (string | number)[],
+): Promise<ActionResult<CriminalCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => !isNaN(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        criminalCase: { isNot: null },
+      },
+      include: {
+        criminalCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const caseCombined: CriminalCaseData[] = cases
+      .filter(
+        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
+      )
+      .map((c) => ({
+        ...c.criminalCase,
+        ...c,
+      }));
+
+    return { success: true, result: caseCombined };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases" };
   }
 }

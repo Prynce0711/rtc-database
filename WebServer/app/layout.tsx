@@ -3,6 +3,7 @@ import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
 import PopupProvider from "./components/Popup/PopupProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
+import ToastProvider from "./components/Toast/ToastProvider";
 import "./globals.css";
 import SocketProvider from "./lib/socket/SocketProvider";
 
@@ -33,7 +34,9 @@ export default async function RootLayout({
       </head>
       <body className={`${montserrat.variable} font-sans antialiased`}>
         <PopupProvider>
-          <SocketProvider>{children}</SocketProvider>
+          <ToastProvider>
+            <SocketProvider>{children}</SocketProvider>
+          </ToastProvider>
         </PopupProvider>
       </body>
     </html>

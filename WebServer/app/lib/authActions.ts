@@ -16,11 +16,14 @@ export async function validateSession(
       headers: await headers(),
     });
 
-    if (
-      !session?.user ||
-      (role && !role.includes(session.user.role as Roles)) ||
-      session.user.banned
-    ) {
+    if (!session || !session.user) {
+      return { success: false, error: "No active session" };
+    }
+
+    const roleCheck =
+      !role || (session?.user && role.includes(session.user.role as Roles));
+
+    if (!roleCheck || session.user.banned) {
       throw new Error(
         "Unauthorized: Invalid session or insufficient permissions",
       );

@@ -3,17 +3,23 @@
 import ActionResult from "@/app/components/ActionResult";
 import { ReceivingLogSchema } from "@/app/components/Case/ReceivingLogs/schema";
 import { LogAction, Prisma } from "@/app/generated/prisma/client";
+import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
 import {
-  excelDateToJSDate,
   ExportExcelData,
   findColumnValue,
-  isExcel,
+  getExcelHeaderMap,
+  isMappedRowEmpty,
+  normalizeRowBySchema,
+  ProcessExcelMeta,
+  processExcelUpload,
+  UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
-import { prettifyError, z } from "zod";
+import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 
 // Parse time string in various formats
@@ -48,26 +54,22 @@ const parseTime = (
 };
 
 // Convert case type abbreviations to enum values
-const convertCaseType = (abbreviation: string | undefined): string => {
-  if (!abbreviation) return "UNKNOWN";
+const convertCaseType = (abbreviation: string | undefined): CaseType => {
+  if (!abbreviation) return CaseType.UNKNOWN;
 
   const abbrev = abbreviation.toString().toUpperCase().trim();
-  const caseTypeMap: Record<string, string> = {
-    CC: "CRIMINAL",
-    CVC: "CIVIL",
-    LRC: "LAND_REGISTRATION_CASE",
-    P: "PETITION",
+  const caseTypeMap: Record<string, CaseType> = {
+    CC: CaseType.CRIMINAL,
+    CVC: CaseType.CIVIL,
+    LRC: CaseType.LAND_REGISTRATION_CASE,
+    P: CaseType.PETITION,
   };
 
-  return caseTypeMap[abbrev] || "UNKNOWN";
+  return caseTypeMap[abbrev] || CaseType.UNKNOWN;
 };
 
 const parseDateCell = (value: unknown): Date | undefined => {
   if (value == null || value === "") return undefined;
-
-  if (typeof value === "number") {
-    return excelDateToJSDate(value);
-  }
 
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? undefined : value;
@@ -83,154 +85,178 @@ const parseDateCell = (value: unknown): Date | undefined => {
 
 export async function uploadReceiveExcel(
   file: File,
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
 
-    if ((await isExcel(file)) === false) {
-      return { success: false, error: "File is not a valid Excel document" };
-    }
-
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet);
-
     console.log(
       `✓ Receiving Log Excel file received: ${file.name} (${file.size} bytes)`,
     );
-    console.log(`✓ Found ${rawData.length} rows in sheet "${sheetName}"`);
-
-    const mappedData = rawData.map((row: any) => {
-      // Use fuzzy matching for column names
-      const dateRecievedCell = findColumnValue(row, [
-        "Date Recieve",
-        "Date Receive",
-        "Date Received",
-        "DateRecieved",
-      ]);
-      const timeCell = findColumnValue(row, ["Time", "TIME"]);
-      const bookAndPageCell = findColumnValue(row, [
-        "Book and Pages",
-        "Book & Pages",
-        "BookAndPages",
-        "Book and Page",
-      ]);
-      const caseTypeCell = findColumnValue(row, [
-        "Abbreviation",
-        "Case Type",
-        "CaseType",
-        "Type",
-      ]);
-      const caseNumberCell = findColumnValue(row, [
-        "Case no.",
-        "Case No.",
-        "Case No",
-        "Case Number",
-        "CaseNumber",
-      ]);
-      const contentCell = findColumnValue(row, [
-        "Content",
-        "CONTENT",
-        "Contents",
-      ]);
-      const branchNumberCell = findColumnValue(row, [
-        "Branch no.",
-        "Branch No.",
-        "Branch No",
-        "Branch Number",
-        "BranchNumber",
-        "Branch",
-      ]);
-      const notesCell = findColumnValue(row, [
-        "Notes",
-        "NOTES",
-        "Note",
-        "Remarks",
-      ]);
-
-      let dateRecieved: Date | undefined = parseDateCell(dateRecievedCell);
-
-      // Combine date and time if both exist
-      if (dateRecieved && timeCell) {
-        const timeData = parseTime(timeCell.toString());
-        if (timeData) {
-          dateRecieved.setHours(
-            timeData.hours,
-            timeData.minutes,
-            timeData.seconds,
-            0,
-          );
-        }
-      }
-
-      return {
-        bookAndPage: bookAndPageCell?.toString() || undefined,
-        dateRecieved: dateRecievedCell ? dateRecieved : undefined,
-        caseType: convertCaseType(caseTypeCell?.toString()),
-        caseNumber: caseNumberCell?.toString() || undefined,
-        content: contentCell?.toString() || undefined,
-        branchNumber: branchNumberCell?.toString() || undefined,
-        notes: notesCell?.toString() || undefined,
-      };
-    });
-
-    const validationResults = {
-      receivingLogs: [] as Prisma.RecievingLogCreateManyInput[],
-      total: mappedData.length,
-      valid: 0,
-      errors: [] as Array<{ row: number; errors: z.ZodError }>,
-    };
-
-    mappedData.forEach((row, index) => {
-      const validated = ReceivingLogSchema.safeParse(row);
-      if (validated.success) {
-        validationResults.receivingLogs.push(validated.data);
-        validationResults.valid += 1;
-      } else {
-        validationResults.errors.push({
-          row: index + 2,
-          errors: validated.error,
-        });
-      }
-    });
-
-    console.log(
-      `✓ Receiving Log rows validated: ${validationResults.valid}/${validationResults.total}`,
-    );
-
-    if (validationResults.errors.length > 0) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
-        `⚠ ${validationResults.errors.length} receiving log rows have validation errors:`,
+        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
-
-      let errorText = "";
-      validationResults.errors.forEach(({ row, errors }) => {
-        errorText += `  Row ${row}: ${prettifyError(errors)}\n`;
-        console.log(`  Row ${row}:`, prettifyError(errors));
-      });
-
-      return {
-        success: false,
-        error: `Validation failed: ${validationResults.errors.length} rows have errors\n${errorText}`,
-      };
+    } catch (peekError) {
+      console.warn("⚠ Unable to preview workbook for logging:", peekError);
     }
 
-    const createdLogs = await prisma.recievingLog.createManyAndReturn({
-      data: validationResults.receivingLogs,
-    });
-    await createLog({
-      action: LogAction.IMPORT_CASES,
-      details: {
-        ids: createdLogs.map((log) => log.id),
+    const headerMap = getExcelHeaderMap(ReceivingLogSchema);
+    const caseNumberHeaders = headerMap.caseNumber ?? ["Case no."];
+
+    const getMappedCells = (row: Record<string, unknown>) => {
+      const values = normalizeRowBySchema(ReceivingLogSchema, row);
+      return {
+        ...values,
+      };
+    };
+
+    const result = await processExcelUpload<
+      Prisma.RecievingLogCreateManyInput,
+      ReturnType<typeof getMappedCells>
+    >({
+      file,
+      requiredHeaders: { "Case no.": caseNumberHeaders },
+      schema: ReceivingLogSchema,
+      getCells: getMappedCells,
+      skipRowsWithoutCell: [
+        "bookAndPage",
+        "caseNumber",
+        "content",
+        "branchNumber",
+        "notes",
+      ],
+      checkExactMatch: async (_cells, mappedRow) => {
+        const where: Prisma.RecievingLogWhereInput = {
+          caseNumber: mappedRow.caseNumber,
+          caseType: mappedRow.caseType,
+          dateRecieved: mappedRow.dateRecieved,
+          bookAndPage: mappedRow.bookAndPage,
+        };
+
+        const existingLogs = await prisma.recievingLog.findMany({ where });
+        const mappedEntries = Object.entries(mappedRow);
+
+        const hasExactMatch = existingLogs.some((existingLog) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(
+              value,
+              (existingLog as Record<string, unknown>)[key],
+            ),
+          ),
+        );
+
+        return { exists: hasExactMatch };
+      },
+      mapRow: (row) => {
+        const cells = getMappedCells(row);
+        if (isMappedRowEmpty(cells, ["caseType", "dateRecieved"])) {
+          return { skip: true };
+        }
+
+        const rawCaseType = findColumnValue(
+          row,
+          headerMap.caseType ?? ["Abbreviation", "Case Type"],
+        );
+        const rawTime = findColumnValue(row, ["Time", "TIME"]);
+
+        const dateRecieved = parseDateCell(cells.dateRecieved);
+        if (dateRecieved && rawTime) {
+          const timeData = parseTime(String(rawTime));
+          if (timeData) {
+            dateRecieved.setHours(
+              timeData.hours,
+              timeData.minutes,
+              timeData.seconds,
+              0,
+            );
+          }
+        }
+
+        const mapped: Prisma.RecievingLogCreateManyInput = {
+          bookAndPage: cells.bookAndPage
+            ? String(cells.bookAndPage)
+            : undefined,
+          dateRecieved,
+          caseType: convertCaseType(
+            typeof rawCaseType === "string"
+              ? rawCaseType
+              : typeof cells.caseType === "string"
+                ? cells.caseType
+                : undefined,
+          ),
+          caseNumber: cells.caseNumber ? String(cells.caseNumber) : undefined,
+          content: cells.content ? String(cells.content) : undefined,
+          branchNumber: cells.branchNumber
+            ? String(cells.branchNumber)
+            : undefined,
+          notes: cells.notes ? String(cells.notes) : undefined,
+        };
+
+        const validation = ReceivingLogSchema.safeParse(mapped);
+        if (!validation.success) {
+          return {
+            errorMessage: prettifyError(validation.error),
+          };
+        }
+
+        return {
+          mapped,
+        };
+      },
+      onBatchInsert: async (rows) => {
+        const created = await prisma.recievingLog.createManyAndReturn({
+          data: rows,
+        });
+        return { ids: created.map((log) => log.id), count: created.length };
       },
     });
 
-    return { success: true, result: undefined };
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    const meta: ProcessExcelMeta = result.result?.meta;
+    const imported = meta.importedCount;
+    const errors = meta.errorCount;
+    const sheets = meta.sheetSummary;
+
+    console.log(
+      `✓ Import completed: ${imported} receiving logs imported, ${errors} row(s) failed validation`,
+    );
+    if (sheets.length > 0) {
+      sheets.forEach((s) => {
+        console.log(
+          `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+        );
+      });
+    }
+
+    if (result.result?.failedExcel) {
+      console.log(
+        "⚠ Failed rows file generated:",
+        result.result.failedExcel.fileName,
+      );
+    }
+
+    await createLog({
+      action: LogAction.IMPORT_CASES,
+      details: {
+        ids: meta.importedIds ?? [],
+      },
+    });
+
+    return {
+      success: true,
+      result: result.result,
+    };
   } catch (error) {
     console.error("Receiving Log upload error:", error);
     return { success: false, error: "Upload failed" };
@@ -250,6 +276,20 @@ export async function exportReceiveLogsExcel(): Promise<
       orderBy: { id: "asc" },
     });
 
+    const headerMap = getExcelHeaderMap(ReceivingLogSchema);
+    const headerKeys = [
+      "bookAndPage",
+      "dateRecieved",
+      "caseType",
+      "caseNumber",
+      "content",
+      "branchNumber",
+      "notes",
+    ] as const;
+    type HeaderKey = (typeof headerKeys)[number];
+    const header = (key: HeaderKey, fallback: string) =>
+      headerMap[key]?.[0] ?? fallback;
+
     const rows = receivingLogs.map((log) => {
       let dateStr = "";
       let timeStr = "";
@@ -263,14 +303,14 @@ export async function exportReceiveLogsExcel(): Promise<
       }
 
       return {
-        "Book and Pages": log.bookAndPage ?? "",
-        "Date Recieve": dateStr,
+        [header("bookAndPage", "Book and Pages")]: log.bookAndPage ?? "",
+        [header("dateRecieved", "Date Recieve")]: dateStr,
         Time: timeStr,
-        Abbreviation: log.caseType,
-        "Case no.": log.caseNumber ?? "",
-        Content: log.content ?? "",
-        "Branch no.": log.branchNumber ?? "",
-        Notes: log.notes ?? "",
+        [header("caseType", "Abbreviation")]: log.caseType,
+        [header("caseNumber", "Case no.")]: log.caseNumber ?? "",
+        [header("content", "Content")]: log.content ?? "",
+        [header("branchNumber", "Branch no.")]: log.branchNumber ?? "",
+        [header("notes", "Notes")]: log.notes ?? "",
       };
     });
 
