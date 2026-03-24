@@ -67,7 +67,6 @@ export async function uploadMonthlyExcel(
       getCells: getMonthlyCells,
       schema: MonthlyRowSchema,
       skipRowsWithoutCell: ["categoryCell", "branchCell"],
-      uniqueKeyLabel: "Monthly row (month + category + branch)",
       checkExistingUniqueKeys: async () => {
         const where = fallbackMonth ? { month: fallbackMonth } : undefined;
         const existing = await prisma.monthlyStatistics.findMany({

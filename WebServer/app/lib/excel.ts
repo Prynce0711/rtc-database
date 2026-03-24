@@ -1,3 +1,5 @@
+"server-only";
+
 import * as XLSX from "xlsx";
 import z, { prettifyError } from "zod";
 import ActionResult from "../components/ActionResult";
@@ -420,7 +422,6 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   skipRowsWithoutCell?: Array<keyof TCells>;
   uniqueKeys?: Array<keyof TCells>;
   checkExistingUniqueKeys?: (keys: string[]) => Promise<Set<string>>;
-  uniqueKeyLabel?: string;
   mapRow: (
     row: Record<string, unknown>,
     rowNum: number,
@@ -444,6 +445,28 @@ function extractUniqueKeysFromRow<TCells extends Record<string, unknown>>(
     .filter((value) => value.length > 0);
 }
 
+function extractUniqueEntriesFromRow<TCells extends Record<string, unknown>>(
+  cells: TCells,
+  keys: Array<keyof TCells>,
+): Array<{ key: string; value: string }> {
+  return keys
+    .map((key) => ({ key: String(key), raw: cells[key] }))
+    .filter(({ raw }) => hasContent(raw))
+    .map(({ key, raw }) => ({ key, value: String(raw).trim() }))
+    .filter(({ value }) => value.length > 0);
+}
+
+function buildUniqueConflictMessage(
+  keys: string[],
+  suffix: "already exists" | "duplicated in this file",
+): string {
+  const uniqueKeys = Array.from(new Set(keys)).filter((key) => key.length > 0);
+  if (uniqueKeys.length === 0 || uniqueKeys.includes("uniqueKey")) {
+    return `Unique value ${suffix}`;
+  }
+  return `${uniqueKeys.join(", ")} ${suffix}`;
+}
+
 export type UploadExcelResult = {
   failedExcel?: ExportExcelData;
   meta: ProcessExcelMeta;
@@ -463,7 +486,6 @@ export async function processExcelUpload<
     skipRowsWithoutCell: skipRows,
     uniqueKeys,
     checkExistingUniqueKeys,
-    uniqueKeyLabel = "Unique value",
     mapRow,
     onBatchInsert,
   } = options;
@@ -566,7 +588,9 @@ export async function processExcelUpload<
     let existingUniqueKeys = new Set<string>();
     if (uniqueKeys && checkExistingUniqueKeys) {
       const keys = sheetData.flatMap((row) =>
-        extractUniqueKeysFromRow(getCells(row), uniqueKeys),
+        extractUniqueEntriesFromRow(getCells(row), uniqueKeys).map(
+          ({ value }) => value,
+        ),
       );
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
@@ -581,42 +605,54 @@ export async function processExcelUpload<
         continue;
       }
 
-      const rowUniqueKeys = mapResult.uniqueKey
-        ? [mapResult.uniqueKey]
-        : uniqueKeys
-          ? extractUniqueKeysFromRow(getCells(row), uniqueKeys)
+      const rowUniqueEntries = uniqueKeys
+        ? extractUniqueEntriesFromRow(getCells(row), uniqueKeys)
+        : mapResult.uniqueKey
+          ? [{ key: "uniqueKey", value: mapResult.uniqueKey }]
           : [];
-      if (rowUniqueKeys.length > 0) {
-        if (
-          rowUniqueKeys.some(
-            (uniqueKey) =>
-              existingUniqueKeys.has(uniqueKey) ||
-              globalUniqueKeys.has(uniqueKey),
-          )
-        ) {
+
+      if (rowUniqueEntries.length > 0) {
+        const existingConflicts = rowUniqueEntries.filter(
+          ({ value }) =>
+            existingUniqueKeys.has(value) || globalUniqueKeys.has(value),
+        );
+
+        if (existingConflicts.length > 0) {
+          const message = buildUniqueConflictMessage(
+            existingConflicts.map(({ key }) => key),
+            "already exists",
+          );
           sheetFailed++;
           sheetFailedRows.push({
             ...row,
-            __error: `${uniqueKeyLabel} already exists`,
+            __error: message,
           });
           validationResults.errors.push({
             row: index + 2,
             sheet: sheetName,
-            errors: { message: `${uniqueKeyLabel} already exists` },
+            errors: { message },
           });
           continue;
         }
 
-        if (rowUniqueKeys.some((uniqueKey) => sheetUniqueKeys.has(uniqueKey))) {
+        const sheetConflicts = rowUniqueEntries.filter(({ value }) =>
+          sheetUniqueKeys.has(value),
+        );
+
+        if (sheetConflicts.length > 0) {
+          const message = buildUniqueConflictMessage(
+            sheetConflicts.map(({ key }) => key),
+            "duplicated in this file",
+          );
           sheetFailed++;
           sheetFailedRows.push({
             ...row,
-            __error: `${uniqueKeyLabel} duplicated in this file`,
+            __error: message,
           });
           validationResults.errors.push({
             row: index + 2,
             sheet: sheetName,
-            errors: { message: `${uniqueKeyLabel} duplicated in this file` },
+            errors: { message },
           });
           continue;
         }
@@ -638,10 +674,10 @@ export async function processExcelUpload<
       validationResults.total++;
 
       if (validated.success) {
-        if (rowUniqueKeys.length > 0) {
-          rowUniqueKeys.forEach((uniqueKey) => {
-            sheetUniqueKeys.add(uniqueKey);
-            globalUniqueKeys.add(uniqueKey);
+        if (rowUniqueEntries.length > 0) {
+          rowUniqueEntries.forEach(({ value }) => {
+            sheetUniqueKeys.add(value);
+            globalUniqueKeys.add(value);
           });
         }
         sheetValidRows.push(validated.data);

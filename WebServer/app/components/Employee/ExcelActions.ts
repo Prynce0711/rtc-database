@@ -66,7 +66,6 @@ export async function uploadEmployeeExcel(
       schema: EmployeeSchema,
       skipRowsWithoutCell: ["employeeNumber"], // Don't skip rows just because employee number is missing - we'll catch that in validation and report it as an error, but we want to attempt to process the row in case other data is present that can be used for error reporting
       uniqueKeys: ["employeeNumber", "email", "contactNumber"],
-      uniqueKeyLabel: "Employee number/email/contact number",
       checkExistingUniqueKeys: async (keys) => {
         const normalizedKeys = Array.from(
           new Set(
@@ -124,7 +123,6 @@ export async function uploadEmployeeExcel(
 
         return {
           mapped: validation.data,
-          uniqueKey: cells.employeeNumber?.toString().trim(),
         };
       },
       onBatchInsert: async (rows) => {
