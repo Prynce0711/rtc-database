@@ -538,7 +538,9 @@ const EmployeeDrawer = ({
     isEmployeeNumberExisting(entry.employeeNumber),
   ).length;
 
-  const refreshExistingEmployeeNumbers = useCallback(async (): Promise<string[]> => {
+  const refreshExistingEmployeeNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
     if (isEdit) {
       setExistingEmployeeNumbers([]);
       return [];
@@ -992,8 +994,9 @@ const EmployeeDrawer = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = activeCols.length - 1;
-                        const rowHasExistingEmployee =
-                          isEmployeeNumberExisting(entry.employeeNumber);
+                        const rowHasExistingEmployee = isEmployeeNumberExisting(
+                          entry.employeeNumber,
+                        );
                         return (
                           <motion.tr
                             key={entry.id}
@@ -1195,8 +1198,7 @@ const EmployeeDrawer = ({
                   {!isEdit && existingEmployeeRowCount > 0 && (
                     <p className="text-sm font-semibold text-warning mt-2">
                       {existingEmployeeRowCount} row
-                      {existingEmployeeRowCount > 1 ? "s" : ""} already
-                      exist.
+                      {existingEmployeeRowCount > 1 ? "s" : ""} already exist.
                     </p>
                   )}
                 </div>
@@ -1218,39 +1220,40 @@ const EmployeeDrawer = ({
                     {entries.length} Employees
                   </div>
                   <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
+                    {entries.map((entry, idx) =>
                       (() => {
-                        const rowHasExistingEmployee =
-                          isEmployeeNumberExisting(entry.employeeNumber);
-                        return (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingEmployee ? " bg-yellow-100/60" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                        title={
-                          rowHasExistingEmployee
-                            ? "Employee number already exists"
-                            : undefined
-                        }
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.employeeName || "No name"}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.position || "No position"}
-                          </div>
-                          {rowHasExistingEmployee && (
-                            <div className="text-xs text-warning font-semibold">
-                              Employee number already exists
-                            </div>
-                          )}
-                        </div>
-                      </button>
+                        const rowHasExistingEmployee = isEmployeeNumberExisting(
+                          entry.employeeNumber,
                         );
-                      })()
-                    ))}
+                        return (
+                          <button
+                            key={entry.id}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingEmployee ? " bg-yellow-100/60" : ""}`}
+                            onClick={() => setReviewIdx(idx)}
+                            title={
+                              rowHasExistingEmployee
+                                ? "Employee number already exists"
+                                : undefined
+                            }
+                          >
+                            <span className="rv-sidebar-num">{idx + 1}</span>
+                            <div className="rv-sidebar-info">
+                              <div className="rv-sidebar-casenum">
+                                {entry.employeeName || "No name"}
+                              </div>
+                              <div className="rv-sidebar-name">
+                                {entry.position || "No position"}
+                              </div>
+                              {rowHasExistingEmployee && (
+                                <div className="text-xs text-warning font-semibold">
+                                  Employee number already exists
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })(),
+                    )}
                   </div>
                 </div>
               )}

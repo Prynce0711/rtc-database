@@ -30,7 +30,7 @@ import { BaseCaseSchema } from "../schema";
 
 export async function uploadPetitionExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {

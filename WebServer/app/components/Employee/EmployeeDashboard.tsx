@@ -81,12 +81,46 @@ const EmployeeDashboard: React.FC = () => {
     (async () => {
       try {
         const res = await uploadEmployeeExcel(file);
+        const importPayload = res.success ? res.result : res.errorResult;
+
+        if (importPayload?.failedExcel) {
+          const { fileName, base64 } = importPayload.failedExcel;
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
         if (!res.success) {
           statusPopup.showError(res.error ?? "Failed to import employees");
           return;
         }
+
+        if ((importPayload?.meta.importedCount ?? 0) === 0) {
+          statusPopup.showError(
+            "No valid rows to import. Failed rows have been downloaded for review.",
+          );
+          return;
+        }
+
         await fetchEmployees();
-        statusPopup.showSuccess("Employees imported successfully");
+        if (importPayload?.failedExcel) {
+          statusPopup.showSuccess(
+            "Import complete. Failed rows have been downloaded for review.",
+          );
+        } else {
+          statusPopup.showSuccess("Employees imported successfully");
+        }
       } catch (err: any) {
         statusPopup.showError(err?.message ?? "Error importing employees");
       } finally {

@@ -304,16 +304,10 @@ const ReceiveLogsPage: React.FC = () => {
     try {
       statusPopup.showLoading("Importing... Please wait.");
       const result = await uploadPetitionExcel(file);
-      if (!result.success) {
-        statusPopup.showError(result.error || "Import failed");
-        input.value = "";
-        return;
-      }
+      const importPayload = result.success ? result.result : result.errorResult;
 
-      statusPopup.showSuccess("Import successful!");
-
-      if (result.result?.failedExcel) {
-        const { fileName, base64 } = result.result.failedExcel;
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -333,7 +327,25 @@ const ReceiveLogsPage: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+      }
 
+      if (!result.success) {
+        statusPopup.showError(result.error || "Import failed");
+        input.value = "";
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        input.value = "";
+        return;
+      }
+
+      statusPopup.showSuccess("Import successful!");
+
+      if (importPayload?.failedExcel) {
         statusPopup.showSuccess(
           "Import complete. Failed rows have been downloaded for review.",
         );

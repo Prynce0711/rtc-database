@@ -243,7 +243,7 @@ const getRtcCells = (row: Record<string, unknown>) => {
 
 export async function uploadMunicipalJudgementExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -389,7 +389,7 @@ export async function exportMunicipalJudgementExcel(): Promise<
 
 export async function uploadRegionalJudgementExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;

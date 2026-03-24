@@ -21,7 +21,7 @@ import { createLog } from "../ActivityLogs/LogActions";
 
 export async function uploadEmployeeExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
@@ -66,16 +66,42 @@ export async function uploadEmployeeExcel(
       schema: EmployeeSchema,
       skipRowsWithoutCell: ["employeeNumber"], // Don't skip rows just because employee number is missing - we'll catch that in validation and report it as an error, but we want to attempt to process the row in case other data is present that can be used for error reporting
       uniqueKeys: ["employeeNumber", "email", "contactNumber"],
-      uniqueKeyLabel: "Employee number",
+      uniqueKeyLabel: "Employee number/email/contact number",
       checkExistingUniqueKeys: async (keys) => {
+        const normalizedKeys = Array.from(
+          new Set(
+            keys.map((key) => key.trim()).filter((key) => key.length > 0),
+          ),
+        );
+
+        if (normalizedKeys.length === 0) {
+          return new Set<string>();
+        }
+
         const existing = await prisma.employee.findMany({
-          where: { employeeNumber: { in: keys } },
-          select: { employeeNumber: true },
+          where: {
+            OR: [
+              { employeeNumber: { in: normalizedKeys } },
+              { email: { in: normalizedKeys } },
+              { contactNumber: { in: normalizedKeys } },
+            ],
+          },
+          select: {
+            employeeNumber: true,
+            email: true,
+            contactNumber: true,
+          },
         });
+
         return new Set(
           existing
-            .map((e) => e.employeeNumber?.trim())
-            .filter((v): v is string => v !== undefined),
+            .flatMap((employee) => [
+              employee.employeeNumber,
+              employee.email,
+              employee.contactNumber,
+            ])
+            .map((value) => value?.trim())
+            .filter((value): value is string => !!value),
         );
       },
       mapRow: (row) => {

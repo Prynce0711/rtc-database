@@ -50,7 +50,7 @@ const getMonthlyCells = (row: Record<string, unknown>) => {
 export async function uploadMonthlyExcel(
   file: File,
   fallbackMonth?: string,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;

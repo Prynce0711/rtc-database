@@ -126,7 +126,7 @@ const getInventoryCells = (row: Record<string, unknown>) => {
 
 export async function uploadMunicipalTrialCourtExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -226,7 +226,7 @@ export async function exportMunicipalTrialCourtExcel(): Promise<
 
 export async function uploadRegionalTrialCourtExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
@@ -326,7 +326,7 @@ export async function exportRegionalTrialCourtExcel(): Promise<
 
 export async function uploadInventoryDocumentExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;

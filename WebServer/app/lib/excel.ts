@@ -433,19 +433,15 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
 };
 
-function extractUniqueKeyFromRow<TCells extends Record<string, unknown>>(
+function extractUniqueKeysFromRow<TCells extends Record<string, unknown>>(
   cells: TCells,
   keys: Array<keyof TCells>,
-): string | undefined {
-  const values = keys
+): string[] {
+  return keys
     .map((key) => cells[key])
-    .filter((value) => hasContent(value));
-
-  if (values.length === 0) {
-    return undefined;
-  }
-
-  return values.map((value) => String(value).trim()).join(" ");
+    .filter((value) => hasContent(value))
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
 }
 
 export type UploadExcelResult = {
@@ -458,7 +454,7 @@ export async function processExcelUpload<
   TCells extends Record<string, unknown> = Record<string, unknown>,
 >(
   options: ProcessExcelOptions<T, TCells>,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   const {
     file,
     requiredHeaders,
@@ -569,9 +565,9 @@ export async function processExcelUpload<
     // Pre-check existing unique keys in DB if provided
     let existingUniqueKeys = new Set<string>();
     if (uniqueKeys && checkExistingUniqueKeys) {
-      const keys = sheetData
-        .map((row) => extractUniqueKeyFromRow(getCells(row), uniqueKeys))
-        .filter((val): val is string => !!val);
+      const keys = sheetData.flatMap((row) =>
+        extractUniqueKeysFromRow(getCells(row), uniqueKeys),
+      );
       if (keys.length > 0) {
         existingUniqueKeys = await checkExistingUniqueKeys(keys);
       }
@@ -585,15 +581,18 @@ export async function processExcelUpload<
         continue;
       }
 
-      const uniqueKey =
-        mapResult.uniqueKey ??
-        (uniqueKeys
-          ? extractUniqueKeyFromRow(getCells(row), uniqueKeys)
-          : undefined);
-      if (uniqueKey) {
+      const rowUniqueKeys = mapResult.uniqueKey
+        ? [mapResult.uniqueKey]
+        : uniqueKeys
+          ? extractUniqueKeysFromRow(getCells(row), uniqueKeys)
+          : [];
+      if (rowUniqueKeys.length > 0) {
         if (
-          existingUniqueKeys.has(uniqueKey) ||
-          globalUniqueKeys.has(uniqueKey)
+          rowUniqueKeys.some(
+            (uniqueKey) =>
+              existingUniqueKeys.has(uniqueKey) ||
+              globalUniqueKeys.has(uniqueKey),
+          )
         ) {
           sheetFailed++;
           sheetFailedRows.push({
@@ -608,7 +607,7 @@ export async function processExcelUpload<
           continue;
         }
 
-        if (sheetUniqueKeys.has(uniqueKey)) {
+        if (rowUniqueKeys.some((uniqueKey) => sheetUniqueKeys.has(uniqueKey))) {
           sheetFailed++;
           sheetFailedRows.push({
             ...row,
@@ -639,9 +638,11 @@ export async function processExcelUpload<
       validationResults.total++;
 
       if (validated.success) {
-        if (uniqueKey) {
-          sheetUniqueKeys.add(uniqueKey);
-          globalUniqueKeys.add(uniqueKey);
+        if (rowUniqueKeys.length > 0) {
+          rowUniqueKeys.forEach((uniqueKey) => {
+            sheetUniqueKeys.add(uniqueKey);
+            globalUniqueKeys.add(uniqueKey);
+          });
         }
         sheetValidRows.push(validated.data);
         validationResults.valid++;
@@ -712,13 +713,44 @@ export async function processExcelUpload<
   }
 
   if (validationResults.valid === 0) {
+    const existingRowCount = validationResults.errors.filter((error) => {
+      if ("message" in error.errors) {
+        return error.errors.message.toLowerCase().includes("already exists");
+      }
+      return false;
+    }).length;
+
+    const allFailedRowsAlreadyExist =
+      validationResults.errors.length > 0 &&
+      existingRowCount === validationResults.errors.length;
+
+    const noValidRowsMessage = allFailedRowsAlreadyExist
+      ? "All rows already exists."
+      : existingRowCount > 0
+        ? `No valid rows to import. ${existingRowCount} row(s) already exist in the database.`
+        : "No valid rows to import";
+
+    if (allFailedRowsAlreadyExist) {
+      return { success: false, error: noValidRowsMessage };
+    }
+
     return failedExcelData
       ? {
           success: false,
-          error:
-            "No valid rows to import. Download failed rows file to review errors.",
+          error: noValidRowsMessage,
+          errorResult: {
+            failedExcel: failedExcelData,
+            meta: {
+              importedIds: validationResults.importedIds,
+              importedCount: validationResults.imported,
+              errorCount: validationResults.errors.length,
+              sheetSummary: validationResults.sheetSummary,
+              totalRows: validationResults.total,
+              validRows: validationResults.valid,
+            },
+          },
         }
-      : { success: false, error: "No valid rows to import" };
+      : { success: false, error: noValidRowsMessage };
   }
 
   return {

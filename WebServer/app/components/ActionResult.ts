@@ -1,4 +1,4 @@
-type ActionResult<T> =
+type ActionResult<T, E = undefined> =
   | {
       success: true;
       result: T;
@@ -6,6 +6,7 @@ type ActionResult<T> =
   | {
       success: false;
       error?: string;
+      errorResult?: E;
     };
 
 export default ActionResult;

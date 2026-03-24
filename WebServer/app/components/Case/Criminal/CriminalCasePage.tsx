@@ -353,16 +353,10 @@ const CriminalCasePage: React.FC = () => {
     setUploading(true);
     try {
       const result = await uploadExcel(file);
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to import cases");
-      } else {
-        statusPopup.showSuccess("Cases imported successfully");
-        await fetchCases();
-      }
+      const importPayload = result.success ? result.result : result.errorResult;
 
-      // Download failed rows Excel if available
-      if (result.success && result.result.failedExcel) {
-        const { fileName, base64 } = result.result.failedExcel;
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -381,10 +375,26 @@ const CriminalCasePage: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+      }
 
-        statusPopup.showSuccess(
-          "Import complete. Failed rows have been downloaded for review.",
-        );
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+      } else {
+        if ((importPayload?.meta.importedCount ?? 0) === 0) {
+          statusPopup.showError(
+            "No valid rows to import. Failed rows have been downloaded for review.",
+          );
+          return;
+        }
+
+        statusPopup.showSuccess("Cases imported successfully");
+        await fetchCases();
+
+        if (importPayload?.failedExcel) {
+          statusPopup.showSuccess(
+            "Import complete. Failed rows have been downloaded for review.",
+          );
+        }
       }
     } finally {
       setUploading(false);

@@ -442,12 +442,52 @@ const Proceedings: React.FC = () => {
     if (!file) return;
     setUploading(true);
     const result = await uploadSpecialProceedingExcel(file);
+    const importPayload = result.success ? result.result : result.errorResult;
+
+    if (importPayload?.failedExcel) {
+      const { fileName, base64 } = importPayload.failedExcel;
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
     if (!result.success) {
       popup.showError(result.error || "Upload failed");
     } else {
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        popup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
       popup.showSuccess("Cases imported successfully");
       await fetchCases(currentPage);
+
+      if (importPayload?.failedExcel) {
+        popup.showSuccess(
+          "Import complete. Failed rows have been downloaded for review.",
+        );
+      }
     }
+
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };

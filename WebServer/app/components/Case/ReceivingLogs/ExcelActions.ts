@@ -84,7 +84,7 @@ const parseDateCell = (value: unknown): Date | undefined => {
 
 export async function uploadReceiveExcel(
   file: File,
-): Promise<ActionResult<UploadExcelResult>> {
+): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
     if (!sessionResult.success) {
