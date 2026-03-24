@@ -3,13 +3,13 @@
 import { exportNotarialExcel } from "@/app/components/Case/Notarial/ExcelActions";
 import {
   deleteNotarial,
+  getNotarialFileUrl,
   getNotarialPage,
   getNotarialStats,
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import FileViewerModal from "@/app/components/Popup/FileViewerModal";
-import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -207,7 +207,7 @@ const NotarialPage: React.FC = () => {
       record,
     });
 
-    const result = await getGarageFileUrl(record.link, {
+    const result = await getNotarialFileUrl(record.id, {
       inline: true,
       fileName: record.fileName,
       contentType: record.mimeType,
@@ -232,7 +232,7 @@ const NotarialPage: React.FC = () => {
   const handleDownloadFile = async (record: NotarialRecord) => {
     if (!record.link) return;
 
-    const result = await getGarageFileUrl(record.link, {
+    const result = await getNotarialFileUrl(record.id, {
       inline: false,
       fileName: record.fileName,
       contentType: record.mimeType,

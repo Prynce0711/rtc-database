@@ -70,3 +70,5 @@ NOTARIAL:|
 
 RAFFLE:
 TBA
+
+on update table check for exact match and unchanged

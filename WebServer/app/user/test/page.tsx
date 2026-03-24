@@ -5,13 +5,12 @@ import ChatTest from "./ChatTest";
 import CivilCaseTester from "./CivilCaseTester";
 import CriminalCaseTester from "./CriminalCaseTester";
 import EmployeeTest from "./EmployeeTest";
-import ExcelWithFileUpload from "./ExcelWithFileUpload";
-import JudgementTester from "./JudgementTester";
 import NotarialTester from "./NotarialTester";
 import PetitionTester from "./PetitionTester";
 import SpecialProceedingTester from "./SpecialProceedingTester";
 import StatisticsTester from "./StatisticsTester";
 import ToastTester from "./ToastTester";
+import JudgementTester from "./JudgementTester";
 
 type TesterItem = {
   id: string;
@@ -50,12 +49,6 @@ const TESTERS: TesterItem[] = [
     label: "Employee Test",
     description: "Test employee CRUD and related actions.",
     Component: EmployeeTest,
-  },
-  {
-    id: "excel-upload",
-    label: "Excel Upload Test",
-    description: "Test excel upload and parsing behavior.",
-    Component: ExcelWithFileUpload,
   },
   {
     id: "judgement",
