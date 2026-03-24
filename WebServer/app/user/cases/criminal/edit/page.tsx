@@ -1,7 +1,10 @@
 "use client";
 
 import CriminalCaseUpdatePage from "@/app/components/Case/Criminal/CriminalCaseUpdatePage";
-import { getCriminalCaseById } from "@/app/components/Case/Criminal/CriminalCasesActions";
+import {
+  getCriminalCaseById,
+  getCriminalCasesByIds,
+} from "@/app/components/Case/Criminal/CriminalCasesActions";
 import type { CriminalCaseData } from "@/app/components/Case/Criminal/schema";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,22 +45,17 @@ const CriminalEditPage = () => {
       setLoading(true);
 
       if (ids.length > 0) {
-        const results = await Promise.all(
-          ids.map((id) => getCriminalCaseById(id)),
-        );
-        const loadedCases: CriminalCaseData[] = [];
-
-        for (const result of results) {
-          if (!result.success || !result.result) {
-            const message = !result.success
-              ? result.error || "Failed to load case"
-              : "Failed to load case";
-            setError(message);
-            setLoading(false);
-            return;
-          }
-          loadedCases.push(result.result);
+        const result = await getCriminalCasesByIds(ids);
+        if (!result.success || !result.result) {
+          const message = !result.success
+            ? result.error || "Failed to load cases"
+            : "Failed to load cases";
+          setError(message);
+          setLoading(false);
+          return;
         }
+
+        const loadedCases = result.result;
 
         setSelectedCases(loadedCases);
         setSelectedCase(loadedCases[0] ?? null);

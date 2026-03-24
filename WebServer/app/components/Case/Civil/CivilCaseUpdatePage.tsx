@@ -19,6 +19,7 @@ import {
   FiTrash2,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
+import { doesCaseExist } from "../CaseActions";
 import {
   createCivilCase,
   deleteCivilCase,
@@ -119,6 +120,7 @@ const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
   ["title", "name", "atty"];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const normalizeCaseNumber = (value: string) => value.trim();
 
 const createEmptyEntry = (id: string): FormEntry => ({
   id,
@@ -191,7 +193,13 @@ const CellInput = ({
   </div>
 );
 
-function ReviewCard({ entry }: { entry: FormEntry }) {
+function ReviewCard({
+  entry,
+  isExistingCase,
+}: {
+  entry: FormEntry;
+  isExistingCase: boolean;
+}) {
   const fmtDate = (d: string) =>
     d
       ? new Date(d).toLocaleDateString("en-PH", {
@@ -203,6 +211,11 @@ function ReviewCard({ entry }: { entry: FormEntry }) {
 
   return (
     <div className="rv-card">
+      {isExistingCase && (
+        <div className="alert alert-warning mb-4">
+          <span>Case is already existing</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -317,6 +330,7 @@ export const NotarialUpdatePage = ({
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const handleFileChange = (id: string, file: File | null) => {
     setEntries((prev) =>
@@ -414,7 +428,65 @@ export const NotarialUpdatePage = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isCaseAlreadyExisting = useCallback(
+    (caseNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && existingCaseNumbers.includes(normalized);
+    },
+    [existingCaseNumbers, isEdit],
+  );
+
+  const existingCaseRowCount = entries.filter((entry) =>
+    isCaseAlreadyExisting(entry.title),
+  ).length;
+
+  const refreshExistingCaseNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(entry.title))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const result = await doesCaseExist(caseNumbers, CaseType.CIVIL);
+    if (!result.success || !result.result) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) => normalizeCaseNumber(value));
+    setExistingCaseNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingCaseNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingCaseNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -431,6 +503,9 @@ export const NotarialUpdatePage = ({
       );
       return;
     }
+
+    await refreshExistingCaseNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -460,6 +535,19 @@ export const NotarialUpdatePage = ({
   };
 
   const handleSubmit = async () => {
+    const existingCases = await refreshExistingCaseNumbers();
+
+    if (!isEdit && existingCases.length > 0) {
+      const duplicateLabel =
+        existingCases.length === 1
+          ? `Case number ${existingCases[0]} already exists. Continue anyway?`
+          : `${existingCases.length} case numbers already exist. Continue anyway?`;
+
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? "Save changes to this case?"
       : entries.length === 1
@@ -700,6 +788,20 @@ export const NotarialUpdatePage = ({
                       <span className="xls-pill-dot" />
                       {completedCount} complete
                     </span>
+                    {existingCaseRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#78350f",
+                          borderColor: "#fbbf24",
+                        }}
+                        title="Case is already existing"
+                      >
+                        <span className="xls-pill-dot" />
+                        {existingCaseRowCount} existing
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
                       <span className="xls-pill xls-pill-err">
                         <span className="xls-pill-dot" />
@@ -778,6 +880,9 @@ export const NotarialUpdatePage = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = DETAIL_COLS.length - 1;
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.title,
+                        );
                         return (
                           <motion.tr
                             key={entry.id}
@@ -787,7 +892,12 @@ export const NotarialUpdatePage = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                             transition={{ duration: 0.12 }}
-                            className="xls-row"
+                            className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
                           >
                             <td className="td-num">
                               <span className="xls-rownum">{rowIdx + 1}</span>
@@ -922,6 +1032,12 @@ export const NotarialUpdatePage = ({
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
+                  {!isEdit && existingCaseRowCount > 0 && (
+                    <p className="text-sm font-semibold text-warning mt-2">
+                      {existingCaseRowCount} row
+                      {existingCaseRowCount > 1 ? "s" : ""} already exist.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -933,23 +1049,40 @@ export const NotarialUpdatePage = ({
                     {entries.length} Records
                   </div>
                   <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.title || "No case number"}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.atty || "No petitioners"}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {entries.map((entry, idx) =>
+                      (() => {
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.title,
+                        );
+                        return (
+                          <button
+                            key={entry.id}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                            onClick={() => setReviewIdx(idx)}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
+                          >
+                            <span className="rv-sidebar-num">{idx + 1}</span>
+                            <div className="rv-sidebar-info">
+                              <div className="rv-sidebar-casenum">
+                                {entry.title || "No case number"}
+                              </div>
+                              <div className="rv-sidebar-name">
+                                {entry.atty || "No petitioners"}
+                              </div>
+                              {rowHasExistingCase && (
+                                <div className="text-xs text-warning font-semibold">
+                                  Case is already existing
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })(),
+                    )}
                   </div>
                 </div>
               )}
@@ -962,7 +1095,12 @@ export const NotarialUpdatePage = ({
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.12 }}
                   >
-                    <ReviewCard entry={entries[reviewIdx]} />
+                    <ReviewCard
+                      entry={entries[reviewIdx]}
+                      isExistingCase={isCaseAlreadyExisting(
+                        entries[reviewIdx]?.title ?? "",
+                      )}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

@@ -330,3 +330,51 @@ export async function getCivilCaseById(
     return { success: false, error: "Failed to fetch case" };
   }
 }
+
+export async function getCivilCasesByIds(
+  ids: (string | number)[],
+): Promise<ActionResult<CivilCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        civilCase: { isNot: null },
+      },
+      include: { civilCase: true },
+    });
+
+    const caseCombined: CivilCaseData[] = cases
+      .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
+      .map((c) => ({
+        ...c,
+        ...c.civilCase,
+      }));
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    const sortedCases = caseCombined.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (sortedCases.length !== validIds.length) {
+      return { success: false, error: "One or more cases were not found" };
+    }
+
+    return { success: true, result: sortedCases };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases" };
+  }
+}

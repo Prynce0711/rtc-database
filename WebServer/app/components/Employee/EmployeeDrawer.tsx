@@ -23,6 +23,7 @@ import { usePopup } from "../Popup/PopupProvider";
 import {
   createEmployee,
   deleteEmployee,
+  doesEmployeeExist,
   updateEmployee,
 } from "./EmployeeActions";
 /* ─── Types ──────────────────────────────────────────────────── */
@@ -50,6 +51,7 @@ interface EntryForm {
 
 const today = new Date().toISOString().slice(0, 10);
 const uid = () => Math.random().toString(36).slice(2, 9);
+const normalizeEmployeeNumber = (value: string) => value.trim();
 
 const emptyEntry = (id: string): EntryForm => ({
   id,
@@ -247,7 +249,13 @@ const CellInput = ({
 };
 
 /* ─── ReviewCard ─────────────────────────────────────────────── */
-function ReviewCard({ entry }: { entry: EntryForm }) {
+function ReviewCard({
+  entry,
+  isExistingEmployee,
+}: {
+  entry: EntryForm;
+  isExistingEmployee: boolean;
+}) {
   const fmtDate = (d: string) =>
     d
       ? new Date(d).toLocaleDateString("en-PH", {
@@ -259,6 +267,11 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
 
   return (
     <div className="rv-card">
+      {isExistingEmployee && (
+        <div className="alert alert-warning mb-4">
+          <span>Employee number already exists</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -392,6 +405,9 @@ const EmployeeDrawer = ({
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState<TabKey>("personal");
   const [reviewIdx, setReviewIdx] = useState(0);
+  const [existingEmployeeNumbers, setExistingEmployeeNumbers] = useState<
+    string[]
+  >([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
@@ -509,7 +525,65 @@ const EmployeeDrawer = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isEmployeeNumberExisting = useCallback(
+    (employeeNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeEmployeeNumber(employeeNumber);
+      return !!normalized && existingEmployeeNumbers.includes(normalized);
+    },
+    [existingEmployeeNumbers, isEdit],
+  );
+
+  const existingEmployeeRowCount = entries.filter((entry) =>
+    isEmployeeNumberExisting(entry.employeeNumber),
+  ).length;
+
+  const refreshExistingEmployeeNumbers = useCallback(async (): Promise<string[]> => {
+    if (isEdit) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const employeeNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeEmployeeNumber(entry.employeeNumber))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (employeeNumbers.length === 0) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const result = await doesEmployeeExist(employeeNumbers);
+    if (!result.success || !result.result) {
+      setExistingEmployeeNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) =>
+      normalizeEmployeeNumber(value),
+    );
+    setExistingEmployeeNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingEmployeeNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingEmployeeNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingEmployeeNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -526,12 +600,28 @@ const EmployeeDrawer = ({
       );
       return;
     }
+
+    await refreshExistingEmployeeNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async () => {
+    const existingEmployees = await refreshExistingEmployeeNumbers();
+
+    if (!isEdit && existingEmployees.length > 0) {
+      const duplicateLabel =
+        existingEmployees.length === 1
+          ? `Employee number ${existingEmployees[0]} already exists. Continue anyway?`
+          : `${existingEmployees.length} employee numbers already exist. Continue anyway?`;
+
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? entries.length === 1
         ? "Save changes to this employee?"
@@ -796,6 +886,20 @@ const EmployeeDrawer = ({
                       <span className="xls-pill-dot" />
                       {completedCount} complete
                     </span>
+                    {existingEmployeeRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#78350f",
+                          borderColor: "#fbbf24",
+                        }}
+                        title="Employee number already exists"
+                      >
+                        <span className="xls-pill-dot" />
+                        {existingEmployeeRowCount} existing
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
                       <span className="xls-pill xls-pill-err">
                         <span className="xls-pill-dot" />
@@ -888,6 +992,8 @@ const EmployeeDrawer = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = activeCols.length - 1;
+                        const rowHasExistingEmployee =
+                          isEmployeeNumberExisting(entry.employeeNumber);
                         return (
                           <motion.tr
                             key={entry.id}
@@ -897,7 +1003,12 @@ const EmployeeDrawer = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                             transition={{ duration: 0.12 }}
-                            className="xls-row"
+                            className={`xls-row ${rowHasExistingEmployee ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            title={
+                              rowHasExistingEmployee
+                                ? "Employee number already exists"
+                                : undefined
+                            }
                           >
                             <td className="td-num">
                               <span className="xls-rownum">{rowIdx + 1}</span>
@@ -1081,6 +1192,13 @@ const EmployeeDrawer = ({
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
+                  {!isEdit && existingEmployeeRowCount > 0 && (
+                    <p className="text-sm font-semibold text-warning mt-2">
+                      {existingEmployeeRowCount} row
+                      {existingEmployeeRowCount > 1 ? "s" : ""} already
+                      exist.
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -1101,10 +1219,19 @@ const EmployeeDrawer = ({
                   </div>
                   <div className="rv-sidebar-list">
                     {entries.map((entry, idx) => (
+                      (() => {
+                        const rowHasExistingEmployee =
+                          isEmployeeNumberExisting(entry.employeeNumber);
+                        return (
                       <button
                         key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
+                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingEmployee ? " bg-yellow-100/60" : ""}`}
                         onClick={() => setReviewIdx(idx)}
+                        title={
+                          rowHasExistingEmployee
+                            ? "Employee number already exists"
+                            : undefined
+                        }
                       >
                         <span className="rv-sidebar-num">{idx + 1}</span>
                         <div className="rv-sidebar-info">
@@ -1114,8 +1241,15 @@ const EmployeeDrawer = ({
                           <div className="rv-sidebar-name">
                             {entry.position || "No position"}
                           </div>
+                          {rowHasExistingEmployee && (
+                            <div className="text-xs text-warning font-semibold">
+                              Employee number already exists
+                            </div>
+                          )}
                         </div>
                       </button>
+                        );
+                      })()
                     ))}
                   </div>
                 </div>
@@ -1129,7 +1263,12 @@ const EmployeeDrawer = ({
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.12 }}
                   >
-                    <ReviewCard entry={entries[reviewIdx]} />
+                    <ReviewCard
+                      entry={entries[reviewIdx]}
+                      isExistingEmployee={isEmployeeNumberExisting(
+                        entries[reviewIdx]?.employeeNumber ?? "",
+                      )}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

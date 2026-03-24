@@ -1,5 +1,6 @@
 "use client";
 
+import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
+import { doesCaseExist } from "../CaseActions";
 import {
   createPetition,
   deletePetition,
@@ -61,6 +63,7 @@ const emptyEntry = (id: string): EntryForm => ({
 });
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const normalizeCaseNumber = (value: string) => value.trim();
 
 const REQUIRED_FIELDS = [
   "caseNumber",
@@ -173,7 +176,13 @@ const CellInput = ({
 );
 
 /* ─── Review Card ────────────────────────────────────────────── */
-function ReviewCard({ entry }: { entry: EntryForm }) {
+function ReviewCard({
+  entry,
+  isExistingCase,
+}: {
+  entry: EntryForm;
+  isExistingCase: boolean;
+}) {
   const fmtDate = (d: string) =>
     d
       ? new Date(d).toLocaleDateString("en-PH", {
@@ -185,6 +194,11 @@ function ReviewCard({ entry }: { entry: EntryForm }) {
 
   return (
     <div className="rv-card">
+      {isExistingCase && (
+        <div className="alert alert-warning mb-4">
+          <span>Case is already existing</span>
+        </div>
+      )}
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
@@ -310,6 +324,7 @@ const PetitionEntryPage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
+  const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
@@ -420,7 +435,65 @@ const PetitionEntryPage = ({
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const handleGoToReview = () => {
+  const isCaseAlreadyExisting = useCallback(
+    (caseNumber: string) => {
+      if (isEdit) return false;
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && existingCaseNumbers.includes(normalized);
+    },
+    [existingCaseNumbers, isEdit],
+  );
+
+  const existingCaseRowCount = entries.filter((entry) =>
+    isCaseAlreadyExisting(entry.caseNumber),
+  ).length;
+
+  const refreshExistingCaseNumbers = useCallback(async (): Promise<
+    string[]
+  > => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const result = await doesCaseExist(caseNumbers, CaseType.PETITION);
+    if (!result.success || !result.result) {
+      setExistingCaseNumbers([]);
+      return [];
+    }
+
+    const normalized = result.result.map((value) => normalizeCaseNumber(value));
+    setExistingCaseNumbers(normalized);
+    return normalized;
+  }, [entries, isEdit]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setExistingCaseNumbers([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void refreshExistingCaseNumbers();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit, refreshExistingCaseNumbers]);
+
+  const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
       const errs = validateEntry(e);
@@ -437,12 +510,28 @@ const PetitionEntryPage = ({
       );
       return;
     }
+
+    await refreshExistingCaseNumbers();
+
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async () => {
+    const existingCases = await refreshExistingCaseNumbers();
+
+    if (!isEdit && existingCases.length > 0) {
+      const duplicateLabel =
+        existingCases.length === 1
+          ? `Case number ${existingCases[0]} already exists. Continue anyway?`
+          : `${existingCases.length} case numbers already exist. Continue anyway?`;
+
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? entries.length === 1
         ? "Save changes to this petition entry?"
@@ -675,6 +764,20 @@ const PetitionEntryPage = ({
                       <span className="xls-pill-dot" />
                       {completedCount} complete
                     </span>
+                    {existingCaseRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#fef3c7",
+                          color: "#78350f",
+                          borderColor: "#fbbf24",
+                        }}
+                        title="Case is already existing"
+                      >
+                        <span className="xls-pill-dot" />
+                        {existingCaseRowCount} existing
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
                       <span className="xls-pill xls-pill-err">
                         <span className="xls-pill-dot" />
@@ -754,6 +857,9 @@ const PetitionEntryPage = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = TAB_COLS.length - 1;
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.caseNumber,
+                        );
                         return (
                           <motion.tr
                             key={entry.id}
@@ -767,7 +873,12 @@ const PetitionEntryPage = ({
                               overflow: "hidden",
                             }}
                             transition={{ duration: 0.12 }}
-                            className="xls-row"
+                            className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
                           >
                             <td className="td-num">
                               <span className="xls-rownum">{rowIdx + 1}</span>
@@ -914,6 +1025,12 @@ const PetitionEntryPage = ({
                       ? "Check the details below, then confirm your changes."
                       : "All fields validated. Confirm the details are correct."}
                   </p>
+                  {!isEdit && existingCaseRowCount > 0 && (
+                    <p className="text-sm font-semibold text-warning mt-2">
+                      {existingCaseRowCount} row
+                      {existingCaseRowCount > 1 ? "s" : ""} already exist.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -926,23 +1043,40 @@ const PetitionEntryPage = ({
                     {entries.length} Entries
                   </div>
                   <div className="rv-sidebar-list">
-                    {entries.map((entry, idx) => (
-                      <button
-                        key={entry.id}
-                        className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}`}
-                        onClick={() => setReviewIdx(idx)}
-                      >
-                        <span className="rv-sidebar-num">{idx + 1}</span>
-                        <div className="rv-sidebar-info">
-                          <div className="rv-sidebar-casenum">
-                            {entry.caseNumber || "No case no."}
-                          </div>
-                          <div className="rv-sidebar-name">
-                            {entry.petitioners || "No petitioner"}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {entries.map((entry, idx) =>
+                      (() => {
+                        const rowHasExistingCase = isCaseAlreadyExisting(
+                          entry.caseNumber,
+                        );
+                        return (
+                          <button
+                            key={entry.id}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                            onClick={() => setReviewIdx(idx)}
+                            title={
+                              rowHasExistingCase
+                                ? "Case is already existing"
+                                : undefined
+                            }
+                          >
+                            <span className="rv-sidebar-num">{idx + 1}</span>
+                            <div className="rv-sidebar-info">
+                              <div className="rv-sidebar-casenum">
+                                {entry.caseNumber || "No case no."}
+                              </div>
+                              <div className="rv-sidebar-name">
+                                {entry.petitioners || "No petitioner"}
+                              </div>
+                              {rowHasExistingCase && (
+                                <div className="text-xs text-warning font-semibold">
+                                  Case is already existing
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })(),
+                    )}
                   </div>
                 </div>
               )}
@@ -955,7 +1089,12 @@ const PetitionEntryPage = ({
                     exit={{ opacity: 0, x: -10 }}
                     transition={{ duration: 0.12 }}
                   >
-                    <ReviewCard entry={entries[reviewIdx]} />
+                    <ReviewCard
+                      entry={entries[reviewIdx]}
+                      isExistingCase={isCaseAlreadyExisting(
+                        entries[reviewIdx]?.caseNumber ?? "",
+                      )}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

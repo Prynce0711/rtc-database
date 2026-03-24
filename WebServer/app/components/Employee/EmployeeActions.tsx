@@ -8,6 +8,46 @@ import ActionResult from "../ActionResult";
 import { createLog } from "../ActivityLogs/LogActions";
 import { EmployeeSchema } from "./schema";
 
+export async function doesEmployeeExist(
+  employeeNumbers: Array<string | null | undefined>,
+): Promise<ActionResult<string[]>> {
+  try {
+    const sessionResult = await validateSession([Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validEmployeeNumbers = employeeNumbers
+      .filter(
+        (employeeNumber): employeeNumber is string =>
+          typeof employeeNumber === "string" &&
+          employeeNumber.trim().length > 0,
+      )
+      .map((employeeNumber) => employeeNumber.trim());
+
+    if (validEmployeeNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const employees = await prisma.employee.findMany({
+      where: {
+        employeeNumber: { in: validEmployeeNumbers },
+      },
+      select: {
+        employeeNumber: true,
+      },
+    });
+
+    const existingEmployeeNumbers = employees
+      .map((e) => e.employeeNumber)
+      .filter((employeeNumber): employeeNumber is string => !!employeeNumber);
+    return { success: true, result: existingEmployeeNumbers };
+  } catch (error) {
+    console.error("Error checking employee existence:", error);
+    return { success: false, error: "Error checking employee existence" };
+  }
+}
+
 export async function getEmployees(): Promise<ActionResult<Employee[]>> {
   try {
     const sessionResult = await validateSession([Roles.ADMIN]);

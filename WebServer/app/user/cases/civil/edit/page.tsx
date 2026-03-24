@@ -1,6 +1,9 @@
 "use client";
 
-import { getCivilCaseById } from "@/app/components/Case/Civil/CivilActions";
+import {
+  getCivilCaseById,
+  getCivilCasesByIds,
+} from "@/app/components/Case/Civil/CivilActions";
 import { NotarialUpdatePage } from "@/app/components/Case/Civil/CivilCaseUpdatePage";
 import {
   caseToRecord,
@@ -45,22 +48,17 @@ const CivilEditPage = () => {
       setLoading(true);
 
       if (ids.length > 0) {
-        const results = await Promise.all(
-          ids.map((id) => getCivilCaseById(id)),
-        );
-        const loadedRecords: NotarialRecord[] = [];
-
-        for (const result of results) {
-          if (!result.success || !result.result) {
-            const message = !result.success
-              ? result.error || "Failed to load case"
-              : "Failed to load case";
-            setError(message);
-            setLoading(false);
-            return;
-          }
-          loadedRecords.push(caseToRecord(result.result));
+        const result = await getCivilCasesByIds(ids);
+        if (!result.success || !result.result) {
+          const message = !result.success
+            ? result.error || "Failed to load cases"
+            : "Failed to load cases";
+          setError(message);
+          setLoading(false);
+          return;
         }
+
+        const loadedRecords = result.result.map(caseToRecord);
 
         setSelectedRecords(loadedRecords);
         setSelectedRecord(loadedRecords[0] ?? null);
