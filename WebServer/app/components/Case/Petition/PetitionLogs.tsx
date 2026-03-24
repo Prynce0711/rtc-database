@@ -2,6 +2,8 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiBarChart2,
@@ -24,7 +26,6 @@ import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
 import { uploadPetitionExcel } from "./ExcelActions";
 import { deletePetition, getPetitions } from "./PetitionActions";
-import PetitionEntryPage, { ReceiveDrawerType } from "./PetitionDrawer";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
 import { PetitionCaseData } from "./schema";
@@ -38,12 +39,13 @@ type PetitionFilterValues = {
 };
 
 const ReceiveLogsPage: React.FC = () => {
+  const router = useRouter();
   const [logs, setLogs] = useState<PetitionCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [drawerType, setDrawerType] = useState<ReceiveDrawerType | null>(null);
-  const [selectedLog, setSelectedLog] = useState<PetitionCaseData | null>(null);
+  const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const session = useSession();
   const isAdminOrAtty =
@@ -226,6 +228,58 @@ const ReceiveLogsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteSelectedLogs = async () => {
+    if (selectedLogIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedLogIds.length} selected petition${selectedLogIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected petitions...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedLogIds.map((id) => deletePetition(id)),
+      );
+
+      const deletedIds: number[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = selectedLogIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(id);
+          return;
+        }
+        failedIds.push(id);
+      });
+
+      setLogs((prev) => prev.filter((log) => !deletedIds.includes(log.id)));
+      setSelectedLogIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} petition(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected petition${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+
+      await fetchLogs();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     if (!input.files || input.files.length === 0) return;
@@ -303,28 +357,6 @@ const ReceiveLogsPage: React.FC = () => {
       <div className="alert alert-error">
         <span>Error: {error}</span>
       </div>
-    );
-  }
-
-  if (drawerType) {
-    return (
-      <PetitionEntryPage
-        type={drawerType}
-        onClose={() => {
-          setDrawerType(null);
-          setSelectedLog(null);
-          fetchLogs();
-        }}
-        selectedLog={selectedLog}
-        onCreate={(newLog) => {
-          setLogs((prev) => [newLog as PetitionCaseData, ...prev]);
-        }}
-        onUpdate={(updatedLog) => {
-          setLogs((prev) =>
-            prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
-          );
-        }}
-      />
     );
   }
 
@@ -451,8 +483,7 @@ const ReceiveLogsPage: React.FC = () => {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    setSelectedLog(null);
-                    setDrawerType(ReceiveDrawerType.ADD);
+                    router.push("/user/cases/petition/add");
                   }}
                 >
                   <svg
@@ -482,6 +513,52 @@ const ReceiveLogsPage: React.FC = () => {
             getSuggestions={getSuggestions}
           />
         </div>
+
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedLogIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedLogIds.length} petition
+                    {selectedLogIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/petition/edit?ids=${selectedLogIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedLogs}
+                      disabled={deletingSelected}
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedLogIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -560,6 +637,11 @@ const ReceiveLogsPage: React.FC = () => {
               ...(isAdminOrAtty
                 ? [
                     {
+                      key: "select",
+                      label: "Select",
+                      align: "center" as const,
+                    },
+                    {
                       key: "actions",
                       label: "Actions",
                       align: "center" as const,
@@ -580,11 +662,18 @@ const ReceiveLogsPage: React.FC = () => {
               <ReceiveRow
                 key={log.id}
                 log={log}
-                onEdit={(l) => {
-                  setSelectedLog(l);
-                  setDrawerType(ReceiveDrawerType.EDIT);
-                }}
+                onEdit={(l) =>
+                  router.push(`/user/cases/petition/edit?id=${l.id}`)
+                }
                 onDelete={(l) => handleDeleteLog(l.id)}
+                isSelected={selectedLogIds.includes(log.id)}
+                onToggleSelect={(id) =>
+                  setSelectedLogIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((entryId) => entryId !== id)
+                      : [...prev, id],
+                  )
+                }
               />
             )}
           />

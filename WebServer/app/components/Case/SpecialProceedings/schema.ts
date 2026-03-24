@@ -121,6 +121,7 @@ export const initialSpecialProceedingFormData: Omit<
 
 /** Create an empty entry based on schema defaults. */
 export const createEmptyEntry = (): SpecialProceedingEntry => ({
+  baseCaseID: createTempId(),
   branch: initialSpecialProceedingFormData.branch ?? null,
   assistantBranch: initialSpecialProceedingFormData.assistantBranch ?? null,
   caseNumber: initialSpecialProceedingFormData.caseNumber,

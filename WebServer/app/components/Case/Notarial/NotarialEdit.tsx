@@ -115,19 +115,27 @@ function validateEntry(entry: NotarialFormEntry): Record<string, string> {
 const NotarialEdit = ({
   type,
   selectedRecord,
+  selectedRecords,
   onClose,
   onCreate,
   onUpdate,
 }: {
   type: ModalType;
   selectedRecord?: NotarialRecord | null;
+  selectedRecords?: NotarialRecord[];
   onClose: () => void;
   onCreate?: (entries: NotarialFormEntry[]) => Promise<string | null>;
-  onUpdate?: (entry: NotarialFormEntry) => Promise<string | null>;
+  onUpdate?: (entries: NotarialFormEntry[]) => Promise<string | null>;
 }) => {
   const statusPopup = usePopup();
   const toast = useToast();
   const isEdit = type === "EDIT";
+  const editRecords =
+    selectedRecords && selectedRecords.length > 0
+      ? selectedRecords
+      : selectedRecord
+        ? [selectedRecord]
+        : [];
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -146,16 +154,24 @@ const NotarialEdit = ({
     );
   };
   const [entries, setEntries] = useState<NotarialFormEntry[]>(() => {
-    if (isEdit && selectedRecord) return [recordToEntry(uid(), selectedRecord)];
+    if (isEdit && editRecords.length > 0) {
+      return editRecords.map((record) => recordToEntry(uid(), record));
+    }
     return [createEmptyEntry(uid())];
   });
 
   useEffect(() => {
-    if (!isEdit) {
-      setEntries([createEmptyEntry(uid())]);
-      setStep("entry");
+    setStep("entry");
+
+    if (isEdit) {
+      if (editRecords.length > 0) {
+        setEntries(editRecords.map((record) => recordToEntry(uid(), record)));
+      }
+      return;
     }
-  }, [type, selectedRecord, isEdit]);
+
+    setEntries([createEmptyEntry(uid())]);
+  }, [type, selectedRecord, selectedRecords, isEdit]);
 
   const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
@@ -246,7 +262,9 @@ const NotarialEdit = ({
 
   const handleSubmit = async () => {
     const label = isEdit
-      ? "Save changes to this record?"
+      ? entries.length === 1
+        ? "Save changes to this record?"
+        : `Save changes to ${entries.length} records?`
       : entries.length === 1
         ? "Create this record?"
         : `Create ${entries.length} records?`;
@@ -255,9 +273,8 @@ const NotarialEdit = ({
     setIsSubmitting(true);
     let errorMessage: string | null = null;
 
-    if (isEdit && selectedRecord) {
-      const e = entries[0];
-      errorMessage = (await onUpdate?.(e)) ?? null;
+    if (isEdit) {
+      errorMessage = (await onUpdate?.(entries)) ?? null;
     } else {
       errorMessage = (await onCreate?.(entries)) ?? null;
     }
@@ -270,7 +287,9 @@ const NotarialEdit = ({
 
     toast.success(
       isEdit
-        ? "Notarial entry updated."
+        ? entries.length === 1
+          ? "Notarial entry updated."
+          : `${entries.length} notarial entries updated.`
         : entries.length === 1
           ? "Notarial entry created."
           : `${entries.length} notarial entries created.`,
@@ -298,7 +317,11 @@ const NotarialEdit = ({
             <span>Notarial</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Record" : "New Notarial Entries"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Record"
+                  : "Edit Records"
+                : "New Notarial Entries"}
             </span>
             {step === "review" && (
               <>
@@ -344,7 +367,11 @@ const NotarialEdit = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Notarial Record" : "New Notarial Entries"}
+                  {isEdit
+                    ? entries.length === 1
+                      ? "Edit Notarial Record"
+                      : "Edit Notarial Records"
+                    : "New Notarial Entries"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (

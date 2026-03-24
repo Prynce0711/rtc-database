@@ -21,6 +21,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 import {
   createCriminalCase,
   deleteCriminalCase,
@@ -35,7 +36,7 @@ import {
   createTempId,
 } from "./schema";
 
-export enum CriminalCaseModalType {
+export enum CriminalCaseUpdateType {
   ADD = "ADD",
   EDIT = "EDIT",
 }
@@ -679,19 +680,28 @@ function ReviewCard({ entry }: { entry: CaseEntry }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────── */
-const NewCriminalCaseModal = ({
+const CriminalCaseUpdatePage = ({
   onClose,
   selectedCase = null,
+  selectedCases,
   onCreate,
   onUpdate,
 }: {
   onClose?: () => void;
   selectedCase?: CriminalCaseData | null;
+  selectedCases?: CriminalCaseData[];
   onCreate?: () => void;
   onUpdate?: () => void;
 }) => {
-  const isEdit = selectedCase !== null;
+  const editCases =
+    selectedCases && selectedCases.length > 0
+      ? selectedCases
+      : selectedCase
+        ? [selectedCase]
+        : [];
+  const isEdit = editCases.length > 0;
   const statusPopup = usePopup();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
@@ -703,17 +713,21 @@ const NewCriminalCaseModal = ({
     caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
-    if (isEdit && selectedCase) return [makeFromCase(selectedCase)];
+    if (isEdit) return editCases.map(makeFromCase);
     return [createEmptyEntry()];
   });
 
   useEffect(() => {
-    if (!isEdit) {
-      setEntries([createEmptyEntry()]);
-      setStep("entry");
-      setActiveTab(0);
+    setStep("entry");
+    setActiveTab(0);
+
+    if (isEdit) {
+      setEntries(editCases.map(makeFromCase));
+      return;
     }
-  }, [selectedCase, isEdit]);
+
+    setEntries([createEmptyEntry()]);
+  }, [isEdit, selectedCase, selectedCases]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -815,14 +829,6 @@ const NewCriminalCaseModal = ({
     });
   };
 
-  const getResponseErrorMessage = (
-    response: { success: boolean; error?: string | null },
-    fallback: string,
-  ) => {
-    const msg = response.error?.trim();
-    return msg && msg.length > 0 ? msg : fallback;
-  };
-
   const handleSubmit = async () => {
     const label = isEdit
       ? "Save changes to this case?"
@@ -862,45 +868,60 @@ const NewCriminalCaseModal = ({
     };
 
     try {
-      if (isEdit && selectedCase) {
-        if (entries[0].caseNumber.trim() !== selectedCase.caseNumber.trim()) {
-          setStep("entry");
-          statusPopup.showError("Case number cannot be changed");
-          return;
-        }
-        const parsed = buildPayload(entries[0]);
-        if (!parsed.success) {
-          setStep("entry");
-          statusPopup.showError("Invalid data. Please review required fields.");
-          return;
-        }
-        const payload = parsed.data;
-        const response = await updateCriminalCase(selectedCase.id, {
-          ...payload,
-          dateFiled: payload.dateFiled
-            ? new Date(payload.dateFiled).toISOString()
-            : null,
-          raffleDate: payload.raffleDate
-            ? new Date(payload.raffleDate).toISOString()
-            : null,
-        });
-        if (!response.success) {
-          console.error("Failed to update criminal case", {
-            caseId: selectedCase.id,
-            response,
+      if (isEdit) {
+        const originalById = new Map(editCases.map((item) => [item.id, item]));
+
+        for (const entry of entries) {
+          const original = originalById.get(entry.id);
+          if (!original) {
+            setStep("entry");
+            statusPopup.showError("Invalid case selection for edit");
+            return;
+          }
+
+          if (entry.caseNumber.trim() !== original.caseNumber.trim()) {
+            setStep("entry");
+            statusPopup.showError("Case number cannot be changed");
+            return;
+          }
+
+          const parsed = buildPayload(entry);
+          if (!parsed.success) {
+            setStep("entry");
+            statusPopup.showError(
+              "Invalid data. Please review required fields.",
+            );
+            return;
+          }
+
+          const payload = parsed.data;
+          const response = await updateCriminalCase(original.id, {
+            ...payload,
+            dateFiled: payload.dateFiled
+              ? new Date(payload.dateFiled).toISOString()
+              : null,
+            raffleDate: payload.raffleDate
+              ? new Date(payload.raffleDate).toISOString()
+              : null,
           });
 
-          const responseError = getResponseErrorMessage(
-            response,
-            "Failed to update case",
-          );
-
-          setStep("entry");
-          statusPopup.showError(responseError);
-          return;
+          if (!response.success) {
+            console.error("Failed to update criminal case", {
+              caseId: original.id,
+              response,
+            });
+            setStep("entry");
+            statusPopup.showError(response.error || "Failed to update case");
+            return;
+          }
         }
+
         onUpdate?.();
-        statusPopup.showSuccess("Case updated successfully");
+        toast.success(
+          entries.length === 1
+            ? "Case updated successfully"
+            : `${entries.length} cases updated successfully`,
+        );
       } else {
         const createdCaseIds: number[] = [];
         let successfulCreates = 0;
@@ -938,10 +959,7 @@ const NewCriminalCaseModal = ({
               response,
             });
 
-            const responseError = getResponseErrorMessage(
-              response,
-              "Unknown error",
-            );
+            const responseError = response.error || "Unknown error";
 
             const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
             setStep("entry");
@@ -983,7 +1001,7 @@ const NewCriminalCaseModal = ({
         }
 
         onCreate?.();
-        statusPopup.showSuccess(
+        toast.success(
           entries.length === 1
             ? "Case created successfully"
             : `${entries.length} cases created successfully`,
@@ -998,7 +1016,6 @@ const NewCriminalCaseModal = ({
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -1245,15 +1262,17 @@ const NewCriminalCaseModal = ({
                               ))}
                               <td className="td-actions">
                                 <div className="xls-row-actions">
-                                  <button
-                                    type="button"
-                                    className="xls-row-btn"
-                                    onClick={() => handleDuplicate(entry.id)}
-                                    title="Duplicate row"
-                                  >
-                                    <FiCopy size={13} />
-                                  </button>
-                                  {entries.length > 1 && (
+                                  {!isEdit && (
+                                    <button
+                                      type="button"
+                                      className="xls-row-btn"
+                                      onClick={() => handleDuplicate(entry.id)}
+                                      title="Duplicate row"
+                                    >
+                                      <FiCopy size={13} />
+                                    </button>
+                                  )}
+                                  {!isEdit && entries.length > 1 && (
                                     <button
                                       type="button"
                                       className="xls-row-btn del"
@@ -1459,4 +1478,4 @@ const NewCriminalCaseModal = ({
   );
 };
 
-export default NewCriminalCaseModal;
+export default CriminalCaseUpdatePage;

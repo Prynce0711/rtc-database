@@ -4,6 +4,8 @@ import { RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -28,7 +30,6 @@ import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import ActionDropdown from "../../Table/ActionDropdown";
 import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
-import ReceiveDrawer, { ReceiveDrawerType } from "./ReceiveDrawer";
 import {
   deleteRecievingLog,
   getRecievingLogsPage,
@@ -67,11 +68,15 @@ const ReceiveRow = ({
   onEdit,
   onDelete,
   isAdminOrAtty,
+  isSelected,
+  onToggleSelect,
 }: {
   log: ReceiveLog;
   onEdit: (log: ReceiveLog) => void;
   onDelete: (log: ReceiveLog) => void;
   isAdminOrAtty: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) => {
   const time = extractTime(log.dateRecieved);
   const date = formatDate(log.dateRecieved);
@@ -87,6 +92,17 @@ const ReceiveRow = ({
 
   return (
     <tr className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm">
+      {isAdminOrAtty && onToggleSelect && (
+        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={Boolean(isSelected)}
+            onChange={() => onToggleSelect(log.id)}
+            aria-label={`Select receiving log ${log.id}`}
+          />
+        </td>
+      )}
       {isAdminOrAtty && (
         <td
           className="relative text-center"
@@ -157,13 +173,14 @@ const toReceiveFilters = (filters: FilterValues): ReceiveLogFilterValues => ({
 });
 
 const ReceiveLogsPage: React.FC = () => {
+  const router = useRouter();
   const [logs, setLogs] = useState<ReceiveLog[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [drawerType, setDrawerType] = useState<ReceiveDrawerType | null>(null);
-  const [selectedLog, setSelectedLog] = useState<ReceiveLog | null>(null);
+  const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const session = useSession();
   const isAdminOrAtty =
@@ -330,6 +347,57 @@ const ReceiveLogsPage: React.FC = () => {
     statusPopup.showSuccess("Entry deleted successfully");
   };
 
+  const handleDeleteSelectedLogs = async () => {
+    if (selectedLogIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedLogIds.length} selected entr${selectedLogIds.length > 1 ? "ies" : "y"}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected receiving logs...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedLogIds.map((id) => deleteRecievingLog(id)),
+      );
+
+      const deletedIds: number[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = selectedLogIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(id);
+          return;
+        }
+        failedIds.push(id);
+      });
+
+      setSelectedLogIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} entr${deletedIds.length > 1 ? "ies" : "y"}, but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected entr${deletedIds.length > 1 ? "ies" : "y"}.`,
+        );
+      }
+
+      await refreshFromBackend();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     if (!input.files || input.files.length === 0) return;
@@ -408,41 +476,6 @@ const ReceiveLogsPage: React.FC = () => {
     return (
       <div className="alert alert-error">
         <span>Error: {error}</span>
-      </div>
-    );
-  }
-
-  // If a drawer is requested, render it as the active page instead of embedding it.
-  if (drawerType) {
-    return (
-      <div className="min-h-screen bg-base-100">
-        <main className="w-full">
-          <ReceiveDrawer
-            type={drawerType}
-            onClose={() => {
-              setDrawerType(null);
-              setSelectedLog(null);
-            }}
-            selectedLog={selectedLog}
-            onCreate={(newLog) => {
-              const withId: ReceiveLog = {
-                ...newLog,
-                id: Math.max(0, ...logs.map((l) => l.id)) + 1,
-              };
-              setLogs((prev) => [withId, ...prev]);
-              // return to list view after create
-              setDrawerType(null);
-              setSelectedLog(null);
-            }}
-            onUpdate={(updatedLog) => {
-              setLogs((prev) =>
-                prev.map((l) => (l.id === updatedLog.id ? updatedLog : l)),
-              );
-              setDrawerType(null);
-              setSelectedLog(null);
-            }}
-          />
-        </main>
       </div>
     );
   }
@@ -583,8 +616,7 @@ const ReceiveLogsPage: React.FC = () => {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    setSelectedLog(null);
-                    setDrawerType(ReceiveDrawerType.ADD);
+                    router.push("/user/cases/receiving/add");
                   }}
                 >
                   <svg
@@ -614,6 +646,52 @@ const ReceiveLogsPage: React.FC = () => {
             getSuggestions={getSuggestions}
           />
         </div>
+
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedLogIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedLogIds.length} entr
+                    {selectedLogIds.length > 1 ? "ies" : "y"} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/receiving/edit?ids=${selectedLogIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedLogs}
+                      disabled={deletingSelected}
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedLogIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -690,6 +768,11 @@ const ReceiveLogsPage: React.FC = () => {
           <Table
             headers={[
               {
+                key: "select",
+                label: "Select",
+                align: "center" as const,
+              },
+              {
                 key: "actions",
                 label: "Actions",
                 align: "center" as const,
@@ -747,11 +830,20 @@ const ReceiveLogsPage: React.FC = () => {
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
                 isAdminOrAtty={isAdminOrAtty}
-                onEdit={(l) => {
-                  setSelectedLog(l);
-                  setDrawerType(ReceiveDrawerType.EDIT);
-                }}
+                onEdit={(l) =>
+                  router.push(`/user/cases/receiving/edit?id=${l.id}`)
+                }
                 onDelete={(l) => handleDeleteLog(l.id)}
+                isSelected={selectedLogIds.includes(
+                  (log as unknown as ReceiveLog).id,
+                )}
+                onToggleSelect={(id) =>
+                  setSelectedLogIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((entryId) => entryId !== id)
+                      : [...prev, id],
+                  )
+                }
               />
             )}
           />

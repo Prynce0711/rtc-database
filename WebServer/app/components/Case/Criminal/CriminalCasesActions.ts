@@ -346,3 +346,44 @@ export async function getCriminalCaseById(
     return { success: false, error: "Failed to fetch case" };
   }
 }
+
+export async function getCriminalCasesByIds(
+  ids: (string | number)[],
+): Promise<ActionResult<CriminalCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => !isNaN(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        criminalCase: { isNot: null },
+      },
+      include: { criminalCase: true },
+    });
+
+    const caseCombined: CriminalCaseData[] = cases
+      .filter(
+        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
+      )
+      .map((c) => ({
+        ...c,
+        ...c.criminalCase,
+      }));
+
+    return { success: true, result: caseCombined };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases" };
+  }
+}

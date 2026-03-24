@@ -9,7 +9,7 @@ type Props = {
   error?: string | undefined;
 };
 
-export default function FormField({ label, htmlFor, children, error }: Props) {
+export default function ({ label, htmlFor, children, error }: Props) {
   return (
     <fieldset className="fieldset">
       <legend className="fieldset-legend text-base font-semibold">

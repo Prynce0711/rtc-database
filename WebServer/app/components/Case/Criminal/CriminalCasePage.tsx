@@ -2,7 +2,8 @@
 
 import { useSession } from "@/app/lib/authClient";
 import { isTextFieldKey } from "@/app/lib/utils";
-import { useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, {
   useCallback,
   useEffect,
@@ -16,6 +17,7 @@ import {
   FiFileText,
   FiLock,
   FiSearch,
+  FiTrash2,
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
@@ -31,9 +33,6 @@ import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
-import NewCriminalCaseModal, {
-  CriminalCaseModalType,
-} from "./CriminalCaseDrawer";
 import CriminalCaseRow from "./CriminalCaseRow";
 import {
   deleteCriminalCase,
@@ -50,6 +49,7 @@ import {
 } from "./schema";
 
 // TODO: Move import excel here instead of server action and just call createCase
+// TODO: Maybe add a reusable CasePage component that you put schema and it will make the filter and table?
 
 type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
@@ -61,12 +61,7 @@ const CriminalCasePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const [modalType, setModalType] = useState<CriminalCaseModalType | null>(
-    null,
-  );
-  const [selectedCase, setSelectedCase] = useState<CriminalCaseData | null>(
-    null,
-  );
+  const router = useRouter();
   const [stats, setStats] = useState<CriminalCaseStats>({
     totalCases: 0,
     detainedCases: 0,
@@ -81,9 +76,9 @@ const CriminalCasePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
   const statusPopup = usePopup();
 
-  // const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     order: "asc" | "desc";
@@ -91,6 +86,7 @@ const CriminalCasePage: React.FC = () => {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
+  const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
 
   const urlFilterState = useMemo(
     () => getFilterStateFromSearchParams(searchParams),
@@ -155,6 +151,16 @@ const CriminalCasePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [appliedFilters]);
+
+  const handleToggleCaseSelection = (caseId: number, checked: boolean) => {
+    setSelectedCaseIds((prev) => {
+      if (checked) {
+        if (prev.includes(caseId)) return prev;
+        return [...prev, caseId];
+      }
+      return prev.filter((id) => id !== caseId);
+    });
+  };
 
   const fetchCases = useCallback(
     async (page = currentPage) => {
@@ -290,6 +296,56 @@ const CriminalCasePage: React.FC = () => {
     await fetchCases();
   };
 
+  const handleDeleteSelectedCases = async () => {
+    if (selectedCaseIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedCaseIds.length} selected case${selectedCaseIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected cases...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedCaseIds.map((caseId) => deleteCriminalCase(caseId)),
+      );
+
+      const failedIds: number[] = [];
+      const deletedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const caseId = selectedCaseIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(caseId);
+          return;
+        }
+        failedIds.push(caseId);
+      });
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} case(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected case${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+
+      setSelectedCaseIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+      await fetchCases();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -374,10 +430,6 @@ const CriminalCasePage: React.FC = () => {
     }
   };
 
-  const showModal = (type: CriminalCaseModalType) => {
-    setModalType(type);
-  };
-
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={10} tableRows={8} />;
   }
@@ -387,21 +439,6 @@ const CriminalCasePage: React.FC = () => {
       <div className="alert alert-error">
         <span>Error: {error}</span>
       </div>
-    );
-  }
-
-  if (modalType) {
-    return (
-      <NewCriminalCaseModal
-        onClose={() => {
-          setModalType(null);
-          setSelectedCase(null);
-          fetchCases();
-        }}
-        selectedCase={selectedCase}
-        onCreate={() => fetchCases()}
-        onUpdate={() => fetchCases()}
-      />
     );
   }
 
@@ -503,7 +540,7 @@ const CriminalCasePage: React.FC = () => {
             {isAdminOrAtty && (
               <button
                 className="btn btn-primary"
-                onClick={() => showModal(CriminalCaseModalType.ADD)}
+                onClick={() => router.push("/user/cases/criminal/add")}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -604,6 +641,53 @@ const CriminalCasePage: React.FC = () => {
         </div>
 
         {/* Cases Table */}
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedCaseIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedCaseIds.length} case
+                    {selectedCaseIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/criminal/edit?ids=${selectedCaseIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedCases}
+                      disabled={deletingSelected}
+                    >
+                      <FiTrash2 className="h-4 w-4" />
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedCaseIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
         <div className="bg-base-100 rounded-lg shadow">
           <Table
             headers={[
@@ -679,9 +763,10 @@ const CriminalCasePage: React.FC = () => {
                 caseItem={caseItem}
                 handleDeleteCase={handleDeleteCase}
                 onEdit={(item) => {
-                  setSelectedCase(item);
-                  setModalType(CriminalCaseModalType.EDIT);
+                  router.push(`/user/cases/criminal/edit?id=${item.id}`);
                 }}
+                selected={selectedCaseIds.includes(caseItem.id)}
+                onToggleSelect={handleToggleCaseSelection}
               />
             )}
           />

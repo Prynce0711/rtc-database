@@ -3,9 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 import { FiX } from "react-icons/fi";
-import FormField from "../../Case/Criminal/FormField";
 import { usePopup } from "../../Popup/PopupProvider";
 import { FieldConfig } from "./AnnualFieldConfig";
+import FormField from "./FormField";
 
 export enum AnnualDrawerType {
   ADD = "ADD",

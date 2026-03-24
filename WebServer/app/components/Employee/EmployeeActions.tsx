@@ -23,6 +23,67 @@ export async function getEmployees(): Promise<ActionResult<Employee[]>> {
   }
 }
 
+export async function getEmployeeById(
+  employeeId: number,
+): Promise<ActionResult<Employee>> {
+  try {
+    const sessionResult = await validateSession([Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!employee) {
+      return { success: false, error: "Employee not found" };
+    }
+
+    return { success: true, result: employee };
+  } catch (error) {
+    console.error("Error fetching employee by id:", error);
+    return { success: false, error: "Error fetching employee" };
+  }
+}
+
+export async function getEmployeesByIds(
+  ids: Array<number | string>,
+): Promise<ActionResult<Employee[]>> {
+  try {
+    const sessionResult = await validateSession([Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid employee IDs provided" };
+    }
+
+    const employees = await prisma.employee.findMany({
+      where: { id: { in: validIds } },
+    });
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    employees.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (employees.length !== validIds.length) {
+      return { success: false, error: "One or more employees were not found" };
+    }
+
+    return { success: true, result: employees };
+  } catch (error) {
+    console.error("Error fetching employees by ids:", error);
+    return { success: false, error: "Error fetching employees" };
+  }
+}
+
 export async function createEmployee(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Employee>> {

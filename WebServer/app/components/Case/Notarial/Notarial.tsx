@@ -2,16 +2,15 @@
 
 import { exportNotarialExcel } from "@/app/components/Case/Notarial/ExcelActions";
 import {
-  createNotarial,
   deleteNotarial,
   getNotarialPage,
   getNotarialStats,
-  updateNotarial,
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import FileViewerModal from "@/app/components/Popup/FileViewerModal";
 import { getGarageFileUrl } from "@/app/lib/garageActions";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -31,7 +30,6 @@ import {
 import { Pagination } from "../../Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
 import { useToast } from "../../Toast/ToastProvider";
-import NotarialEdit, { ModalType } from "./NotarialEdit";
 import NotarialRow, { NotarialRecord } from "./NotarialRow";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -117,11 +115,8 @@ const NotarialPage: React.FC = () => {
     order: "desc",
   });
   const [currentPage, setCurrentPage] = useState(1);
-
-  const [modalType, setModalType] = useState<ModalType | null>(null);
-  const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
-    null,
-  );
+  const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<NotarialFilterValues>(
@@ -391,6 +386,56 @@ const NotarialPage: React.FC = () => {
     toast.success("Notarial entry deleted.");
   };
 
+  const handleDeleteSelectedRecords = async () => {
+    if (selectedRecordIds.length === 0) return;
+
+    if (
+      !(await statusPopup.showConfirm(
+        `Are you sure you want to delete ${selectedRecordIds.length} selected record${selectedRecordIds.length > 1 ? "s" : ""}?`,
+      ))
+    ) {
+      return;
+    }
+
+    setDeletingSelected(true);
+    statusPopup.showLoading("Deleting selected records...");
+
+    try {
+      const results = await Promise.allSettled(
+        selectedRecordIds.map((id) => deleteNotarial(id)),
+      );
+
+      const failedIds: number[] = [];
+      const deletedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const recordId = selectedRecordIds[index];
+        if (result.status === "fulfilled" && result.value.success) {
+          deletedIds.push(recordId);
+          return;
+        }
+        failedIds.push(recordId);
+      });
+
+      if (failedIds.length > 0) {
+        statusPopup.showError(
+          `Deleted ${deletedIds.length} record(s), but failed to delete ${failedIds.length}.`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Deleted ${deletedIds.length} selected record${deletedIds.length > 1 ? "s" : ""}.`,
+        );
+      }
+
+      setSelectedRecordIds((prev) =>
+        prev.filter((id) => !deletedIds.includes(id)),
+      );
+      await refreshFromBackend();
+    } finally {
+      setDeletingSelected(false);
+    }
+  };
+
   const handleExport = async () => {
     setExporting(true);
     const result = await exportNotarialExcel();
@@ -407,66 +452,6 @@ const NotarialPage: React.FC = () => {
     a.click();
     toast.success("Notarial records exported.");
   };
-
-  // ── Full-page modal — same as Proceedings/CasePage ──
-  if (modalType) {
-    return (
-      <NotarialEdit
-        type={modalType}
-        selectedRecord={selectedRecord}
-        onClose={() => {
-          setModalType(null);
-          setSelectedRecord(null);
-        }}
-        onCreate={async (entries) => {
-          for (const entry of entries) {
-            const payload: Record<string, unknown> = {
-              title: entry.title || null,
-              name: entry.name || null,
-              attorney: entry.atty || null,
-              date: entry.date ? new Date(entry.date) : null,
-              path: undefined,
-              removeFile: undefined,
-              file: entry.file ?? undefined,
-            };
-
-            const result = await createNotarial(payload);
-            console.log("Create result:", result);
-            if (!result.success) {
-              return result.error || "Failed to create notarial entry.";
-            }
-          }
-
-          await refreshFromBackend(1);
-          setCurrentPage(1);
-          return null;
-        }}
-        onUpdate={async (entry) => {
-          if (!selectedRecord) {
-            return "No record selected for update.";
-          }
-
-          const payload: Record<string, unknown> = {
-            title: entry.title || null,
-            name: entry.name || null,
-            attorney: entry.atty || null,
-            date: entry.date ? new Date(entry.date) : null,
-            path: undefined,
-            removeFile: undefined,
-            file: entry.file ?? undefined,
-          };
-
-          const result = await updateNotarial(selectedRecord.id, payload);
-          if (!result.success) {
-            return result.error || "Failed to update notarial entry.";
-          }
-
-          await refreshFromBackend();
-          return null;
-        }}
-      />
-    );
-  }
 
   if (loading) {
     return (
@@ -596,8 +581,7 @@ const NotarialPage: React.FC = () => {
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  setSelectedRecord(null);
-                  setModalType("ADD");
+                  router.push("/user/cases/notarial/add");
                 }}
               >
                 <svg
@@ -626,6 +610,52 @@ const NotarialPage: React.FC = () => {
             getSuggestions={getSuggestions}
           />
         </div>
+
+        {isAdminOrAtty && (
+          <AnimatePresence>
+            {selectedRecordIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-primary">
+                    {selectedRecordIds.length} record
+                    {selectedRecordIds.length > 1 ? "s" : ""} selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/notarial/edit?ids=${selectedRecordIds.join(",")}`,
+                        )
+                      }
+                    >
+                      Edit Selected
+                    </button>
+                    <button
+                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                      onClick={handleDeleteSelectedRecords}
+                      disabled={deletingSelected}
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setSelectedRecordIds([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -702,6 +732,7 @@ const NotarialPage: React.FC = () => {
           <table className="table table-zebra w-full text-center">
             <thead className="bg-base-300">
               <tr className="text-center">
+                {isAdminOrAtty && <th>SELECT</th>}
                 {isAdminOrAtty && <th>ACTIONS</th>}
                 <SortTh
                   label="TITLE"
@@ -733,7 +764,7 @@ const NotarialPage: React.FC = () => {
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={isAdminOrAtty ? 7 : 6}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
                       <div className=" flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
@@ -752,16 +783,23 @@ const NotarialPage: React.FC = () => {
                   <NotarialRow
                     key={r.id}
                     record={r}
-                    onEdit={(item) => {
-                      setSelectedRecord(item);
-                      setModalType("EDIT");
-                    }}
+                    onEdit={(item) =>
+                      router.push(`/user/cases/notarial/edit?id=${item.id}`)
+                    }
                     onDelete={handleDelete}
                     onViewFile={(item) => void handleViewFile(item)}
                     onDownloadFile={(item) => void handleDownloadFile(item)}
                     canPreview={isPreviewable(r)}
                     onRowClick={(item) =>
                       router.push(`/user/cases/notarial/${item.id}`)
+                    }
+                    isSelected={selectedRecordIds.includes(r.id)}
+                    onToggleSelect={(id) =>
+                      setSelectedRecordIds((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((entryId) => entryId !== id)
+                          : [...prev, id],
+                      )
                     }
                   />
                 ))

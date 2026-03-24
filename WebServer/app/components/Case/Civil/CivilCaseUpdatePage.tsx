@@ -1,5 +1,6 @@
 "use client";
 
+import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -12,37 +13,39 @@ import {
   FiEdit3,
   FiEye,
   FiFileText,
+  FiFolder,
   FiPlus,
   FiSave,
   FiTrash2,
-  FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
-  createSpecialProceeding,
-  deleteSpecialProceeding,
-  updateSpecialProceeding,
-} from "./SpecialProceedingActions";
-import {
-  createEmptyEntry,
-  SpecialProceedingData,
-  SpecialProceedingEntry,
-} from "./schema";
+  createCivilCase,
+  deleteCivilCase,
+  updateCivilCase,
+} from "./CivilActions";
+import type { NotarialRecord } from "./CivilTypes";
+import { CivilCaseSchema } from "./schema";
+
+type FormEntry = {
+  id: string;
+  sourceId?: number;
+  title: string;
+  name: string;
+  atty: string;
+  defendant?: string;
+  date: string;
+  notes?: string;
+  nature?: string;
+
+  file?: File | null;
+
+  errors: Record<string, string>;
+  saved: boolean;
+};
 
 type ColDef = {
-  key: keyof Omit<
-    SpecialProceedingEntry,
-    | "id"
-    | "createdAt"
-    | "errors"
-    | "collapsed"
-    | "saved"
-    | "branch"
-    | "assistantBranch"
-    | "dateFiled"
-    | "caseType"
-    | "updatedAt"
-  >;
+  key: keyof Omit<FormEntry, "id" | "errors" | "saved">;
   label: string;
   placeholder: string;
   type: "text" | "date";
@@ -51,18 +54,40 @@ type ColDef = {
   mono?: boolean;
 };
 
-type ModalType = "ADD" | "EDIT";
-type Step = "entry" | "review";
-
 const FROZEN_COLS: ColDef[] = [
   {
-    key: "caseNumber",
+    key: "title",
     label: "Case Number",
-    placeholder: "SPC-2026-0001",
+    placeholder: "01-M-2006",
     type: "text",
-    width: 160,
+    width: 260,
     required: true,
-    mono: true,
+  },
+  {
+    key: "name",
+    label: "Branch",
+    placeholder: "18",
+    type: "text",
+    width: 240,
+    required: true,
+  },
+];
+
+const DETAIL_COLS: ColDef[] = [
+  {
+    key: "atty",
+    label: "Petitioner/s",
+    placeholder: "MARICEL L. PINEDA",
+    type: "text",
+    width: 300,
+    required: true,
+  },
+  {
+    key: "defendant",
+    label: "Defendant/s",
+    placeholder: "MUNER JAHER",
+    type: "text",
+    width: 300,
   },
   {
     key: "date",
@@ -70,55 +95,66 @@ const FROZEN_COLS: ColDef[] = [
     placeholder: "",
     type: "date",
     width: 148,
-    required: true,
+    mono: true,
+  },
+  {
+    key: "notes",
+    label: "Notes/Appealed",
+    placeholder: "Appealed",
+    type: "text",
+    width: 240,
+    mono: true,
+  },
+  {
+    key: "nature",
+    label: "Nature of Petition",
+    placeholder: "Support",
+    type: "text",
+    width: 360,
     mono: true,
   },
 ];
 
-const TAB_GROUP_COLS: ColDef[] = [
-  {
-    key: "raffledTo",
-    label: "Branch",
-    placeholder: "Branch 1",
-    type: "text",
-    width: 148,
-    required: true,
-  },
-  {
-    key: "petitioner",
-    label: "Petitioners",
-    placeholder: "Full name of petitioner(s)",
-    type: "text",
-    width: 220,
-    required: true,
-  },
-  {
-    key: "nature",
-    label: "Nature",
-    placeholder: "e.g. Petition for Adoption",
-    type: "text",
-    width: 240,
-    required: true,
-  },
-  {
-    key: "respondent",
-    label: "Respondent",
-    placeholder: "e.g. Republic of the Philippines",
-    type: "text",
-    width: 260,
-    required: true,
-  },
-];
+const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
+  ["title", "name", "atty"];
 
-const REQUIRED_FIELDS: Array<
-  keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
-> = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
+const uid = () => Math.random().toString(36).slice(2, 9);
 
-function validateEntry(entry: SpecialProceedingEntry): Record<string, string> {
+const createEmptyEntry = (id: string): FormEntry => ({
+  id,
+  sourceId: undefined,
+  title: "",
+  name: "",
+  atty: "",
+  defendant: "",
+  date: "",
+  notes: "",
+  nature: "",
+  file: null,
+  errors: {},
+  saved: false,
+});
+
+const recordToEntry = (id: string, r: NotarialRecord): FormEntry => ({
+  id,
+  sourceId: r.id,
+  title: r.title,
+  name: r.name,
+  atty: r.atty,
+  defendant: r.defendant ?? "",
+  date: r.date,
+  notes: r.notes ?? "",
+  nature: r.nature ?? "",
+  errors: {},
+  saved: false,
+});
+
+function validateEntry(entry: FormEntry): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
-    if (!entry[k] || String(entry[k]).trim() === "")
+    if (!entry[k] || String(entry[k]).trim() === "") {
       errs[k as string] = "Required";
+    }
   });
   return errs;
 }
@@ -155,45 +191,37 @@ const CellInput = ({
   </div>
 );
 
-const toInputValue = (value: Date | string | null | undefined): string => {
-  if (!value) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return value;
-};
-
-function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
-  const fmtDate = (value: Date | string | null | undefined) => {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toLocaleDateString("en-PH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+function ReviewCard({ entry }: { entry: FormEntry }) {
+  const fmtDate = (d: string) =>
+    d
+      ? new Date(d).toLocaleDateString("en-PH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
 
   return (
     <div className="rv-card">
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.caseNumber || (
-              <span style={{ opacity: 0.4 }}>No Case Number</span>
-            )}
+            {entry.title || <span style={{ opacity: 0.4 }}>No Case No.</span>}
           </div>
           <div className="rv-hero-name">
-            {entry.petitioner || (
+            {entry.atty || (
               <span style={{ opacity: 0.4, fontSize: 18 }}>
-                No petitioner entered
+                No petitioner/s
               </span>
             )}
           </div>
-          {entry.nature && <div className="rv-hero-charge">{entry.nature}</div>}
+          {entry.name && <div className="rv-hero-charge">{entry.name}</div>}
         </div>
         <div className="rv-hero-badges">
-          {entry.raffledTo && (
-            <span className="rv-badge rv-badge-court">{entry.raffledTo}</span>
+          {entry.date && (
+            <span className="rv-badge rv-badge-court">
+              {fmtDate(entry.date)}
+            </span>
           )}
         </div>
       </div>
@@ -203,19 +231,25 @@ function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
           <div className="rv-section">
             <div className="rv-section-header">
               <FiFileText size={13} />
-              <span>Case Identity</span>
+              <span>Record Details</span>
             </div>
             <div className="rv-grid rv-grid-3">
               <div className="rv-field">
                 <div className="rv-field-label">Case Number</div>
-                <div className="rv-field-value rv-mono">
-                  {entry.caseNumber || <span className="rv-empty">—</span>}
+                <div className="rv-field-value">
+                  {entry.title || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Raffled to Branch</div>
+                <div className="rv-field-label">Branch</div>
                 <div className="rv-field-value">
-                  {entry.raffledTo || <span className="rv-empty">—</span>}
+                  {entry.name || <span className="rv-empty">—</span>}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Petitioner/s</div>
+                <div className="rv-field-value">
+                  {entry.atty || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
@@ -229,26 +263,21 @@ function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
 
           <div className="rv-section">
             <div className="rv-section-header">
-              <FiUsers size={13} />
-              <span>Petition Details</span>
+              <FiFolder size={13} />
+              <span>File</span>
             </div>
             <div className="rv-grid rv-grid-2">
-              <div className="rv-field">
-                <div className="rv-field-label">Petitioners</div>
-                <div className="rv-field-value">
-                  {entry.petitioner || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Nature</div>
-                <div className="rv-field-value">
-                  {entry.nature || <span className="rv-empty">—</span>}
-                </div>
-              </div>
-              <div className="rv-field">
-                <div className="rv-field-label">Respondent</div>
-                <div className="rv-field-value">
-                  {entry.respondent || <span className="rv-empty">—</span>}
+              <div className="rv-field" style={{ gridColumn: "1 / -1" }}>
+                <div className="rv-field-label">Attachment</div>
+                <div
+                  className="rv-field-value rv-mono"
+                  style={{ fontSize: 12, wordBreak: "break-all" }}
+                >
+                  {entry.file ? (
+                    <span>{entry.file.name}</span>
+                  ) : (
+                    <span className="rv-empty">—</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -259,78 +288,67 @@ function ReviewCard({ entry }: { entry: SpecialProceedingEntry }) {
   );
 }
 
-const SpecialProceedingDrawer = ({
+type UpdateType = "ADD" | "EDIT";
+type Step = "entry" | "review";
+
+export const NotarialUpdatePage = ({
   type,
-  selectedCase,
-  selectedCases,
-  onClose,
-  onCreate,
-  onUpdate,
+  selectedRecord,
+  selectedRecords,
+  onCloseAction,
+  onCreateAction,
+  onUpdateAction,
 }: {
-  type: ModalType;
-  selectedCase?: SpecialProceedingData | null;
-  selectedCases?: SpecialProceedingData[];
-  onClose: () => void;
-  onCreate?: () => void;
-  onUpdate?: () => void;
+  type: UpdateType;
+  selectedRecord?: NotarialRecord | null;
+  selectedRecords?: NotarialRecord[];
+  onCloseAction: () => void;
+  onCreateAction?: () => void;
+  onUpdateAction?: () => void;
 }) => {
-  const isEdit = type === "EDIT";
-  const editCases =
-    selectedCases && selectedCases.length > 0
-      ? selectedCases
-      : selectedCase
-        ? [selectedCase]
+  const statusPopup = usePopup();
+  const editRecords =
+    selectedRecords && selectedRecords.length > 0
+      ? selectedRecords
+      : selectedRecord
+        ? [selectedRecord]
         : [];
-  const popup = usePopup();
+  const isEdit = type === "EDIT" && editRecords.length > 0;
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const nextTempIdRef = useRef<number>(-1000);
-
-  const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
-    if (isEdit && editCases.length > 0) {
-      return editCases.map((item) => ({
-        ...item,
-        errors: {},
-        collapsed: false,
-        saved: false,
-      }));
+  const handleFileChange = (id: string, file: File | null) => {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              file,
+            }
+          : e,
+      ),
+    );
+  };
+  const [entries, setEntries] = useState<FormEntry[]>(() => {
+    if (isEdit) {
+      return editRecords.map((record) => recordToEntry(uid(), record));
     }
-    return [
-      {
-        ...createEmptyEntry(),
-        id: nextTempIdRef.current--,
-      },
-    ];
+    return [createEmptyEntry(uid())];
   });
 
   useEffect(() => {
     setStep("entry");
 
     if (isEdit) {
-      if (editCases.length > 0) {
-        setEntries(
-          editCases.map((item) => ({
-            ...item,
-            errors: {},
-            collapsed: false,
-            saved: false,
-          })),
-        );
-      }
+      setEntries(editRecords.map((record) => recordToEntry(uid(), record)));
       return;
     }
 
-    setEntries([
-      {
-        ...createEmptyEntry(),
-        id: nextTempIdRef.current--,
-      },
-    ]);
-  }, [type, selectedCase, selectedCases, isEdit]);
+    setEntries([createEmptyEntry(uid())]);
+  }, [type, selectedRecord, selectedRecords, isEdit]);
 
-  const handleChange = (id: number, field: string, value: string) => {
+  const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -341,13 +359,7 @@ const SpecialProceedingDrawer = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [
-      ...prev,
-      {
-        ...createEmptyEntry(),
-        id: nextTempIdRef.current--,
-      },
-    ]);
+    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -356,16 +368,17 @@ const SpecialProceedingDrawer = ({
     }, 60);
   }, []);
 
-  const handleRemove = (id: number) =>
+  const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
-  const handleDuplicate = (id: number) => {
+  const handleDuplicate = (id: string) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: SpecialProceedingEntry = {
+    const dup: FormEntry = {
       ...source,
-      id: nextTempIdRef.current--,
-      caseNumber: "",
+      id: uid(),
+      sourceId: undefined,
+      title: "",
       errors: {},
       saved: false,
     };
@@ -379,7 +392,7 @@ const SpecialProceedingDrawer = ({
 
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: number,
+    entryId: string,
     isLastCol: boolean,
   ) => {
     if (e.key === "Tab" && !e.shiftKey && isLastCol) {
@@ -413,7 +426,9 @@ const SpecialProceedingDrawer = ({
     });
     setEntries(validated);
     if (anyError) {
-      popup.showError("Please fill in all required fields before reviewing.");
+      statusPopup.showError(
+        "Please fill in all required fields before reviewing.",
+      );
       return;
     }
     setReviewIdx(0);
@@ -421,120 +436,201 @@ const SpecialProceedingDrawer = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const buildPayload = (entry: FormEntry) => {
+    const payload = {
+      caseNumber: entry.title.trim(),
+      branch: entry.name.trim() || null,
+      assistantBranch: entry.name.trim() || null,
+      dateFiled: entry.date ? new Date(entry.date).toISOString() : null,
+      caseType: CaseType.CIVIL,
+      petitioners: entry.atty.trim() || null,
+      defendants: entry.defendant?.trim() || null,
+      notes: entry.notes?.trim() || null,
+      nature: entry.nature?.trim() || null,
+      originCaseNumber: null,
+      reRaffleDate: null,
+      reRaffleBranch: null,
+      consolitationDate: null,
+      consolidationBranch: null,
+      dateRemanded: null,
+      remandedNote: null,
+    };
+
+    return CivilCaseSchema.safeParse(payload);
+  };
+
   const handleSubmit = async () => {
     const label = isEdit
-      ? entries.length === 1
-        ? "Save changes to this case?"
-        : `Save changes to ${entries.length} cases?`
+      ? "Save changes to this case?"
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
-    if (!(await popup.showConfirm(label))) return;
+    if (!(await statusPopup.showConfirm(label))) return;
     setIsSubmitting(true);
-    popup.showLoading(isEdit ? "Updating case..." : "Creating case(s)...");
+    statusPopup.showLoading(
+      isEdit ? "Updating case..." : "Creating case(s)...",
+    );
+
+    const rollbackCreatedCases = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteCivilCase(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const msg = `Rollback failed for case ID ${createdIds[index]}`;
+          rollbackErrors.push(msg);
+          console.warn(msg, result.reason);
+        } else if (!result.value.success) {
+          const msg = `Rollback failed for case ID ${createdIds[index]}: ${result.value.error || "Unknown rollback error"}`;
+          rollbackErrors.push(msg);
+          console.warn(msg);
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       if (isEdit) {
-        if (entries.length !== editCases.length) {
-          popup.showError("Proceedings row count mismatch. Please reload.");
-          return;
-        }
+        const originalById = new Map(
+          editRecords.map((record) => [record.id, record]),
+        );
 
-        for (let index = 0; index < entries.length; index++) {
-          const e = entries[index];
-          const target = editCases[index];
-
-          if (!target?.id) {
-            popup.showError(`Missing case id for row ${index + 1}`);
-            return;
+        for (const entry of entries) {
+          const sourceId = entry.sourceId;
+          if (!sourceId) {
+            throw new Error("Missing source case id for edit");
           }
 
-          const result = await updateSpecialProceeding(target.id, {
-            caseNumber: e.caseNumber,
-            raffledTo: e.raffledTo ?? null,
-            date: e.date ? new Date(e.date) : null,
-            petitioner: e.petitioner ?? null,
-            nature: e.nature,
-            respondent: e.respondent ?? null,
-          });
-          if (!result.success) {
-            popup.showError(
-              result.error || `Update failed for row ${index + 1}`,
-            );
-            return;
+          const original = originalById.get(sourceId);
+          if (!original) {
+            throw new Error("Original case not found for edit");
+          }
+
+          if (entry.title.trim() !== original.title.trim()) {
+            throw new Error("Case number cannot be changed");
+          }
+
+          const parsed = buildPayload(entry);
+          if (!parsed.success) throw new Error("Invalid case data");
+          const response = await updateCivilCase(sourceId, parsed.data);
+          if (!response.success) {
+            throw new Error(response.error || "Failed to update case");
           }
         }
 
-        popup.showSuccess(
+        onUpdateAction?.();
+        statusPopup.showSuccess(
           entries.length === 1
             ? "Case updated successfully"
             : `${entries.length} cases updated successfully`,
         );
-        onUpdate?.();
       } else {
-        const createdIds: number[] = [];
-        for (const e of entries) {
-          const result = await createSpecialProceeding({
-            caseNumber: e.caseNumber,
-            raffledTo: e.raffledTo ?? null,
-            date: e.date ? new Date(e.date) : null,
-            petitioner: e.petitioner ?? null,
-            nature: e.nature,
-            respondent: e.respondent ?? null,
-          });
-          if (!result.success) {
-            if (createdIds.length > 0) {
-              await Promise.allSettled(
-                createdIds.map((id) => deleteSpecialProceeding(id)),
-              );
-            }
-            popup.showError(result.error || "Create failed");
+        const createdCaseIds: number[] = [];
+        let successfulCreates = 0;
+
+        for (let idx = 0; idx < entries.length; idx++) {
+          const entry = entries[idx];
+          const parsed = buildPayload(entry);
+          if (!parsed.success) {
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Row ${idx + 1} has invalid data.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
-          if (result.result?.id) {
-            createdIds.push(result.result.id);
+
+          const response = await createCivilCase(parsed.data);
+          if (!response.success) {
+            const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${idx + 1}: ${response.error || "Unknown error"}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
+            return;
+          }
+
+          successfulCreates += 1;
+
+          if (response.result?.id) {
+            createdCaseIds.push(response.result.id);
           }
         }
-        onCreate?.();
-        popup.showSuccess(
-          `${entries.length} case${entries.length > 1 ? "s" : ""} created successfully`,
+
+        if (successfulCreates !== entries.length) {
+          const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+          setStep("entry");
+          console.error(
+            `Only ${successfulCreates} of ${entries.length} cases were created successfully.`,
+            rollbackErrors,
+          );
+
+          statusPopup.showError(
+            [
+              `Only ${successfulCreates} of ${entries.length} rows were confirmed created.`,
+              rollbackErrors.length > 0
+                ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                : "Any created rows in this batch were rolled back.",
+            ].join(" "),
+          );
+          return;
+        }
+
+        onCreateAction?.();
+        statusPopup.showSuccess(
+          entries.length === 1
+            ? "Case created successfully"
+            : `${entries.length} cases created successfully`,
         );
       }
-      onClose();
-    } catch (error) {
-      popup.showError(
-        error instanceof Error ? error.message : "An error occurred",
+
+      onCloseAction();
+    } catch (err) {
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Failed to save case",
       );
-      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const allCols = [...TAB_GROUP_COLS];
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
 
   return (
     <div className="xls-root">
-      {/* TOPBAR */}
       <div className="bg-base-100 xls-topbar">
         <div className="xls-topbar-left">
           <button
             className="xls-back-btn"
-            onClick={step === "review" ? () => setStep("entry") : onClose}
+            onClick={step === "review" ? () => setStep("entry") : onCloseAction}
             title="Back"
           >
             <FiArrowLeft size={16} />
           </button>
           <nav className="xls-breadcrumb">
-            <span>Proceedings</span>
+            <span>Civil Cases</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit
-                ? entries.length === 1
-                  ? "Edit Petition"
-                  : "Edit Petitions"
-                : "New Proceedings Entries"}
+              {isEdit ? "Edit Civil Case" : "New Civil Case"}
             </span>
             {step === "review" && (
               <>
@@ -566,7 +662,6 @@ const SpecialProceedingDrawer = ({
         </div>
       </div>
 
-      {/* BODY */}
       <AnimatePresence mode="wait">
         {step === "entry" ? (
           <motion.div
@@ -580,18 +675,14 @@ const SpecialProceedingDrawer = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit
-                    ? entries.length === 1
-                      ? "Edit Petition"
-                      : "Edit Petitions"
-                    : "New Proceedings Entries"}
+                  {isEdit ? "Edit Civil Case" : "New Civil Case"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (
-                    "Update petition details. Required fields are marked *."
+                    "Update record details. Required fields are marked *."
                   ) : (
                     <>
-                      Fill rows like a spreadsheet —{" "}
+                      Fill rows like a spreadsheet -{" "}
                       <kbd className="xls-kbd">Tab</kbd> past the last cell to
                       add a new row.
                     </>
@@ -619,6 +710,7 @@ const SpecialProceedingDrawer = ({
                 )}
               </div>
             </div>
+
             {!isEdit && (
               <div className="xls-progress">
                 <div
@@ -631,10 +723,13 @@ const SpecialProceedingDrawer = ({
             )}
 
             <div className="xls-sheet-wrap">
-              {/* Tab bar */}
               <div className="xls-tab-bar">
-                <button className="xls-tab active">Petition Info</button>
+                <button className="xls-tab active">
+                  <FiFileText size={13} />
+                  Civil Case Info
+                </button>
               </div>
+
               <div className="xls-table-outer" ref={scrollAreaRef}>
                 <table className="xls-table">
                   <colgroup>
@@ -642,7 +737,7 @@ const SpecialProceedingDrawer = ({
                     {FROZEN_COLS.map((c) => (
                       <col key={c.key} style={{ width: c.width }} />
                     ))}
-                    {allCols.map((c) => (
+                    {DETAIL_COLS.map((c) => (
                       <col key={c.key} style={{ width: c.width }} />
                     ))}
                     <col style={{ width: ACTION_W }} />
@@ -653,8 +748,8 @@ const SpecialProceedingDrawer = ({
                       <th colSpan={FROZEN_COLS.length}>
                         <div className="xls-group-label">Identity</div>
                       </th>
-                      <th colSpan={allCols.length}>
-                        <div className="xls-group-label">Petition Info</div>
+                      <th colSpan={DETAIL_COLS.length}>
+                        <div className="xls-group-label">Civil Case Info</div>
                       </th>
                       <th />
                     </tr>
@@ -668,7 +763,7 @@ const SpecialProceedingDrawer = ({
                           {col.label}
                         </th>
                       ))}
-                      {allCols.map((col) => (
+                      {DETAIL_COLS.map((col) => (
                         <th
                           key={col.key}
                           className={col.required ? "req-col" : ""}
@@ -682,7 +777,7 @@ const SpecialProceedingDrawer = ({
                   <tbody>
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
-                        const lastColIdx = allCols.length - 1;
+                        const lastColIdx = DETAIL_COLS.length - 1;
                         return (
                           <motion.tr
                             key={entry.id}
@@ -701,26 +796,19 @@ const SpecialProceedingDrawer = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={toInputValue(
-                                    entry[col.key] as Date | string | null,
-                                  )}
+                                  value={entry[col.key] as string}
                                   error={entry.errors[col.key as string]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key as string, v)
                                   }
-                                  onKeyDown={(e) =>
-                                    handleCellKeyDown(e, entry.id, false)
-                                  }
                                 />
                               </td>
                             ))}
-                            {allCols.map((col, colIdx) => (
+                            {DETAIL_COLS.map((col, colIdx) => (
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={toInputValue(
-                                    entry[col.key] as Date | string | null,
-                                  )}
+                                  value={entry[col.key] as string}
                                   error={entry.errors[col.key as string]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key as string, v)
@@ -742,10 +830,11 @@ const SpecialProceedingDrawer = ({
                                   className="xls-row-btn"
                                   onClick={() => handleDuplicate(entry.id)}
                                   title="Duplicate row"
+                                  disabled={isEdit}
                                 >
                                   <FiCopy size={13} />
                                 </button>
-                                {entries.length > 1 && (
+                                {entries.length > 1 && !isEdit && (
                                   <button
                                     type="button"
                                     className="xls-row-btn del"
@@ -764,6 +853,7 @@ const SpecialProceedingDrawer = ({
                   </tbody>
                 </table>
               </div>
+
               {!isEdit && (
                 <button
                   type="button"
@@ -791,7 +881,10 @@ const SpecialProceedingDrawer = ({
                 </span>
               </div>
               <div className="xls-footer-right">
-                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                <button
+                  className="xls-btn xls-btn-ghost"
+                  onClick={onCloseAction}
+                >
                   Cancel
                 </button>
                 <button
@@ -822,7 +915,7 @@ const SpecialProceedingDrawer = ({
                       ? "Review your edits"
                       : entries.length === 1
                         ? "Review before saving"
-                        : `Review ${entries.length} cases before saving`}
+                        : `Review ${entries.length} records before saving`}
                   </p>
                   <p className="font-light text-md mt-1">
                     {isEdit
@@ -836,7 +929,9 @@ const SpecialProceedingDrawer = ({
             <div className="rv-layout">
               {entries.length > 1 && (
                 <div className="rv-sidebar">
-                  <div className="rv-sidebar-head">{entries.length} Cases</div>
+                  <div className="rv-sidebar-head">
+                    {entries.length} Records
+                  </div>
                   <div className="rv-sidebar-list">
                     {entries.map((entry, idx) => (
                       <button
@@ -847,10 +942,10 @@ const SpecialProceedingDrawer = ({
                         <span className="rv-sidebar-num">{idx + 1}</span>
                         <div className="rv-sidebar-info">
                           <div className="rv-sidebar-casenum">
-                            {entry.caseNumber || "No case no."}
+                            {entry.title || "No case number"}
                           </div>
                           <div className="rv-sidebar-name">
-                            {entry.petitioner || "No petitioner"}
+                            {entry.atty || "No petitioners"}
                           </div>
                         </div>
                       </button>
@@ -929,7 +1024,7 @@ const SpecialProceedingDrawer = ({
                       ? "Save Changes"
                       : entries.length === 1
                         ? "Confirm & Save"
-                        : `Save All ${entries.length} Cases`}
+                        : `Save All ${entries.length} Records`}
                   </>
                 )}
               </button>
@@ -940,5 +1035,3 @@ const SpecialProceedingDrawer = ({
     </div>
   );
 };
-
-export default SpecialProceedingDrawer;

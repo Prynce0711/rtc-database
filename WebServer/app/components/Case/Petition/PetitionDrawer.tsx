@@ -18,7 +18,11 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { createPetition, updatePetition } from "./PetitionActions";
+import {
+  createPetition,
+  deletePetition,
+  updatePetition,
+} from "./PetitionActions";
 import { PetitionCaseData } from "./schema";
 
 export enum ReceiveDrawerType {
@@ -284,16 +288,24 @@ const PetitionEntryPage = ({
   type,
   onClose,
   selectedLog = null,
+  selectedLogs,
   onCreate,
   onUpdate,
 }: {
   type: ReceiveDrawerType;
   onClose: () => void;
   selectedLog?: PetitionCaseData | null;
+  selectedLogs?: PetitionCaseData[];
   onCreate?: (log: any) => void;
   onUpdate?: (log: any) => void;
 }) => {
   const isEdit = type === ReceiveDrawerType.EDIT;
+  const editLogs =
+    selectedLogs && selectedLogs.length > 0
+      ? selectedLogs
+      : selectedLog
+        ? [selectedLog]
+        : [];
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
@@ -301,30 +313,46 @@ const PetitionEntryPage = ({
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
-    if (isEdit && selectedLog) {
-      return [
-        {
-          ...emptyEntry(uid()),
-          caseNumber: selectedLog.caseNumber ?? "",
-          raffledToBranch: selectedLog.raffledTo ?? "",
-          dateFiled: selectedLog.date
-            ? new Date(selectedLog.date).toISOString().slice(0, 10)
-            : today,
-          petitioners: selectedLog.petitioner ?? "",
-          titleNo: "",
-          nature: selectedLog.nature ?? "",
-        },
-      ];
+    if (isEdit && editLogs.length > 0) {
+      return editLogs.map((log) => ({
+        ...emptyEntry(uid()),
+        caseNumber: log.caseNumber ?? "",
+        raffledToBranch: log.raffledTo ?? "",
+        dateFiled: log.date
+          ? new Date(log.date).toISOString().slice(0, 10)
+          : today,
+        petitioners: log.petitioner ?? "",
+        titleNo: "",
+        nature: log.nature ?? "",
+      }));
     }
     return [emptyEntry(uid())];
   });
 
   useEffect(() => {
-    if (!isEdit) {
-      setEntries([emptyEntry(uid())]);
-      setStep("entry");
+    setStep("entry");
+
+    if (isEdit) {
+      if (editLogs.length > 0) {
+        setEntries(
+          editLogs.map((log) => ({
+            ...emptyEntry(uid()),
+            caseNumber: log.caseNumber ?? "",
+            raffledToBranch: log.raffledTo ?? "",
+            dateFiled: log.date
+              ? new Date(log.date).toISOString().slice(0, 10)
+              : today,
+            petitioners: log.petitioner ?? "",
+            titleNo: "",
+            nature: log.nature ?? "",
+          })),
+        );
+      }
+      return;
     }
-  }, [type, selectedLog]);
+
+    setEntries([emptyEntry(uid())]);
+  }, [type, selectedLog, selectedLogs]);
 
   const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
@@ -416,7 +444,9 @@ const PetitionEntryPage = ({
 
   const handleSubmit = async () => {
     const label = isEdit
-      ? "Save changes to this petition entry?"
+      ? entries.length === 1
+        ? "Save changes to this petition entry?"
+        : `Save changes to ${entries.length} petition entries?`
       : entries.length === 1
         ? "Create this petition entry?"
         : `Create ${entries.length} petition entries?`;
@@ -428,22 +458,44 @@ const PetitionEntryPage = ({
       isEdit ? "Updating petition entry..." : "Creating petition entry(ies)...",
     );
     try {
-      if (isEdit && selectedLog) {
-        const e = entries[0];
-        const result = await updatePetition(selectedLog.id, {
-          caseNumber: e.caseNumber,
-          raffledTo: e.raffledToBranch,
-          date: e.dateFiled ? new Date(e.dateFiled) : null,
-          petitioner: e.petitioners,
-          nature: e.nature,
-        });
-        if (!result.success) {
-          statusPopup.showError(result.error || "Update failed");
+      if (isEdit) {
+        if (entries.length !== editLogs.length) {
+          statusPopup.showError("Petition row count mismatch. Please reload.");
           return;
         }
-        statusPopup.showSuccess("Petition entry updated successfully");
-        onUpdate?.(result.result as any);
+
+        for (let index = 0; index < entries.length; index++) {
+          const e = entries[index];
+          const target = editLogs[index];
+
+          if (!target?.id) {
+            statusPopup.showError(`Missing petition id for row ${index + 1}`);
+            return;
+          }
+
+          const result = await updatePetition(target.id, {
+            caseNumber: e.caseNumber,
+            raffledTo: e.raffledToBranch,
+            date: e.dateFiled ? new Date(e.dateFiled) : null,
+            petitioner: e.petitioners,
+            nature: e.nature,
+          });
+          if (!result.success) {
+            statusPopup.showError(
+              result.error || `Update failed for row ${index + 1}`,
+            );
+            return;
+          }
+          onUpdate?.(result.result as any);
+        }
+
+        statusPopup.showSuccess(
+          entries.length === 1
+            ? "Petition entry updated successfully"
+            : `${entries.length} petition entries updated successfully`,
+        );
       } else {
+        const createdIds: number[] = [];
         for (const e of entries) {
           const result = await createPetition({
             caseNumber: e.caseNumber,
@@ -453,8 +505,16 @@ const PetitionEntryPage = ({
             nature: e.nature,
           });
           if (!result.success) {
+            if (createdIds.length > 0) {
+              await Promise.allSettled(
+                createdIds.map((id) => deletePetition(id)),
+              );
+            }
             statusPopup.showError(result.error || "Create failed");
             return;
+          }
+          if (result.result?.id) {
+            createdIds.push(result.result.id);
           }
           onCreate?.(result.result as any);
         }
@@ -473,7 +533,6 @@ const PetitionEntryPage = ({
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -496,7 +555,11 @@ const PetitionEntryPage = ({
             <span>Petitions</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className=" xls-breadcrumb-current">
-              {isEdit ? "Edit Petition Entry" : "New Petition Entries"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Petition Entry"
+                  : "Edit Petition Entries"
+                : "New Petition Entries"}
             </span>
             {step === "review" && (
               <>
@@ -544,7 +607,11 @@ const PetitionEntryPage = ({
             <div className="xls-title-row">
               <div>
                 <h1 className=" text-5xl xls-title">
-                  {isEdit ? "Edit Petition Entry" : "New Petition Entries"}
+                  {isEdit
+                    ? entries.length === 1
+                      ? "Edit Petition Entry"
+                      : "Edit Petition Entries"
+                    : "New Petition Entries"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (

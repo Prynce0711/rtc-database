@@ -87,6 +87,66 @@ export async function getRecievingLogs(): Promise<
   }
 }
 
+export async function getRecievingLogById(
+  logId: number,
+): Promise<ActionResult<RecievingLog>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const log = await prisma.recievingLog.findUnique({ where: { id: logId } });
+
+    if (!log) {
+      return { success: false, error: "Receiving log not found" };
+    }
+
+    return { success: true, result: log };
+  } catch (error) {
+    console.error("Error fetching receiving log by id:", error);
+    return { success: false, error: "Failed to fetch receiving log" };
+  }
+}
+
+export async function getRecievingLogsByIds(
+  ids: Array<number | string>,
+): Promise<ActionResult<RecievingLog[]>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid log IDs provided" };
+    }
+
+    const logs = await prisma.recievingLog.findMany({
+      where: { id: { in: validIds } },
+    });
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    logs.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+
+    if (logs.length !== validIds.length) {
+      return {
+        success: false,
+        error: "One or more receiving logs were not found",
+      };
+    }
+
+    return { success: true, result: logs };
+  } catch (error) {
+    console.error("Error fetching receiving logs by ids:", error);
+    return { success: false, error: "Failed to fetch receiving logs" };
+  }
+}
+
 export async function getRecievingLogsPage(
   options?: ReceivingLogFilterOptions,
 ): Promise<ActionResult<PaginatedResult<RecievingLog>>> {

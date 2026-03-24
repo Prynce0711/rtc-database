@@ -3,7 +3,7 @@
 import { EmploymentType } from "@/app/generated/prisma/enums";
 import { enumToText } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -20,6 +20,11 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { usePopup } from "../Popup/PopupProvider";
+import {
+  createEmployee,
+  deleteEmployee,
+  updateEmployee,
+} from "./EmployeeActions";
 /* ─── Types ──────────────────────────────────────────────────── */
 export enum EmployeeDrawerType {
   ADD = "ADD",
@@ -364,16 +369,24 @@ const EmployeeDrawer = ({
   type,
   onClose,
   selectedEmployee = null,
+  selectedEmployees,
   onCreate,
   onUpdate,
 }: {
   type: EmployeeDrawerType;
   onClose: () => void;
   selectedEmployee?: Record<string, any> | null;
+  selectedEmployees?: Array<Record<string, any>>;
   onCreate?: (employee: any) => void;
   onUpdate?: (employee: any) => void;
 }) => {
   const isEdit = type === EmployeeDrawerType.EDIT;
+  const editEmployees =
+    selectedEmployees && selectedEmployees.length > 0
+      ? selectedEmployees
+      : selectedEmployee
+        ? [selectedEmployee]
+        : [];
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
@@ -382,25 +395,49 @@ const EmployeeDrawer = ({
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
-    if (isEdit && selectedEmployee) {
-      const e = selectedEmployee;
-      return [
-        {
-          ...emptyEntry(uid()),
-          employeeName: e.employeeName ?? "",
-          employeeNumber: e.employeeNumber ?? "",
-          position: e.position ?? "",
-          branch: e.branch ?? "",
-          birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
-          dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
-          employmentType: e.employmentType ?? "",
-          contactNumber: e.contactNumber ?? "",
-          email: e.email ?? "",
-        },
-      ];
+    if (isEdit && editEmployees.length > 0) {
+      return editEmployees.map((e) => ({
+        ...emptyEntry(uid()),
+        employeeName: e.employeeName ?? "",
+        employeeNumber: e.employeeNumber ?? "",
+        position: e.position ?? "",
+        branch: e.branch ?? "",
+        birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
+        dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
+        employmentType: e.employmentType ?? "",
+        contactNumber: e.contactNumber ?? "",
+        email: e.email ?? "",
+      }));
     }
     return [emptyEntry(uid())];
   });
+
+  useEffect(() => {
+    setStep("entry");
+    setActiveTab("personal");
+
+    if (isEdit) {
+      if (editEmployees.length > 0) {
+        setEntries(
+          editEmployees.map((e) => ({
+            ...emptyEntry(uid()),
+            employeeName: e.employeeName ?? "",
+            employeeNumber: e.employeeNumber ?? "",
+            position: e.position ?? "",
+            branch: e.branch ?? "",
+            birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
+            dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
+            employmentType: e.employmentType ?? "",
+            contactNumber: e.contactNumber ?? "",
+            email: e.email ?? "",
+          })),
+        );
+      }
+      return;
+    }
+
+    setEntries([emptyEntry(uid())]);
+  }, [type, selectedEmployee, selectedEmployees, isEdit]);
 
   const handleChange = (id: string, field: string, value: string) => {
     setEntries((prev) =>
@@ -496,7 +533,9 @@ const EmployeeDrawer = ({
 
   const handleSubmit = async () => {
     const label = isEdit
-      ? "Save changes to this employee?"
+      ? entries.length === 1
+        ? "Save changes to this employee?"
+        : `Save changes to ${entries.length} employees?`
       : entries.length === 1
         ? "Create this employee?"
         : `Create ${entries.length} employees?`;
@@ -510,7 +549,6 @@ const EmployeeDrawer = ({
 
     try {
       const payloads = entries.map((e) => ({
-        id: isEdit ? (selectedEmployee?.id ?? 0) : 0,
         employeeName: e.employeeName,
         employeeNumber: e.employeeNumber || undefined,
         position: e.position,
@@ -522,29 +560,82 @@ const EmployeeDrawer = ({
         email: e.email?.trim() || undefined,
       }));
 
-      const resp = await fetch("/api/employees/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payloads),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.success)
-        throw new Error(json.error || "Save failed");
-
-      const created = json.result || [];
       if (isEdit) {
-        if (created[0]) {
-          onUpdate?.(created[0]);
-          statusPopup.showSuccess("Employee updated successfully");
-        } else {
-          statusPopup.showError("Update failed");
+        if (entries.length !== editEmployees.length) {
+          statusPopup.showError("Employee row count mismatch. Please reload.");
+          return;
         }
-      } else {
-        created.forEach((c: any) => onCreate?.(c));
+
+        for (let index = 0; index < payloads.length; index++) {
+          const target = editEmployees[index];
+
+          if (!target?.id) {
+            statusPopup.showError(
+              `Employee id is missing for row ${index + 1}`,
+            );
+            return;
+          }
+
+          const result = await updateEmployee(target.id, payloads[index]);
+          if (!result.success) {
+            const message = "error" in result ? result.error : undefined;
+            statusPopup.showError(
+              message || `Update failed for row ${index + 1}`,
+            );
+            return;
+          }
+          if (!result.result) {
+            statusPopup.showError(`Update failed for row ${index + 1}`);
+            return;
+          }
+
+          onUpdate?.(result.result);
+        }
+
         statusPopup.showSuccess(
-          created.length === 1
+          payloads.length === 1
+            ? "Employee updated successfully"
+            : `${payloads.length} employees updated successfully`,
+        );
+      } else {
+        const createdEmployees: any[] = [];
+
+        for (const payload of payloads) {
+          const result = await createEmployee(payload);
+          if (!result.success) {
+            if (createdEmployees.length > 0) {
+              await Promise.allSettled(
+                createdEmployees.map((employee) => deleteEmployee(employee.id)),
+              );
+            }
+            const message = "error" in result ? result.error : undefined;
+            statusPopup.showError(message || "Create failed");
+            return;
+          }
+
+          if (!result.result) {
+            if (createdEmployees.length > 0) {
+              await Promise.allSettled(
+                createdEmployees.map((employee) => deleteEmployee(employee.id)),
+              );
+            }
+            statusPopup.showError("Create failed");
+            return;
+          }
+
+          createdEmployees.push(result.result);
+          onCreate?.(result.result);
+        }
+
+        if (createdEmployees.length === 0) {
+          statusPopup.showError("Update failed");
+          return;
+        }
+
+        statusPopup.showSuccess(
+          createdEmployees.length === 1
             ? "Employee created successfully"
-            : `${created.length} employees created successfully`,
+            : `${createdEmployees.length} employees created successfully`,
         );
       }
       onClose();
@@ -556,7 +647,6 @@ const EmployeeDrawer = ({
       );
     } finally {
       setIsSubmitting(false);
-      statusPopup.hidePopup();
     }
   };
 
@@ -579,7 +669,11 @@ const EmployeeDrawer = ({
             <span>Employees</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Employee" : "New Employees"}
+              {isEdit
+                ? entries.length === 1
+                  ? "Edit Employee"
+                  : "Edit Employees"
+                : "New Employees"}
             </span>
             {step === "review" && (
               <>
@@ -627,7 +721,11 @@ const EmployeeDrawer = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Employee" : "New Employees"}
+                  {isEdit
+                    ? entries.length === 1
+                      ? "Edit Employee"
+                      : "Edit Employees"
+                    : "New Employees"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (

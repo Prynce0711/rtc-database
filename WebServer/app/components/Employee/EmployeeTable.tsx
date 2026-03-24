@@ -19,6 +19,8 @@ interface Props {
   employees: Employee[];
   onEdit: (emp: Employee) => void;
   onDelete: (id: number) => void;
+  selectedIds?: number[];
+  onToggleSelect?: (id: number) => void;
 }
 
 type SortKey =
@@ -81,7 +83,13 @@ const SortTh = ({
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
+const EmployeeTable: React.FC<Props> = ({
+  employees,
+  onEdit,
+  onDelete,
+  selectedIds = [],
+  onToggleSelect,
+}) => {
   const router = useRouter();
 
   const getYearsInService = (
@@ -165,6 +173,9 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
           {/* HEADER */}
           <thead className="text-sm">
             <tr className="border-b border-base-200 bg-[#e6eef5] text-center">
+              <th className="py-4 px-5 font-bold uppercase text-[13px] text-base-content/70 text-center w-14">
+                Select
+              </th>
               {/* Actions col — no sort */}
               <th className="py-4 px-5 font-bold uppercase text-[13px] text-base-content/70 text-center w-16">
                 Actions
@@ -265,7 +276,7 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
             {paginated.length === 0 ? (
               <tr>
                 <td
-                  colSpan={13}
+                  colSpan={14}
                   className="text-center py-16 text-base-content/30 text-sm font-medium"
                 >
                   <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
@@ -301,6 +312,18 @@ const EmployeeTable: React.FC<Props> = ({ employees, onEdit, onDelete }) => {
                       className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100 cursor-pointer text-center"
                     >
                       {/* ACTIONS */}
+                      <td
+                        className="py-4 px-3 text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedIds.includes(emp.id)}
+                          onChange={() => onToggleSelect?.(emp.id)}
+                          aria-label={`Select employee ${emp.id}`}
+                        />
+                      </td>
                       <td
                         className="py-4 px-5 text-center"
                         onClick={(e) => e.stopPropagation()}

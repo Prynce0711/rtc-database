@@ -374,6 +374,60 @@ export async function getSpecialProceedingById(
   }
 }
 
+export async function getSpecialProceedingsByIds(
+  ids: Array<string | number>,
+): Promise<ActionResult<SpecialProceedingData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (validIds.length === 0) {
+      return { success: false, error: "No valid case IDs provided" };
+    }
+
+    const results = await prisma.case.findMany({
+      where: {
+        id: { in: validIds },
+        specialProceeding: { isNot: null },
+      },
+      include: { specialProceeding: true },
+    });
+
+    const specialProceedings: SpecialProceedingData[] = results
+      .filter(
+        (c): c is Case & { specialProceeding: SpecialProceeding } =>
+          !!c.specialProceeding,
+      )
+      .map((c) => ({
+        ...c.specialProceeding,
+        ...c,
+      }));
+
+    const orderMap = new Map(validIds.map((id, index) => [id, index]));
+    specialProceedings.sort(
+      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
+    );
+
+    if (specialProceedings.length !== validIds.length) {
+      return {
+        success: false,
+        error: "One or more special proceedings were not found",
+      };
+    }
+
+    return { success: true, result: specialProceedings };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch special proceedings" };
+  }
+}
+
 export async function getSpecialProceedingByCaseNumber(
   caseNumber: string,
 ): Promise<ActionResult<SpecialProceedingData>> {

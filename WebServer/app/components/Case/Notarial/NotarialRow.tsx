@@ -24,6 +24,8 @@ const NotarialRow = ({
   onViewFile,
   onDownloadFile,
   canPreview,
+  isSelected,
+  onToggleSelect,
 }: {
   record: NotarialRecord;
   onEdit: (r: NotarialRecord) => void;
@@ -32,6 +34,8 @@ const NotarialRow = ({
   onViewFile: (r: NotarialRecord) => void;
   onDownloadFile: (r: NotarialRecord) => void;
   canPreview: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) => {
   const popoverId = `notarial-actions-popover-${record.id}`;
   const anchorName = `--notarial-actions-anchor-${record.id}`;
@@ -48,6 +52,17 @@ const NotarialRow = ({
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
       onClick={() => onRowClick(record)}
     >
+      {onToggleSelect && (
+        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={Boolean(isSelected)}
+            onChange={() => onToggleSelect(record.id)}
+            aria-label={`Select notarial record ${record.id}`}
+          />
+        </td>
+      )}
       <td onClick={(e) => e.stopPropagation()} className="text-center">
         <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
           <li>
