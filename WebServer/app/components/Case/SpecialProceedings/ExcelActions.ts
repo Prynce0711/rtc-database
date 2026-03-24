@@ -21,6 +21,7 @@ import {
   ProcessExcelMeta,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
@@ -30,17 +31,6 @@ import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 import { BaseCaseSchema } from "../schema";
-
-const valuesAreEqual = (left: unknown, right: unknown): boolean => {
-  const normalize = (value: unknown) => {
-    if (value === undefined || value === null) return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === "string") return value.trim();
-    return value;
-  };
-
-  return normalize(left) === normalize(right);
-};
 
 export async function uploadSpecialProceedingExcel(
   file: File,

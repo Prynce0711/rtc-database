@@ -14,23 +14,13 @@ import {
   ProcessExcelMeta,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-
-const valuesAreEqual = (left: unknown, right: unknown): boolean => {
-  const normalize = (value: unknown) => {
-    if (value === undefined || value === null) return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === "string") return value.trim();
-    return value;
-  };
-
-  return normalize(left) === normalize(right);
-};
 
 // Parse time string in various formats
 const parseTime = (

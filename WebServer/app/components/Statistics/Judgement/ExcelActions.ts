@@ -7,6 +7,7 @@ import {
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -28,17 +29,6 @@ const toNumber = (value: unknown): number => {
 const toBranch = (value: unknown): string | null => {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
-};
-
-const valuesAreEqual = (left: unknown, right: unknown): boolean => {
-  const normalize = (value: unknown) => {
-    if (value === undefined || value === null) return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === "string") return value.trim();
-    return value;
-  };
-
-  return normalize(left) === normalize(right);
 };
 
 const getMtcCells = (row: Record<string, unknown>) => {

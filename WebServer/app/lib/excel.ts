@@ -104,6 +104,17 @@ export const hasContent = (val: unknown) => {
   return true;
 };
 
+export const valuesAreEqual = (left: unknown, right: unknown): boolean => {
+  const normalize = (value: unknown) => {
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "string") return value.trim();
+    return value;
+  };
+
+  return normalize(left) === normalize(right);
+};
+
 export const isMappedRowEmpty = <
   T extends Record<string, unknown>,
   K extends keyof T = keyof T,

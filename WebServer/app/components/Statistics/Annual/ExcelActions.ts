@@ -9,6 +9,7 @@ import {
   isValidDate,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -18,17 +19,6 @@ import { CaseSchema, InventoryDocumentSchema } from "./Schema";
 const toText = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : undefined;
-};
-
-const valuesAreEqual = (left: unknown, right: unknown): boolean => {
-  const normalize = (value: unknown) => {
-    if (value === undefined || value === null) return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === "string") return value.trim();
-    return value;
-  };
-
-  return normalize(left) === normalize(right);
 };
 
 const toIsoDateString = (value: unknown): string | undefined => {

@@ -7,6 +7,7 @@ import {
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
+  valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import * as XLSX from "xlsx";
@@ -24,17 +25,6 @@ const normalizeText = (value: unknown): string =>
   String(value ?? "")
     .trim()
     .replace(/\s+/g, " ");
-
-const valuesAreEqual = (left: unknown, right: unknown): boolean => {
-  const normalize = (value: unknown) => {
-    if (value === undefined || value === null) return null;
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === "string") return value.trim();
-    return value;
-  };
-
-  return normalize(left) === normalize(right);
-};
 
 const getMonthlyCells = (row: Record<string, unknown>) => {
   const monthCell = findColumnValue(row, ["Month", "Period", "Report Month"]);
