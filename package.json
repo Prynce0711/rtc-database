@@ -9,6 +9,7 @@
     "dev:frontend": "pnpm --filter rtc-database-nativeapp dev",
     "dev": "concurrently \"pnpm --filter @rtc-database/shared build:watch\" \"pnpm --filter rtc-database-webserver dev\" \"pnpm --filter rtc-database-nativeapp dev\"",
     "build": "pnpm --filter '@rtc-database/shared' build && pnpm --filter rtc-database-webserver build && pnpm --filter rtc-database-nativeapp build",
+    "update": "pnpm i && pnpm update:prisma",
     "update:prisma": "pnpm --filter rtc-database-webserver exec prisma migrate dev && pnpm --filter rtc-database-webserver exec prisma generate && pnpm --filter rtc-database-webserver exec prisma db seed",
     "reset:prisma": "pnpm --filter rtc-database-webserver exec prisma migrate reset --force && pnpm --filter rtc-database-webserver exec prisma generate && pnpm --filter rtc-database-webserver exec prisma db seed",
     "seed": "concurrently --kill-others-on-success \"pnpm --filter rtc-database-webserver dev\" \"node -e 'setTimeout(() => {}, 3000)' && pnpm --filter rtc-database-webserver exec prisma db seed\""
@@ -17,6 +18,6 @@
     "concurrently": "^9.2.1"
   },
   "dependencies": {
-    "framer-motion": "^12.34.0"
+    "framer-motion": "^12.38.0"
   }
 }
