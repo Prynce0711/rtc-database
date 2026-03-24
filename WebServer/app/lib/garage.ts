@@ -5,6 +5,12 @@ export type UploadResult = {
   type: string;
 };
 
+export type GetFileOptions = {
+  inline?: boolean;
+  fileName?: string;
+  contentType?: string;
+};
+
 export const garage = new S3Client({
   region: "garage",
   endpoint: process.env.GARAGE_ENDPOINT, // e.g. http://garage.local:3900

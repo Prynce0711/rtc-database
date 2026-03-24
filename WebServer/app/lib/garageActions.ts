@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 // TODO: Make this server-only and users must first validate session and
 // if they are authorized to use file management before calling these functions.
@@ -15,7 +15,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "crypto";
 import ActionResult from "../components/ActionResult";
 import { FileData } from "../generated/prisma/browser";
-import { garage } from "../lib/garage";
+import { garage, GetFileOptions } from "../lib/garage";
 import { validateSession } from "./authActions";
 import { prisma } from "./prisma";
 
@@ -179,11 +179,7 @@ export async function listGarageFiles(): Promise<
 
 export async function getGarageFileUrl(
   key: string,
-  options?: {
-    inline?: boolean;
-    fileName?: string;
-    contentType?: string;
-  },
+  options?: GetFileOptions,
 ): Promise<ActionResult<string>> {
   try {
     const sessionValidation = await validateSession();

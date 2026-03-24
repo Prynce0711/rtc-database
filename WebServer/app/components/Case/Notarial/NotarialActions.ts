@@ -4,8 +4,10 @@ import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
 import { FilterOptions } from "@/app/components/Filter/FilterUtils";
 import { Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import { GetFileOptions } from "@/app/lib/garage";
 import {
   deleteGarageFile,
+  getGarageFileUrl,
   moveGarageFile,
   uploadFileToGarage,
 } from "@/app/lib/garageActions";
@@ -510,5 +512,43 @@ export async function deleteNotarial(id: number): Promise<ActionResult<void>> {
   } catch (error) {
     console.error("Error deleting notarial data:", error);
     return { success: false, error: "Error deleting notarial data" };
+  }
+}
+
+export async function getNotarialFileUrl(
+  id: number,
+  options?: GetFileOptions,
+): Promise<ActionResult<string>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const notarial = await prisma.notarial.findUnique({
+      where: { id },
+      include: { file: true },
+    });
+
+    if (!notarial) {
+      return { success: false, error: "Notarial data not found" };
+    }
+
+    if (!notarial.file) {
+      return { success: false, error: "No file associated with this notarial" };
+    }
+
+    const urlResult = await getGarageFileUrl(notarial.file.key, options);
+
+    if (!urlResult.success) {
+      return {
+        success: false,
+        error: "Failed to get file URL: " + urlResult.error,
+      };
+    }
+    return { success: true, result: urlResult.result };
+  } catch (error) {
+    console.error("Error getting notarial file URL:", error);
+    return { success: false, error: "Error getting notarial file URL" };
   }
 }

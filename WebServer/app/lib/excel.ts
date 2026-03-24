@@ -1,5 +1,3 @@
-"server-only";
-
 import * as XLSX from "xlsx";
 import z, { prettifyError } from "zod";
 import ActionResult from "../components/ActionResult";

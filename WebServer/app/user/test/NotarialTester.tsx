@@ -4,13 +4,14 @@ import {
   createNotarial,
   deleteNotarial,
   getNotarial,
+  getNotarialFileUrl,
   updateNotarial,
 } from "@/app/components/Case/Notarial/NotarialActions";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
-import { getGarageFileUrl } from "@/app/lib/garageActions";
 import { useEffect, useMemo, useState } from "react";
 import NotarialExcelUploader from "../../components/Case/Notarial/NotarialExcelUploader";
 import { deleteAllNotarial } from "./TestActions";
+import { type } from "os";
 
 type NotarialFormState = {
   title: string;
@@ -131,7 +132,7 @@ export default function NotarialTester() {
       return;
     }
 
-    const result = await getGarageFileUrl(item.file.key);
+    const result = await getNotarialFileUrl(item.id);
     if (result.success) {
       window.open(result.result, "_blank");
     } else {

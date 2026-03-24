@@ -1,5 +1,4 @@
-"server-only";
-
+import "server-only";
 import z from "zod";
 import type { BaseCaseSchema as BaseCaseSchemaType } from "../components/Case/schema";
 import { BaseCaseSchema } from "../components/Case/schema";
@@ -196,3 +195,7 @@ export const splitCaseDataBySchema = <T extends Record<string, unknown>>(
     detailData,
   };
 };
+
+export function test() {
+  return "Prisma helper function is working!";
+}
