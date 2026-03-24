@@ -104,6 +104,10 @@ export const auth = betterAuth({
         type: "boolean",
         input: false,
       },
+      branch: {
+        type: "string",
+        input: false,
+      },
     },
   },
   session: {

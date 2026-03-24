@@ -22,6 +22,10 @@ export const authClient = createAuthClient({
           type: "boolean",
           input: false,
         },
+        branch: {
+          type: "string",
+          input: false,
+        },
       },
     }),
   ],
