@@ -318,7 +318,13 @@ export async function getCriminalCaseById(
 
     const criminalCase = await prisma.case.findUnique({
       where: { id: Number(id), criminalCase: { isNot: null } },
-      include: { criminalCase: true },
+      include: {
+        criminalCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!criminalCase) {
@@ -336,8 +342,8 @@ export async function getCriminalCaseById(
     }
 
     const caseCombined: CriminalCaseData = {
-      ...criminalCase,
       ...criminalCase.criminalCase,
+      ...criminalCase,
     };
 
     return { success: true, result: caseCombined };
@@ -369,7 +375,13 @@ export async function getCriminalCasesByIds(
         id: { in: validIds },
         criminalCase: { isNot: null },
       },
-      include: { criminalCase: true },
+      include: {
+        criminalCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     const caseCombined: CriminalCaseData[] = cases
@@ -377,8 +389,8 @@ export async function getCriminalCasesByIds(
         (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
       )
       .map((c) => ({
-        ...c,
         ...c.criminalCase,
+        ...c,
       }));
 
     return { success: true, result: caseCombined };

@@ -308,7 +308,13 @@ export async function getCivilCaseById(
 
     const civilCase = await prisma.case.findUnique({
       where: { id: Number(id), civilCase: { isNot: null } },
-      include: { civilCase: true },
+      include: {
+        civilCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!civilCase) {
@@ -320,8 +326,8 @@ export async function getCivilCaseById(
     }
 
     const caseCombined: CivilCaseData = {
-      ...civilCase,
       ...civilCase.civilCase,
+      ...civilCase,
     };
 
     return { success: true, result: caseCombined };
@@ -353,14 +359,20 @@ export async function getCivilCasesByIds(
         id: { in: validIds },
         civilCase: { isNot: null },
       },
-      include: { civilCase: true },
+      include: {
+        civilCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
     });
 
     const caseCombined: CivilCaseData[] = cases
       .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
       .map((c) => ({
-        ...c,
         ...c.civilCase,
+        ...c,
       }));
 
     const orderMap = new Map(validIds.map((id, index) => [id, index]));
