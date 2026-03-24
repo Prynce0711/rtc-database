@@ -457,6 +457,40 @@ const PetitionEntryPage = ({
     statusPopup.showLoading(
       isEdit ? "Updating petition entry..." : "Creating petition entry(ies)...",
     );
+
+    const rollbackCreatedPetitions = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deletePetition(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for petition ID ${createdIds[index]}`,
+          );
+          return;
+        }
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for petition ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       if (isEdit) {
         if (entries.length !== editLogs.length) {
@@ -496,7 +530,8 @@ const PetitionEntryPage = ({
         );
       } else {
         const createdIds: number[] = [];
-        for (const e of entries) {
+        for (let index = 0; index < entries.length; index++) {
+          const e = entries[index];
           const result = await createPetition({
             caseNumber: e.caseNumber,
             raffledTo: e.raffledToBranch,
@@ -505,12 +540,16 @@ const PetitionEntryPage = ({
             nature: e.nature,
           });
           if (!result.success) {
-            if (createdIds.length > 0) {
-              await Promise.allSettled(
-                createdIds.map((id) => deletePetition(id)),
-              );
-            }
-            statusPopup.showError(result.error || "Create failed");
+            const rollbackErrors = await rollbackCreatedPetitions(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}: ${result.error || "Create failed"}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
           if (result.result?.id) {

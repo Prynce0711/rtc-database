@@ -547,6 +547,39 @@ const EmployeeDrawer = ({
       isEdit ? "Updating employee..." : "Creating employee(s)...",
     );
 
+    const rollbackCreatedEmployees = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteEmployee(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for employee ID ${createdIds[index]}`,
+          );
+          return;
+        }
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for employee ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       const payloads = entries.map((e) => ({
         employeeName: e.employeeName,
@@ -599,30 +632,43 @@ const EmployeeDrawer = ({
         );
       } else {
         const createdEmployees: any[] = [];
+        const createdIds: number[] = [];
 
-        for (const payload of payloads) {
+        for (let index = 0; index < payloads.length; index++) {
+          const payload = payloads[index];
           const result = await createEmployee(payload);
           if (!result.success) {
-            if (createdEmployees.length > 0) {
-              await Promise.allSettled(
-                createdEmployees.map((employee) => deleteEmployee(employee.id)),
-              );
-            }
             const message = "error" in result ? result.error : undefined;
-            statusPopup.showError(message || "Create failed");
+            const rollbackErrors = await rollbackCreatedEmployees(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}: ${message || "Create failed"}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
 
           if (!result.result) {
-            if (createdEmployees.length > 0) {
-              await Promise.allSettled(
-                createdEmployees.map((employee) => deleteEmployee(employee.id)),
-              );
-            }
-            statusPopup.showError("Create failed");
+            const rollbackErrors = await rollbackCreatedEmployees(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}: Create failed.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
 
+          if (result.result.id) {
+            createdIds.push(result.result.id);
+          }
           createdEmployees.push(result.result);
           onCreate?.(result.result);
         }

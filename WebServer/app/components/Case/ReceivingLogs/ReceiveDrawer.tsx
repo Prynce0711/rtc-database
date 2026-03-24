@@ -498,6 +498,40 @@ const ReceiveDrawer = ({
     statusPopup.showLoading(
       isEdit ? "Updating entry..." : "Creating entry(ies)...",
     );
+
+    const rollbackCreatedLogs = async (
+      createdIds: number[],
+    ): Promise<string[]> => {
+      if (createdIds.length === 0) return [];
+
+      const rollbackResults = await Promise.allSettled(
+        createdIds.map((id) => deleteRecievingLog(id)),
+      );
+
+      const rollbackErrors: string[] = [];
+
+      rollbackResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          rollbackErrors.push(
+            `Rollback failed for receiving ID ${createdIds[index]}`,
+          );
+          return;
+        }
+
+        if (!result.value.success) {
+          const message =
+            "error" in result.value
+              ? result.value.error
+              : "Unknown rollback error";
+          rollbackErrors.push(
+            `Rollback failed for receiving ID ${createdIds[index]}: ${message}`,
+          );
+        }
+      });
+
+      return rollbackErrors;
+    };
+
     try {
       if (isEdit) {
         if (entries.length !== editLogs.length) {
@@ -531,24 +565,33 @@ const ReceiveDrawer = ({
       } else {
         const createdIds: number[] = [];
 
-        for (const entry of entries) {
+        for (let index = 0; index < entries.length; index++) {
+          const entry = entries[index];
           const result = await createRecievingLog(buildPayload(entry));
           if (!result.success) {
-            if (createdIds.length > 0) {
-              await Promise.allSettled(
-                createdIds.map((id) => deleteRecievingLog(id)),
-              );
-            }
-            statusPopup.showError("Create failed");
+            const rollbackErrors = await rollbackCreatedLogs(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
           if (!result.result) {
-            if (createdIds.length > 0) {
-              await Promise.allSettled(
-                createdIds.map((id) => deleteRecievingLog(id)),
-              );
-            }
-            statusPopup.showError("Create failed");
+            const rollbackErrors = await rollbackCreatedLogs(createdIds);
+            setStep("entry");
+            statusPopup.showError(
+              [
+                `Failed to create row ${index + 1}.`,
+                rollbackErrors.length > 0
+                  ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                  : "Any created rows in this batch were rolled back.",
+              ].join(" "),
+            );
             return;
           }
 
