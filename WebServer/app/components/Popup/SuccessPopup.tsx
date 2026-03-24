@@ -15,7 +15,7 @@ const SuccessPopup = ({
   redirectTo,
 }: SuccessScreenProps) => {
   return (
-    <ModalBase>
+    <ModalBase onClose={onClose}>
       <div className="bg-base-100 border border-success/30 shadow-xl rounded-2xl px-6 py-5 max-w-sm w-full text-base-content">
         <div className="flex flex-col items-center text-center gap-4">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-success/10 text-success">

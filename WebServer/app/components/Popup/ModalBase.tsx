@@ -26,6 +26,12 @@ const ModalBase = ({
 }) => {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(true);
+  const canClose = typeof onClose === "function";
+
+  const requestClose = () => {
+    if (!canClose) return;
+    setVisible(false);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -51,7 +57,7 @@ const ModalBase = ({
       },
       // provide a `requestClose` function to children so they can ask ModalBase
       // to perform the animated close sequence before calling the parent's onClose
-      ...(!isNativeElement && { requestClose: () => setVisible(false) }),
+      ...(!isNativeElement && { requestClose }),
     });
   }
 
@@ -71,7 +77,9 @@ const ModalBase = ({
           className={`fixed inset-0 min-w-0 flex items-center justify-center z-9999 ${
             notTransparent ? `${bgColor}` : "bg-black/50"
           } ${className}`}
-          onClick={() => setVisible(false)}
+          onClick={() => {
+            requestClose();
+          }}
         >
           <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
             <div className="flex-1 flex p-5 items-center justify-center">

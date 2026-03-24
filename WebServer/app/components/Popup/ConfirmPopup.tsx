@@ -16,7 +16,7 @@ const ConfirmPopup = ({
   console.log("Rendering YesNoPopup", warning);
 
   return (
-    <ModalBase>
+    <ModalBase onClose={onNo}>
       <div className="bg-base-100 border border-base-300 shadow-xl rounded-2xl px-6 py-5 max-w-sm w-full text-base-content">
         <div className="flex flex-col items-center text-center gap-4">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-base-200 text-base-content">
