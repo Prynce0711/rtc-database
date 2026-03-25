@@ -2,8 +2,17 @@
 import { Message, Messaging } from "@/@types/network";
 import { getChatById } from "@/app/components/Messages/MessagesActions";
 import { useCallback, useEffect, useState } from "react";
-import { SocketEventType, SocketMessage } from "../SocketEvents";
+import { SocketChatMessage, SocketEventType } from "../SocketEvents";
 import { useSocket } from "../SocketProvider";
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 export function useMessaging(chatId: number, fetchMessages = true): Messaging {
   const socket = useSocket().socket;
@@ -47,8 +56,8 @@ export function useMessaging(chatId: number, fetchMessages = true): Messaging {
 
   useEffect(() => {
     const unsubscribe = onRecieveData((event) => {
-      if (event.type === SocketEventType.MESSAGE) {
-        onMessage(event.payload as Message);
+      if (event.type === SocketEventType.RECIEVE_MESSAGE) {
+        onMessage(event.payload);
       }
     });
     return () => {
@@ -57,16 +66,31 @@ export function useMessaging(chatId: number, fetchMessages = true): Messaging {
   }, [onRecieveData, onMessage]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, file?: File) => {
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         console.warn("Socket not open. Cannot send message.");
         return;
       }
 
-      const message: SocketMessage = { content, chatId };
+      let message: SocketChatMessage = { content, chatId };
+      if (file) {
+        const buffer = await file.arrayBuffer();
+        message = {
+          ...message,
+          file: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: arrayBufferToBase64(buffer),
+          },
+        };
+      }
 
       socket.send(
-        JSON.stringify({ type: SocketEventType.MESSAGE, payload: message }),
+        JSON.stringify({
+          type: SocketEventType.SEND_MESSAGE,
+          payload: message,
+        }),
       );
     },
     [socket, chatId],
@@ -89,7 +113,9 @@ export function useMessaging(chatId: number, fetchMessages = true): Messaging {
       return;
     }
 
-    socket.send(JSON.stringify({ type: SocketEventType.LEAVECHAT }));
+    socket.send(
+      JSON.stringify({ type: SocketEventType.LEAVECHAT, payload: { chatId } }),
+    );
   }, [socket, chatId]);
 
   useEffect(() => {

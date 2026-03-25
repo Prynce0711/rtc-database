@@ -9,7 +9,13 @@ import {
   useRef,
 } from "react";
 import { useWebSocket } from "./hooks/useWebsocket";
-import { SocketError, SocketEvent, SocketEventType } from "./SocketEvents";
+import {
+  AnySocketEvent,
+  SocketError,
+  SocketEvent,
+  SocketEventPayload,
+  SocketEventType,
+} from "./SocketEvents";
 
 interface Prop {
   children: ReactNode;
@@ -17,9 +23,12 @@ interface Prop {
 
 interface SocketContextType {
   socket: WebSocket | null;
-  onRecieveData: (handler: (data: SocketEvent) => void) => () => void;
+  onRecieveData: (handler: (data: AnySocketEvent) => void) => () => void;
   onRecieveError: (handler: (error: SocketError) => void) => () => void;
-  send: (event: SocketEventType, payload: SocketEvent["payload"]) => void;
+  send: <T extends SocketEventType>(
+    event: T,
+    payload: SocketEventPayload<T>,
+  ) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -44,7 +53,7 @@ const SocketProvider = ({ children }: Prop) => {
     reconnectIntervalMs: 5000,
   });
 
-  const recieveDataHandlersRef = useRef<Set<(data: SocketEvent) => void>>(
+  const recieveDataHandlersRef = useRef<Set<(data: AnySocketEvent) => void>>(
     new Set(),
   );
 
@@ -56,7 +65,7 @@ const SocketProvider = ({ children }: Prop) => {
     if (socket) {
       const handleMessage = (event: MessageEvent) => {
         try {
-          const socketEvent: SocketEvent = JSON.parse(event.data);
+          const socketEvent: AnySocketEvent = JSON.parse(event.data);
           if (socketEvent.type === SocketEventType.ERROR) {
             recieveErrorHandlersRef.current.forEach((handler) => {
               handler(socketEvent.payload as SocketError);
@@ -81,7 +90,7 @@ const SocketProvider = ({ children }: Prop) => {
     }
   }, [socket]);
 
-  const onRecieveData = (handler: (data: SocketEvent) => void) => {
+  const onRecieveData = (handler: (data: AnySocketEvent) => void) => {
     recieveDataHandlersRef.current.add(handler);
 
     // Return cleanup function
@@ -99,13 +108,16 @@ const SocketProvider = ({ children }: Prop) => {
     };
   };
 
-  const send = (event: SocketEventType, payload: SocketEvent["payload"]) => {
+  const send = <T extends SocketEventType>(
+    event: T,
+    payload: SocketEventPayload<T>,
+  ) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       console.warn("Socket not open. Cannot send message.");
       return;
     }
 
-    const socketEvent: SocketEvent = { type: event, payload };
+    const socketEvent: SocketEvent<T> = { type: event, payload };
     socket.send(JSON.stringify(socketEvent));
   };
 

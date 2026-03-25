@@ -7,13 +7,13 @@ import { validateSession } from "@/app/lib/authActions";
 import { GetFileOptions } from "@/app/lib/garage";
 import {
   deleteGarageFile,
+  getFileHash,
   getGarageFileUrl,
   moveGarageFile,
   uploadFileToGarage,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import { createHash } from "crypto";
 import { prettifyError } from "zod";
 import ActionResult from "../../ActionResult";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
@@ -71,11 +71,6 @@ function buildNotarialWhere(
   }
 
   return conditions.length > 0 ? { AND: conditions } : {};
-}
-
-async function getFileHash(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
 }
 
 async function deleteFileIfUnreferenced(fileId: number, key: string) {

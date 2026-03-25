@@ -489,7 +489,7 @@ model ChatMessage {
   updatedAt DateTime? @updatedAt
 
   fileId Int?
-  file FileData? @relation(fields: [fileId], references: [id])
+  file FileData? @relation(fields: [fileId], references: [id], onDelete: SetNull)
 
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

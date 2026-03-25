@@ -1,7 +1,9 @@
+import "server-only";
+
+import { joinChatSchema } from "@/app/components/Messages/schema";
 import { prisma } from "@/app/lib/prisma";
 import ClientSocketServer from "../ClientSocketServer";
 import { SocketErrorRequestType, SocketJoinChat } from "../SocketEvents";
-import { joinChatSchema } from "@/app/components/Messages/schema";
 import { sendErrorResponseToSelf } from "./messaging";
 
 export async function joinChat(
