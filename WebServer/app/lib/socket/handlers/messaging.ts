@@ -1,16 +1,14 @@
 import "server-only";
 
 import { messageSchema } from "@/app/components/Messages/schema";
-import { ChatMessage } from "@/app/generated/prisma/browser";
 import { prisma } from "@/app/lib/prisma";
 import ClientSocketServer from "@/app/lib/socket/ClientSocketServer";
 import {
-  SocketCallEnded,
   SocketChatMessage,
-  SocketError,
   SocketErrorRequestType,
   SocketErrorType,
   SocketEvent,
+  SocketEventPayload,
   SocketEventType,
 } from "@/app/lib/socket/SocketEvents";
 import { createHash } from "crypto";
@@ -171,23 +169,18 @@ export async function receiveMessage(
           payload: {
             ...newMessage,
             name: client.socketUser.name,
-            src: client.socketUser.image,
+            src: client.socketUser.image ?? undefined,
           },
-        } as SocketEvent<ChatMessage>),
+        } satisfies SocketEvent<SocketEventType.RECIEVE_MESSAGE>),
       );
     }
   }
 }
 
-export async function sendMessageToSelf(
+export async function sendMessageToSelf<T extends SocketEventType>(
   client: ClientSocketServer,
-  eventType: SocketEventType,
-  payload:
-    | SocketChatMessage
-    // | SocketInitiateCall
-    // | SocketAnswerCall
-    | SocketCallEnded
-    | SocketError,
+  eventType: T,
+  payload: SocketEventPayload<T>,
 ) {
   if (client.clientSocket.readyState !== WebSocket.OPEN) return;
   console.log(`Sending message to self: ${client.socketUser.name}`, {
@@ -197,15 +190,10 @@ export async function sendMessageToSelf(
   client.clientSocket.send(JSON.stringify({ type: eventType, payload }));
 }
 
-export async function sendMessageToClient(
+export async function sendMessageToClient<T extends SocketEventType>(
   client: ClientSocketServer,
-  eventType: SocketEventType,
-  payload:
-    | SocketChatMessage
-    // | SocketInitiateCall
-    // | SocketAnswerCall
-    | SocketCallEnded
-    | SocketError,
+  eventType: T,
+  payload: SocketEventPayload<T>,
   id: string,
 ) {
   if (id === client.socketUser.id) {
@@ -234,5 +222,5 @@ export async function sendErrorResponseToSelf(
   sendMessageToSelf(client, SocketEventType.ERROR, {
     message,
     errorType,
-  } as SocketError);
+  });
 }

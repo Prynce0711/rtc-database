@@ -57,7 +57,7 @@ export function useMessaging(chatId: number, fetchMessages = true): Messaging {
   useEffect(() => {
     const unsubscribe = onRecieveData((event) => {
       if (event.type === SocketEventType.RECIEVE_MESSAGE) {
-        onMessage(event.payload as Message);
+        onMessage(event.payload);
       }
     });
     return () => {

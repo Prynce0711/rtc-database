@@ -40,23 +40,6 @@ export enum SocketErrorRequestType {
 
 export type SocketErrorType = SocketErrorCallType | SocketErrorRequestType;
 
-export type SocketEvent<
-  T =
-    | SocketChatMessage
-    | Message
-    // | SocketInitiateCall
-    // | SocketAnswerCall
-    | SocketLeaveCall
-    | SocketJoinChat
-    | SocketCallEnded
-    | SocketSdp
-    | SocketTyping
-    | SocketError,
-> = {
-  type: SocketEventType;
-  payload: T;
-};
-
 export type SocketChatMessage = {
   content: string;
   chatId: number;
@@ -108,6 +91,10 @@ export type SocketJoinChat = {
   chatId: number;
 };
 
+export type SocketLeaveChat = {
+  chatId: number;
+};
+
 export type SocketCallEnded = {
   callId: string;
   chatId: number;
@@ -126,6 +113,37 @@ export type SocketTyping = {
   userId: string;
   userName?: string;
 };
+
+export type SocketEventPayloadMap = {
+  [SocketEventType.SEND_MESSAGE]: SocketChatMessage;
+  [SocketEventType.RECIEVE_MESSAGE]: Message;
+  [SocketEventType.INITIATECALL]: unknown;
+  [SocketEventType.ANSWERCALL]: unknown;
+  [SocketEventType.LEAVECALL]: SocketLeaveCall;
+  [SocketEventType.CALLENDED]: SocketCallEnded;
+  [SocketEventType.ERROR]: SocketError;
+  [SocketEventType.JOINCHAT]: SocketJoinChat;
+  [SocketEventType.LEAVECHAT]: SocketLeaveChat;
+  [SocketEventType.TYPING]: SocketTyping;
+  [SocketEventType.SDP]: SocketSdp;
+  [SocketEventType.GET_ROUTER_CAPABILITIES]: unknown;
+  [SocketEventType.CREATE_TRANSPORT]: unknown;
+  [SocketEventType.CONNECT_TRANSPORT]: unknown;
+  [SocketEventType.PRODUCE]: unknown;
+  [SocketEventType.CONSUME]: unknown;
+};
+
+export type SocketEventPayload<T extends SocketEventType> =
+  SocketEventPayloadMap[T];
+
+export type SocketEvent<T extends SocketEventType = SocketEventType> = {
+  type: T;
+  payload: SocketEventPayload<T>;
+};
+
+export type AnySocketEvent = {
+  [K in SocketEventType]: SocketEvent<K>;
+}[SocketEventType];
 
 // export interface SocketGetRouterCapabilities {
 //   routerRtpCapabilities: types.RtpCapabilities;

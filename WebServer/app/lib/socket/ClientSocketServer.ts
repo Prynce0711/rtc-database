@@ -10,11 +10,9 @@ import { WebSocket, WebSocketServer } from "ws";
 import { joinChat, leaveChat } from "./handlers/chat";
 import { receiveMessage, sendErrorResponseToSelf } from "./handlers/messaging";
 import {
-  SocketChatMessage,
+  AnySocketEvent,
   SocketErrorRequestType,
-  SocketEvent,
   SocketEventType,
-  SocketJoinChat,
 } from "./SocketEvents";
 
 //TODO: when user connects, check if they have an active call
@@ -48,7 +46,7 @@ class ClientSocketServer {
 
     this.clientSocket.on("message", (data: JSON) => {
       try {
-        const event = JSON.parse(data.toString()) as SocketEvent;
+        const event = JSON.parse(data.toString()) as AnySocketEvent;
         this.handlePayload(event);
       } catch (error) {
         console.error("Error parsing message:", error);
@@ -81,11 +79,11 @@ class ClientSocketServer {
     this.setupHeartbeat();
   }
 
-  private handlePayload(event: SocketEvent) {
+  private handlePayload(event: AnySocketEvent) {
     switch (event.type) {
       case SocketEventType.SEND_MESSAGE:
         console.log("Message received from client:" + this.socketUser.name);
-        receiveMessage(this, event.payload as SocketChatMessage);
+        receiveMessage(this, event.payload);
         break;
       // case SocketEventType.INITIATECALL:
       //   console.log("Call event received from client:" + this.socketUser.name);
@@ -113,7 +111,7 @@ class ClientSocketServer {
         console.log(
           "Join chat event received from client:" + this.socketUser.name,
         );
-        joinChat(this, event.payload as SocketJoinChat);
+        joinChat(this, event.payload);
         break;
       case SocketEventType.LEAVECHAT:
         console.log(
