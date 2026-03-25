@@ -117,24 +117,14 @@ export type SocketTyping = {
 export type SocketEventPayloadMap = {
   [SocketEventType.SEND_MESSAGE]: SocketChatMessage;
   [SocketEventType.RECIEVE_MESSAGE]: Message;
-  [SocketEventType.INITIATECALL]: never;
-  [SocketEventType.ANSWERCALL]: never;
-  [SocketEventType.LEAVECALL]: SocketLeaveCall;
-  [SocketEventType.CALLENDED]: SocketCallEnded;
   [SocketEventType.ERROR]: SocketError;
   [SocketEventType.JOINCHAT]: SocketJoinChat;
   [SocketEventType.LEAVECHAT]: SocketLeaveChat;
   [SocketEventType.TYPING]: SocketTyping;
-  [SocketEventType.SDP]: SocketSdp;
-  [SocketEventType.GET_ROUTER_CAPABILITIES]: never;
-  [SocketEventType.CREATE_TRANSPORT]: never;
-  [SocketEventType.CONNECT_TRANSPORT]: never;
-  [SocketEventType.PRODUCE]: never;
-  [SocketEventType.CONSUME]: never;
 };
 
 export type SocketEventPayload<T extends SocketEventType> =
-  SocketEventPayloadMap[T];
+  T extends keyof SocketEventPayloadMap ? SocketEventPayloadMap[T] : never;
 
 export type SocketEvent<T extends SocketEventType = SocketEventType> = {
   type: T;
