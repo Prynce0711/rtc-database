@@ -56,6 +56,7 @@ interface DisplayUser {
 type GroupedMessages = { date: string; messages: Message[] };
 
 const INLINE_MEDIA_AUTOPLAY_LIMIT = 1;
+const ATTACHMENT_PLACEHOLDER_TEXT = "Sent an attachment";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatTime = (iso: string) => {
@@ -85,6 +86,9 @@ const formatRecordingTime = (seconds: number) => {
   const secs = (seconds % 60).toString().padStart(2, "0");
   return `${mins}:${secs}`;
 };
+
+const isAttachmentPlaceholderText = (value: string, hasFile: boolean) =>
+  hasFile && value.trim().toLowerCase() === ATTACHMENT_PLACEHOLDER_TEXT;
 
 const formatLastSeen = (iso?: string) => {
   if (!iso) return "";
@@ -268,7 +272,10 @@ const Messages: React.FC = () => {
   >([]);
   const [showPinnedPanel, setShowPinnedPanel] = useState(false);
   const [unsendConfirm, setUnsendConfirm] = useState<number | null>(null);
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+  const [lightboxGallery, setLightboxGallery] = useState<{
+    images: string[];
+    index: number;
+  } | null>(null);
   const [showGroupCompose, setShowGroupCompose] = useState(false);
   const [groupMembers, setGroupMembers] = useState<DisplayUser[]>([]);
   const [groupName, setGroupName] = useState("");
@@ -374,11 +381,15 @@ const Messages: React.FC = () => {
     if (!input.trim() && attachments.length === 0) return;
 
     try {
-      const attachment = attachments[0];
-      await sendMessage(
-        input.trim() || (attachment ? "Sent an attachment" : ""),
-        attachment?.file,
-      );
+      const trimmed = input.trim();
+      if (trimmed) {
+        await sendMessage(trimmed);
+      }
+
+      for (const attachment of attachments) {
+        await sendMessage(ATTACHMENT_PLACEHOLDER_TEXT, attachment.file);
+      }
+
       setInput("");
       setAttachments([]);
     } catch {
@@ -445,17 +456,19 @@ const Messages: React.FC = () => {
     imageInputRef.current?.click();
   }, []);
 
-  const handlePickedFile = useCallback(
-    (file: File | null, kind: "image" | "file") => {
-      if (!file) return;
-      setAttachments([
-        {
-          file,
-          name: file.name,
-          type: kind,
-          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        },
-      ]);
+  const handlePickedFiles = useCallback(
+    (files: FileList | null, preferredKind: "image" | "file") => {
+      if (!files?.length) return;
+      const next = Array.from(files).map((file) => ({
+        file,
+        name: file.name,
+        type:
+          preferredKind === "image" || file.type.startsWith("image/")
+            ? ("image" as const)
+            : ("file" as const),
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      }));
+      setAttachments((prev) => [...prev, ...next]);
     },
     [],
   );
@@ -906,6 +919,14 @@ const Messages: React.FC = () => {
                   image: convo.src,
                 };
                 const isPinned = pinnedConvoIds.has(convo.id);
+                const latestHasFile = Boolean(convo.latestMessage?.fileId);
+                const latestContent = convo.latestMessage?.content ?? "";
+                const latestText = isAttachmentPlaceholderText(
+                  latestContent,
+                  latestHasFile,
+                )
+                  ? "Attachment"
+                  : latestContent || "No messages yet";
                 return (
                   <div
                     key={convo.id}
@@ -976,7 +997,7 @@ const Messages: React.FC = () => {
                             }`}
                           >
                             {isOwn && "You: "}
-                            {convo.latestMessage?.content ?? "No messages yet"}
+                            {latestText}
                           </p>
                           {unreadCount > 0 && (
                             <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-primary text-primary-content text-[10px] font-bold flex items-center justify-center">
@@ -1157,6 +1178,12 @@ const Messages: React.FC = () => {
                         >
                           <div className="max-h-48 overflow-y-auto bg-warning/3 divide-y divide-base-200/60">
                             {pinned.map((msg) => {
+                              const pinnedText = isAttachmentPlaceholderText(
+                                msg.content,
+                                Boolean(msg.fileId),
+                              )
+                                ? "Attachment"
+                                : msg.content;
                               const sender =
                                 msg.userId === viewerId
                                   ? "You"
@@ -1184,7 +1211,7 @@ const Messages: React.FC = () => {
                                       </span>
                                     </div>
                                     <p className="text-xs text-base-content/70 truncate">
-                                      {msg.content}
+                                      {pinnedText}
                                     </p>
                                   </div>
                                   <button
@@ -1240,6 +1267,63 @@ const Messages: React.FC = () => {
                           activeConvo.id,
                           msg.id,
                         );
+                        const isImageMessage =
+                          Boolean(msg.fileId) &&
+                          Boolean(fileAccess?.isImage) &&
+                          !isDeleted;
+                        const previousMsg = group.messages[i - 1];
+                        const previousAccess = previousMsg
+                          ? fileAccessByMessageId[previousMsg.id]
+                          : undefined;
+                        const previousDeleted = previousMsg
+                          ? isMessageUnsent(activeConvo.id, previousMsg.id)
+                          : false;
+                        const isContinuationImage =
+                          isImageMessage &&
+                          Boolean(previousMsg) &&
+                          !previousDeleted &&
+                          previousMsg?.userId === msg.userId &&
+                          Boolean(previousMsg?.fileId) &&
+                          Boolean(previousAccess?.isImage);
+                        if (isContinuationImage) {
+                          return null;
+                        }
+
+                        const imageCluster = isImageMessage
+                          ? group.messages.slice(i).filter((candidate, idx) => {
+                              if (idx === 0) return true;
+                              const prevCandidate = group.messages[i + idx - 1];
+                              const candidateAccess =
+                                fileAccessByMessageId[candidate.id];
+                              const candidateDeleted = isMessageUnsent(
+                                activeConvo.id,
+                                candidate.id,
+                              );
+                              const prevCandidateAccess =
+                                fileAccessByMessageId[prevCandidate.id];
+                              const prevCandidateDeleted = isMessageUnsent(
+                                activeConvo.id,
+                                prevCandidate.id,
+                              );
+                              if (candidateDeleted || prevCandidateDeleted)
+                                return false;
+                              return (
+                                candidate.userId === msg.userId &&
+                                Boolean(candidate.fileId) &&
+                                Boolean(candidateAccess?.isImage) &&
+                                Boolean(prevCandidate.fileId) &&
+                                Boolean(prevCandidateAccess?.isImage)
+                              );
+                            })
+                          : [];
+                        const imageClusterUrls = imageCluster
+                          .map(
+                            (imageMsg) =>
+                              fileAccessByMessageId[imageMsg.id]?.url,
+                          )
+                          .filter((url): url is string => Boolean(url));
+                        const imageClusterCount = imageClusterUrls.length;
+
                         const showAvatar =
                           !isOwn &&
                           (i === 0 ||
@@ -1332,7 +1416,10 @@ const Messages: React.FC = () => {
                                     type="button"
                                     className="relative w-64 h-48 rounded-xl overflow-hidden bg-base-200"
                                     onClick={() =>
-                                      setLightboxImg(fileAccess.url)
+                                      setLightboxGallery({
+                                        images: imageClusterUrls,
+                                        index: 0,
+                                      })
                                     }
                                   >
                                     <Image
@@ -1342,6 +1429,11 @@ const Messages: React.FC = () => {
                                       className="object-cover"
                                       unoptimized
                                     />
+                                    {imageClusterCount > 1 && (
+                                      <span className="absolute left-2 top-2 rounded-md bg-black/65 px-2 py-1 text-[10px] font-semibold text-white">
+                                        {imageClusterCount} images
+                                      </span>
+                                    )}
                                   </button>
                                   <div
                                     className={`text-[10px] mt-1.5 ${
@@ -1472,7 +1564,10 @@ const Messages: React.FC = () => {
                               ) : (
                                 /* Text message */
                                 <>
-                                  <p>{msg.content}</p>
+                                  {!isAttachmentPlaceholderText(
+                                    msg.content,
+                                    Boolean(msg.fileId),
+                                  ) && <p>{msg.content}</p>}
                                   <div
                                     className={`flex items-center gap-1 mt-1.5 ${
                                       isOwn ? "justify-end" : "justify-start"
@@ -1555,9 +1650,10 @@ const Messages: React.FC = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    handlePickedFile(e.target.files?.[0] ?? null, "file");
+                    handlePickedFiles(e.target.files, "file");
                     e.currentTarget.value = "";
                   }}
                 />
@@ -1565,9 +1661,10 @@ const Messages: React.FC = () => {
                   ref={imageInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    handlePickedFile(e.target.files?.[0] ?? null, "image");
+                    handlePickedFiles(e.target.files, "image");
                     e.currentTarget.value = "";
                   }}
                 />
@@ -1706,13 +1803,13 @@ const Messages: React.FC = () => {
 
       {/* ── Image Lightbox Modal ───────────────────────────────────────── */}
       <AnimatePresence>
-        {lightboxImg && (
+        {lightboxGallery && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
-            onClick={() => setLightboxImg(null)}
+            onClick={() => setLightboxGallery(null)}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -1723,20 +1820,61 @@ const Messages: React.FC = () => {
               className="relative max-w-3xl max-h-[80vh] w-full"
             >
               <button
-                onClick={() => setLightboxImg(null)}
+                onClick={() => setLightboxGallery(null)}
                 className="absolute -top-10 right-0 btn btn-ghost btn-sm btn-circle text-white/70 hover:text-white hover:bg-white/10"
               >
                 <FiX className="w-5 h-5" />
               </button>
+              {lightboxGallery.images.length > 1 && (
+                <>
+                  <button
+                    onClick={() =>
+                      setLightboxGallery((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index:
+                                (prev.index - 1 + prev.images.length) %
+                                prev.images.length,
+                            }
+                          : prev,
+                      )
+                    }
+                    className="absolute left-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-sm btn-circle text-white/70 hover:text-white hover:bg-white/10 z-10"
+                  >
+                    <FiChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setLightboxGallery((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index + 1) % prev.images.length,
+                            }
+                          : prev,
+                      )
+                    }
+                    className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-sm btn-circle text-white/70 hover:text-white hover:bg-white/10 z-10"
+                  >
+                    <FiChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
               <div className="relative w-full h-[70vh] rounded-xl overflow-hidden bg-base-200/10">
                 <Image
-                  src={lightboxImg}
+                  src={lightboxGallery.images[lightboxGallery.index] ?? ""}
                   alt="Image preview"
                   fill
                   className="object-contain"
                   unoptimized
                 />
               </div>
+              {lightboxGallery.images.length > 1 && (
+                <p className="mt-2 text-center text-xs text-white/75">
+                  {lightboxGallery.index + 1} / {lightboxGallery.images.length}
+                </p>
+              )}
             </motion.div>
           </motion.div>
         )}
