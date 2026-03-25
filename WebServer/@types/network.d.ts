@@ -18,7 +18,7 @@ declare module "ws" {
 export interface Messaging {
   messages: Message[];
   loading: boolean;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, file?: File) => Promise<void>;
 }
 
 export interface Message extends ChatMessage {

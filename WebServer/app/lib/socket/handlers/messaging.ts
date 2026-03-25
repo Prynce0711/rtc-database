@@ -1,21 +1,45 @@
-import { Message } from "@/@types/network";
+import "server-only";
+
 import { messageSchema } from "@/app/components/Messages/schema";
+import { ChatMessage } from "@/app/generated/prisma/browser";
 import { prisma } from "@/app/lib/prisma";
 import ClientSocketServer from "@/app/lib/socket/ClientSocketServer";
 import {
   SocketCallEnded,
+  SocketChatMessage,
   SocketError,
   SocketErrorRequestType,
   SocketErrorType,
   SocketEvent,
   SocketEventType,
-  SocketMessage,
 } from "@/app/lib/socket/SocketEvents";
+import { createHash } from "crypto";
 import { WebSocket } from "ws";
+import { uploadFileToGarageTrusted } from "../../garageActions";
+
+function sanitizeFileName(fileName: string): string {
+  const base = fileName
+    .replace(/[\\/]/g, "_")
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .trim();
+  if (!base) return `upload-${Date.now()}`;
+  return base.slice(0, 255);
+}
+
+function isBlockedMimeType(mimeType: string): boolean {
+  const blocked = new Set([
+    "application/x-msdownload",
+    "application/x-msdos-program",
+    "application/x-sh",
+    "application/x-bat",
+    "application/x-powershell",
+  ]);
+  return blocked.has(mimeType.toLowerCase());
+}
 
 export async function receiveMessage(
   client: ClientSocketServer,
-  payload: SocketMessage,
+  payload: SocketChatMessage,
   rateLimited: boolean = false,
 ) {
   if (rateLimited) {
@@ -48,21 +72,87 @@ export async function receiveMessage(
   });
   if (!chat) {
     console.error("Chat not found for ID:", payload.chatId);
-    client.clientSocket.close(1008, "Chat not found");
+    sendErrorResponseToSelf(
+      client,
+      `Chat with ID ${payload.chatId} not found`,
+      SocketErrorRequestType.NOT_FOUND,
+    );
     return;
   }
   if (!chat.members.some((m) => m.userId === client.socketUser.id)) {
     console.log("User is not a member of the chat");
-    client.clientSocket.close(1008, "You are not a member of this chat");
+    sendErrorResponseToSelf(
+      client,
+      "You are not a member of this chat",
+      SocketErrorRequestType.NOT_FOUND,
+    );
     return;
   }
-  const newMessage = await prisma.chatMessage.create({
+  let newMessage = await prisma.chatMessage.create({
     data: {
       chatId: payload.chatId,
       userId: client.socketUser.id!,
-      content: validation.data.content,
+      content: validation.data.content || "Sent an attachment",
     },
   });
+
+  if (validation.data.file) {
+    if (isBlockedMimeType(validation.data.file.type)) {
+      sendErrorResponseToSelf(
+        client,
+        "File type is not allowed",
+        SocketErrorRequestType.FORBIDDEN,
+      );
+      await prisma.chatMessage.delete({ where: { id: newMessage.id } });
+      return;
+    }
+
+    const fileBuffer = Buffer.from(validation.data.file.data, "base64");
+    if (!fileBuffer.length || fileBuffer.length !== validation.data.file.size) {
+      sendErrorResponseToSelf(
+        client,
+        "Invalid file payload",
+        SocketErrorRequestType.INVALID_DATA,
+      );
+      await prisma.chatMessage.delete({ where: { id: newMessage.id } });
+      return;
+    }
+
+    const safeFileName = sanitizeFileName(validation.data.file.name);
+    const fileHash = createHash("sha256").update(fileBuffer).digest("hex");
+    const key = `${newMessage.chatId}-${fileHash}-${safeFileName}`;
+
+    const fileLike = {
+      name: safeFileName,
+      type: validation.data.file.type,
+      size: fileBuffer.length,
+      arrayBuffer: async () =>
+        fileBuffer.buffer.slice(
+          fileBuffer.byteOffset,
+          fileBuffer.byteOffset + fileBuffer.byteLength,
+        ),
+    } as unknown as File;
+
+    const uploadResult = await uploadFileToGarageTrusted(fileLike, key);
+    if (!uploadResult.success) {
+      sendErrorResponseToSelf(
+        client,
+        "Failed to upload file",
+        SocketErrorRequestType.FILE_UPLOAD_FAILED,
+      );
+
+      await prisma.chatMessage.delete({ where: { id: newMessage.id } });
+      console.error("File upload failed:", uploadResult.error);
+      return;
+    }
+
+    newMessage = await prisma.chatMessage.update({
+      where: { id: newMessage.id },
+      data: {
+        fileId: uploadResult.result.id,
+      },
+    });
+  }
 
   await prisma.chat.update({
     where: { id: payload.chatId },
@@ -77,13 +167,13 @@ export async function receiveMessage(
       console.log("Sending message to client:", ws.userId, newMessage.content);
       ws.send(
         JSON.stringify({
-          type: SocketEventType.MESSAGE,
+          type: SocketEventType.RECIEVE_MESSAGE,
           payload: {
             ...newMessage,
             name: client.socketUser.name,
             src: client.socketUser.image,
           },
-        } as SocketEvent<Message>),
+        } as SocketEvent<ChatMessage>),
       );
     }
   }
@@ -93,7 +183,7 @@ export async function sendMessageToSelf(
   client: ClientSocketServer,
   eventType: SocketEventType,
   payload:
-    | SocketMessage
+    | SocketChatMessage
     // | SocketInitiateCall
     // | SocketAnswerCall
     | SocketCallEnded
@@ -111,7 +201,7 @@ export async function sendMessageToClient(
   client: ClientSocketServer,
   eventType: SocketEventType,
   payload:
-    | SocketMessage
+    | SocketChatMessage
     // | SocketInitiateCall
     // | SocketAnswerCall
     | SocketCallEnded

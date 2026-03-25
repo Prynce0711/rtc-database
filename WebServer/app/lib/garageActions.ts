@@ -19,6 +19,11 @@ import { garage, GetFileOptions } from "../lib/garage";
 import { validateSession } from "./authActions";
 import { prisma } from "./prisma";
 
+export async function getFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
+}
+
 export async function uploadFileToGarage(
   file: File,
   fileName?: string,
@@ -33,10 +38,30 @@ export async function uploadFileToGarage(
   fileNameOrKey: string = "",
   folderPathParam: string = "",
 ): Promise<ActionResult<FileData>> {
+  return uploadFileToGarageCore(file, fileNameOrKey, folderPathParam, false);
+}
+
+// Use this only from trusted server-internal code paths that already validated user access.
+export async function uploadFileToGarageTrusted(
+  file: File,
+  fileNameOrKey: string = "",
+  folderPathParam: string = "",
+): Promise<ActionResult<FileData>> {
+  return uploadFileToGarageCore(file, fileNameOrKey, folderPathParam, true);
+}
+
+async function uploadFileToGarageCore(
+  file: File,
+  fileNameOrKey: string,
+  folderPathParam: string,
+  skipSessionValidation: boolean,
+): Promise<ActionResult<FileData>> {
   try {
-    const sessionValidation = await validateSession();
-    if (!sessionValidation.success) {
-      return sessionValidation;
+    if (!skipSessionValidation) {
+      const sessionValidation = await validateSession();
+      if (!sessionValidation.success) {
+        return sessionValidation;
+      }
     }
 
     const originalExt = file.name.includes(".")

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { User } from "better-auth";
 import { WebSocket, WebSocketServer } from "ws";
 // import {
@@ -8,11 +10,11 @@ import { WebSocket, WebSocketServer } from "ws";
 import { joinChat, leaveChat } from "./handlers/chat";
 import { receiveMessage, sendErrorResponseToSelf } from "./handlers/messaging";
 import {
+  SocketChatMessage,
   SocketErrorRequestType,
   SocketEvent,
   SocketEventType,
   SocketJoinChat,
-  SocketMessage,
 } from "./SocketEvents";
 
 //TODO: when user connects, check if they have an active call
@@ -81,9 +83,9 @@ class ClientSocketServer {
 
   private handlePayload(event: SocketEvent) {
     switch (event.type) {
-      case SocketEventType.MESSAGE:
+      case SocketEventType.SEND_MESSAGE:
         console.log("Message received from client:" + this.socketUser.name);
-        receiveMessage(this, event.payload as SocketMessage);
+        receiveMessage(this, event.payload as SocketChatMessage);
         break;
       // case SocketEventType.INITIATECALL:
       //   console.log("Call event received from client:" + this.socketUser.name);

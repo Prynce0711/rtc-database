@@ -1,12 +1,14 @@
 "use client";
 
-import { ChatData, Message as NetworkMessage } from "@/@types/network";
+import { ChatData, Message } from "@/@types/network";
 import {
   createGroupChat as createGroupChatAction,
   getChats,
 } from "@/app/components/Messages/MessagesActions";
 import { usePopup } from "@/app/components/Popup/PopupProvider";
+import { ChatType, Roles } from "@/app/generated/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
+import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -23,16 +25,18 @@ import {
   FiCheck,
   FiChevronLeft,
   FiChevronRight,
-  FiClock,
+  FiDownload,
   FiFile,
   FiImage,
-  FiMaximize2,
+  FiMic,
   FiMoreHorizontal,
+  FiMusic,
   FiPaperclip,
   FiPhone,
   FiSearch,
   FiSend,
   FiSmile,
+  FiSquare,
   FiTrash2,
   FiUsers,
   FiVideo,
@@ -40,41 +44,18 @@ import {
 } from "react-icons/fi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface User {
+interface DisplayUser {
   id: string;
   name: string;
-  role: "admin" | "atty" | "user";
-  avatar?: string;
-  isOnline: boolean;
+  image?: string;
+  role?: Roles;
+  isOnline?: boolean;
   lastSeen?: string;
 }
 
-interface Message {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: string;
-  status: "sent" | "delivered" | "read";
-  type: "text" | "image" | "file";
-  isPinned?: boolean;
-  isDeleted?: boolean;
-  fileName?: string;
-  fileSize?: string;
-  imageUrl?: string;
-}
+type GroupedMessages = { date: string; messages: Message[] };
 
-interface Conversation {
-  id: string;
-  participant: User;
-  participants?: User[]; // for group chats
-  groupName?: string;
-  isGroup?: boolean;
-  messages: Message[];
-  lastMessage: Message;
-  unreadCount: number;
-  isPinned: boolean;
-  isTyping?: boolean;
-}
+const INLINE_MEDIA_AUTOPLAY_LIMIT = 1;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatTime = (iso: string) => {
@@ -97,6 +78,14 @@ const formatTime = (iso: string) => {
 const formatFullTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+const formatRecordingTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = (seconds % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+};
+
 const formatLastSeen = (iso?: string) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -118,11 +107,11 @@ const getInitials = (name: string) =>
     .slice(0, 2)
     .join("");
 
-const getRoleBadge = (role: string) => {
+const getRoleBadge = (role?: Roles) => {
   switch (role) {
-    case "admin":
+    case Roles.admin:
       return { label: "Admin", cls: "bg-error/15 text-error" };
-    case "atty":
+    case Roles.atty:
       return { label: "Attorney", cls: "bg-info/15 text-info" };
     default:
       return { label: "Staff", cls: "bg-success/15 text-success" };
@@ -171,7 +160,7 @@ const UserAvatar = ({
   size = "md",
   showStatus = true,
 }: {
-  user: User;
+  user: DisplayUser;
   size?: "sm" | "md" | "lg";
   showStatus?: boolean;
 }) => {
@@ -189,55 +178,12 @@ const UserAvatar = ({
       </div>
       {showStatus && (
         <OnlineDot
-          isOnline={user.isOnline}
+          isOnline={Boolean(user.isOnline)}
           size={size === "sm" ? "sm" : "md"}
         />
       )}
     </div>
   );
-};
-
-/** Seen / Delivered / Sent status with label */
-const MessageStatusBadge = ({
-  status,
-  showLabel = false,
-  isOwn = false,
-}: {
-  status: Message["status"];
-  showLabel?: boolean;
-  isOwn?: boolean;
-}) => {
-  const light = isOwn ? "text-primary-content/50" : "text-base-content/40";
-  const labelCls = `text-[9px] font-medium ${light}`;
-  switch (status) {
-    case "read":
-      return (
-        <span className="inline-flex items-center gap-0.5">
-          <span className="relative flex items-center text-primary">
-            <FiCheck className="w-3 h-3" />
-            <FiCheck className="w-3 h-3 -ml-1.5" />
-          </span>
-          {showLabel && <span className={labelCls}>Seen</span>}
-        </span>
-      );
-    case "delivered":
-      return (
-        <span className="inline-flex items-center gap-0.5">
-          <span className={`relative flex items-center ${light}`}>
-            <FiCheck className="w-3 h-3" />
-            <FiCheck className="w-3 h-3 -ml-1.5" />
-          </span>
-          {showLabel && <span className={labelCls}>Delivered</span>}
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-0.5">
-          <FiClock className={`w-3 h-3 ${light}`} />
-          {showLabel && <span className={labelCls}>Sent</span>}
-        </span>
-      );
-  }
 };
 
 /** Typing indicator bubble */
@@ -267,7 +213,7 @@ const GroupAvatar = ({
   users,
   size = "md",
 }: {
-  users: User[];
+  users: DisplayUser[];
   size?: "sm" | "md";
 }) => {
   const s = size === "sm" ? "w-5 h-5 text-[8px]" : "w-7 h-7 text-[10px]";
@@ -309,108 +255,54 @@ const Messages: React.FC = () => {
   const currentUserId = session.data?.user?.id ?? "";
   const viewerId = currentUserId;
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ChatData[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState<ConvoFilter>("all");
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [hoveredMsg, setHoveredMsg] = useState<string | null>(null);
+  const [hoveredMsg, setHoveredMsg] = useState<number | null>(null);
   const [composeSearch, setComposeSearch] = useState("");
   const [attachments, setAttachments] = useState<
-    { name: string; type: "image" | "file"; size: string }[]
+    { file: File; name: string; type: "image" | "file"; size: string }[]
   >([]);
   const [showPinnedPanel, setShowPinnedPanel] = useState(false);
-  const [unsendConfirm, setUnsendConfirm] = useState<string | null>(null);
+  const [unsendConfirm, setUnsendConfirm] = useState<number | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [showGroupCompose, setShowGroupCompose] = useState(false);
-  const [groupMembers, setGroupMembers] = useState<User[]>([]);
+  const [groupMembers, setGroupMembers] = useState<DisplayUser[]>([]);
   const [groupName, setGroupName] = useState("");
   const [onlineScrollOffset, setOnlineScrollOffset] = useState(0);
-  const [hoveredConvo, setHoveredConvo] = useState<string | null>(null);
+  const [hoveredConvo, setHoveredConvo] = useState<number | null>(null);
+  const [pinnedConvoIds, setPinnedConvoIds] = useState<Set<number>>(new Set());
+  const [pinnedMessageIdsByChat, setPinnedMessageIdsByChat] = useState<
+    Record<number, Set<number>>
+  >({});
+  const [unsentMessageIdsByChat, setUnsentMessageIdsByChat] = useState<
+    Record<number, Set<number>>
+  >({});
+  const [unreadByChat, setUnreadByChat] = useState<Record<number, number>>({});
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [fileAccessByMessageId, setFileAccessByMessageId] = useState<
+    Record<
+      number,
+      { url: string; isImage: boolean; fileName: string; mimeType: string }
+    >
+  >({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const onlineStripRef = useRef<HTMLDivElement>(null);
-  const activeChatId = useMemo(() => {
-    if (!activeId) return null;
-    const numeric = Number(activeId);
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-  }, [activeId]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeChatId = activeId;
   const { messages: backendMessages, sendMessage } = useMessaging(
     activeChatId ?? 0,
     Boolean(activeChatId),
-  );
-  const activeConvo = conversations.find((c) => c.id === activeId) ?? null;
-
-  const mapChatToConversation = useCallback(
-    (chat: ChatData): Conversation => {
-      const name = chat.name || chat.email || "Unknown";
-      const latest = chat.latestMessage;
-      const latestText = latest
-        ? typeof latest.content === "string"
-          ? latest.content
-          : "[binary message]"
-        : "No messages yet";
-      const latestTimestamp = latest?.createdAt
-        ? new Date(latest.createdAt).toISOString()
-        : new Date().toISOString();
-      const participants: User[] = (chat.members ?? []).map((member) => ({
-        id: member.id,
-        name: member.name,
-        role: "user",
-        avatar: member.image ?? undefined,
-        isOnline: false,
-      }));
-      const fallbackParticipant = participants.find(
-        (member) => member.id !== viewerId,
-      );
-
-      return {
-        id: String(chat.id),
-        participant: fallbackParticipant ??
-          participants[0] ?? {
-            id: chat.email || String(chat.id),
-            name,
-            role: "user",
-            avatar: chat.src ?? undefined,
-            isOnline: false,
-          },
-        participants: chat.type === "GROUP" ? participants : undefined,
-        isGroup: chat.type === "GROUP",
-        groupName: chat.type === "GROUP" ? name : undefined,
-        messages: [],
-        lastMessage: {
-          id: String(latest?.id ?? `chat-${chat.id}-latest`),
-          senderId: latest?.userId ?? "",
-          text: latestText,
-          timestamp: latestTimestamp,
-          status: latest?.userId === viewerId ? "sent" : "delivered",
-          type: "text",
-        },
-        unreadCount: 0,
-        isPinned: false,
-      };
-    },
-    [viewerId],
-  );
-
-  const mapBackendMessage = useCallback(
-    (message: NetworkMessage): Message => {
-      const text =
-        typeof message.content === "string"
-          ? message.content
-          : "[binary message]";
-      return {
-        id: String(message.id),
-        senderId: message.userId,
-        text,
-        timestamp: new Date(message.createdAt).toISOString(),
-        status: message.userId === viewerId ? "sent" : "delivered",
-        type: "text",
-      };
-    },
-    [viewerId],
   );
 
   const loadChats = useCallback(async () => {
@@ -419,38 +311,27 @@ const Messages: React.FC = () => {
       statusPopup.showError(result.error || "Failed to load chats");
       return;
     }
-    const mapped = result.result.map(mapChatToConversation);
-    setConversations(mapped);
-    if (mapped.length > 0) {
-      setActiveId((prev) => prev ?? mapped[0].id);
-    }
-  }, [mapChatToConversation, statusPopup]);
+    setConversations(result.result);
+  }, [statusPopup]);
 
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
 
-  useEffect(() => {
-    if (!activeId || !activeChatId) return;
-    const mappedMessages = backendMessages.map(mapBackendMessage);
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeId
-          ? {
-              ...c,
-              messages: mappedMessages,
-              lastMessage:
-                mappedMessages[mappedMessages.length - 1] ?? c.lastMessage,
-            }
-          : c,
-      ),
-    );
-  }, [activeChatId, activeId, backendMessages, mapBackendMessage]);
+  const activeConvo = useMemo(
+    () => conversations.find((c) => c.id === activeId) ?? null,
+    [conversations, activeId],
+  );
+
+  const activeMessages = useMemo(() => {
+    if (!activeConvo) return [];
+    return backendMessages;
+  }, [activeConvo, backendMessages]);
 
   // scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeConvo?.messages.length, activeId]);
+  }, [activeMessages.length, activeId]);
 
   // focus input
   useEffect(() => {
@@ -459,26 +340,30 @@ const Messages: React.FC = () => {
 
   // ── Filtered list ───────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = conversations;
-    if (filter === "unread") list = list.filter((c) => c.unreadCount > 0);
-    if (filter === "pinned") list = list.filter((c) => c.isPinned);
+    let list = [...conversations];
+    if (filter === "unread")
+      list = list.filter((c) => (unreadByChat[c.id] ?? 0) > 0);
+    if (filter === "pinned")
+      list = list.filter((c) => pinnedConvoIds.has(c.id));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
         (c) =>
-          c.participant.name.toLowerCase().includes(q) ||
-          c.lastMessage.text.toLowerCase().includes(q),
+          c.name.toLowerCase().includes(q) ||
+          c.latestMessage?.content.toLowerCase().includes(q),
       );
     }
-    // pinned first, then by last message time
+    // pinned first, then by latest activity time
     return list.sort((a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      const aPinned = pinnedConvoIds.has(a.id);
+      const bPinned = pinnedConvoIds.has(b.id);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
       return (
-        new Date(b.lastMessage.timestamp).getTime() -
-        new Date(a.lastMessage.timestamp).getTime()
+        new Date(b.latestMessage?.updatedAt ?? 0).getTime() -
+        new Date(a.latestMessage?.updatedAt ?? 0).getTime()
       );
     });
-  }, [conversations, filter, search]);
+  }, [conversations, filter, search, pinnedConvoIds, unreadByChat]);
 
   // ── Send message ────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -486,118 +371,213 @@ const Messages: React.FC = () => {
       statusPopup.showWarning("Select a conversation first.");
       return;
     }
-    if (attachments.length > 0) {
-      statusPopup.showWarning("Attachments are not supported yet.");
-      return;
-    }
-    if (!input.trim()) return;
+    if (!input.trim() && attachments.length === 0) return;
 
     try {
-      await sendMessage(input.trim());
+      const attachment = attachments[0];
+      await sendMessage(
+        input.trim() || (attachment ? "Sent an attachment" : ""),
+        attachment?.file,
+      );
       setInput("");
       setAttachments([]);
     } catch {
       statusPopup.showError("Failed to send message.");
     }
-  }, [activeChatId, attachments.length, input, sendMessage, statusPopup]);
+  }, [activeChatId, attachments, input, sendMessage, statusPopup]);
 
   // ── Select conversation ─────────────────────────────────────────────────
-  const selectConvo = useCallback((id: string) => {
+  const selectConvo = useCallback((id: number) => {
     setActiveId(id);
     setShowMobileChat(true);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)),
-    );
+    setUnreadByChat((prev) => ({ ...prev, [id]: 0 }));
   }, []);
 
   // ── Pin message ─────────────────────────────────────────────────────────
   const togglePinMessage = useCallback(
-    (msgId: string) => {
+    (msgId: number) => {
       if (!activeId) return;
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === activeId
-            ? {
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === msgId ? { ...m, isPinned: !m.isPinned } : m,
-                ),
-              }
-            : c,
-        ),
-      );
+      setPinnedMessageIdsByChat((prev) => {
+        const current = prev[activeId]
+          ? new Set(prev[activeId])
+          : new Set<number>();
+        if (current.has(msgId)) current.delete(msgId);
+        else current.add(msgId);
+        return { ...prev, [activeId]: current };
+      });
     },
     [activeId],
   );
 
   // ── Delete message ──────────────────────────────────────────────────────
-  const requestUnsend = useCallback((msgId: string) => {
+  const requestUnsend = useCallback((msgId: number) => {
     setUnsendConfirm(msgId);
   }, []);
 
   const executeUnsend = useCallback(() => {
     if (!unsendConfirm || !activeId) return;
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id !== activeId) return c;
-        const updated = c.messages.map((m) =>
-          m.id === unsendConfirm
-            ? { ...m, isDeleted: true, text: "You unsent a message" }
-            : m,
-        );
-        return {
-          ...c,
-          messages: updated,
-          lastMessage: updated[updated.length - 1],
-        };
-      }),
-    );
+    setUnsentMessageIdsByChat((prev) => {
+      const current = prev[activeId]
+        ? new Set(prev[activeId])
+        : new Set<number>();
+      current.add(unsendConfirm);
+      return { ...prev, [activeId]: current };
+    });
     setUnsendConfirm(null);
   }, [unsendConfirm, activeId]);
 
   // ── Pin / unpin conversation ────────────────────────────────────────────
-  const toggleConvoPinned = useCallback((convoId: string) => {
-    setConversations((prev) =>
-      prev.map((c) => (c.id === convoId ? { ...c, isPinned: !c.isPinned } : c)),
-    );
+  const toggleConvoPinned = useCallback((convoId: number) => {
+    setPinnedConvoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(convoId)) next.delete(convoId);
+      else next.add(convoId);
+      return next;
+    });
   }, []);
 
   // ── Mock attach file ────────────────────────────────────────────────────
   const handleFileAttach = useCallback(() => {
-    setAttachments((prev) => [
-      ...prev,
-      {
-        name: `Document_${Date.now().toString().slice(-4)}.pdf`,
-        type: "file" as const,
-        size: "1.2 MB",
-      },
-    ]);
+    fileInputRef.current?.click();
   }, []);
 
   const handleImageAttach = useCallback(() => {
-    setAttachments((prev) => [
-      ...prev,
-      {
-        name: `Photo_${Date.now().toString().slice(-4)}.jpg`,
-        type: "image" as const,
-        size: "856 KB",
-      },
-    ]);
+    imageInputRef.current?.click();
   }, []);
+
+  const handlePickedFile = useCallback(
+    (file: File | null, kind: "image" | "file") => {
+      if (!file) return;
+      setAttachments([
+        {
+          file,
+          name: file.name,
+          type: kind,
+          size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        },
+      ]);
+    },
+    [],
+  );
 
   const removeAttachment = useCallback((idx: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
+  const stopAudioRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+    if (recorder.state === "recording") {
+      recorder.stop();
+    }
+  }, []);
+
+  const startAudioRecording = useCallback(async () => {
+    if (
+      typeof window === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      statusPopup.showError(
+        "Audio recording is not supported in this browser.",
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstart = () => {
+        setIsRecordingAudio(true);
+        setRecordingSeconds(0);
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingSeconds((s) => s + 1);
+        }, 1000);
+      };
+
+      recorder.onstop = () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+
+        const blobType = recorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
+        if (audioBlob.size > 0) {
+          const extension = blobType.includes("ogg")
+            ? "ogg"
+            : blobType.includes("mp4") || blobType.includes("m4a")
+              ? "m4a"
+              : blobType.includes("wav")
+                ? "wav"
+                : "webm";
+          const file = new File(
+            [audioBlob],
+            `Voice_${Date.now()}.${extension}`,
+            { type: blobType },
+          );
+          setAttachments([
+            {
+              file,
+              name: file.name,
+              type: "file",
+              size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+            },
+          ]);
+        }
+
+        stream.getTracks().forEach((track) => track.stop());
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        setIsRecordingAudio(false);
+      };
+
+      recorder.onerror = () => {
+        statusPopup.showError("Audio recording failed.");
+        stream.getTracks().forEach((track) => track.stop());
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setIsRecordingAudio(false);
+        mediaRecorderRef.current = null;
+      };
+
+      recorder.start();
+    } catch {
+      statusPopup.showError("Microphone permission denied or unavailable.");
+    }
+  }, [statusPopup]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
   const availableUsers = useMemo(() => {
-    const unique = new Map<string, User>();
+    const unique = new Map<string, DisplayUser>();
     conversations.forEach((conversation) => {
-      const entries = conversation.participants?.length
-        ? conversation.participants
-        : [conversation.participant];
+      const entries = conversation.members ?? [];
       entries.forEach((entry) => {
         if (!entry || entry.id === viewerId) return;
-        unique.set(entry.id, entry);
+        unique.set(entry.id, {
+          id: entry.id,
+          name: entry.name,
+          image: entry.image ?? undefined,
+        });
       });
     });
     return Array.from(unique.values()).sort((a, b) =>
@@ -606,7 +586,7 @@ const Messages: React.FC = () => {
   }, [conversations, viewerId]);
 
   // ── Group chat creation ─────────────────────────────────────────────────
-  const toggleGroupMember = useCallback((user: User) => {
+  const toggleGroupMember = useCallback((user: DisplayUser) => {
     setGroupMembers((prev) =>
       prev.find((u) => u.id === user.id)
         ? prev.filter((u) => u.id !== user.id)
@@ -632,11 +612,11 @@ const Messages: React.FC = () => {
     setGroupName("");
     setComposeSearch("");
     await loadChats();
-    setActiveId(String(result.result));
+    setActiveId(result.result);
   }, [groupMembers, groupName, loadChats, statusPopup]);
 
   // ── Online users scroll ─────────────────────────────────────────────────
-  const onlineUsers: User[] = [];
+  const onlineUsers: DisplayUser[] = [];
   const ONLINE_VISIBLE = 4;
   const canScrollOnlineLeft = onlineScrollOffset > 0;
   const canScrollOnlineRight =
@@ -649,9 +629,9 @@ const Messages: React.FC = () => {
   // ── Group messages by date ─────────────────────────────────────────────
   const groupedMessages = useMemo(() => {
     if (!activeConvo) return [];
-    const groups: { date: string; messages: Message[] }[] = [];
-    activeConvo.messages.forEach((msg) => {
-      const dateStr = new Date(msg.timestamp).toLocaleDateString([], {
+    const groups: GroupedMessages[] = [];
+    activeMessages.forEach((msg) => {
+      const dateStr = new Date(msg.createdAt).toLocaleDateString([], {
         weekday: "long",
         month: "long",
         day: "numeric",
@@ -664,9 +644,98 @@ const Messages: React.FC = () => {
       }
     });
     return groups;
-  }, [activeConvo]);
+  }, [activeConvo, activeMessages]);
 
-  const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
+  const totalUnread = conversations.reduce(
+    (s, c) => s + (unreadByChat[c.id] ?? 0),
+    0,
+  );
+  const primaryUserByConvo = useMemo(() => {
+    const map: Record<number, DisplayUser> = {};
+    conversations.forEach((convo) => {
+      const fallbackName = convo.name || convo.email || "Unknown";
+      const preferred =
+        convo.members?.find((m) => m.id !== viewerId) ?? convo.members?.[0];
+      map[convo.id] = {
+        id: preferred?.id ?? String(convo.id),
+        name: preferred?.name ?? fallbackName,
+        image: preferred?.image ?? convo.src,
+      };
+    });
+    return map;
+  }, [conversations, viewerId]);
+
+  const isMessagePinned = useCallback(
+    (chatId: number, messageId: number) =>
+      Boolean(pinnedMessageIdsByChat[chatId]?.has(messageId)),
+    [pinnedMessageIdsByChat],
+  );
+
+  const isMessageUnsent = useCallback(
+    (chatId: number, messageId: number) =>
+      Boolean(unsentMessageIdsByChat[chatId]?.has(messageId)),
+    [unsentMessageIdsByChat],
+  );
+
+  const autoplayMediaMessageIds = useMemo(() => {
+    if (!activeConvo) return new Set<number>();
+    const mediaMessages = activeMessages.filter((msg) => {
+      if (!msg.fileId || isMessageUnsent(activeConvo.id, msg.id)) return false;
+      const access = fileAccessByMessageId[msg.id];
+      if (!access) return false;
+      return (
+        access.mimeType.startsWith("video/") ||
+        access.mimeType.startsWith("audio/")
+      );
+    });
+
+    return new Set(
+      mediaMessages
+        .slice(-INLINE_MEDIA_AUTOPLAY_LIMIT)
+        .map((message) => message.id),
+    );
+  }, [activeConvo, activeMessages, fileAccessByMessageId, isMessageUnsent]);
+
+  useEffect(() => {
+    if (!activeConvo) return;
+    const candidates = activeMessages.filter(
+      (msg) => msg.fileId && !fileAccessByMessageId[msg.id],
+    );
+    if (candidates.length === 0) return;
+
+    let cancelled = false;
+    const load = async () => {
+      const fetched = await Promise.all(
+        candidates.map(async (msg) => {
+          const result = await getFileUrl(msg.id, false);
+          if (!result.success) return null;
+          return {
+            id: msg.id,
+            access: {
+              url: result.result.url,
+              isImage: result.result.isImage,
+              fileName: result.result.fileName,
+              mimeType: result.result.mimeType,
+            },
+          };
+        }),
+      );
+      if (cancelled) return;
+      setFileAccessByMessageId((prev) => {
+        const next = { ...prev };
+        fetched.forEach((entry) => {
+          if (!entry) return;
+          next[entry.id] = entry.access;
+        });
+        return next;
+      });
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConvo, activeMessages, fileAccessByMessageId]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -781,8 +850,8 @@ const Messages: React.FC = () => {
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={{ duration: 0.15 }}
                       onClick={() => {
-                        const c = conversations.find(
-                          (cv) => cv.participant.id === u.id,
+                        const c = conversations.find((cv) =>
+                          cv.members?.some((m) => m.id === u.id),
                         );
                         if (c) selectConvo(c.id);
                       }}
@@ -826,9 +895,17 @@ const Messages: React.FC = () => {
             ) : (
               filtered.map((convo) => {
                 const isActive = convo.id === activeId;
-                const isOwn = convo.lastMessage.senderId === viewerId;
-                const badge = getRoleBadge(convo.participant.role);
+                const isOwn = convo.latestMessage?.userId === viewerId;
                 const isHovered = hoveredConvo === convo.id;
+                const isGroup = convo.type === ChatType.GROUP;
+                const badge = getRoleBadge();
+                const unreadCount = unreadByChat[convo.id] ?? 0;
+                const primaryUser = primaryUserByConvo[convo.id] ?? {
+                  id: String(convo.id),
+                  name: convo.name,
+                  image: convo.src,
+                };
+                const isPinned = pinnedConvoIds.has(convo.id);
                 return (
                   <div
                     key={convo.id}
@@ -845,70 +922,65 @@ const Messages: React.FC = () => {
                           : "hover:bg-base-200/50 border-l-[3px] border-l-transparent",
                       ].join(" ")}
                     >
-                      {convo.isGroup && convo.participants ? (
-                        <GroupAvatar users={convo.participants} />
+                      {isGroup && convo.members?.length ? (
+                        <GroupAvatar
+                          users={convo.members.map((m) => ({
+                            id: m.id,
+                            name: m.name,
+                            image: m.image ?? undefined,
+                          }))}
+                        />
                       ) : (
-                        <UserAvatar user={convo.participant} size="md" />
+                        <UserAvatar user={primaryUser} size="md" />
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-2 min-w-0">
-                            {convo.isGroup && (
+                            {isGroup && (
                               <FiUsers className="w-3 h-3 text-base-content/40 shrink-0" />
                             )}
                             <span
                               className={`text-sm truncate ${
-                                convo.unreadCount > 0
+                                unreadCount > 0
                                   ? "font-bold text-base-content"
                                   : "font-semibold text-base-content/90"
                               }`}
                             >
-                              {convo.isGroup
-                                ? convo.groupName
-                                : convo.participant.name}
+                              {convo.name}
                             </span>
-                            {!convo.isGroup && (
+                            {!isGroup && (
                               <span
                                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${badge.cls}`}
                               >
                                 {badge.label}
                               </span>
                             )}
-                            {convo.isPinned && (
+                            {isPinned && (
                               <BsPinFill className="w-2.5 h-2.5 text-warning shrink-0" />
                             )}
                           </div>
                           <span className="text-[11px] text-base-content/40 shrink-0 tabular-nums">
-                            {formatTime(convo.lastMessage.timestamp)}
+                            {convo.latestMessage
+                              ? formatTime(
+                                  convo.latestMessage.createdAt.toString(),
+                                )
+                              : ""}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {isOwn && (
-                            <span className="shrink-0">
-                              <MessageStatusBadge
-                                status={convo.lastMessage.status}
-                              />
-                            </span>
-                          )}
                           <p
                             className={`text-xs truncate ${
-                              convo.unreadCount > 0
+                              unreadCount > 0
                                 ? "text-base-content/80 font-medium"
                                 : "text-base-content/50"
                             }`}
                           >
                             {isOwn && "You: "}
-                            {convo.isTyping
-                              ? "Typing..."
-                              : convo.lastMessage.type === "image"
-                                ? "📷 Photo"
-                                : convo.lastMessage.type === "file"
-                                  ? `📎 ${convo.lastMessage.fileName ?? "File"}`
-                                  : convo.lastMessage.text}
+                            {convo.latestMessage?.content ?? "No messages yet"}
                           </p>
-                          {convo.unreadCount > 0 && (
+                          {unreadCount > 0 && (
                             <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-primary text-primary-content text-[10px] font-bold flex items-center justify-center">
-                              {convo.unreadCount}
+                              {unreadCount}
                             </span>
                           )}
                         </div>
@@ -921,14 +993,12 @@ const Messages: React.FC = () => {
                           e.stopPropagation();
                           toggleConvoPinned(convo.id);
                         }}
-                        className={`absolute top-2 right-2 btn btn-ghost btn-xs btn-square rounded-md z-10 ${convo.isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
+                        className={`absolute top-2 right-2 btn btn-ghost btn-xs btn-square rounded-md z-10 ${isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
                         title={
-                          convo.isPinned
-                            ? "Unpin conversation"
-                            : "Pin conversation"
+                          isPinned ? "Unpin conversation" : "Pin conversation"
                         }
                       >
-                        {convo.isPinned ? (
+                        {isPinned ? (
                           <BsPinFill className="w-3 h-3" />
                         ) : (
                           <BsPin className="w-3 h-3" />
@@ -977,42 +1047,56 @@ const Messages: React.FC = () => {
                   <FiChevronLeft className="w-5 h-5" />
                 </button>
 
-                {activeConvo.isGroup && activeConvo.participants ? (
-                  <GroupAvatar users={activeConvo.participants} />
+                {activeConvo.type === ChatType.GROUP &&
+                activeConvo.members?.length ? (
+                  <GroupAvatar
+                    users={activeConvo.members.map((m) => ({
+                      id: m.id,
+                      name: m.name,
+                      image: m.image ?? undefined,
+                    }))}
+                  />
                 ) : (
-                  <UserAvatar user={activeConvo.participant} size="md" />
+                  <UserAvatar
+                    user={
+                      primaryUserByConvo[activeConvo.id] ?? {
+                        id: String(activeConvo.id),
+                        name: activeConvo.name,
+                        image: activeConvo.src,
+                      }
+                    }
+                    size="md"
+                  />
                 )}
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-base-content truncate">
-                    {activeConvo.isGroup
-                      ? activeConvo.groupName
-                      : activeConvo.participant.name}
+                    {activeConvo.name}
                   </h3>
                   <div className="flex items-center gap-2">
-                    {activeConvo.isGroup ? (
+                    {activeConvo.type === ChatType.GROUP ? (
                       <span className="text-xs text-base-content/50 flex items-center gap-1">
                         <FiUsers className="w-3 h-3" />
-                        {activeConvo.participants?.length ?? 0} members
+                        {activeConvo.members?.length ?? 0} members
                       </span>
                     ) : (
                       <>
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${getRoleBadge(activeConvo.participant.role).cls}`}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${getRoleBadge().cls}`}
                         >
-                          {getRoleBadge(activeConvo.participant.role).label}
+                          {getRoleBadge().label}
                         </span>
-                        {activeConvo.participant.isOnline ? (
+                        {false ? (
                           <span className="text-xs text-success font-medium flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                             Active now
                           </span>
-                        ) : activeConvo.isTyping ? (
+                        ) : false ? (
                           <span className="text-xs text-primary font-medium">
                             Typing...
                           </span>
                         ) : (
                           <span className="text-xs text-base-content/40">
-                            {formatLastSeen(activeConvo.participant.lastSeen)}
+                            {formatLastSeen(undefined)}
                           </span>
                         )}
                       </>
@@ -1035,8 +1119,10 @@ const Messages: React.FC = () => {
 
               {/* ── Pinned Messages Bar ──────────────────────────────── */}
               {(() => {
-                const pinned = activeConvo.messages.filter(
-                  (m) => m.isPinned && !m.isDeleted,
+                const pinned = activeMessages.filter(
+                  (m) =>
+                    isMessagePinned(activeConvo.id, m.id) &&
+                    !isMessageUnsent(activeConvo.id, m.id),
                 );
                 if (pinned.length === 0) return null;
                 return (
@@ -1052,7 +1138,7 @@ const Messages: React.FC = () => {
                           {pinned.length} pinned
                         </span>
                         {" — "}
-                        {pinned[pinned.length - 1].text || "Media"}
+                        {pinned[pinned.length - 1].content || "Message"}
                       </span>
                       <FiChevronRight
                         className={`w-3.5 h-3.5 text-base-content/30 transition-transform duration-200 ${showPinnedPanel ? "rotate-90" : ""}`}
@@ -1072,18 +1158,14 @@ const Messages: React.FC = () => {
                           <div className="max-h-48 overflow-y-auto bg-warning/3 divide-y divide-base-200/60">
                             {pinned.map((msg) => {
                               const sender =
-                                msg.senderId === viewerId
+                                msg.userId === viewerId
                                   ? "You"
-                                  : activeConvo.isGroup
-                                    ? (activeConvo.participants
-                                        ?.find((u) => u.id === msg.senderId)
+                                  : activeConvo.type === ChatType.GROUP
+                                    ? (activeConvo.members
+                                        ?.find((u) => u.id === msg.userId)
                                         ?.name.split(" ")[0] ??
-                                      activeConvo.participant.name.split(
-                                        " ",
-                                      )[0])
-                                    : activeConvo.participant.name.split(
-                                        " ",
-                                      )[0];
+                                      activeConvo.name.split(" ")[0])
+                                    : activeConvo.name.split(" ")[0];
                               return (
                                 <div
                                   key={msg.id}
@@ -1096,15 +1178,13 @@ const Messages: React.FC = () => {
                                         {sender}
                                       </span>
                                       <span className="text-[10px] text-base-content/30 tabular-nums">
-                                        {formatFullTime(msg.timestamp)}
+                                        {formatFullTime(
+                                          msg.createdAt.toString(),
+                                        )}
                                       </span>
                                     </div>
                                     <p className="text-xs text-base-content/70 truncate">
-                                      {msg.type === "image"
-                                        ? "📷 Photo"
-                                        : msg.type === "file"
-                                          ? `📎 ${msg.fileName}`
-                                          : msg.text}
+                                      {msg.content}
                                     </p>
                                   </div>
                                   <button
@@ -1141,14 +1221,32 @@ const Messages: React.FC = () => {
                     {/* Messages */}
                     <div className="space-y-1.5">
                       {group.messages.map((msg, i) => {
-                        const isOwn = msg.senderId === viewerId;
+                        const fileAccess = fileAccessByMessageId[msg.id];
+                        const isVideo = Boolean(
+                          fileAccess?.mimeType?.startsWith("video/"),
+                        );
+                        const isAudio = Boolean(
+                          fileAccess?.mimeType?.startsWith("audio/"),
+                        );
+                        const canInlineAutoplay = autoplayMediaMessageIds.has(
+                          msg.id,
+                        );
+                        const isOwn = msg.userId === viewerId;
+                        const isDeleted = isMessageUnsent(
+                          activeConvo.id,
+                          msg.id,
+                        );
+                        const isPinned = isMessagePinned(
+                          activeConvo.id,
+                          msg.id,
+                        );
                         const showAvatar =
                           !isOwn &&
                           (i === 0 ||
-                            group.messages[i - 1].senderId !== msg.senderId);
+                            group.messages[i - 1].userId !== msg.userId);
                         const isLast =
                           i === group.messages.length - 1 ||
-                          group.messages[i + 1]?.senderId !== msg.senderId;
+                          group.messages[i + 1]?.userId !== msg.userId;
 
                         return (
                           <motion.div
@@ -1165,7 +1263,13 @@ const Messages: React.FC = () => {
                               <div className="w-8 shrink-0">
                                 {showAvatar && (
                                   <UserAvatar
-                                    user={activeConvo.participant}
+                                    user={
+                                      primaryUserByConvo[activeConvo.id] ?? {
+                                        id: String(activeConvo.id),
+                                        name: activeConvo.name,
+                                        image: activeConvo.src,
+                                      }
+                                    }
                                     size="sm"
                                     showStatus={false}
                                   />
@@ -1174,107 +1278,130 @@ const Messages: React.FC = () => {
                             )}
 
                             {/* Hover actions (own messages: left side) */}
-                            {isOwn &&
-                              hoveredMsg === msg.id &&
-                              !msg.isDeleted && (
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity pb-1">
-                                  <button
-                                    onClick={() => togglePinMessage(msg.id)}
-                                    className={`btn btn-ghost btn-xs btn-square rounded-md ${msg.isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
-                                    title={msg.isPinned ? "Unpin" : "Pin"}
-                                  >
-                                    <BsPin className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => requestUnsend(msg.id)}
-                                    className="btn btn-ghost btn-xs btn-square rounded-md text-base-content/30 hover:text-error"
-                                    title="Unsend"
-                                  >
-                                    <FiTrash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              )}
+                            {isOwn && hoveredMsg === msg.id && !isDeleted && (
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity pb-1">
+                                <button
+                                  onClick={() => togglePinMessage(msg.id)}
+                                  className={`btn btn-ghost btn-xs btn-square rounded-md ${isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
+                                  title={isPinned ? "Unpin" : "Pin"}
+                                >
+                                  <BsPin className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => requestUnsend(msg.id)}
+                                  className="btn btn-ghost btn-xs btn-square rounded-md text-base-content/30 hover:text-error"
+                                  title="Unsend"
+                                >
+                                  <FiTrash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
 
                             <div
                               className={[
                                 "max-w-[70%] text-sm leading-relaxed relative",
-                                msg.isDeleted
+                                isDeleted
                                   ? "px-4 py-2.5 italic opacity-50 bg-base-200 text-base-content/50 rounded-2xl border border-dashed border-base-300"
-                                  : msg.type === "image"
-                                    ? "rounded-2xl overflow-hidden shadow-sm"
-                                    : [
-                                        "px-4 py-2.5",
-                                        isOwn
-                                          ? "bg-primary text-primary-content rounded-2xl rounded-br-md shadow-sm"
-                                          : "bg-base-100 text-base-content border border-base-200 rounded-2xl rounded-bl-md shadow-xs",
-                                      ].join(" "),
-                                msg.isPinned && !msg.isDeleted
+                                  : [
+                                      "px-4 py-2.5",
+                                      isOwn
+                                        ? "bg-primary text-primary-content rounded-2xl rounded-br-md shadow-sm"
+                                        : "bg-base-100 text-base-content border border-base-200 rounded-2xl rounded-bl-md shadow-xs",
+                                    ].join(" "),
+                                isPinned && !isDeleted
                                   ? "ring-1 ring-warning/40"
                                   : "",
                               ].join(" ")}
                             >
                               {/* Pinned indicator */}
-                              {msg.isPinned && !msg.isDeleted && (
+                              {isPinned && !isDeleted && (
                                 <div className="absolute -top-2 -right-2">
                                   <BsPinFill className="w-3 h-3 text-warning" />
                                 </div>
                               )}
 
                               {/* Deleted message */}
-                              {msg.isDeleted ? (
+                              {isDeleted ? (
                                 <p className="flex items-center gap-1.5">
                                   <FiTrash2 className="w-3 h-3" />
                                   You unsent a message
                                 </p>
-                              ) : msg.type === "image" ? (
-                                /* Image message */
+                              ) : msg.fileId && fileAccess?.isImage ? (
                                 <div>
-                                  <div
-                                    className="w-64 h-48 bg-base-200 flex items-center justify-center relative cursor-pointer group/img"
+                                  <button
+                                    type="button"
+                                    className="relative w-64 h-48 rounded-xl overflow-hidden bg-base-200"
                                     onClick={() =>
-                                      setLightboxImg(msg.imageUrl ?? null)
+                                      setLightboxImg(fileAccess.url)
                                     }
                                   >
                                     <Image
-                                      src={msg.imageUrl ?? ""}
-                                      alt="Shared"
+                                      src={fileAccess.url}
+                                      alt={fileAccess.fileName || "Image"}
                                       fill
                                       className="object-cover"
                                       unoptimized
                                     />
-                                    {/* Zoom overlay */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors flex items-center justify-center">
-                                      <FiMaximize2 className="w-6 h-6 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow-lg" />
-                                    </div>
-                                  </div>
+                                  </button>
                                   <div
-                                    className={`px-3 py-1.5 ${
+                                    className={`text-[10px] mt-1.5 ${
                                       isOwn
-                                        ? "bg-primary text-primary-content"
-                                        : "bg-base-100 border-t border-base-200"
+                                        ? "text-primary-content/60"
+                                        : "text-base-content/35"
                                     }`}
                                   >
-                                    <div className="flex items-center gap-1">
-                                      <span
-                                        className={`text-[10px] tabular-nums ${
-                                          isOwn
-                                            ? "text-primary-content/60"
-                                            : "text-base-content/35"
-                                        }`}
-                                      >
-                                        {formatFullTime(msg.timestamp)}
-                                      </span>
-                                      {isOwn && isLast && (
-                                        <MessageStatusBadge
-                                          status={msg.status}
-                                          isOwn
-                                          showLabel
-                                        />
-                                      )}
-                                    </div>
+                                    {formatFullTime(msg.createdAt.toString())}
                                   </div>
                                 </div>
-                              ) : msg.type === "file" ? (
+                              ) : msg.fileId && isVideo ? (
+                                <div className="w-72">
+                                  <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-base-200 px-2 py-0.5 text-[10px] font-semibold text-base-content/70">
+                                    <FiVideo className="w-3 h-3" />
+                                    Video
+                                  </div>
+                                  <video
+                                    src={fileAccess?.url}
+                                    controls
+                                    preload="metadata"
+                                    autoPlay={canInlineAutoplay}
+                                    muted={canInlineAutoplay}
+                                    playsInline
+                                    className="w-full rounded-xl bg-black"
+                                  />
+                                  <div
+                                    className={`text-[10px] mt-1.5 ${
+                                      isOwn
+                                        ? "text-primary-content/60"
+                                        : "text-base-content/35"
+                                    }`}
+                                  >
+                                    {formatFullTime(msg.createdAt.toString())}
+                                  </div>
+                                </div>
+                              ) : msg.fileId && isAudio ? (
+                                <div className="w-72">
+                                  <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-base-200 px-2 py-0.5 text-[10px] font-semibold text-base-content/70">
+                                    <FiMusic className="w-3 h-3" />
+                                    Audio
+                                  </div>
+                                  <audio
+                                    src={fileAccess?.url}
+                                    controls
+                                    preload="metadata"
+                                    autoPlay={canInlineAutoplay}
+                                    className="w-full"
+                                  />
+                                  <div
+                                    className={`text-[10px] mt-1.5 ${
+                                      isOwn
+                                        ? "text-primary-content/60"
+                                        : "text-base-content/35"
+                                    }`}
+                                  >
+                                    {formatFullTime(msg.createdAt.toString())}
+                                  </div>
+                                </div>
+                              ) : msg.fileId ? (
                                 /* File message */
                                 <div className="flex items-center gap-3">
                                   <div
@@ -1296,19 +1423,41 @@ const Messages: React.FC = () => {
                                           : "text-base-content"
                                       }`}
                                     >
-                                      {msg.fileName}
-                                    </p>
-                                    <p
-                                      className={`text-[10px] ${
-                                        isOwn
-                                          ? "text-primary-content/60"
-                                          : "text-base-content/40"
-                                      }`}
-                                    >
-                                      {msg.fileSize}
+                                      {fileAccess?.fileName ?? "Attachment"}
                                     </p>
                                   </div>
                                   <div className="flex flex-col items-end gap-0.5">
+                                    <button
+                                      type="button"
+                                      className={`text-[10px] font-semibold ${
+                                        isOwn
+                                          ? "text-primary-content"
+                                          : "text-primary"
+                                      }`}
+                                      onClick={async () => {
+                                        const result = await getFileUrl(
+                                          msg.id,
+                                          true,
+                                        );
+                                        if (!result.success) {
+                                          statusPopup.showError(
+                                            result.error ||
+                                              "Failed to download file.",
+                                          );
+                                          return;
+                                        }
+                                        window.open(
+                                          result.result.url,
+                                          "_blank",
+                                          "noopener,noreferrer",
+                                        );
+                                      }}
+                                    >
+                                      <span className="inline-flex items-center gap-1">
+                                        <FiDownload className="w-3 h-3" />
+                                        Download
+                                      </span>
+                                    </button>
                                     <span
                                       className={`text-[10px] tabular-nums ${
                                         isOwn
@@ -1316,21 +1465,14 @@ const Messages: React.FC = () => {
                                           : "text-base-content/35"
                                       }`}
                                     >
-                                      {formatFullTime(msg.timestamp)}
+                                      {formatFullTime(msg.createdAt.toString())}
                                     </span>
-                                    {isOwn && isLast && (
-                                      <MessageStatusBadge
-                                        status={msg.status}
-                                        isOwn
-                                        showLabel
-                                      />
-                                    )}
                                   </div>
                                 </div>
                               ) : (
                                 /* Text message */
                                 <>
-                                  <p>{msg.text}</p>
+                                  <p>{msg.content}</p>
                                   <div
                                     className={`flex items-center gap-1 mt-1.5 ${
                                       isOwn ? "justify-end" : "justify-start"
@@ -1343,64 +1485,31 @@ const Messages: React.FC = () => {
                                           : "text-base-content/35"
                                       }`}
                                     >
-                                      {formatFullTime(msg.timestamp)}
+                                      {formatFullTime(msg.createdAt.toString())}
                                     </span>
-                                    {isOwn && isLast && (
-                                      <MessageStatusBadge
-                                        status={msg.status}
-                                        isOwn
-                                        showLabel
-                                      />
-                                    )}
                                   </div>
                                 </>
                               )}
                             </div>
 
                             {/* Hover actions (other's messages: right side) */}
-                            {!isOwn &&
-                              hoveredMsg === msg.id &&
-                              !msg.isDeleted && (
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity pb-1">
-                                  <button
-                                    onClick={() => togglePinMessage(msg.id)}
-                                    className={`btn btn-ghost btn-xs btn-square rounded-md ${msg.isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
-                                    title={msg.isPinned ? "Unpin" : "Pin"}
-                                  >
-                                    <BsPin className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              )}
+                            {!isOwn && hoveredMsg === msg.id && !isDeleted && (
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity pb-1">
+                                <button
+                                  onClick={() => togglePinMessage(msg.id)}
+                                  className={`btn btn-ghost btn-xs btn-square rounded-md ${isPinned ? "text-warning" : "text-base-content/30 hover:text-warning"}`}
+                                  title={isPinned ? "Unpin" : "Pin"}
+                                >
+                                  <BsPin className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
                           </motion.div>
                         );
                       })}
                     </div>
                   </div>
                 ))}
-                {/* Typing indicator */}
-                {activeConvo.isTyping && (
-                  <div className="flex items-end gap-2 ml-10">
-                    <TypingIndicator
-                      name={activeConvo.participant.name.split(" ")[0]}
-                    />
-                  </div>
-                )}
-
-                {/* Seen receipt */}
-                {(() => {
-                  const lastOwn = [...activeConvo.messages]
-                    .reverse()
-                    .find((m) => m.senderId === viewerId);
-                  if (!lastOwn || lastOwn.status !== "read") return null;
-                  return (
-                    <div className="flex justify-end pr-1">
-                      <span className="text-[10px] text-base-content/40 flex items-center gap-1">
-                        Seen {formatFullTime(lastOwn.timestamp)}
-                      </span>
-                    </div>
-                  );
-                })()}
-
                 <div ref={messagesEndRef} />
               </div>
 
@@ -1443,6 +1552,26 @@ const Messages: React.FC = () => {
                   )}
                 </AnimatePresence>
 
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    handlePickedFile(e.target.files?.[0] ?? null, "file");
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handlePickedFile(e.target.files?.[0] ?? null, "image");
+                    e.currentTarget.value = "";
+                  }}
+                />
+
                 <div className="px-4 py-3 flex items-end gap-2">
                   {/* Attachment buttons */}
                   <div className="flex items-center gap-0.5 pb-1">
@@ -1460,10 +1589,32 @@ const Messages: React.FC = () => {
                     >
                       <FiImage className="w-4 h-4" />
                     </button>
+                    <button
+                      onClick={
+                        isRecordingAudio
+                          ? stopAudioRecording
+                          : startAudioRecording
+                      }
+                      className={`btn btn-ghost btn-xs btn-square rounded-lg ${isRecordingAudio ? "text-error" : "text-base-content/40 hover:text-primary"}`}
+                      title={
+                        isRecordingAudio ? "Stop recording" : "Record audio"
+                      }
+                    >
+                      {isRecordingAudio ? (
+                        <FiSquare className="w-4 h-4" />
+                      ) : (
+                        <FiMic className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
 
                   {/* Input */}
                   <div className="flex-1 relative">
+                    {isRecordingAudio && (
+                      <span className="absolute -top-5 left-2 text-[10px] font-semibold text-error">
+                        Recording {formatRecordingTime(recordingSeconds)}
+                      </span>
+                    )}
                     <input
                       ref={inputRef}
                       type="text"
