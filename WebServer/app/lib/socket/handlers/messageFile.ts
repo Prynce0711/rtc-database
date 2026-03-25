@@ -12,6 +12,21 @@ export type MessageFileAccess = {
   isImage: boolean;
 };
 
+function sanitizeDownloadName(rawFileName: string): string {
+  const safe = rawFileName.trim();
+  if (!safe) return "attachment";
+
+  // Stored keys may look like: <chatId>-<sha256>-<originalName>
+  const prefixed = safe.match(/^\d+-[a-f0-9]{32,128}-(.+)$/i);
+  if (prefixed?.[1]) return prefixed[1];
+
+  // Fallback: remove only leading numeric id prefix if present.
+  const numericPrefixed = safe.match(/^\d+-(.+)$/);
+  if (numericPrefixed?.[1]) return numericPrefixed[1];
+
+  return safe;
+}
+
 export async function getFileUrl(
   messageId: number,
   download: boolean = false,
@@ -50,9 +65,11 @@ export async function getFileUrl(
       };
     }
 
+    const downloadName = sanitizeDownloadName(message.file.fileName);
+
     const fileUrl = await getGarageFileUrl(message.file.key, {
       inline: !download,
-      fileName: message.file.fileName,
+      fileName: downloadName,
       contentType: message.file.mimeType,
     });
     if (!fileUrl.success) {
@@ -67,7 +84,7 @@ export async function getFileUrl(
       result: {
         url: fileUrl.result,
         mimeType: message.file.mimeType,
-        fileName: message.file.fileName,
+        fileName: downloadName,
         isImage: message.file.mimeType.startsWith("image/"),
       },
     };
