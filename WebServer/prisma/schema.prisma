@@ -188,6 +188,19 @@ model SpecialProceeding {
   case      Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
+model Sherriff {
+  id              Int        @id @default(autoincrement())
+  ejfCaseNumber   String?
+  mortgagee       String?
+  mortgagor       String?
+  remarks         String?
+  date            DateTime?
+  name            String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime?  @updatedAt @default(now())
+}
+
 model Employee {
   id               Int        @id @default(autoincrement())
   employeeName     String
