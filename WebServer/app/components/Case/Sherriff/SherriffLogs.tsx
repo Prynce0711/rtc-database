@@ -55,6 +55,36 @@ const toSherriffFilters = (filters: FilterValues): SherriffFilterValues => ({
   ...filters,
 });
 
+const SHERRIFF_TEXT_FILTER_KEYS = [
+  "ejfCaseNumber",
+  "name",
+  "mortgagee",
+  "mortgagor",
+  "remarks",
+] as const;
+
+const normalizeSherriffExactMatchMap = (
+  filters: SherriffFilterValues,
+  exactMap: ExactMatchMap,
+): ExactMatchMap => {
+  const nextExactMap = { ...exactMap };
+
+  SHERRIFF_TEXT_FILTER_KEYS.forEach((key) => {
+    const value = filters[key];
+    const hasTextValue = typeof value === "string" && value.trim().length > 0;
+    if (!hasTextValue) {
+      delete nextExactMap[key];
+      return;
+    }
+
+    if (nextExactMap[key] === undefined) {
+      nextExactMap[key] = false;
+    }
+  });
+
+  return nextExactMap;
+};
+
 const SherriffRow = ({
   log,
   onEdit,
@@ -255,8 +285,14 @@ const SherriffLogsPage: React.FC = () => {
     filters: FilterValues,
     exactMap: ExactMatchMap,
   ) => {
-    setAppliedFilters(toSherriffFilters(filters));
-    setExactMatchMap(exactMap);
+    const nextFilters = toSherriffFilters(filters);
+    const normalizedExactMap = normalizeSherriffExactMatchMap(
+      nextFilters,
+      exactMap,
+    );
+
+    setAppliedFilters(nextFilters);
+    setExactMatchMap(normalizedExactMap);
     setCurrentPage(1);
   };
 
@@ -500,12 +536,22 @@ const SherriffLogsPage: React.FC = () => {
               placeholder="Search EJF case number..."
               className="input input-bordered input-lg w-full pl-12 text-base"
               value={appliedFilters?.ejfCaseNumber || ""}
-              onChange={(e) =>
+              onChange={(e) => {
+                const value = e.target.value;
                 setAppliedFilters((prev) => ({
                   ...prev,
-                  ejfCaseNumber: e.target.value,
-                }))
-              }
+                  ejfCaseNumber: value,
+                }));
+                setExactMatchMap((prev) => {
+                  const next = { ...prev };
+                  if (value.trim()) {
+                    next.ejfCaseNumber = false;
+                  } else {
+                    delete next.ejfCaseNumber;
+                  }
+                  return next;
+                });
+              }}
             />
             <input
               ref={fileInputRef}

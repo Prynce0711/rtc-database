@@ -296,7 +296,7 @@ export async function updateSherriff(
       details: {
         from: oldRecord,
         to: updatedRecord,
-      } as any,
+      },
     });
 
     return { success: true, result: updatedRecord };
