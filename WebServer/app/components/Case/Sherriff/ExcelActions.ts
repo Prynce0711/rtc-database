@@ -11,6 +11,7 @@ import {
   normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
+  QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
 } from "@/app/lib/excel";
@@ -44,6 +45,64 @@ export async function uploadSherriffExcel(
       return sessionResult;
     }
 
+    const candidateCaseNumbers = new Set<string>();
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        const rows =
+          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+
+        for (const row of rows) {
+          const normalized = normalizeRowBySchema(SherriffSchema, row);
+          const caseNumber = normalized.ejfCaseNumber;
+          if (typeof caseNumber !== "string") continue;
+          const trimmed = caseNumber.trim();
+          if (trimmed) {
+            candidateCaseNumbers.add(trimmed);
+          }
+        }
+      }
+    } catch (peekError) {
+      console.warn(
+        "⚠ Unable to preview sheriff workbook for matching:",
+        peekError,
+      );
+    }
+
+    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
+    const exactMatchCache = new Map<string, boolean>();
+
+    if (candidateCaseNumbers.size > 0) {
+      const allCaseNumbers = Array.from(candidateCaseNumbers);
+
+      for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
+        const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
+
+        const existingRecords = await prisma.sherriff.findMany({
+          where: {
+            ejfCaseNumber: {
+              in: caseNumberChunk,
+            },
+          },
+        });
+
+        for (const existingRecord of existingRecords) {
+          if (!existingRecord.ejfCaseNumber) continue;
+
+          const key = existingRecord.ejfCaseNumber.trim();
+          if (!key) continue;
+
+          const bucket = existingByCaseNumber.get(key) ?? [];
+          bucket.push(existingRecord as unknown as Record<string, unknown>);
+          existingByCaseNumber.set(key, bucket);
+        }
+      }
+    }
+
     const headerMap = getExcelHeaderMap(SherriffSchema);
     const caseNumberHeaders = headerMap.ejfCaseNumber ?? ["EJF Case Number"];
 
@@ -70,25 +129,43 @@ export async function uploadSherriffExcel(
         "remarks",
       ],
       checkExactMatch: async (_cells, mappedRow) => {
-        const where: Prisma.SherriffWhereInput = {
-          ejfCaseNumber: mappedRow.ejfCaseNumber,
-          mortgagee: mappedRow.mortgagee,
-          mortgagor: mappedRow.mortgagor,
-          date: mappedRow.date,
-          name: mappedRow.name,
-        };
-
-        const existingRecords = await prisma.sherriff.findMany({ where });
         const mappedEntries = Object.entries(mappedRow);
 
-        const hasExactMatch = existingRecords.some((existingRecord) =>
+        const cacheKey = JSON.stringify(
+          mappedEntries
+            .slice()
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => [
+              key,
+              value instanceof Date
+                ? value.getTime()
+                : typeof value === "string"
+                  ? value.trim()
+                  : (value ?? null),
+            ]),
+        );
+
+        const cachedResult = exactMatchCache.get(cacheKey);
+        if (cachedResult !== undefined) {
+          return { exists: cachedResult };
+        }
+
+        const caseNumberKey =
+          typeof mappedRow.ejfCaseNumber === "string"
+            ? mappedRow.ejfCaseNumber.trim()
+            : "";
+
+        const candidates = caseNumberKey
+          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
+          : [];
+
+        const hasExactMatch = candidates.some((existingRecord) =>
           mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRecord as Record<string, unknown>)[key],
-            ),
+            valuesAreEqual(value, existingRecord[key]),
           ),
         );
+
+        exactMatchCache.set(cacheKey, hasExactMatch);
 
         return { exists: hasExactMatch };
       },

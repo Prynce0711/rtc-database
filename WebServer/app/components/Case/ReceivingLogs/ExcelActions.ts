@@ -13,6 +13,7 @@ import {
   normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
+  QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
 } from "@/app/lib/excel";
@@ -92,6 +93,8 @@ export async function uploadReceiveExcel(
       return sessionResult;
     }
 
+    const candidateCaseNumbers = new Set<string>();
+
     console.log(
       `✓ Receiving Log Excel file received: ${file.name} (${file.size} bytes)`,
     );
@@ -101,8 +104,54 @@ export async function uploadReceiveExcel(
       console.log(
         `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
+
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        const rows =
+          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+
+        for (const row of rows) {
+          const normalized = normalizeRowBySchema(ReceivingLogSchema, row);
+          const caseNumber = normalized.caseNumber;
+          if (typeof caseNumber !== "string") continue;
+          const trimmed = caseNumber.trim();
+          if (trimmed) {
+            candidateCaseNumbers.add(trimmed);
+          }
+        }
+      }
     } catch (peekError) {
       console.warn("⚠ Unable to preview workbook for logging:", peekError);
+    }
+
+    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
+    const exactMatchCache = new Map<string, boolean>();
+
+    if (candidateCaseNumbers.size > 0) {
+      const allCaseNumbers = Array.from(candidateCaseNumbers);
+
+      for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
+        const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
+
+        const existingLogs = await prisma.recievingLog.findMany({
+          where: {
+            caseNumber: {
+              in: caseNumberChunk,
+            },
+          },
+        });
+
+        for (const existingLog of existingLogs) {
+          if (!existingLog.caseNumber) continue;
+
+          const key = existingLog.caseNumber.trim();
+          if (!key) continue;
+
+          const bucket = existingByCaseNumber.get(key) ?? [];
+          bucket.push(existingLog as unknown as Record<string, unknown>);
+          existingByCaseNumber.set(key, bucket);
+        }
+      }
     }
 
     const headerMap = getExcelHeaderMap(ReceivingLogSchema);
@@ -131,24 +180,43 @@ export async function uploadReceiveExcel(
         "notes",
       ],
       checkExactMatch: async (_cells, mappedRow) => {
-        const where: Prisma.RecievingLogWhereInput = {
-          caseNumber: mappedRow.caseNumber,
-          caseType: mappedRow.caseType,
-          dateRecieved: mappedRow.dateRecieved,
-          bookAndPage: mappedRow.bookAndPage,
-        };
-
-        const existingLogs = await prisma.recievingLog.findMany({ where });
         const mappedEntries = Object.entries(mappedRow);
 
-        const hasExactMatch = existingLogs.some((existingLog) =>
+        const cacheKey = JSON.stringify(
+          mappedEntries
+            .slice()
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => [
+              key,
+              value instanceof Date
+                ? value.getTime()
+                : typeof value === "string"
+                  ? value.trim()
+                  : (value ?? null),
+            ]),
+        );
+
+        const cachedResult = exactMatchCache.get(cacheKey);
+        if (cachedResult !== undefined) {
+          return { exists: cachedResult };
+        }
+
+        const caseNumberKey =
+          typeof mappedRow.caseNumber === "string"
+            ? mappedRow.caseNumber.trim()
+            : "";
+
+        const candidates = caseNumberKey
+          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
+          : [];
+
+        const hasExactMatch = candidates.some((existingLog) =>
           mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingLog as Record<string, unknown>)[key],
-            ),
+            valuesAreEqual(value, existingLog[key]),
           ),
         );
+
+        exactMatchCache.set(cacheKey, hasExactMatch);
 
         return { exists: hasExactMatch };
       },

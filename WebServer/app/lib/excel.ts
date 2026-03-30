@@ -5,6 +5,8 @@ import { normalizeValueBySchema } from "./utils";
 
 const EXCEL_HEADERS_PREFIX = "excelHeaders:";
 
+export const QUERY_CHUNK_SIZE = 750;
+
 export const excelHeaders = (headers: string[]): string =>
   `${EXCEL_HEADERS_PREFIX}${JSON.stringify(headers)}`;
 
