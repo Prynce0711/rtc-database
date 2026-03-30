@@ -1,5 +1,7 @@
 "use server";
+
 import nodemailer from "nodemailer";
+import { getSystemSettings } from "../components/Settings/SettingsActions";
 
 export async function sendEmail(
   to: string,
@@ -7,19 +9,38 @@ export async function sendEmail(
   text: string,
 ): Promise<boolean> {
   try {
+    const result = await getSystemSettings();
+    if (!result.success) {
+      console.error("Failed to retrieve system settings:", result.error);
+      return false;
+    }
+
+    const systemSettings = result.result;
+
+    if (
+      !systemSettings.smtpHost ||
+      !systemSettings.smtpPort ||
+      !systemSettings.senderEmail ||
+      !systemSettings.senderName ||
+      !systemSettings.senderPassword
+    ) {
+      console.error("Incomplete SMTP settings");
+      return false;
+    }
+
     // Create a transporter using the test account
     const transporter = nodemailer.createTransport({
-      service: "gmail",
-      port: 465,
+      host: systemSettings.smtpHost,
+      port: systemSettings.smtpPort,
       secure: true,
       auth: {
-        user: process.env.GOOGLE_EMAIL, // Your Gmail address
-        pass: process.env.GOOGLE_APP_PASSWORD, // The 16-character App Password
+        user: systemSettings.senderEmail, // Your Gmail address
+        pass: systemSettings.senderPassword, // The 16-character App Password
       },
     });
 
     const info = await transporter.sendMail({
-      from: '"Test Sender" <test@example.com>',
+      from: `"${systemSettings.senderName}" <${systemSettings.senderEmail}>`,
       to: to,
       subject: subject,
       text: text,

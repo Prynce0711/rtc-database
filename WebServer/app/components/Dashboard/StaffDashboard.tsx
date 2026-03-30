@@ -16,7 +16,7 @@ import {
   getCases,
   type UnifiedCaseData,
   type UnifiedCaseStats,
-} from "../CaseActions";
+} from "../Case/CaseActions";
 import { usePopup } from "../Popup/PopupProvider";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";

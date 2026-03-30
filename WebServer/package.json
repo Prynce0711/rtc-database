@@ -26,11 +26,13 @@
     "next-runtime-env": "^3.3.0",
     "next-ws": "^2.1.16",
     "nodemailer": "^8.0.1",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",
     "recharts": "^3.7.0",
     "server-only": "^0.0.1",
+    "speakeasy": "^2.0.0",
     "ws": "^8.19.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"

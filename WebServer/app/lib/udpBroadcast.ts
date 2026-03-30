@@ -1,3 +1,5 @@
+import "server-only";
+
 import dgram from "dgram";
 
 const UDP_PORT = Number(process.env.UDP_PORT) || 41234;

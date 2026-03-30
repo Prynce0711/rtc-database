@@ -507,3 +507,67 @@ model ChatMessage {
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+enum BackupFrequency {
+  MANUAL
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum LogRetention {
+  ONE_MONTH
+  THREE_MONTHS
+  SIX_MONTHS
+  ONE_YEAR
+  INDEFINITELY
+}
+
+enum PasswordExpiration {
+  NEVER
+  ONE_MONTH
+  TWO_MONTHS
+  THREE_MONTHS
+  SIX_MONTHS
+}
+
+enum LockoutThreshold {
+  NONE
+  THREE_ATTEMPTS
+  FIVE_ATTEMPTS
+  TEN_ATTEMPTS
+}
+
+enum SessionTimeout {
+  FIFTEEN_MINUTES
+  THIRTY_MINUTES
+  ONE_HOUR
+  TWO_HOURS
+  FOUR_HOURS
+  EIGHT_HOURS
+  NEVER
+}
+
+model SystemSettings {
+  id Int @id @default(1)
+
+  maintainanceMode Boolean @default(false)
+  systemAnnouncement String?
+
+  smtpHost String? @default("smtp.gmail.com")
+  smtpPort Int? @default(587)
+  senderName String? @default("RTC Notifications")
+  senderEmail String? @default("noreply@rtc.com")
+  senderPassword String?
+
+  backupFrequency BackupFrequency @default(MANUAL)
+  logRetention LogRetention @default(THREE_MONTHS)
+
+  passwordExpiration PasswordExpiration @default(NEVER)
+  lockoutThreshold LockoutThreshold @default(NONE)
+  sessionTimeout SessionTimeout @default(NEVER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime? @updatedAt @default(now())
+}
+

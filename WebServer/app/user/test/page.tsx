@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import ChatTest from "./ChatTest";
 import CivilCaseTester from "./CivilCaseTester";
 import CriminalCaseTester from "./CriminalCaseTester";
+import EmailTester from "./EmailTester";
 import EmployeeTest from "./EmployeeTest";
+import JudgementTester from "./JudgementTester";
 import NotarialTester from "./NotarialTester";
 import PetitionTester from "./PetitionTester";
 import SpecialProceedingTester from "./SpecialProceedingTester";
 import StatisticsTester from "./StatisticsTester";
 import ToastTester from "./ToastTester";
-import JudgementTester from "./JudgementTester";
 
 type TesterItem = {
   id: string;
@@ -49,6 +50,12 @@ const TESTERS: TesterItem[] = [
     label: "Employee Test",
     description: "Test employee CRUD and related actions.",
     Component: EmployeeTest,
+  },
+  {
+    id: "email",
+    label: "Email Tester",
+    description: "Test SMTP settings and send email manually.",
+    Component: EmailTester,
   },
   {
     id: "judgement",

@@ -5,7 +5,7 @@ import {
   getCases,
   type UnifiedCaseData,
   type UnifiedCaseStats,
-} from "@/app/components/CaseActions";
+} from "@/app/components/Case/CaseActions";
 import {
   BarChart3,
   Calendar,
