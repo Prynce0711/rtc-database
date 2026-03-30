@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
-import { admin, magicLink } from "better-auth/plugins";
+import { admin, magicLink, twoFactor } from "better-auth/plugins";
 import { createLog } from "../components/ActivityLogs/LogActions";
 import { ChatType } from "../generated/prisma/browser";
 import { LogAction, Roles as PrismaRole } from "../generated/prisma/enums";
@@ -79,6 +79,7 @@ export const auth = betterAuth({
   },
   plugins: [
     admin(),
+    twoFactor(),
     magicLink({
       sendMagicLink: async ({ email, token, url }, ctx) => {
         sendEmail(

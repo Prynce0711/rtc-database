@@ -85,136 +85,133 @@ enum LogAction {
 }
 
 model Case {
-  id              Int       @id @default(autoincrement())
-  caseType        CaseType  @default(UNKNOWN)
-  branch          String?
-  assistantBranch String?
-  caseNumber          String
-  dateFiled       DateTime?
-  
-  criminalCase     CriminalCase?
-  petition         Petition?
-  civilCase        CivilCase?
+  id                Int                @id @default(autoincrement())
+  caseType          CaseType           @default(UNKNOWN)
+  branch            String?
+  assistantBranch   String?
+  caseNumber        String
+  dateFiled         DateTime?
+  criminalCase      CriminalCase?
+  petition          Petition?
+  civilCase         CivilCase?
   specialProceeding SpecialProceeding?
 }
 
-model CriminalCase{
-  id              Int       @id @default(autoincrement())
-  baseCaseID      Int @unique
-  name            String
-  charge          String?
-  infoSheet       String?
-  court           String?
-  detained        String?
-  consolidation   String?
-  eqcNumber       String?
-  bond            String?
-  raffleDate      DateTime?
-  committee1      String?
-  committee2      String?
-  judge           String?
-  ao              String?
-  complainant     String?
-  houseNo         String?
-  street          String?
-  barangay        String?
-  municipality    String?
-  province        String?
-  counts          String?
-  jdf             String?
-  sajj            String?
-  sajj2           String?
-  mf              String?
-  stf             String?
-  lrf             String?
-  vcf             String?
-  total           String?
-  amountInvolved  String?
+model CriminalCase {
+  id             Int       @id @default(autoincrement())
+  baseCaseID     Int       @unique
+  name           String
+  charge         String?
+  infoSheet      String?
+  court          String?
+  detained       String?
+  consolidation  String?
+  eqcNumber      String?
+  bond           String?
+  raffleDate     DateTime?
+  committee1     String?
+  committee2     String?
+  judge          String?
+  ao             String?
+  complainant    String?
+  houseNo        String?
+  street         String?
+  barangay       String?
+  municipality   String?
+  province       String?
+  counts         String?
+  jdf            String?
+  sajj           String?
+  sajj2          String?
+  mf             String?
+  stf            String?
+  lrf            String?
+  vcf            String?
+  total          String?
+  amountInvolved String?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
-  case            Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
-model CivilCase{
-  id              Int       @id @default(autoincrement())
-  baseCaseID         Int       @unique
-  petitioners    String?
-  defendants    String?
-  notes         String?
-  nature        String?
-  originCaseNumber String?
-  reRaffleDate     DateTime?
-  reRaffleBranch    String?
-  consolitationDate DateTime?
+model CivilCase {
+  id                  Int       @id @default(autoincrement())
+  baseCaseID          Int       @unique
+  petitioners         String?
+  defendants          String?
+  notes               String?
+  nature              String?
+  originCaseNumber    String?
+  reRaffleDate        DateTime?
+  reRaffleBranch      String?
+  consolitationDate   DateTime?
   consolidationBranch String?
-  dateRemanded       DateTime?
+  dateRemanded        DateTime?
   remandedNote        String?
-  undocketed Boolean @default(false)
+  undocketed          Boolean   @default(false)
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
-  case            Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model Petition {
   id         Int       @id @default(autoincrement())
-  baseCaseID Int    @unique
+  baseCaseID Int       @unique
   petitioner String?
   raffledTo  String?
   date       DateTime?
   nature     String?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
-  case     Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model SpecialProceeding {
   id         Int       @id @default(autoincrement())
-  baseCaseID Int    @unique
+  baseCaseID Int       @unique
   petitioner String?
   raffledTo  String?
   date       DateTime?
   nature     String?
   respondent String?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
-  case      Case      @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
 }
 
 model Sherriff {
-  id              Int        @id @default(autoincrement())
-  ejfCaseNumber   String?
-  mortgagee       String?
-  mortgagor       String?
-  remarks         String?
-  date            DateTime?
-  name            String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt @default(now())
+  id            Int       @id @default(autoincrement())
+  ejfCaseNumber String?
+  mortgagee     String?
+  mortgagor     String?
+  remarks       String?
+  date          DateTime?
+  name          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt @default(now())
 }
 
 model Employee {
-  id               Int        @id @default(autoincrement())
-  employeeName     String
-  employeeNumber   String?    @unique
-  position         String
-  branch           String
-  birthDate        DateTime
-  dateHired         DateTime
+  id             Int            @id @default(autoincrement())
+  employeeName   String
+  employeeNumber String?        @unique
+  position       String
+  branch         String
+  birthDate      DateTime
+  dateHired      DateTime
   employmentType EmploymentType
-  contactNumber    String?    @unique
-  email            String?    @unique
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  contactNumber  String?        @unique
+  email          String?        @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime?      @updatedAt
 }
 
 model Log {
@@ -226,14 +223,13 @@ model Log {
   // from and to when updating
   details Json?
 
-  timestamp DateTime @default(now())
+  timestamp DateTime  @default(now())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress String?
   userAgent String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 }
 
 model User {
@@ -249,16 +245,19 @@ model User {
   banReason     String?
   banExpires    DateTime?
   branch        String?
-  darkMode       Boolean?  @default(false)
+  darkMode      Boolean?  @default(false)
 
-  sessions      Session[]
-  accounts      Account[]
+  sessions Session[]
+  accounts Account[]
 
-  status Status @default(PENDING)
+  status       Status        @default(PENDING)
   chatMessages ChatMessage[]
-  chatMembers ChatMember[]
+  chatMembers  ChatMember[]
 
   Logs Log[]
+
+  twoFactorEnabled Boolean?    @default(false)
+  twofactors       TwoFactor[]
 
   @@unique([email])
   @@map("user")
@@ -323,38 +322,36 @@ model RecievingLog {
   content      String?
   branchNumber String?
   notes        String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime? @updatedAt
 }
 
 model Notarial {
-  id        Int      @id @default(autoincrement())
-  title     String?
-  name      String?
-  attorney  String?
-  date      DateTime?
+  id       Int       @id @default(autoincrement())
+  title    String?
+  name     String?
+  attorney String?
+  date     DateTime?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
   file   FileData? @relation(fields: [fileId], references: [id])
   fileId Int?
 }
 
 model FileData {
-  id        Int      @id @default(autoincrement())
-  key      String @unique
-  fileHash String
+  id        Int       @id @default(autoincrement())
+  key       String    @unique
+  fileHash  String
   fileName  String
   path      String
   size      Int
   mimeType  String
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime?  @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
-  notarials Notarial[]
+  notarials    Notarial[]
   chatMessages ChatMessage[]
 }
 
@@ -466,22 +463,22 @@ model JudgementRegional {
 }
 
 model Chat {
-  id            Int   @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   type          ChatType @default(DIRECT)
   name          String?
   description   String?
   lastMessageAt DateTime @default(now())
   // call          Call?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime? @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
 
   members  ChatMember[]
   messages ChatMessage[]
 }
 
 model ChatMember {
-  id       Int   @id @default(autoincrement())
+  id       Int      @id @default(autoincrement())
   chatId   Int
   userId   String
   joinedAt DateTime @default(now())
@@ -493,16 +490,16 @@ model ChatMember {
 }
 
 model ChatMessage {
-  id        Int   @id @default(autoincrement())
-  chatId    Int
-  userId    String
-  content   String
+  id      Int    @id @default(autoincrement())
+  chatId  Int
+  userId  String
+  content String
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   updatedAt DateTime? @updatedAt
 
   fileId Int?
-  file FileData? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  file   FileData? @relation(fields: [fileId], references: [id], onDelete: SetNull)
 
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -551,23 +548,34 @@ enum SessionTimeout {
 model SystemSettings {
   id Int @id @default(1)
 
-  maintainanceMode Boolean @default(false)
+  maintainanceMode   Boolean @default(false)
   systemAnnouncement String?
 
-  smtpHost String? @default("smtp.gmail.com")
-  smtpPort Int? @default(587)
-  senderName String? @default("RTC Notifications")
-  senderEmail String? @default("noreply@rtc.com")
+  smtpHost       String? @default("smtp.gmail.com")
+  smtpPort       Int?    @default(587)
+  senderName     String? @default("RTC Notifications")
+  senderEmail    String? @default("noreply@rtc.com")
   senderPassword String?
 
   backupFrequency BackupFrequency @default(MANUAL)
-  logRetention LogRetention @default(THREE_MONTHS)
+  logRetention    LogRetention    @default(THREE_MONTHS)
 
   passwordExpiration PasswordExpiration @default(NEVER)
-  lockoutThreshold LockoutThreshold @default(NONE)
-  sessionTimeout SessionTimeout @default(NEVER)
+  lockoutThreshold   LockoutThreshold   @default(NONE)
+  sessionTimeout     SessionTimeout     @default(NEVER)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   updatedAt DateTime? @updatedAt @default(now())
 }
 
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("twoFactor")
+}

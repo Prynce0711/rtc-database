@@ -27,6 +27,13 @@ export const buildCaseFind = <T extends z.ZodType>(
   const filters = options?.filters;
   const exactMatchMap = options?.exactMatchMap ?? {};
 
+  const getSearchTokens = (value: string): string[] =>
+    value
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
   type Filters = FilterOptions<z.infer<T>>["filters"];
 
   const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
@@ -60,25 +67,47 @@ export const buildCaseFind = <T extends z.ZodType>(
   const addCaseStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
     const isExact = exactMatchMap[key] ?? false;
-    const filter: Prisma.StringNullableFilter = {
-      [isExact ? "equals" : "contains"]: value,
-    };
-    conditions.push({ [key]: filter } as Prisma.CaseWhereInput);
+
+    if (isExact) {
+      conditions.push({
+        [key]: { equals: value },
+      } as Prisma.CaseWhereInput);
+      return;
+    }
+
+    const tokens = getSearchTokens(value);
+    tokens.forEach((token) => {
+      conditions.push({
+        [key]: { contains: token },
+      } as Prisma.CaseWhereInput);
+    });
   };
 
   const addRelatedStringFilter = (key: keyof Filters, value?: string) => {
     if (!value) return;
     const isExact = exactMatchMap[key] ?? false;
-    const filter: Prisma.StringNullableFilter = {
-      [isExact ? "equals" : "contains"]: value,
-    };
-    conditions.push({
-      [relationKey]: {
-        is: {
-          [key]: filter,
+
+    if (isExact) {
+      conditions.push({
+        [relationKey]: {
+          is: {
+            [key]: { equals: value },
+          },
         },
-      },
-    } as Prisma.CaseWhereInput);
+      } as Prisma.CaseWhereInput);
+      return;
+    }
+
+    const tokens = getSearchTokens(value);
+    tokens.forEach((token) => {
+      conditions.push({
+        [relationKey]: {
+          is: {
+            [key]: { contains: token },
+          },
+        },
+      } as Prisma.CaseWhereInput);
+    });
   };
 
   baseCaseFieldKeys.stringKeys.forEach((field) => {
