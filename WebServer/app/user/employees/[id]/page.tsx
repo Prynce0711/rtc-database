@@ -215,7 +215,7 @@ export default function EmployeeDetailsPage() {
             Employee not found
           </p>
           <button
-            onClick={() => router.push("/user/employees")}
+            onClick={() => router.back()}
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -235,7 +235,7 @@ export default function EmployeeDetailsPage() {
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           {/* Back */}
           <button
-            onClick={() => router.push("/user/employees")}
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             <svg
