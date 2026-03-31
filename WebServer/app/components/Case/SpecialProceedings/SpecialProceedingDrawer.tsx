@@ -2,7 +2,13 @@
 
 import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -23,6 +29,7 @@ import { doesCaseExist } from "../CaseActions";
 import {
   createSpecialProceeding,
   deleteSpecialProceeding,
+  getSpecialProceedingCaseNumberPreview,
   updateSpecialProceeding,
 } from "./SpecialProceedingActions";
 import {
@@ -116,10 +123,57 @@ const REQUIRED_FIELDS: Array<
   keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
 > = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
 const normalizeCaseNumber = (value: string) => value.trim();
+const AUTO_DEFAULT_AREA = "M";
+const AUTO_DEFAULT_YEAR = new Date().getFullYear();
 
-function validateEntry(entry: SpecialProceedingEntry): Record<string, string> {
+const parseCaseNumberParts = (
+  value: string,
+): { area: string; year: number; number: number } | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]+)-(\d{4})/);
+  if (numberFirst) {
+    const number = Number.parseInt(numberFirst[1], 10);
+    const year = Number.parseInt(numberFirst[3], 10);
+    if (Number.isNaN(number) || Number.isNaN(year)) return null;
+
+    return {
+      number,
+      area: numberFirst[2].toUpperCase(),
+      year,
+    };
+  }
+
+  const areaFirst = trimmed.match(/^\s*([A-Za-z]+)-(\d+)-(\d{4})/);
+  if (areaFirst) {
+    const number = Number.parseInt(areaFirst[2], 10);
+    const year = Number.parseInt(areaFirst[3], 10);
+    if (Number.isNaN(number) || Number.isNaN(year)) return null;
+
+    return {
+      area: areaFirst[1].toUpperCase(),
+      number,
+      year,
+    };
+  }
+
+  return null;
+};
+
+const formatCaseNumber = (area: string, number: number, year: number): string =>
+  `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
+
+function validateEntry(
+  entry: SpecialProceedingEntry,
+  options: { requireCaseNumber: boolean },
+): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
+    if (k === "caseNumber" && !options.requireCaseNumber) {
+      return;
+    }
+
     if (!entry[k] || String(entry[k]).trim() === "")
       errs[k as string] = "Required";
   });
@@ -166,9 +220,11 @@ const toInputValue = (value: Date | string | null | undefined): string => {
 
 function ReviewCard({
   entry,
+  displayCaseNumber,
   isExistingCase,
 }: {
   entry: SpecialProceedingEntry;
+  displayCaseNumber: string;
   isExistingCase: boolean;
 }) {
   const fmtDate = (value: Date | string | null | undefined) => {
@@ -192,7 +248,7 @@ function ReviewCard({
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.caseNumber || (
+            {displayCaseNumber || (
               <span style={{ opacity: 0.4 }}>No Case Number</span>
             )}
           </div>
@@ -223,7 +279,7 @@ function ReviewCard({
               <div className="rv-field">
                 <div className="rv-field-label">Case Number</div>
                 <div className="rv-field-value rv-mono">
-                  {entry.caseNumber || <span className="rv-empty">—</span>}
+                  {displayCaseNumber || <span className="rv-empty">—</span>}
                 </div>
               </div>
               <div className="rv-field">
@@ -300,6 +356,10 @@ const SpecialProceedingDrawer = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
+  const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
+    Record<number, string>
+  >({});
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
@@ -345,7 +405,82 @@ const SpecialProceedingDrawer = ({
     ]);
   }, [type, selectedCase, selectedCases, isEdit]);
 
-  const handleChange = (id: number, field: string, value: string) => {
+  useEffect(() => {
+    if (isEdit) {
+      setAutoCaseNumbersByRow({});
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      const autoRows = entries.filter((entry) => !entry.isManual);
+      if (autoRows.length === 0) {
+        setAutoCaseNumbersByRow({});
+        return;
+      }
+
+      setIsPreviewLoading(true);
+
+      const manualMaxPerBucket = new Map<string, number>();
+      entries
+        .filter((entry) => entry.isManual)
+        .forEach((entry) => {
+          const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
+          if (!parsed) return;
+
+          const key = `${parsed.area}|${parsed.year}`;
+          const current = manualMaxPerBucket.get(key) ?? 0;
+          if (parsed.number > current) {
+            manualMaxPerBucket.set(key, parsed.number);
+          }
+        });
+
+      const rowBuckets = autoRows.map((entry) => {
+        const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
+        return {
+          entryId: entry.id,
+          area: parsed?.area ?? AUTO_DEFAULT_AREA,
+          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+        };
+      });
+
+      const uniqueBuckets = Array.from(
+        new Set(rowBuckets.map((row) => `${row.area}|${row.year}`)),
+      );
+
+      const nextPerBucket = new Map<string, number>();
+
+      for (const bucket of uniqueBuckets) {
+        const [area, yearRaw] = bucket.split("|");
+        const year = Number.parseInt(yearRaw, 10);
+        const preview = await getSpecialProceedingCaseNumberPreview(area, year);
+        nextPerBucket.set(
+          bucket,
+          preview.success ? preview.result!.nextNumber : 1,
+        );
+      }
+
+      const offsetPerBucket = new Map<string, number>();
+      const nextByRow: Record<number, string> = {};
+
+      rowBuckets.forEach((row) => {
+        const key = `${row.area}|${row.year}`;
+        const dbBase = nextPerBucket.get(key) ?? 1;
+        const manualBase = (manualMaxPerBucket.get(key) ?? 0) + 1;
+        const bucketBase = Math.max(dbBase, manualBase);
+        const offset = offsetPerBucket.get(key) ?? 0;
+        const sequence = bucketBase + offset;
+        nextByRow[row.entryId] = formatCaseNumber(row.area, sequence, row.year);
+        offsetPerBucket.set(key, offset + 1);
+      });
+
+      setAutoCaseNumbersByRow(nextByRow);
+      setIsPreviewLoading(false);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit]);
+
+  const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -380,7 +515,7 @@ const SpecialProceedingDrawer = ({
     const dup: SpecialProceedingEntry = {
       ...source,
       id: nextTempIdRef.current--,
-      caseNumber: "",
+      caseNumber: source.isManual ? "" : source.caseNumber,
       errors: {},
       saved: false,
     };
@@ -412,9 +547,22 @@ const SpecialProceedingDrawer = ({
   };
 
   const completedCount = entries.filter((e) =>
-    REQUIRED_FIELDS.every((k) => e[k] && String(e[k]).trim() !== ""),
+    REQUIRED_FIELDS.every(
+      (k) =>
+        (!e.isManual || isEdit || k !== "caseNumber") &&
+        e[k] &&
+        String(e[k]).trim() !== "",
+    ),
   ).length;
   const incompleteCount = entries.length - completedCount;
+
+  const getDisplayCaseNumber = (entry: SpecialProceedingEntry): string => {
+    if (entry.isManual || isEdit) {
+      return String(entry.caseNumber ?? "");
+    }
+
+    return autoCaseNumbersByRow[entry.id] ?? "";
+  };
 
   const isCaseAlreadyExisting = useCallback(
     (caseNumber: string) => {
@@ -425,8 +573,39 @@ const SpecialProceedingDrawer = ({
     [existingCaseNumbers, isEdit],
   );
 
-  const existingCaseRowCount = entries.filter((entry) =>
-    isCaseAlreadyExisting(entry.caseNumber),
+  const existingCaseRowCount = entries.filter(
+    (entry) =>
+      entry.isManual && isCaseAlreadyExisting(String(entry.caseNumber)),
+  ).length;
+
+  const duplicateCaseNumbers = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    entries.forEach((entry) => {
+      const displayCaseNumber = normalizeCaseNumber(
+        getDisplayCaseNumber(entry),
+      );
+      if (!displayCaseNumber) return;
+      counts.set(displayCaseNumber, (counts.get(displayCaseNumber) ?? 0) + 1);
+    });
+
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([value]) => value),
+    );
+  }, [entries, autoCaseNumbersByRow, isEdit]);
+
+  const isCaseDuplicateInBatch = useCallback(
+    (caseNumber: string) => {
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && duplicateCaseNumbers.has(normalized);
+    },
+    [duplicateCaseNumbers],
+  );
+
+  const duplicateCaseRowCount = entries.filter((entry) =>
+    isCaseDuplicateInBatch(getDisplayCaseNumber(entry)),
   ).length;
 
   const refreshExistingCaseNumbers = useCallback(async (): Promise<
@@ -440,7 +619,8 @@ const SpecialProceedingDrawer = ({
     const caseNumbers = Array.from(
       new Set(
         entries
-          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .filter((entry) => entry.isManual)
+          .map((entry) => normalizeCaseNumber(String(entry.caseNumber ?? "")))
           .filter((value) => value.length > 0),
       ),
     );
@@ -477,7 +657,9 @@ const SpecialProceedingDrawer = ({
   const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
-      const errs = validateEntry(e);
+      const errs = validateEntry(e, {
+        requireCaseNumber: isEdit || e.isManual,
+      });
       if (Object.keys(errs).length > 0) {
         anyError = true;
         return { ...e, errors: errs };
@@ -495,6 +677,24 @@ const SpecialProceedingDrawer = ({
     setReviewIdx(0);
     setStep("review");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const buildPayload = (entry: SpecialProceedingEntry) => {
+    const caseNumberForPayload =
+      !isEdit && !entry.isManual
+        ? autoCaseNumbersByRow[entry.id] ||
+          formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR)
+        : String(entry.caseNumber ?? "");
+
+    return {
+      caseNumber: caseNumberForPayload,
+      raffledTo: entry.raffledTo?.toString().trim() || null,
+      date: entry.date ? new Date(String(entry.date)) : null,
+      petitioner: entry.petitioner?.toString().trim() || null,
+      nature: entry.nature?.toString().trim() || null,
+      respondent: entry.respondent?.toString().trim() || null,
+      isManual: entry.isManual,
+    };
   };
 
   const handleSubmit = async () => {
@@ -571,14 +771,8 @@ const SpecialProceedingDrawer = ({
             return;
           }
 
-          const result = await updateSpecialProceeding(target.id, {
-            caseNumber: e.caseNumber,
-            raffledTo: e.raffledTo ?? null,
-            date: e.date ? new Date(e.date) : null,
-            petitioner: e.petitioner ?? null,
-            nature: e.nature,
-            respondent: e.respondent ?? null,
-          });
+          const payload = buildPayload(e);
+          const result = await updateSpecialProceeding(target.id, payload);
           if (!result.success) {
             popup.showError(
               result.error || `Update failed for row ${index + 1}`,
@@ -597,14 +791,8 @@ const SpecialProceedingDrawer = ({
         const createdIds: number[] = [];
         for (let index = 0; index < entries.length; index++) {
           const e = entries[index];
-          const result = await createSpecialProceeding({
-            caseNumber: e.caseNumber,
-            raffledTo: e.raffledTo ?? null,
-            date: e.date ? new Date(e.date) : null,
-            petitioner: e.petitioner ?? null,
-            nature: e.nature,
-            respondent: e.respondent ?? null,
-          });
+          const payload = buildPayload(e);
+          const result = await createSpecialProceeding(payload);
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedCases(createdIds);
             setStep("entry");
@@ -729,6 +917,10 @@ const SpecialProceedingDrawer = ({
                   <div className="xls-pills" style={{ marginTop: 10 }}>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
+                      Per-row mode (default: Auto)
+                    </span>
+                    <span className="xls-pill xls-pill-neutral">
+                      <span className="xls-pill-dot" />
                       {entries.length} {entries.length === 1 ? "row" : "rows"}
                     </span>
                     <span
@@ -745,19 +937,49 @@ const SpecialProceedingDrawer = ({
                           color: "#78350f",
                           borderColor: "#fbbf24",
                         }}
-                        title="Case is already existing"
+                        title="At least one manual case number already exists in the database."
                       >
                         <span className="xls-pill-dot" />
                         {existingCaseRowCount} existing
                       </span>
                     )}
+                    {duplicateCaseRowCount > 0 && (
+                      <span
+                        className="xls-pill"
+                        style={{
+                          background: "#ffedd5",
+                          color: "#9a3412",
+                          borderColor: "#fdba74",
+                        }}
+                        title="At least two rows in this batch share the same case number."
+                      >
+                        <span className="xls-pill-dot" />
+                        {duplicateCaseRowCount} duplicate
+                      </span>
+                    )}
                     {incompleteCount > 0 && (
-                      <span className="xls-pill xls-pill-err">
+                      <span
+                        className="xls-pill xls-pill-err"
+                        title="One or more required fields are missing in these rows."
+                      >
                         <span className="xls-pill-dot" />
                         {incompleteCount} incomplete
                       </span>
                     )}
                   </div>
+                )}
+                {!isEdit && (
+                  <p
+                    style={{
+                      marginTop: 10,
+                      fontSize: 13,
+                      color: "var(--color-subtle)",
+                    }}
+                  >
+                    Auto: system assigns the next case number based on sequence.
+                    Manual: you type the case number yourself (duplicates
+                    allowed).
+                  </p>
                 )}
               </div>
             </div>
@@ -825,9 +1047,11 @@ const SpecialProceedingDrawer = ({
                     <AnimatePresence initial={false}>
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = allCols.length - 1;
-                        const rowHasExistingCase = isCaseAlreadyExisting(
-                          entry.caseNumber,
-                        );
+                        const displayCaseNumber = getDisplayCaseNumber(entry);
+                        const rowHasExistingCase =
+                          isCaseAlreadyExisting(displayCaseNumber);
+                        const rowHasDuplicate =
+                          isCaseDuplicateInBatch(displayCaseNumber);
                         return (
                           <motion.tr
                             key={entry.id}
@@ -837,11 +1061,15 @@ const SpecialProceedingDrawer = ({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                             transition={{ duration: 0.12 }}
-                            className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                            className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}${!rowHasExistingCase && rowHasDuplicate ? " bg-orange-100/60 hover:bg-orange-100" : ""}`}
                             title={
-                              rowHasExistingCase
-                                ? "Case is already existing"
-                                : undefined
+                              rowHasExistingCase && rowHasDuplicate
+                                ? "Case is already existing and duplicate in current rows"
+                                : rowHasExistingCase
+                                  ? "Case is already existing"
+                                  : rowHasDuplicate
+                                    ? "Duplicate case number in current batch"
+                                    : undefined
                             }
                           >
                             <td className="td-num">
@@ -849,19 +1077,84 @@ const SpecialProceedingDrawer = ({
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={toInputValue(
-                                    entry[col.key] as Date | string | null,
-                                  )}
-                                  error={entry.errors[col.key as string]}
-                                  onChange={(v) =>
-                                    handleChange(entry.id, col.key as string, v)
-                                  }
-                                  onKeyDown={(e) =>
-                                    handleCellKeyDown(e, entry.id, false)
-                                  }
-                                />
+                                {!isEdit && col.key === "caseNumber" ? (
+                                  <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                      <select
+                                        className="xls-input xls-mono"
+                                        style={{ width: "100%", height: 32 }}
+                                        value={
+                                          entry.isManual ? "manual" : "auto"
+                                        }
+                                        onChange={(e) =>
+                                          handleChange(
+                                            entry.id,
+                                            "isManual",
+                                            e.target.value === "manual",
+                                          )
+                                        }
+                                        title="Numbering mode"
+                                      >
+                                        <option value="auto">Auto</option>
+                                        <option value="manual">Manual</option>
+                                      </select>
+                                      <input
+                                        className="xls-input xls-mono"
+                                        style={{ width: "100%" }}
+                                        value={
+                                          entry.isManual
+                                            ? String(entry.caseNumber ?? "")
+                                            : (autoCaseNumbersByRow[entry.id] ??
+                                              "")
+                                        }
+                                        readOnly={!entry.isManual}
+                                        onChange={(e) =>
+                                          handleChange(
+                                            entry.id,
+                                            "caseNumber",
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder={
+                                          entry.isManual
+                                            ? "Enter case no."
+                                            : isPreviewLoading
+                                              ? "Generating..."
+                                              : "Auto"
+                                        }
+                                        title={
+                                          entry.isManual
+                                            ? "Manual case number"
+                                            : "Auto-generated case number"
+                                        }
+                                      />
+                                    </div>
+                                    {entry.errors[col.key as string] && (
+                                      <span className="xls-cell-err">
+                                        <FiAlertCircle size={10} />
+                                        {entry.errors[col.key as string]}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <CellInput
+                                    col={col}
+                                    value={toInputValue(
+                                      entry[col.key] as Date | string | null,
+                                    )}
+                                    error={entry.errors[col.key as string]}
+                                    onChange={(v) =>
+                                      handleChange(
+                                        entry.id,
+                                        col.key as string,
+                                        v,
+                                      )
+                                    }
+                                    onKeyDown={(e) =>
+                                      handleCellKeyDown(e, entry.id, false)
+                                    }
+                                  />
+                                )}
                               </td>
                             ))}
                             {allCols.map((col, colIdx) => (
@@ -887,15 +1180,17 @@ const SpecialProceedingDrawer = ({
                             ))}
                             <td className="td-actions">
                               <div className="xls-row-actions">
-                                <button
-                                  type="button"
-                                  className="xls-row-btn"
-                                  onClick={() => handleDuplicate(entry.id)}
-                                  title="Duplicate row"
-                                >
-                                  <FiCopy size={13} />
-                                </button>
-                                {entries.length > 1 && (
+                                {!isEdit && (
+                                  <button
+                                    type="button"
+                                    className="xls-row-btn"
+                                    onClick={() => handleDuplicate(entry.id)}
+                                    title="Duplicate row"
+                                  >
+                                    <FiCopy size={13} />
+                                  </button>
+                                )}
+                                {entries.length > 1 && !isEdit && (
                                   <button
                                     type="button"
                                     className="xls-row-btn del"
@@ -985,6 +1280,16 @@ const SpecialProceedingDrawer = ({
                       {existingCaseRowCount > 1 ? "s" : ""} already exist.
                     </p>
                   )}
+                  {!isEdit && duplicateCaseRowCount > 0 && (
+                    <p
+                      className="text-sm font-semibold mt-2"
+                      style={{ color: "#9a3412" }}
+                    >
+                      {duplicateCaseRowCount} row
+                      {duplicateCaseRowCount > 1 ? "s" : ""} have duplicate case
+                      numbers in this batch.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -996,31 +1301,87 @@ const SpecialProceedingDrawer = ({
                   <div className="rv-sidebar-list">
                     {entries.map((entry, idx) =>
                       (() => {
-                        const rowHasExistingCase = isCaseAlreadyExisting(
-                          entry.caseNumber,
-                        );
+                        const displayCaseNumber = getDisplayCaseNumber(entry);
+                        const rowHasExistingCase =
+                          isCaseAlreadyExisting(displayCaseNumber);
+                        const rowHasDuplicate =
+                          isCaseDuplicateInBatch(displayCaseNumber);
                         return (
                           <button
                             key={entry.id}
-                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                            className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}${!rowHasExistingCase && rowHasDuplicate ? " bg-orange-100/60" : ""}`}
                             onClick={() => setReviewIdx(idx)}
                             title={
                               rowHasExistingCase
                                 ? "Case is already existing"
-                                : undefined
+                                : rowHasDuplicate
+                                  ? "Duplicate case number in current batch"
+                                  : undefined
                             }
                           >
                             <span className="rv-sidebar-num">{idx + 1}</span>
                             <div className="rv-sidebar-info">
                               <div className="rv-sidebar-casenum">
-                                {entry.caseNumber || "No case no."}
+                                {displayCaseNumber || "No case no."}
                               </div>
                               <div className="rv-sidebar-name">
                                 {entry.petitioner || "No petitioner"}
                               </div>
-                              {rowHasExistingCase && (
-                                <div className="text-xs text-warning font-semibold">
-                                  Case is already existing
+                              {(rowHasExistingCase || rowHasDuplicate) && (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    marginTop: 2,
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {rowHasExistingCase && (
+                                    <div
+                                      className="tooltip tooltip-bottom"
+                                      role="presentation"
+                                    >
+                                      <div className="tooltip-content z-50">
+                                        <span className="text-xs font-medium">
+                                          Case is already existing
+                                        </span>
+                                      </div>
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium"
+                                        style={{
+                                          background: "#fef3c7",
+                                          color: "#78350f",
+                                          borderColor: "#fbbf24",
+                                        }}
+                                      >
+                                        <FiAlertCircle size={10} />
+                                        Existing
+                                      </span>
+                                    </div>
+                                  )}
+                                  {rowHasDuplicate && (
+                                    <div
+                                      className="tooltip tooltip-bottom"
+                                      role="presentation"
+                                    >
+                                      <div className="tooltip-content z-50">
+                                        <span className="text-xs font-medium">
+                                          Duplicate case number in current rows
+                                        </span>
+                                      </div>
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium"
+                                        style={{
+                                          background: "#ffedd5",
+                                          color: "#9a3412",
+                                          borderColor: "#fdba74",
+                                        }}
+                                      >
+                                        <FiAlertCircle size={10} />
+                                        Duplicate
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1042,8 +1403,15 @@ const SpecialProceedingDrawer = ({
                   >
                     <ReviewCard
                       entry={entries[reviewIdx]}
+                      displayCaseNumber={
+                        entries[reviewIdx]
+                          ? getDisplayCaseNumber(entries[reviewIdx])
+                          : ""
+                      }
                       isExistingCase={isCaseAlreadyExisting(
-                        entries[reviewIdx]?.caseNumber ?? "",
+                        entries[reviewIdx]
+                          ? getDisplayCaseNumber(entries[reviewIdx])
+                          : "",
                       )}
                     />
                   </motion.div>

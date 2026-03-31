@@ -14,6 +14,10 @@ import {
 } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
+import {
   ExportExcelData,
   getExcelHeaderMap,
   isMappedRowEmpty,
@@ -203,36 +207,72 @@ export async function uploadSpecialProceedingExcel(
         };
       },
       onBatchInsert: async (rows) => {
-        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        return prisma.$transaction(async (tx) => {
+          const caseRows: Prisma.CaseCreateManyInput[] = [];
 
-        rows.forEach((row) => {
-          const { caseData, detailData } = splitCaseDataBySchema(row);
-          caseRows.push({
-            ...caseData,
-            caseType: CaseType.SCA,
+          rows.forEach((row) => {
+            const { caseData } = splitCaseDataBySchema(row);
+            caseRows.push({
+              ...caseData,
+              caseType: CaseType.SCA,
+              isManual: true,
+              number: null,
+              area: null,
+              year: null,
+            });
           });
+
+          const created = await tx.case.createManyAndReturn({
+            data: caseRows,
+          });
+
+          const specialProceedingRows: Prisma.SpecialProceedingCreateManyInput[] =
+            rows.map((row, index) => {
+              const { detailData } = splitCaseDataBySchema(row);
+              return {
+                ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
+                baseCaseID: created[index].id,
+              };
+            });
+
+          if (specialProceedingRows.length > 0) {
+            await tx.specialProceeding.createMany({
+              data: specialProceedingRows,
+            });
+          }
+
+          const maxPerBucket = new Map<
+            string,
+            { area: string; year: number; number: number }
+          >();
+
+          rows.forEach((row) => {
+            const parsed = parseCaseNumber(String(row.caseNumber ?? ""));
+            if (!parsed) return;
+
+            const key = `${CaseType.SCA}|${parsed.area}|${parsed.year}`;
+            const current = maxPerBucket.get(key);
+            if (!current || parsed.number > current.number) {
+              maxPerBucket.set(key, {
+                area: parsed.area,
+                year: parsed.year,
+                number: parsed.number,
+              });
+            }
+          });
+
+          for (const bucket of maxPerBucket.values()) {
+            await syncCaseCounterToAtLeast(
+              tx,
+              CaseType.SCA,
+              bucket.area,
+              bucket.year,
+              bucket.number,
+            );
+          }
+
+          return { ids: created.map((c) => c.id), count: created.length };
         });
-
-        const created = await prisma.case.createManyAndReturn({
-          data: caseRows,
-        });
-
-        const specialProceedingRows: Prisma.SpecialProceedingCreateManyInput[] =
-          rows.map((row, index) => {
-            const { detailData } = splitCaseDataBySchema(row);
-            return {
-              ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
-              baseCaseID: created[index].id,
-            };
-          });
-
-        if (specialProceedingRows.length > 0) {
-          await prisma.specialProceeding.createMany({
-            data: specialProceedingRows,
-          });
-        }
-
-        return { ids: created.map((c) => c.id), count: created.length };
       },
     });
 

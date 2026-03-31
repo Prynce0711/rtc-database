@@ -96,6 +96,7 @@ export const specialProceedingToEntry = (
   sp: SpecialProceedingData,
 ): SpecialProceedingEntry => ({
   ...sp,
+  isManual: Boolean(sp.isManual),
   date: sp.date,
   dateFiled: sp.dateFiled,
   errors: {},
@@ -125,6 +126,10 @@ export const createEmptyEntry = (): SpecialProceedingEntry => ({
   branch: initialSpecialProceedingFormData.branch ?? null,
   assistantBranch: initialSpecialProceedingFormData.assistantBranch ?? null,
   caseNumber: initialSpecialProceedingFormData.caseNumber,
+  number: null,
+  area: null,
+  year: null,
+  isManual: false,
   caseType: initialSpecialProceedingFormData.caseType,
   petitioner: initialSpecialProceedingFormData.petitioner ?? null,
   raffledTo: initialSpecialProceedingFormData.raffledTo ?? null,

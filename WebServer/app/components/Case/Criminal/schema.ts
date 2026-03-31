@@ -179,6 +179,7 @@ export const createTempId = (): number => {
 /** Form entry used by the grid UI (CaseSchema + UI metadata). */
 export type CaseEntry = CriminalCaseSchema & {
   id: number;
+  isManual: boolean;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
@@ -188,6 +189,7 @@ export type CaseEntry = CriminalCaseSchema & {
 export const caseToEntry = (c: CriminalCaseData): CaseEntry => ({
   ...c,
   id: c.id ?? createTempId(),
+  isManual: Boolean(c.isManual),
   errors: {},
   collapsed: false,
   saved: false,
@@ -234,6 +236,7 @@ export const initialCaseFormData: Omit<CriminalCaseSchema, "id" | "createdAt"> =
 export const createEmptyEntry = (): CaseEntry => ({
   ...initialCaseFormData,
   id: createTempId(),
+  isManual: false,
   errors: {},
   collapsed: false,
   saved: false,
