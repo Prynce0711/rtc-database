@@ -85,7 +85,10 @@ export const formatAutoCaseNumber = (
   return `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
 };
 
-export const formatSheriffCaseNumber = (number: number, year: number): string => {
+export const formatSheriffCaseNumber = (
+  number: number,
+  year: number,
+): string => {
   return `${String(number).padStart(2, "0")}-${year}`;
 };
 
