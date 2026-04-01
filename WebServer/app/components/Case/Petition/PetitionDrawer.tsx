@@ -612,6 +612,19 @@ const PetitionEntryPage = ({
     }, 60);
   }, [defaultArea]);
 
+  const handleClearTable = useCallback(async () => {
+    const label =
+      entries.length === 1
+        ? "Clear the table and reset the current row?"
+        : `Clear all ${entries.length} rows and start over?`;
+
+    if (!(await statusPopup.showConfirm(label))) return;
+
+    setEntries([emptyEntry(uid(), defaultArea)]);
+    setAutoCaseNumbersByRow({});
+    setExistingCaseNumbers([]);
+  }, [defaultArea, entries.length, statusPopup]);
+
   const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
@@ -1036,7 +1049,17 @@ const PetitionEntryPage = ({
                   )}
                 </p>
                 {!isEdit && (
-                  <div className="xls-pills" style={{ marginTop: 10 }}>
+                  <div
+                    className="xls-pills"
+                    style={{
+                      marginTop: 10,
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
                       Per-row mode (default: Auto)
@@ -1156,6 +1179,17 @@ const PetitionEntryPage = ({
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 <button className="xls-tab active">Petition Info</button>
+                {!isEdit && (
+                  <button
+                    type="button"
+                    className="xls-btn xls-btn-ghost"
+                    onClick={() => void handleClearTable()}
+                    style={{ marginLeft: "auto" }}
+                  >
+                    <FiTrash2 size={14} />
+                    Clear Table
+                  </button>
+                )}
               </div>
 
               <div className="xls-table-outer" ref={tableRef}>

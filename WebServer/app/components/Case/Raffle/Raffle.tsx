@@ -435,6 +435,17 @@ const NotarialModal = ({
     }, 60);
   }, []);
 
+  const handleClearTable = useCallback(() => {
+    const label =
+      entries.length === 1
+        ? "Clear the table and reset the current row?"
+        : `Clear all ${entries.length} rows and start over?`;
+
+    if (!confirm(label)) return;
+
+    setEntries([createEmptyEntry(uid())]);
+  }, [entries.length]);
+
   const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
@@ -614,7 +625,17 @@ const NotarialModal = ({
                   )}
                 </p>
                 {!isEdit && (
-                  <div className="xls-pills" style={{ marginTop: 10 }}>
+                  <div
+                    className="xls-pills"
+                    style={{
+                      marginTop: 10,
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
                       {entries.length} {entries.length === 1 ? "row" : "rows"}
@@ -653,6 +674,17 @@ const NotarialModal = ({
                   <FiFileText size={13} />
                   Notarial Info
                 </button>
+                {!isEdit && (
+                  <button
+                    type="button"
+                    className="xls-btn xls-btn-ghost"
+                    onClick={handleClearTable}
+                    style={{ marginLeft: "auto" }}
+                  >
+                    <FiTrash2 size={14} />
+                    Clear Table
+                  </button>
+                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>

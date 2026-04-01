@@ -20,9 +20,9 @@ import {
 } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
-  createSherriff,
-  deleteSherriff,
-  updateSherriff,
+  createSheriffCase,
+  deleteSheriffCase,
+  updateSheriffCase,
 } from "./SherriffActions";
 
 export enum SherriffDrawerType {
@@ -346,6 +346,17 @@ const SherriffDrawer = ({
     }, 60);
   }, []);
 
+  const handleClearTable = useCallback(async () => {
+    const label =
+      entries.length === 1
+        ? "Clear the table and reset the current row?"
+        : `Clear all ${entries.length} rows and start over?`;
+
+    if (!(await statusPopup.showConfirm(label))) return;
+
+    setEntries([emptyEntry(nextTempIdRef.current--)]);
+  }, [entries.length, statusPopup]);
+
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
@@ -443,7 +454,7 @@ const SherriffDrawer = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteSherriff(id)),
+        createdIds.map((id) => deleteSheriffCase(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -484,7 +495,7 @@ const SherriffDrawer = ({
             return;
           }
 
-          const result = await updateSherriff(
+          const result = await updateSheriffCase(
             target.id,
             buildPayload(entries[index]),
           );
@@ -504,7 +515,7 @@ const SherriffDrawer = ({
 
         for (let index = 0; index < entries.length; index++) {
           const entry = entries[index];
-          const result = await createSherriff(buildPayload(entry));
+          const result = await createSheriffCase(buildPayload(entry));
           if (!result.success || !result.result) {
             const rollbackErrors = await rollbackCreatedLogs(createdIds);
             setStep("entry");
@@ -628,7 +639,17 @@ const SherriffDrawer = ({
                   )}
                 </p>
                 {!isEdit && (
-                  <div className="xls-pills" style={{ marginTop: 10 }}>
+                  <div
+                    className="xls-pills"
+                    style={{
+                      marginTop: 10,
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
                       {entries.length} {entries.length === 1 ? "row" : "rows"}
@@ -675,6 +696,17 @@ const SherriffDrawer = ({
                     )}
                   </button>
                 ))}
+                {!isEdit && (
+                  <button
+                    type="button"
+                    className="xls-btn xls-btn-ghost"
+                    onClick={() => void handleClearTable()}
+                    style={{ marginLeft: "auto" }}
+                  >
+                    <FiTrash2 size={14} />
+                    Clear Table
+                  </button>
+                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
