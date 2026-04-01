@@ -125,6 +125,13 @@ const REQUIRED_FIELDS: Array<
 const normalizeCaseNumber = (value: string) => value.trim();
 const AUTO_DEFAULT_AREA = "M";
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
+const normalizeAreaCode = (value: string) =>
+  value
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 8);
+const resolveAreaCode = (value: string) =>
+  normalizeAreaCode(value) || AUTO_DEFAULT_AREA;
 
 const parseCaseNumberParts = (
   value: string,
@@ -132,7 +139,7 @@ const parseCaseNumberParts = (
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]+)-(\d{4})/);
+  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]*)-(\d{4})/);
   if (numberFirst) {
     const number = Number.parseInt(numberFirst[1], 10);
     const year = Number.parseInt(numberFirst[3], 10);
@@ -164,6 +171,19 @@ const parseCaseNumberParts = (
 const formatCaseNumber = (area: string, number: number, year: number): string =>
   `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
 
+const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
+  parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
+
+const applyAreaToCaseNumber = (value: string, area: string): string => {
+  const normalizedArea = normalizeAreaCode(area);
+  const parsed = parseCaseNumberParts(value);
+  if (!parsed) {
+    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+  }
+
+  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+};
+
 function validateEntry(
   entry: SpecialProceedingEntry,
   options: { requireCaseNumber: boolean },
@@ -177,6 +197,14 @@ function validateEntry(
     if (!entry[k] || String(entry[k]).trim() === "")
       errs[k as string] = "Required";
   });
+
+  if (!options.requireCaseNumber && !entry.isManual) {
+    const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
+    if (!parsed || !parsed.area) {
+      errs.caseNumber = "Area is required in auto mode";
+    }
+  }
+
   return errs;
 }
 
@@ -360,6 +388,7 @@ const SpecialProceedingDrawer = ({
     Record<number, string>
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
@@ -376,6 +405,7 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
+        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
       },
     ];
   });
@@ -401,6 +431,7 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
+        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
       },
     ]);
   }, [type, selectedCase, selectedCases, isEdit]);
@@ -425,7 +456,7 @@ const SpecialProceedingDrawer = ({
         .filter((entry) => entry.isManual)
         .forEach((entry) => {
           const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
-          if (!parsed) return;
+          if (!parsed || !parsed.area) return;
 
           const key = `${parsed.area}|${parsed.year}`;
           const current = manualMaxPerBucket.get(key) ?? 0;
@@ -438,13 +469,17 @@ const SpecialProceedingDrawer = ({
         const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
         return {
           entryId: entry.id,
-          area: parsed?.area ?? AUTO_DEFAULT_AREA,
+          area: parsed?.area ?? "",
           year: parsed?.year ?? AUTO_DEFAULT_YEAR,
         };
       });
 
       const uniqueBuckets = Array.from(
-        new Set(rowBuckets.map((row) => `${row.area}|${row.year}`)),
+        new Set(
+          rowBuckets
+            .filter((row) => row.area)
+            .map((row) => `${row.area}|${row.year}`),
+        ),
       );
 
       const nextPerBucket = new Map<string, number>();
@@ -463,6 +498,11 @@ const SpecialProceedingDrawer = ({
       const nextByRow: Record<number, string> = {};
 
       rowBuckets.forEach((row) => {
+        if (!row.area) {
+          nextByRow[row.entryId] = "";
+          return;
+        }
+
         const key = `${row.area}|${row.year}`;
         const dbBase = nextPerBucket.get(key) ?? 1;
         const manualBase = (manualMaxPerBucket.get(key) ?? 0) + 1;
@@ -480,6 +520,45 @@ const SpecialProceedingDrawer = ({
     return () => window.clearTimeout(timer);
   }, [entries, isEdit]);
 
+  const handleAreaChange = useCallback((id: number, areaInput: string) => {
+    const normalizedArea = normalizeAreaCode(areaInput);
+
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              caseNumber: applyAreaToCaseNumber(
+                String(entry.caseNumber ?? ""),
+                normalizedArea,
+              ),
+              errors: {
+                ...entry.errors,
+                caseNumber: "",
+              },
+            }
+          : entry,
+      ),
+    );
+  }, []);
+
+  const handleApplyDefaultAreaToRows = useCallback(() => {
+    const effectiveDefaultArea = normalizeAreaCode(defaultArea);
+    setDefaultArea(effectiveDefaultArea);
+
+    setEntries((prev) =>
+      prev.map((entry) => {
+        return {
+          ...entry,
+          caseNumber: applyAreaToCaseNumber(
+            String(entry.caseNumber ?? ""),
+            effectiveDefaultArea,
+          ),
+        };
+      }),
+    );
+  }, [defaultArea]);
+
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
       prev.map((e) =>
@@ -496,6 +575,11 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
+        caseNumber: formatCaseNumber(
+          normalizeAreaCode(defaultArea),
+          1,
+          AUTO_DEFAULT_YEAR,
+        ),
       },
     ]);
     setTimeout(() => {
@@ -504,7 +588,7 @@ const SpecialProceedingDrawer = ({
         behavior: "smooth",
       });
     }, 60);
-  }, []);
+  }, [defaultArea]);
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -546,12 +630,16 @@ const SpecialProceedingDrawer = ({
     }
   };
 
-  const completedCount = entries.filter((e) =>
-    REQUIRED_FIELDS.every(
-      (k) =>
-        (k === "caseNumber" && !e.isManual && !isEdit) ||
-        (e[k] && String(e[k]).trim() !== ""),
-    ),
+  const completedCount = entries.filter(
+    (e) =>
+      (e.isManual ||
+        isEdit ||
+        Boolean(parseCaseNumberParts(String(e.caseNumber ?? ""))?.area)) &&
+      REQUIRED_FIELDS.every(
+        (k) =>
+          (k === "caseNumber" && !e.isManual && !isEdit) ||
+          (e[k] && String(e[k]).trim() !== ""),
+      ),
   ).length;
   const incompleteCount = entries.length - completedCount;
 
@@ -682,7 +770,11 @@ const SpecialProceedingDrawer = ({
     const caseNumberForPayload =
       !isEdit && !entry.isManual
         ? autoCaseNumbersByRow[entry.id] ||
-          formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR)
+          formatCaseNumber(
+            getAreaFromCaseNumber(String(entry.caseNumber ?? ""), ""),
+            1,
+            AUTO_DEFAULT_YEAR,
+          )
         : String(entry.caseNumber ?? "");
 
     return {
@@ -980,6 +1072,40 @@ const SpecialProceedingDrawer = ({
                     allowed).
                   </p>
                 )}
+                {!isEdit && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 13, color: "var(--color-subtle)" }}
+                    >
+                      Default Area
+                    </span>
+                    <input
+                      className="xls-input xls-mono"
+                      style={{ width: 88, height: 36 }}
+                      value={defaultArea}
+                      onChange={(e) =>
+                        setDefaultArea(normalizeAreaCode(e.target.value))
+                      }
+                      placeholder="M"
+                      title="Default area for auto numbering"
+                    />
+                    <button
+                      type="button"
+                      className="xls-btn xls-btn-ghost"
+                      onClick={handleApplyDefaultAreaToRows}
+                    >
+                      Update All To This Area
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             {!isEdit && (
@@ -1047,6 +1173,22 @@ const SpecialProceedingDrawer = ({
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = allCols.length - 1;
                         const displayCaseNumber = getDisplayCaseNumber(entry);
+                        const autoCasePreview =
+                          autoCaseNumbersByRow[entry.id] ||
+                          String(entry.caseNumber ?? "");
+                        const autoParsedCaseNumber =
+                          parseCaseNumberParts(autoCasePreview);
+                        const autoNumberPart = String(
+                          autoParsedCaseNumber?.number ?? 1,
+                        ).padStart(2, "0");
+                        const autoYearPart = String(
+                          autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                        );
+                        const autoAreaValue = getAreaFromCaseNumber(
+                          String(entry.caseNumber ?? ""),
+                          "",
+                        );
+                        const autoAreaMissing = !autoAreaValue;
                         const rowHasExistingCase =
                           isCaseAlreadyExisting(displayCaseNumber);
                         const rowHasDuplicate =
@@ -1097,37 +1239,69 @@ const SpecialProceedingDrawer = ({
                                         <option value="auto">Auto</option>
                                         <option value="manual">Manual</option>
                                       </select>
-                                      <input
-                                        className="xls-input xls-mono"
-                                        style={{ width: "100%" }}
-                                        value={
-                                          entry.isManual
-                                            ? String(entry.caseNumber ?? "")
-                                            : (autoCaseNumbersByRow[entry.id] ??
-                                              "")
-                                        }
-                                        readOnly={!entry.isManual}
-                                        onChange={(e) =>
-                                          handleChange(
-                                            entry.id,
-                                            "caseNumber",
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={
-                                          entry.isManual
-                                            ? "Enter case no."
-                                            : isPreviewLoading
-                                              ? "Generating..."
-                                              : "Auto"
-                                        }
-                                        title={
-                                          entry.isManual
-                                            ? "Manual case number"
-                                            : "Auto-generated case number"
-                                        }
-                                      />
+                                      {entry.isManual ? (
+                                        <input
+                                          className="xls-input xls-mono"
+                                          style={{ width: "100%" }}
+                                          value={String(entry.caseNumber ?? "")}
+                                          onChange={(e) =>
+                                            handleChange(
+                                              entry.id,
+                                              "caseNumber",
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="Enter case no."
+                                          title="Manual case number"
+                                        />
+                                      ) : (
+                                        <div
+                                          style={{
+                                            display: "grid",
+                                            gridTemplateColumns:
+                                              "64px minmax(0, 1fr) 76px",
+                                            gap: 6,
+                                          }}
+                                        >
+                                          <input
+                                            className="xls-input xls-mono"
+                                            style={{ width: "100%" }}
+                                            value={`${autoNumberPart}-`}
+                                            readOnly
+                                            title="Auto sequence"
+                                          />
+                                          <input
+                                            className={`xls-input xls-mono${autoAreaMissing ? " xls-input-err" : ""}`}
+                                            style={{
+                                              width: "100%",
+                                              textAlign: "center",
+                                            }}
+                                            value={autoAreaValue}
+                                            onChange={(e) =>
+                                              handleAreaChange(
+                                                entry.id,
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder="Area"
+                                            title="Area code for this row"
+                                          />
+                                          <input
+                                            className="xls-input xls-mono"
+                                            style={{ width: "100%" }}
+                                            value={`-${autoYearPart}`}
+                                            readOnly
+                                            title="Auto year"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
+                                    {!entry.isManual && autoAreaMissing && (
+                                      <span className="xls-cell-err">
+                                        <FiAlertCircle size={10} />
+                                        Area is required in auto mode
+                                      </span>
+                                    )}
                                     {entry.errors[col.key as string] && (
                                       <span className="xls-cell-err">
                                         <FiAlertCircle size={10} />

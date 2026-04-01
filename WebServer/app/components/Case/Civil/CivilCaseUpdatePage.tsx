@@ -131,6 +131,13 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const normalizeCaseNumber = (value: string) => value.trim();
 const AUTO_DEFAULT_AREA = "M";
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
+const normalizeAreaCode = (value: string) =>
+  value
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 8);
+const resolveAreaCode = (value: string) =>
+  normalizeAreaCode(value) || AUTO_DEFAULT_AREA;
 
 const parseCaseNumberParts = (
   value: string,
@@ -138,7 +145,7 @@ const parseCaseNumberParts = (
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]+)-(\d{4})/);
+  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]*)-(\d{4})/);
   if (numberFirst) {
     const number = Number.parseInt(numberFirst[1], 10);
     const year = Number.parseInt(numberFirst[3], 10);
@@ -170,10 +177,26 @@ const parseCaseNumberParts = (
 const formatCaseNumber = (area: string, number: number, year: number): string =>
   `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
 
-const createEmptyEntry = (id: string): FormEntry => ({
+const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
+  parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
+
+const applyAreaToCaseNumber = (value: string, area: string): string => {
+  const normalizedArea = normalizeAreaCode(area);
+  const parsed = parseCaseNumberParts(value);
+  if (!parsed) {
+    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+  }
+
+  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+};
+
+const createEmptyEntry = (
+  id: string,
+  defaultArea: string = AUTO_DEFAULT_AREA,
+): FormEntry => ({
   id,
   sourceId: undefined,
-  title: "",
+  title: formatCaseNumber(normalizeAreaCode(defaultArea), 1, AUTO_DEFAULT_YEAR),
   isManual: false,
   name: "",
   atty: "",
@@ -215,6 +238,14 @@ function validateEntry(
       errs[k as string] = "Required";
     }
   });
+
+  if (!options.requireCaseNumber && !entry.isManual) {
+    const parsed = parseCaseNumberParts(entry.title);
+    if (!parsed || !parsed.area) {
+      errs.title = "Area is required in auto mode";
+    }
+  }
+
   return errs;
 }
 
@@ -396,6 +427,7 @@ export const NotarialUpdatePage = ({
     Record<string, string>
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const handleFileChange = (id: string, file: File | null) => {
     setEntries((prev) =>
@@ -413,7 +445,7 @@ export const NotarialUpdatePage = ({
     if (isEdit) {
       return editRecords.map((record) => recordToEntry(uid(), record));
     }
-    return [createEmptyEntry(uid())];
+    return [createEmptyEntry(uid(), AUTO_DEFAULT_AREA)];
   });
 
   useEffect(() => {
@@ -424,7 +456,7 @@ export const NotarialUpdatePage = ({
       return;
     }
 
-    setEntries([createEmptyEntry(uid())]);
+    setEntries([createEmptyEntry(uid(), AUTO_DEFAULT_AREA)]);
   }, [type, selectedRecord, selectedRecords, isEdit]);
 
   useEffect(() => {
@@ -441,13 +473,12 @@ export const NotarialUpdatePage = ({
       }
 
       setIsPreviewLoading(true);
-
       const manualMaxPerBucket = new Map<string, number>();
       entries
         .filter((entry) => entry.isManual)
         .forEach((entry) => {
           const parsed = parseCaseNumberParts(entry.title);
-          if (!parsed) return;
+          if (!parsed || !parsed.area) return;
 
           const key = `${parsed.area}|${parsed.year}`;
           const current = manualMaxPerBucket.get(key) ?? 0;
@@ -460,13 +491,17 @@ export const NotarialUpdatePage = ({
         const parsed = parseCaseNumberParts(entry.title);
         return {
           entryId: entry.id,
-          area: parsed?.area ?? AUTO_DEFAULT_AREA,
+          area: parsed?.area ?? "",
           year: parsed?.year ?? AUTO_DEFAULT_YEAR,
         };
       });
 
       const uniqueBuckets = Array.from(
-        new Set(rowBuckets.map((row) => `${row.area}|${row.year}`)),
+        new Set(
+          rowBuckets
+            .filter((row) => row.area)
+            .map((row) => `${row.area}|${row.year}`),
+        ),
       );
 
       const nextPerBucket = new Map<string, number>();
@@ -485,6 +520,11 @@ export const NotarialUpdatePage = ({
       const nextByRow: Record<string, string> = {};
 
       rowBuckets.forEach((row) => {
+        if (!row.area) {
+          nextByRow[row.entryId] = "";
+          return;
+        }
+
         const key = `${row.area}|${row.year}`;
         const dbBase = nextPerBucket.get(key) ?? 1;
         const manualBase = (manualMaxPerBucket.get(key) ?? 0) + 1;
@@ -502,6 +542,39 @@ export const NotarialUpdatePage = ({
     return () => window.clearTimeout(timer);
   }, [entries, isEdit]);
 
+  const handleAreaChange = useCallback((id: string, areaInput: string) => {
+    const normalizedArea = normalizeAreaCode(areaInput);
+
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              title: applyAreaToCaseNumber(entry.title, normalizedArea),
+              errors: {
+                ...entry.errors,
+                title: "",
+              },
+            }
+          : entry,
+      ),
+    );
+  }, []);
+
+  const handleApplyDefaultAreaToRows = useCallback(() => {
+    const effectiveDefaultArea = normalizeAreaCode(defaultArea);
+    setDefaultArea(effectiveDefaultArea);
+
+    setEntries((prev) =>
+      prev.map((entry) => {
+        return {
+          ...entry,
+          title: applyAreaToCaseNumber(entry.title, effectiveDefaultArea),
+        };
+      }),
+    );
+  }, [defaultArea]);
+
   const handleChange = (id: string, field: string, value: string | boolean) => {
     setEntries((prev) =>
       prev.map((e) =>
@@ -513,14 +586,14 @@ export const NotarialUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
+    setEntries((prev) => [...prev, createEmptyEntry(uid(), defaultArea)]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
         behavior: "smooth",
       });
     }, 60);
-  }, []);
+  }, [defaultArea]);
 
   const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -563,12 +636,14 @@ export const NotarialUpdatePage = ({
     }
   };
 
-  const completedCount = entries.filter((e) =>
-    REQUIRED_FIELDS.every(
-      (k) =>
-        (k === "title" && !e.isManual && !isEdit) ||
-        (e[k] && String(e[k]).trim() !== ""),
-    ),
+  const completedCount = entries.filter(
+    (e) =>
+      (e.isManual || isEdit || Boolean(parseCaseNumberParts(e.title)?.area)) &&
+      REQUIRED_FIELDS.every(
+        (k) =>
+          (k === "title" && !e.isManual && !isEdit) ||
+          (e[k] && String(e[k]).trim() !== ""),
+      ),
   ).length;
   const incompleteCount = entries.length - completedCount;
 
@@ -700,7 +775,11 @@ export const NotarialUpdatePage = ({
     const caseNumberForPayload =
       !isEdit && !entry.isManual
         ? autoCaseNumbersByRow[entry.id] ||
-          formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR)
+          formatCaseNumber(
+            getAreaFromCaseNumber(entry.title, ""),
+            1,
+            AUTO_DEFAULT_YEAR,
+          )
         : entry.title.trim();
 
     const payload = {
@@ -1025,6 +1104,40 @@ export const NotarialUpdatePage = ({
                     allowed).
                   </p>
                 )}
+                {!isEdit && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 13, color: "var(--color-subtle)" }}
+                    >
+                      Default Area
+                    </span>
+                    <input
+                      className="xls-input xls-mono"
+                      style={{ width: 88, height: 36 }}
+                      value={defaultArea}
+                      onChange={(e) =>
+                        setDefaultArea(normalizeAreaCode(e.target.value))
+                      }
+                      placeholder="M"
+                      title="Default area for auto numbering"
+                    />
+                    <button
+                      type="button"
+                      className="xls-btn xls-btn-ghost"
+                      onClick={handleApplyDefaultAreaToRows}
+                    >
+                      Update All To This Area
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1096,6 +1209,21 @@ export const NotarialUpdatePage = ({
                       {entries.map((entry, rowIdx) => {
                         const lastColIdx = DETAIL_COLS.length - 1;
                         const displayCaseNumber = getDisplayCaseNumber(entry);
+                        const autoCasePreview =
+                          autoCaseNumbersByRow[entry.id] || entry.title;
+                        const autoParsedCaseNumber =
+                          parseCaseNumberParts(autoCasePreview);
+                        const autoNumberPart = String(
+                          autoParsedCaseNumber?.number ?? 1,
+                        ).padStart(2, "0");
+                        const autoYearPart = String(
+                          autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                        );
+                        const autoAreaValue = getAreaFromCaseNumber(
+                          entry.title,
+                          "",
+                        );
+                        const autoAreaMissing = !autoAreaValue;
                         const rowHasExistingCase =
                           isCaseAlreadyExisting(displayCaseNumber);
                         const rowHasDuplicate =
@@ -1146,37 +1274,69 @@ export const NotarialUpdatePage = ({
                                         <option value="auto">Auto</option>
                                         <option value="manual">Manual</option>
                                       </select>
-                                      <input
-                                        className="xls-input xls-mono"
-                                        style={{ width: "100%" }}
-                                        value={
-                                          entry.isManual
-                                            ? String(entry.title ?? "")
-                                            : (autoCaseNumbersByRow[entry.id] ??
-                                              "")
-                                        }
-                                        readOnly={!entry.isManual}
-                                        onChange={(e) =>
-                                          handleChange(
-                                            entry.id,
-                                            "title",
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={
-                                          entry.isManual
-                                            ? "Enter case no."
-                                            : isPreviewLoading
-                                              ? "Generating..."
-                                              : "Auto"
-                                        }
-                                        title={
-                                          entry.isManual
-                                            ? "Manual case number"
-                                            : "Auto-generated case number"
-                                        }
-                                      />
+                                      {entry.isManual ? (
+                                        <input
+                                          className="xls-input xls-mono"
+                                          style={{ width: "100%" }}
+                                          value={String(entry.title ?? "")}
+                                          onChange={(e) =>
+                                            handleChange(
+                                              entry.id,
+                                              "title",
+                                              e.target.value,
+                                            )
+                                          }
+                                          placeholder="Enter case no."
+                                          title="Manual case number"
+                                        />
+                                      ) : (
+                                        <div
+                                          style={{
+                                            display: "grid",
+                                            gridTemplateColumns:
+                                              "72px minmax(0, 1fr) 84px",
+                                            gap: 6,
+                                          }}
+                                        >
+                                          <input
+                                            className="xls-input xls-mono"
+                                            style={{ width: "100%" }}
+                                            value={`${autoNumberPart}-`}
+                                            readOnly
+                                            title="Auto sequence"
+                                          />
+                                          <input
+                                            className={`xls-input xls-mono${autoAreaMissing ? " xls-input-err" : ""}`}
+                                            style={{
+                                              width: "100%",
+                                              textAlign: "center",
+                                            }}
+                                            value={autoAreaValue}
+                                            onChange={(e) =>
+                                              handleAreaChange(
+                                                entry.id,
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder="Area"
+                                            title="Area code for this row"
+                                          />
+                                          <input
+                                            className="xls-input xls-mono"
+                                            style={{ width: "100%" }}
+                                            value={`-${autoYearPart}`}
+                                            readOnly
+                                            title="Auto year"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
+                                    {!entry.isManual && autoAreaMissing && (
+                                      <span className="xls-cell-err">
+                                        <FiAlertCircle size={10} />
+                                        Area is required in auto mode
+                                      </span>
+                                    )}
                                     {entry.errors[col.key as string] && (
                                       <span className="xls-cell-err">
                                         <FiAlertCircle size={10} />
