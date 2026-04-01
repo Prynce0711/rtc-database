@@ -8,6 +8,12 @@ import {
   Prisma,
 } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  formatAutoCaseNumber,
+  getNextCaseNumber,
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
 import {
   buildCaseFind,
@@ -116,14 +122,75 @@ export async function createPetition(
       petitionData.data,
     );
 
-    const newCase = await prisma.case.create({
-      data: {
-        ...casePayload,
-        caseType: CaseType.PETITION,
-        petition: {
-          create: detailData as Prisma.PetitionCreateWithoutCaseInput,
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : true;
+
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const isManual = requestedManual || hasManualSuffix;
+
+    const newCase = await prisma.$transaction(async (tx) => {
+      if (!isManual) {
+        if (!parsedCaseNumber) {
+          throw new Error(
+            "Auto mode requires a case number pattern like M-01-2026 or 01-M-2026",
+          );
+        }
+
+        const next = await getNextCaseNumber(
+          tx,
+          CaseType.PETITION,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+        );
+
+        return tx.case.create({
+          data: {
+            ...casePayload,
+            caseType: CaseType.PETITION,
+            caseNumber: next.caseNumber,
+            number: next.number,
+            area: next.area,
+            year: next.year,
+            isManual: false,
+            petition: {
+              create: detailData as Prisma.PetitionCreateWithoutCaseInput,
+            },
+          },
+        });
+      }
+
+      const createdCase = await tx.case.create({
+        data: {
+          ...casePayload,
+          caseType: CaseType.PETITION,
+          caseNumber: rawCaseNumber,
+          number: null,
+          area: null,
+          year: null,
+          isManual: true,
+          petition: {
+            create: detailData as Prisma.PetitionCreateWithoutCaseInput,
+          },
         },
-      },
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.PETITION,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return createdCase;
     });
 
     await createLog({
@@ -137,6 +204,47 @@ export async function createPetition(
   } catch (error) {
     console.error("Error creating petition:", error);
     return { success: false, error: "Error creating petition" };
+  }
+}
+
+export async function getPetitionCaseNumberPreview(
+  area: string,
+  year: number,
+): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
+  try {
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedArea = area.trim().toUpperCase();
+    if (!normalizedArea || !Number.isFinite(year)) {
+      return { success: false, error: "Invalid area/year" };
+    }
+
+    const counter = await prisma.caseCounter.findUnique({
+      where: {
+        caseType_area_year: {
+          caseType: CaseType.PETITION,
+          area: normalizedArea,
+          year,
+        },
+      },
+    });
+
+    const nextNumber = (counter?.last ?? 0) + 1;
+    const caseNumber = formatAutoCaseNumber(normalizedArea, nextNumber, year);
+
+    return {
+      success: true,
+      result: {
+        caseNumber,
+        nextNumber,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting petition case number preview:", error);
+    return { success: false, error: "Failed to get next case number" };
   }
 }
 
@@ -170,6 +278,18 @@ export async function updatePetition(
       petitionData.data,
     );
 
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : undefined;
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const inferredManual = hasManualSuffix || !parsedCaseNumber;
+    const isManual = requestedManual ?? inferredManual;
+
     if (casePayload.caseType && casePayload.caseType !== CaseType.PETITION) {
       throw new Error("Case type cannot be changed to non-petition");
     }
@@ -183,27 +303,59 @@ export async function updatePetition(
       throw new Error("Petition not found");
     }
 
-    const [, , updatedCase] = await prisma.$transaction([
-      prisma.case.update({
+    const updatedCase = await prisma.$transaction(async (tx) => {
+      const caseUpdateData: Prisma.CaseUpdateInput = {
+        ...casePayload,
+        caseType: CaseType.PETITION,
+      };
+
+      if (!isManual && parsedCaseNumber) {
+        caseUpdateData.caseNumber = formatAutoCaseNumber(
+          parsedCaseNumber.area,
+          parsedCaseNumber.number,
+          parsedCaseNumber.year,
+        );
+        caseUpdateData.number = parsedCaseNumber.number;
+        caseUpdateData.area = parsedCaseNumber.area;
+        caseUpdateData.year = parsedCaseNumber.year;
+        caseUpdateData.isManual = false;
+      } else {
+        caseUpdateData.caseNumber = rawCaseNumber;
+        caseUpdateData.number = null;
+        caseUpdateData.area = null;
+        caseUpdateData.year = null;
+        caseUpdateData.isManual = true;
+      }
+
+      await tx.case.update({
         where: { id: caseId },
-        data: {
-          ...casePayload,
-          caseType: CaseType.PETITION,
-        },
-      }),
-      prisma.petition.upsert({
+        data: caseUpdateData,
+      });
+
+      await tx.petition.upsert({
         where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
-      }),
-      prisma.case.findUnique({
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.PETITION,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return tx.case.findUnique({
         where: { id: caseId },
         include: { petition: true },
-      }),
-    ]);
+      });
+    });
 
     if (!updatedCase) {
       throw new Error("Failed to update petition");

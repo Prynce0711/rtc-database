@@ -14,12 +14,17 @@ import {
 } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
+import {
   ExportExcelData,
   getExcelHeaderMap,
   isMappedRowEmpty,
   normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
+  QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
 } from "@/app/lib/excel";
@@ -44,15 +49,72 @@ export async function uploadExcel(
 
     console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
-    // Peek workbook to log sheet names (processExcelUpload will parse again for validation)
+    const candidateCaseNumbers = new Set<string>();
+
+    // Peek workbook to log sheet names and pre-collect case numbers for faster exact-match checks.
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
         `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
+
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        const rows =
+          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+
+        for (const row of rows) {
+          const normalized = normalizeRowBySchema(CivilCaseSchema, row);
+          const caseNumber = normalized.caseNumber;
+          if (typeof caseNumber !== "string") continue;
+          const trimmed = caseNumber.trim();
+          if (trimmed) {
+            candidateCaseNumbers.add(trimmed);
+          }
+        }
+      }
     } catch (peekError) {
       console.warn("WARN Unable to preview workbook for logging:", peekError);
+    }
+
+    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
+    const exactMatchCache = new Map<string, boolean>();
+
+    if (candidateCaseNumbers.size > 0) {
+      const allCaseNumbers = Array.from(candidateCaseNumbers);
+
+      for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
+        const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
+
+        const existingCases = await prisma.case.findMany({
+          where: {
+            caseType,
+            caseNumber: {
+              in: caseNumberChunk,
+            },
+          },
+          include: {
+            civilCase: true,
+          },
+        });
+
+        for (const existingCase of existingCases) {
+          if (!existingCase.civilCase || !existingCase.caseNumber) continue;
+
+          const key = existingCase.caseNumber.trim();
+          if (!key) continue;
+
+          const mergedCase = {
+            ...existingCase,
+            ...existingCase.civilCase,
+          } as Record<string, unknown>;
+
+          const bucket = existingByCaseNumber.get(key) ?? [];
+          bucket.push(mergedCase);
+          existingByCaseNumber.set(key, bucket);
+        }
+      }
     }
 
     const headerMap = getExcelHeaderMap(CivilCaseSchema);
@@ -73,30 +135,46 @@ export async function uploadExcel(
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
       checkExactMatch: async (_cells, mappedRow) => {
-        const existingCases = await prisma.case.findMany({
-          where: {
-            caseNumber: mappedRow.caseNumber,
-            caseType: mappedRow.caseType,
-          },
-          include: {
-            civilCase: true,
-          },
-        });
-
         const mappedEntries = Object.entries(mappedRow);
 
-        const hasExactMatch = existingCases.some((existingCase) => {
-          if (!existingCase.civilCase) return false;
+        const cacheKey = JSON.stringify(
+          mappedEntries
+            .slice()
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => [
+              key,
+              value instanceof Date
+                ? value.getTime()
+                : typeof value === "string"
+                  ? value.trim()
+                  : (value ?? null),
+            ]),
+        );
 
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.civilCase,
-          } as Record<string, unknown>;
+        const cachedResult = exactMatchCache.get(cacheKey);
+        if (cachedResult !== undefined) {
+          return {
+            exists: cachedResult,
+            fields: cachedResult ? mappedEntries.map(([key]) => key) : [],
+          };
+        }
 
-          return mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, mergedCase[key]),
-          );
-        });
+        const caseNumberKey =
+          typeof mappedRow.caseNumber === "string"
+            ? mappedRow.caseNumber.trim()
+            : "";
+
+        const candidates = caseNumberKey
+          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
+          : [];
+
+        const hasExactMatch = candidates.some((existingRow) =>
+          mappedEntries.every(([key, value]) =>
+            valuesAreEqual(value, existingRow[key]),
+          ),
+        );
+
+        exactMatchCache.set(cacheKey, hasExactMatch);
 
         return {
           exists: hasExactMatch,
@@ -158,32 +236,71 @@ export async function uploadExcel(
         };
       },
       onBatchInsert: async (rows) => {
-        const caseRows: Prisma.CaseCreateManyInput[] = [];
+        return prisma.$transaction(async (tx) => {
+          const caseRows: Prisma.CaseCreateManyInput[] = [];
 
-        rows.forEach((row) => {
-          const { caseData } = splitCaseDataBySchema(row);
-          caseRows.push(caseData);
+          rows.forEach((row) => {
+            const { caseData } = splitCaseDataBySchema(row);
+            caseRows.push({
+              ...caseData,
+              caseType: CaseType.CIVIL,
+              isManual: true,
+              number: null,
+              area: null,
+              year: null,
+            });
+          });
+
+          const created = await tx.case.createManyAndReturn({
+            data: caseRows,
+          });
+
+          const civilRows: Prisma.CivilCaseCreateManyInput[] = rows.map(
+            (row, index) => {
+              const { detailData } = splitCaseDataBySchema(row);
+              return {
+                ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
+                baseCaseID: created[index].id,
+              };
+            },
+          );
+
+          if (civilRows.length > 0) {
+            await tx.civilCase.createMany({ data: civilRows });
+          }
+
+          const maxPerBucket = new Map<
+            string,
+            { area: string; year: number; number: number }
+          >();
+
+          rows.forEach((row) => {
+            const parsed = parseCaseNumber(String(row.caseNumber ?? ""));
+            if (!parsed) return;
+
+            const key = `${CaseType.CIVIL}|${parsed.area}|${parsed.year}`;
+            const current = maxPerBucket.get(key);
+            if (!current || parsed.number > current.number) {
+              maxPerBucket.set(key, {
+                area: parsed.area,
+                year: parsed.year,
+                number: parsed.number,
+              });
+            }
+          });
+
+          for (const bucket of maxPerBucket.values()) {
+            await syncCaseCounterToAtLeast(
+              tx,
+              CaseType.CIVIL,
+              bucket.area,
+              bucket.year,
+              bucket.number,
+            );
+          }
+
+          return { ids: created.map((c) => c.id), count: created.length };
         });
-
-        const created = await prisma.case.createManyAndReturn({
-          data: caseRows,
-        });
-
-        const civilRows: Prisma.CivilCaseCreateManyInput[] = rows.map(
-          (row, index) => {
-            const { detailData } = splitCaseDataBySchema(row);
-            return {
-              ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
-              baseCaseID: created[index].id,
-            };
-          },
-        );
-
-        if (civilRows.length > 0) {
-          await prisma.civilCase.createMany({ data: civilRows });
-        }
-
-        return { ids: created.map((c) => c.id), count: created.length };
       },
     });
 

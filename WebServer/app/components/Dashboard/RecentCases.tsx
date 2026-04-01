@@ -1,5 +1,5 @@
 import React from "react";
-import type { UnifiedCaseData } from "../CaseActions";
+import type { UnifiedCaseData } from "../Case/CaseActions";
 
 interface RecentCasesProps {
   cases: UnifiedCaseData[];

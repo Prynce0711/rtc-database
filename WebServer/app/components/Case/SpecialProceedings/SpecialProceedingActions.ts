@@ -8,6 +8,12 @@ import {
   SpecialProceeding,
 } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  formatAutoCaseNumber,
+  getNextCaseNumber,
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
 import {
   buildCaseFind,
@@ -200,14 +206,77 @@ export async function createSpecialProceeding(
       specialProceedingData.data,
     );
 
-    const newCase = await prisma.case.create({
-      data: {
-        ...casePayload,
-        caseType: CaseType.SCA,
-        specialProceeding: {
-          create: detailData as Prisma.SpecialProceedingCreateWithoutCaseInput,
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : true;
+
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const isManual = requestedManual || hasManualSuffix;
+
+    const newCase = await prisma.$transaction(async (tx) => {
+      if (!isManual) {
+        if (!parsedCaseNumber) {
+          throw new Error(
+            "Auto mode requires a case number pattern like M-01-2026 or 01-M-2026",
+          );
+        }
+
+        const next = await getNextCaseNumber(
+          tx,
+          CaseType.SCA,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+        );
+
+        return tx.case.create({
+          data: {
+            ...casePayload,
+            caseType: CaseType.SCA,
+            caseNumber: next.caseNumber,
+            number: next.number,
+            area: next.area,
+            year: next.year,
+            isManual: false,
+            specialProceeding: {
+              create:
+                detailData as Prisma.SpecialProceedingCreateWithoutCaseInput,
+            },
+          },
+        });
+      }
+
+      const createdCase = await tx.case.create({
+        data: {
+          ...casePayload,
+          caseType: CaseType.SCA,
+          caseNumber: rawCaseNumber,
+          number: null,
+          area: null,
+          year: null,
+          isManual: true,
+          specialProceeding: {
+            create:
+              detailData as Prisma.SpecialProceedingCreateWithoutCaseInput,
+          },
         },
-      },
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.SCA,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return createdCase;
     });
 
     await createLog({
@@ -221,6 +290,50 @@ export async function createSpecialProceeding(
   } catch (error) {
     console.error("Error creating special proceeding:", error);
     return { success: false, error: "Error creating special proceeding" };
+  }
+}
+
+export async function getSpecialProceedingCaseNumberPreview(
+  area: string,
+  year: number,
+): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
+  try {
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedArea = area.trim().toUpperCase();
+    if (!normalizedArea || !Number.isFinite(year)) {
+      return { success: false, error: "Invalid area/year" };
+    }
+
+    const counter = await prisma.caseCounter.findUnique({
+      where: {
+        caseType_area_year: {
+          caseType: CaseType.SCA,
+          area: normalizedArea,
+          year,
+        },
+      },
+    });
+
+    const nextNumber = (counter?.last ?? 0) + 1;
+    const caseNumber = formatAutoCaseNumber(normalizedArea, nextNumber, year);
+
+    return {
+      success: true,
+      result: {
+        caseNumber,
+        nextNumber,
+      },
+    };
+  } catch (error) {
+    console.error(
+      "Error getting special proceeding case number preview:",
+      error,
+    );
+    return { success: false, error: "Failed to get next case number" };
   }
 }
 
@@ -254,6 +367,18 @@ export async function updateSpecialProceeding(
       specialProceedingData.data,
     );
 
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : undefined;
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const inferredManual = hasManualSuffix || !parsedCaseNumber;
+    const isManual = requestedManual ?? inferredManual;
+
     if (casePayload.caseType && casePayload.caseType !== CaseType.SCA) {
       throw new Error("Case type cannot be changed to non-special proceeding");
     }
@@ -267,27 +392,59 @@ export async function updateSpecialProceeding(
       throw new Error("Special proceeding not found");
     }
 
-    const [, , updatedCase] = await prisma.$transaction([
-      prisma.case.update({
+    const updatedCase = await prisma.$transaction(async (tx) => {
+      const caseUpdateData: Prisma.CaseUpdateInput = {
+        ...casePayload,
+        caseType: CaseType.SCA,
+      };
+
+      if (!isManual && parsedCaseNumber) {
+        caseUpdateData.caseNumber = formatAutoCaseNumber(
+          parsedCaseNumber.area,
+          parsedCaseNumber.number,
+          parsedCaseNumber.year,
+        );
+        caseUpdateData.number = parsedCaseNumber.number;
+        caseUpdateData.area = parsedCaseNumber.area;
+        caseUpdateData.year = parsedCaseNumber.year;
+        caseUpdateData.isManual = false;
+      } else {
+        caseUpdateData.caseNumber = rawCaseNumber;
+        caseUpdateData.number = null;
+        caseUpdateData.area = null;
+        caseUpdateData.year = null;
+        caseUpdateData.isManual = true;
+      }
+
+      await tx.case.update({
         where: { id: caseId },
-        data: {
-          ...casePayload,
-          caseType: CaseType.SCA,
-        },
-      }),
-      prisma.specialProceeding.upsert({
+        data: caseUpdateData,
+      });
+
+      await tx.specialProceeding.upsert({
         where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.SpecialProceedingCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
-      }),
-      prisma.case.findUnique({
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.SCA,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return tx.case.findUnique({
         where: { id: caseId },
         include: { specialProceeding: true },
-      }),
-    ]);
+      });
+    });
 
     if (!updatedCase) {
       throw new Error("Failed to update special proceeding");

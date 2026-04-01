@@ -7,14 +7,20 @@ import { deleteGarageFile } from "../../lib/garageActions";
 import { prisma } from "../../lib/prisma";
 import Roles from "../../lib/Roles";
 
-export async function deleteAllCases(): Promise<ActionResult<void>> {
+export async function deleteAllCases(
+  caseType: CaseType,
+): Promise<ActionResult<void>> {
   try {
     const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
 
-    await prisma.case.deleteMany({});
+    await prisma.case.deleteMany({
+      where: {
+        caseType,
+      },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {

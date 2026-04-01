@@ -6,7 +6,7 @@ import {
   getCases,
   type UnifiedCaseData,
   type UnifiedCaseStats,
-} from "@/app/components/CaseActions";
+} from "@/app/components/Case/CaseActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
 import {

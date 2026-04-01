@@ -3,7 +3,13 @@
 import { CaseType } from "@/app/generated/prisma/enums";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -27,6 +33,7 @@ import { doesCaseExist } from "../CaseActions";
 import {
   createCriminalCase,
   deleteCriminalCase,
+  getCriminalCaseNumberPreview,
   updateCriminalCase,
 } from "./CriminalCasesActions";
 import {
@@ -47,6 +54,79 @@ type Step = "entry" | "review";
 
 const REQUIRED_FIELDS = ["name", "caseNumber"] as const;
 const normalizeCaseNumber = (value: string) => value.trim();
+const AUTO_DEFAULT_AREA = "M";
+const AUTO_DEFAULT_YEAR = new Date().getFullYear();
+const getAutoYearFromDate = (
+  value: string | Date | null | undefined,
+): number => {
+  if (!value) return AUTO_DEFAULT_YEAR;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return AUTO_DEFAULT_YEAR;
+  return date.getFullYear();
+};
+const normalizeAreaCode = (value: string) =>
+  value
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 8);
+const resolveAreaCode = (value: string) =>
+  normalizeAreaCode(value) || AUTO_DEFAULT_AREA;
+
+const parseCaseNumberParts = (
+  value: string,
+): { area: string; year: number; number: number } | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numberFirst = trimmed.match(/^\s*(\d+)-([A-Za-z]*)-(\d{4})/);
+  if (numberFirst) {
+    const number = Number.parseInt(numberFirst[1], 10);
+    const year = Number.parseInt(numberFirst[3], 10);
+    if (Number.isNaN(number) || Number.isNaN(year)) return null;
+
+    return {
+      number,
+      area: numberFirst[2].toUpperCase(),
+      year,
+    };
+  }
+
+  const areaFirst = trimmed.match(/^\s*([A-Za-z]+)-(\d+)-(\d{4})/);
+  if (areaFirst) {
+    const number = Number.parseInt(areaFirst[2], 10);
+    const year = Number.parseInt(areaFirst[3], 10);
+    if (Number.isNaN(number) || Number.isNaN(year)) return null;
+
+    return {
+      area: areaFirst[1].toUpperCase(),
+      number,
+      year,
+    };
+  }
+
+  return null;
+};
+
+const formatCaseNumber = (area: string, number: number, year: number): string =>
+  `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
+
+const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
+  parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
+
+const applyAreaToCaseNumber = (
+  value: string,
+  area: string,
+  year?: number,
+): string => {
+  const normalizedArea = normalizeAreaCode(area);
+  const parsed = parseCaseNumberParts(value);
+  const resolvedYear = year ?? parsed?.year ?? AUTO_DEFAULT_YEAR;
+  if (!parsed) {
+    return formatCaseNumber(normalizedArea, 1, resolvedYear);
+  }
+
+  return formatCaseNumber(normalizedArea, parsed.number, resolvedYear);
+};
 
 type ColDef = {
   key: string;
@@ -65,7 +145,7 @@ const FROZEN_COLS: ColDef[] = [
     label: "Case No.",
     placeholder: "CR-2026-0001",
     type: "text",
-    width: 152,
+    width: 220,
     required: true,
     mono: true,
   },
@@ -350,15 +430,27 @@ const TAB_GROUPS: TabGroup[] = [
   },
 ];
 
-function validateEntry(entry: CaseEntry): Record<string, string> {
+function validateEntry(
+  entry: CaseEntry,
+  options: { requireCaseNumber: boolean },
+): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
+    if (!options.requireCaseNumber && k === "caseNumber") return;
     if (
       !entry[k as keyof CaseEntry] ||
       String(entry[k as keyof CaseEntry]).trim() === ""
     )
       errs[k] = "Required";
   });
+
+  if (!options.requireCaseNumber && !entry.isManual) {
+    const parsed = parseCaseNumberParts(String(entry.caseNumber ?? ""));
+    if (!parsed || !parsed.area) {
+      errs.caseNumber = "Area is required in auto mode";
+    }
+  }
+
   return errs;
 }
 
@@ -369,12 +461,14 @@ const CellInput = ({
   error,
   onChange,
   onKeyDown,
+  readOnly,
 }: {
   col: ColDef;
   value: string | boolean | number | Date | null | undefined;
   error?: string;
   onChange: (v: string | boolean) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  readOnly?: boolean;
 }) => {
   // Convert null/undefined to empty string, Date objects to YYYY-MM-DD format
   const stringValue =
@@ -444,6 +538,7 @@ const CellInput = ({
         placeholder={col.placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
+        readOnly={readOnly}
         title={error || col.label}
         className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
       />
@@ -460,9 +555,11 @@ const CellInput = ({
 /* ─── Review: single case card ───────────────────────────────── */
 function ReviewCard({
   entry,
+  displayCaseNumber,
   isExistingCase,
 }: {
   entry: CaseEntry;
+  displayCaseNumber: string;
   isExistingCase: boolean;
 }) {
   const filledAddress =
@@ -523,7 +620,7 @@ function ReviewCard({
       <div className="rv-hero">
         <div className="rv-hero-left">
           <div className="rv-hero-casenum">
-            {entry.caseNumber || (
+            {displayCaseNumber || (
               <span style={{ opacity: 0.4 }}>No Case No.</span>
             )}
           </div>
@@ -721,6 +818,11 @@ const CriminalCaseUpdatePage = ({
   const [activeTab, setActiveTab] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
+  const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
+    Record<number, string>
+  >({});
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -729,7 +831,17 @@ const CriminalCaseUpdatePage = ({
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
     if (isEdit) return editCases.map(makeFromCase);
-    return [createEmptyEntry()];
+    const newEntry = createEmptyEntry();
+    return [
+      {
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
+      },
+    ];
   });
 
   useEffect(() => {
@@ -741,8 +853,142 @@ const CriminalCaseUpdatePage = ({
       return;
     }
 
-    setEntries([createEmptyEntry()]);
+    const newEntry = createEmptyEntry();
+    setEntries([
+      {
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
+      },
+    ]);
   }, [isEdit, selectedCase, selectedCases]);
+
+  useEffect(() => {
+    if (isEdit) {
+      setAutoCaseNumbersByRow({});
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      const autoRows = entries.filter((entry) => !entry.isManual);
+      if (autoRows.length === 0) {
+        setAutoCaseNumbersByRow({});
+        return;
+      }
+
+      setIsPreviewLoading(true);
+      const manualMaxPerBucket = new Map<string, number>();
+      entries
+        .filter((entry) => entry.isManual)
+        .forEach((entry) => {
+          const parsed = parseCaseNumberParts(entry.caseNumber);
+          if (!parsed || !parsed.area) return;
+
+          const key = `${parsed.area}|${parsed.year}`;
+          const current = manualMaxPerBucket.get(key) ?? 0;
+          if (parsed.number > current) {
+            manualMaxPerBucket.set(key, parsed.number);
+          }
+        });
+
+      const rowBuckets = autoRows.map((entry) => {
+        const parsed = parseCaseNumberParts(entry.caseNumber);
+        return {
+          entryId: entry.id,
+          area: parsed?.area ?? "",
+          year: getAutoYearFromDate(entry.dateFiled),
+        };
+      });
+
+      const uniqueBuckets = Array.from(
+        new Set(
+          rowBuckets
+            .filter((row) => row.area)
+            .map((row) => `${row.area}|${row.year}`),
+        ),
+      );
+
+      const nextPerBucket = new Map<string, number>();
+
+      for (const bucket of uniqueBuckets) {
+        const [area, yearRaw] = bucket.split("|");
+        const year = Number.parseInt(yearRaw, 10);
+        const preview = await getCriminalCaseNumberPreview(area, year);
+        nextPerBucket.set(
+          bucket,
+          preview.success ? preview.result!.nextNumber : 1,
+        );
+      }
+
+      const offsetPerBucket = new Map<string, number>();
+      const nextByRow: Record<number, string> = {};
+
+      rowBuckets.forEach((row) => {
+        if (!row.area) {
+          nextByRow[row.entryId] = "";
+          return;
+        }
+
+        const key = `${row.area}|${row.year}`;
+        const dbBase = nextPerBucket.get(key) ?? 1;
+        const manualBase = (manualMaxPerBucket.get(key) ?? 0) + 1;
+        const bucketBase = Math.max(dbBase, manualBase);
+        const offset = offsetPerBucket.get(key) ?? 0;
+        const sequence = bucketBase + offset;
+        nextByRow[row.entryId] = formatCaseNumber(row.area, sequence, row.year);
+        offsetPerBucket.set(key, offset + 1);
+      });
+
+      setAutoCaseNumbersByRow(nextByRow);
+      setIsPreviewLoading(false);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [entries, isEdit]);
+
+  const handleAreaChange = useCallback((id: number, areaInput: string) => {
+    const normalizedArea = normalizeAreaCode(areaInput);
+
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              caseNumber: applyAreaToCaseNumber(
+                String(entry.caseNumber ?? ""),
+                normalizedArea,
+                getAutoYearFromDate(entry.dateFiled),
+              ),
+              errors: {
+                ...entry.errors,
+                caseNumber: "",
+              },
+            }
+          : entry,
+      ),
+    );
+  }, []);
+
+  const handleApplyDefaultAreaToRows = useCallback(() => {
+    const effectiveDefaultArea = normalizeAreaCode(defaultArea);
+    setDefaultArea(effectiveDefaultArea);
+
+    setEntries((prev) =>
+      prev.map((entry) => {
+        return {
+          ...entry,
+          caseNumber: applyAreaToCaseNumber(
+            String(entry.caseNumber ?? ""),
+            effectiveDefaultArea,
+            getAutoYearFromDate(entry.dateFiled),
+          ),
+        };
+      }),
+    );
+  }, [defaultArea]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -755,14 +1001,48 @@ const CriminalCaseUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry()]);
+    const newEntry = createEmptyEntry();
+    setEntries((prev) => [
+      ...prev,
+      {
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          normalizeAreaCode(defaultArea),
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
+      },
+    ]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
         behavior: "smooth",
       });
     }, 60);
-  }, []);
+  }, [defaultArea]);
+
+  const handleClearTable = useCallback(async () => {
+    const label =
+      entries.length === 1
+        ? "Clear the table and reset the current row?"
+        : `Clear all ${entries.length} rows and start over?`;
+
+    if (!(await statusPopup.showConfirm(label))) return;
+
+    const newEntry = createEmptyEntry();
+    setEntries([
+      {
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          normalizeAreaCode(defaultArea),
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
+      },
+    ]);
+    setAutoCaseNumbersByRow({});
+    setExistingCaseNumbers([]);
+  }, [defaultArea, entries.length, statusPopup]);
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -773,7 +1053,7 @@ const CriminalCaseUpdatePage = ({
     const dup: CaseEntry = {
       ...source,
       id: createTempId(),
-      caseNumber: "",
+      caseNumber: source.isManual ? "" : source.caseNumber,
       errors: {},
       saved: false,
       collapsed: false,
@@ -805,12 +1085,17 @@ const CriminalCaseUpdatePage = ({
     }
   };
 
-  const completedCount = entries.filter((e) =>
-    REQUIRED_FIELDS.every(
-      (k) =>
-        e[k as keyof CaseEntry] &&
-        String(e[k as keyof CaseEntry]).trim() !== "",
-    ),
+  const completedCount = entries.filter(
+    (e) =>
+      (e.isManual ||
+        isEdit ||
+        Boolean(parseCaseNumberParts(String(e.caseNumber ?? ""))?.area)) &&
+      REQUIRED_FIELDS.every(
+        (k) =>
+          (k === "caseNumber" && !e.isManual && !isEdit) ||
+          (e[k as keyof CaseEntry] &&
+            String(e[k as keyof CaseEntry]).trim() !== ""),
+      ),
   ).length;
   const incompleteCount = entries.length - completedCount;
 
@@ -823,8 +1108,46 @@ const CriminalCaseUpdatePage = ({
     [existingCaseNumbers, isEdit],
   );
 
-  const existingCaseRowCount = entries.filter((entry) =>
-    isCaseAlreadyExisting(entry.caseNumber),
+  const existingCaseRowCount = entries.filter(
+    (entry) => entry.isManual && isCaseAlreadyExisting(entry.caseNumber),
+  ).length;
+
+  const getDisplayCaseNumber = (entry: CaseEntry): string => {
+    if (entry.isManual || isEdit) {
+      return entry.caseNumber || "";
+    }
+
+    return autoCaseNumbersByRow[entry.id] ?? "";
+  };
+
+  const duplicateCaseNumbers = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    entries.forEach((entry) => {
+      const displayCaseNumber = normalizeCaseNumber(
+        getDisplayCaseNumber(entry),
+      );
+      if (!displayCaseNumber) return;
+      counts.set(displayCaseNumber, (counts.get(displayCaseNumber) ?? 0) + 1);
+    });
+
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([value]) => value),
+    );
+  }, [entries, autoCaseNumbersByRow, isEdit]);
+
+  const isCaseDuplicateInBatch = useCallback(
+    (caseNumber: string) => {
+      const normalized = normalizeCaseNumber(caseNumber);
+      return !!normalized && duplicateCaseNumbers.has(normalized);
+    },
+    [duplicateCaseNumbers],
+  );
+
+  const duplicateCaseRowCount = entries.filter((entry) =>
+    isCaseDuplicateInBatch(getDisplayCaseNumber(entry)),
   ).length;
 
   const refreshExistingCaseNumbers = useCallback(async (): Promise<
@@ -838,6 +1161,7 @@ const CriminalCaseUpdatePage = ({
     const caseNumbers = Array.from(
       new Set(
         entries
+          .filter((entry) => entry.isManual)
           .map((entry) => normalizeCaseNumber(entry.caseNumber))
           .filter((value) => value.length > 0),
       ),
@@ -875,7 +1199,9 @@ const CriminalCaseUpdatePage = ({
   const handleGoToReview = async () => {
     let anyError = false;
     const validated = entries.map((e) => {
-      const errs = validateEntry(e);
+      const errs = validateEntry(e, {
+        requireCaseNumber: isEdit || e.isManual,
+      });
       if (Object.keys(errs).length > 0) {
         anyError = true;
         return { ...e, errors: errs };
@@ -898,9 +1224,21 @@ const CriminalCaseUpdatePage = ({
   };
 
   const buildPayload = (e: CaseEntry) => {
-    const { id, errors, collapsed, saved, ...caseInput } = e;
+    const { id, errors, collapsed, saved, isManual, ...caseInput } = e;
+
+    const caseNumberForPayload =
+      !isEdit && !isManual
+        ? autoCaseNumbersByRow[e.id] ||
+          formatCaseNumber(
+            getAreaFromCaseNumber(String(caseInput.caseNumber ?? ""), ""),
+            1,
+            getAutoYearFromDate(caseInput.dateFiled),
+          )
+        : caseInput.caseNumber;
+
     return CriminalCaseSchema.safeParse({
       ...caseInput,
+      caseNumber: caseNumberForPayload,
       caseType: "CRIMINAL",
     });
   };
@@ -968,12 +1306,6 @@ const CriminalCaseUpdatePage = ({
             return;
           }
 
-          if (entry.caseNumber.trim() !== original.caseNumber.trim()) {
-            setStep("entry");
-            statusPopup.showError("Case number cannot be changed");
-            return;
-          }
-
           const parsed = buildPayload(entry);
           if (!parsed.success) {
             setStep("entry");
@@ -1034,6 +1366,7 @@ const CriminalCaseUpdatePage = ({
           const payload = parsed.data;
           const response = await createCriminalCase({
             ...payload,
+            isManual: entry.isManual,
             dateFiled: payload.dateFiled
               ? new Date(payload.dateFiled).toISOString()
               : null,
@@ -1097,6 +1430,7 @@ const CriminalCaseUpdatePage = ({
         );
       }
 
+      statusPopup.hidePopup();
       handleClose();
     } catch (err) {
       setStep("entry");
@@ -1202,7 +1536,21 @@ const CriminalCaseUpdatePage = ({
                     )}
                   </p>
                   {!isEdit && (
-                    <div className="xls-pills" style={{ marginTop: 10 }}>
+                    <div
+                      className="xls-pills"
+                      style={{
+                        marginTop: 10,
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span className="xls-pill xls-pill-neutral">
+                        <span className="xls-pill-dot" />
+                        Per-row mode (default: Auto)
+                      </span>
                       <span className="xls-pill xls-pill-neutral">
                         <span className="xls-pill-dot" />
                         {entries.length} {entries.length === 1 ? "row" : "rows"}
@@ -1221,18 +1569,82 @@ const CriminalCaseUpdatePage = ({
                             color: "#78350f",
                             borderColor: "#fbbf24",
                           }}
-                          title="Case is already existing"
+                          title="At least one manual case number already exists in the database."
                         >
                           <span className="xls-pill-dot" />
                           {existingCaseRowCount} existing
                         </span>
                       )}
+                      {duplicateCaseRowCount > 0 && (
+                        <span
+                          className="xls-pill"
+                          style={{
+                            background: "#ffedd5",
+                            color: "#9a3412",
+                            borderColor: "#fdba74",
+                          }}
+                          title="At least two rows in this batch share the same case number."
+                        >
+                          <span className="xls-pill-dot" />
+                          {duplicateCaseRowCount} duplicate
+                        </span>
+                      )}
                       {incompleteCount > 0 && (
-                        <span className="xls-pill xls-pill-err">
+                        <span
+                          className="xls-pill xls-pill-err"
+                          title="One or more required fields are missing in these rows."
+                        >
                           <span className="xls-pill-dot" />
                           {incompleteCount} incomplete
                         </span>
                       )}
+                    </div>
+                  )}
+                  {!isEdit && (
+                    <p
+                      style={{
+                        marginTop: 10,
+                        fontSize: 13,
+                        color: "var(--color-subtle)",
+                      }}
+                    >
+                      Auto: system assigns the next case number based on
+                      sequence. Manual: you type the case number yourself
+                      (duplicates allowed).
+                    </p>
+                  )}
+                  {!isEdit && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: 13, color: "var(--color-subtle)" }}
+                      >
+                        Default Area
+                      </span>
+                      <input
+                        className="xls-input xls-mono"
+                        style={{ width: 88, height: 36 }}
+                        value={defaultArea}
+                        onChange={(e) =>
+                          setDefaultArea(normalizeAreaCode(e.target.value))
+                        }
+                        placeholder="M"
+                        title="Default area for auto numbering"
+                      />
+                      <button
+                        type="button"
+                        className="xls-btn xls-btn-ghost"
+                        onClick={handleApplyDefaultAreaToRows}
+                      >
+                        Update All To This Area
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1263,6 +1675,17 @@ const CriminalCaseUpdatePage = ({
                       </button>
                     );
                   })}
+                  {!isEdit && (
+                    <button
+                      type="button"
+                      className="xls-btn xls-btn-ghost"
+                      onClick={() => void handleClearTable()}
+                      style={{ marginLeft: "auto" }}
+                    >
+                      <FiTrash2 size={14} />
+                      Clear Table
+                    </button>
+                  )}
                 </div>
                 <div className="xls-table-outer" ref={scrollAreaRef}>
                   <table className="xls-table">
@@ -1314,9 +1737,28 @@ const CriminalCaseUpdatePage = ({
                       <AnimatePresence initial={false}>
                         {entries.map((entry, rowIdx) => {
                           const lastColIdx = currentTabCols.length - 1;
-                          const rowHasExistingCase = isCaseAlreadyExisting(
-                            entry.caseNumber,
+                          const displayCaseNumber = getDisplayCaseNumber(entry);
+                          const autoCasePreview =
+                            autoCaseNumbersByRow[entry.id] ||
+                            String(entry.caseNumber ?? "");
+                          const autoParsedCaseNumber =
+                            parseCaseNumberParts(autoCasePreview);
+                          const autoNumberPart = String(
+                            autoParsedCaseNumber?.number ?? 1,
+                          ).padStart(2, "0");
+                          const autoYearPart = String(
+                            autoParsedCaseNumber?.year ??
+                              getAutoYearFromDate(entry.dateFiled),
                           );
+                          const autoAreaValue = getAreaFromCaseNumber(
+                            String(entry.caseNumber ?? ""),
+                            "",
+                          );
+                          const autoAreaMissing = !autoAreaValue;
+                          const rowHasExistingCase =
+                            isCaseAlreadyExisting(displayCaseNumber);
+                          const rowHasDuplicate =
+                            isCaseDuplicateInBatch(displayCaseNumber);
                           return (
                             <motion.tr
                               key={entry.id}
@@ -1330,11 +1772,15 @@ const CriminalCaseUpdatePage = ({
                                 overflow: "hidden",
                               }}
                               transition={{ duration: 0.12 }}
-                              className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}`}
+                              className={`xls-row ${rowHasExistingCase ? "bg-yellow-100/60 hover:bg-yellow-100" : ""}${!rowHasExistingCase && rowHasDuplicate ? " bg-orange-100/60 hover:bg-orange-100" : ""}`}
                               title={
-                                rowHasExistingCase
-                                  ? "Case is already existing"
-                                  : undefined
+                                rowHasExistingCase && rowHasDuplicate
+                                  ? "Case is already existing and duplicate in current rows"
+                                  : rowHasExistingCase
+                                    ? "Case is already existing"
+                                    : rowHasDuplicate
+                                      ? "Duplicate case number in current batch"
+                                      : undefined
                               }
                             >
                               <td className="td-num">
@@ -1342,14 +1788,109 @@ const CriminalCaseUpdatePage = ({
                               </td>
                               {FROZEN_COLS.map((col) => (
                                 <td key={col.key}>
-                                  <CellInput
-                                    col={col}
-                                    value={(entry as any)[col.key]}
-                                    error={entry.errors[col.key]}
-                                    onChange={(v) =>
-                                      handleChange(entry.id, col.key, v)
-                                    }
-                                  />
+                                  {!isEdit && col.key === "caseNumber" ? (
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                      <div style={{ display: "grid", gap: 6 }}>
+                                        <select
+                                          className="xls-input xls-mono"
+                                          style={{ width: "100%", height: 32 }}
+                                          value={
+                                            entry.isManual ? "manual" : "auto"
+                                          }
+                                          onChange={(e) =>
+                                            handleChange(
+                                              entry.id,
+                                              "isManual",
+                                              e.target.value === "manual",
+                                            )
+                                          }
+                                          title="Numbering mode"
+                                        >
+                                          <option value="auto">Auto</option>
+                                          <option value="manual">Manual</option>
+                                        </select>
+                                        {entry.isManual ? (
+                                          <input
+                                            className="xls-input xls-mono"
+                                            style={{ width: "100%" }}
+                                            value={String(
+                                              entry.caseNumber ?? "",
+                                            )}
+                                            onChange={(e) =>
+                                              handleChange(
+                                                entry.id,
+                                                "caseNumber",
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder="Enter case no."
+                                            title="Manual case number"
+                                          />
+                                        ) : (
+                                          <div
+                                            style={{
+                                              display: "grid",
+                                              gridTemplateColumns:
+                                                "64px minmax(0, 1fr) 76px",
+                                              gap: 6,
+                                            }}
+                                          >
+                                            <input
+                                              className="xls-input xls-mono"
+                                              style={{ width: "100%" }}
+                                              value={`${autoNumberPart}-`}
+                                              readOnly
+                                              title="Auto sequence"
+                                            />
+                                            <input
+                                              className={`xls-input xls-mono${autoAreaMissing ? " xls-input-err" : ""}`}
+                                              style={{
+                                                width: "100%",
+                                                textAlign: "center",
+                                              }}
+                                              value={autoAreaValue}
+                                              onChange={(e) =>
+                                                handleAreaChange(
+                                                  entry.id,
+                                                  e.target.value,
+                                                )
+                                              }
+                                              placeholder="Area"
+                                              title="Area code for this row"
+                                            />
+                                            <input
+                                              className="xls-input xls-mono"
+                                              style={{ width: "100%" }}
+                                              value={`-${autoYearPart}`}
+                                              readOnly
+                                              title="Auto year"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                      {!entry.isManual && autoAreaMissing && (
+                                        <span className="xls-cell-err">
+                                          <FiAlertCircle size={10} />
+                                          Area is required in auto mode
+                                        </span>
+                                      )}
+                                      {entry.errors[col.key] && (
+                                        <span className="xls-cell-err">
+                                          <FiAlertCircle size={10} />
+                                          {entry.errors[col.key]}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <CellInput
+                                      col={col}
+                                      value={(entry as any)[col.key]}
+                                      error={entry.errors[col.key]}
+                                      onChange={(v) =>
+                                        handleChange(entry.id, col.key, v)
+                                      }
+                                    />
+                                  )}
                                 </td>
                               ))}
                               {currentTabCols.map((col, colIdx) => (
@@ -1478,6 +2019,16 @@ const CriminalCaseUpdatePage = ({
                         {existingCaseRowCount > 1 ? "s" : ""} already exist.
                       </p>
                     )}
+                    {!isEdit && duplicateCaseRowCount > 0 && (
+                      <p
+                        className="text-sm font-semibold mt-2"
+                        style={{ color: "#9a3412" }}
+                      >
+                        {duplicateCaseRowCount} row
+                        {duplicateCaseRowCount > 1 ? "s" : ""} have duplicate
+                        case numbers in this batch.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1491,31 +2042,88 @@ const CriminalCaseUpdatePage = ({
                     <div className="rv-sidebar-list">
                       {entries.map((entry, idx) =>
                         (() => {
-                          const rowHasExistingCase = isCaseAlreadyExisting(
-                            entry.caseNumber,
-                          );
+                          const displayCaseNumber = getDisplayCaseNumber(entry);
+                          const rowHasExistingCase =
+                            isCaseAlreadyExisting(displayCaseNumber);
+                          const rowHasDuplicate =
+                            isCaseDuplicateInBatch(displayCaseNumber);
                           return (
                             <button
                               key={entry.id}
-                              className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}`}
+                              className={`rv-sidebar-item${reviewIdx === idx ? " active" : ""}${rowHasExistingCase ? " bg-yellow-100/60" : ""}${!rowHasExistingCase && rowHasDuplicate ? " bg-orange-100/60" : ""}`}
                               onClick={() => setReviewIdx(idx)}
                               title={
                                 rowHasExistingCase
                                   ? "Case is already existing"
-                                  : undefined
+                                  : rowHasDuplicate
+                                    ? "Duplicate case number in current batch"
+                                    : undefined
                               }
                             >
                               <span className="rv-sidebar-num">{idx + 1}</span>
                               <div className="rv-sidebar-info">
                                 <div className="rv-sidebar-casenum">
-                                  {entry.caseNumber || "No case no."}
+                                  {displayCaseNumber || "No case no."}
                                 </div>
                                 <div className="rv-sidebar-name">
                                   {entry.name || "No name"}
                                 </div>
-                                {rowHasExistingCase && (
-                                  <div className="text-xs text-warning font-semibold">
-                                    Case is already existing
+                                {(rowHasExistingCase || rowHasDuplicate) && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 6,
+                                      marginTop: 2,
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    {rowHasExistingCase && (
+                                      <div
+                                        className="tooltip tooltip-bottom"
+                                        role="presentation"
+                                      >
+                                        <div className="tooltip-content z-50">
+                                          <span className="text-xs font-medium">
+                                            Case is already existing
+                                          </span>
+                                        </div>
+                                        <span
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium"
+                                          style={{
+                                            background: "#fef3c7",
+                                            color: "#78350f",
+                                            borderColor: "#fbbf24",
+                                          }}
+                                        >
+                                          <FiAlertCircle size={10} />
+                                          Existing
+                                        </span>
+                                      </div>
+                                    )}
+                                    {rowHasDuplicate && (
+                                      <div
+                                        className="tooltip tooltip-bottom"
+                                        role="presentation"
+                                      >
+                                        <div className="tooltip-content z-50">
+                                          <span className="text-xs font-medium">
+                                            Duplicate case number in current
+                                            rows
+                                          </span>
+                                        </div>
+                                        <span
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium"
+                                          style={{
+                                            background: "#ffedd5",
+                                            color: "#9a3412",
+                                            borderColor: "#fdba74",
+                                          }}
+                                        >
+                                          <FiAlertCircle size={10} />
+                                          Duplicate
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -1537,8 +2145,15 @@ const CriminalCaseUpdatePage = ({
                     >
                       <ReviewCard
                         entry={entries[reviewIdx]}
+                        displayCaseNumber={
+                          entries[reviewIdx]
+                            ? getDisplayCaseNumber(entries[reviewIdx])
+                            : ""
+                        }
                         isExistingCase={isCaseAlreadyExisting(
-                          entries[reviewIdx]?.caseNumber ?? "",
+                          entries[reviewIdx]
+                            ? getDisplayCaseNumber(entries[reviewIdx])
+                            : "",
                         )}
                       />
                     </motion.div>

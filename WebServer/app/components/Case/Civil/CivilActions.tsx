@@ -8,6 +8,12 @@ import {
   Prisma,
 } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  formatAutoCaseNumber,
+  getNextCaseNumber,
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
 import {
   buildCaseFind,
@@ -172,14 +178,75 @@ export async function createCivilCase(
       caseData.data,
     );
 
-    const newCase = await prisma.case.create({
-      data: {
-        ...casePayload,
-        caseType: CaseType.CIVIL,
-        civilCase: {
-          create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : true;
+
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const isManual = requestedManual || hasManualSuffix;
+
+    const newCase = await prisma.$transaction(async (tx) => {
+      if (!isManual) {
+        if (!parsedCaseNumber) {
+          throw new Error(
+            "Auto mode requires a case number pattern like M-01-2026 or 01-M-2026",
+          );
+        }
+
+        const next = await getNextCaseNumber(
+          tx,
+          CaseType.CIVIL,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+        );
+
+        return tx.case.create({
+          data: {
+            ...casePayload,
+            caseType: CaseType.CIVIL,
+            caseNumber: next.caseNumber,
+            number: next.number,
+            area: next.area,
+            year: next.year,
+            isManual: false,
+            civilCase: {
+              create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
+            },
+          },
+        });
+      }
+
+      const createdCase = await tx.case.create({
+        data: {
+          ...casePayload,
+          caseType: CaseType.CIVIL,
+          caseNumber: rawCaseNumber,
+          number: null,
+          area: null,
+          year: null,
+          isManual: true,
+          civilCase: {
+            create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
+          },
         },
-      },
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.CIVIL,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return createdCase;
     });
 
     await createLog({
@@ -193,6 +260,47 @@ export async function createCivilCase(
   } catch (error) {
     console.error("Error creating civil case:", error);
     return { success: false, error: "Error creating civil case" };
+  }
+}
+
+export async function getCivilCaseNumberPreview(
+  area: string,
+  year: number,
+): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
+  try {
+    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedArea = area.trim().toUpperCase();
+    if (!normalizedArea || !Number.isFinite(year)) {
+      return { success: false, error: "Invalid area/year" };
+    }
+
+    const counter = await prisma.caseCounter.findUnique({
+      where: {
+        caseType_area_year: {
+          caseType: CaseType.CIVIL,
+          area: normalizedArea,
+          year,
+        },
+      },
+    });
+
+    const nextNumber = (counter?.last ?? 0) + 1;
+    const caseNumber = formatAutoCaseNumber(normalizedArea, nextNumber, year);
+
+    return {
+      success: true,
+      result: {
+        caseNumber,
+        nextNumber,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting civil case number preview:", error);
+    return { success: false, error: "Failed to get next case number" };
   }
 }
 
@@ -215,6 +323,18 @@ export async function updateCivilCase(
       caseData.data,
     );
 
+    const rawCaseNumber = String(casePayload.caseNumber ?? "").trim();
+    if (!rawCaseNumber) {
+      throw new Error("Case number is required");
+    }
+
+    const parsedCaseNumber = parseCaseNumber(rawCaseNumber);
+    const requestedManual =
+      typeof data.isManual === "boolean" ? data.isManual : undefined;
+    const hasManualSuffix = !!parsedCaseNumber?.tail;
+    const inferredManual = hasManualSuffix || !parsedCaseNumber;
+    const isManual = requestedManual ?? inferredManual;
+
     if (casePayload.caseType && casePayload.caseType !== CaseType.CIVIL) {
       throw new Error("Case type cannot be changed to non-civil");
     }
@@ -228,24 +348,59 @@ export async function updateCivilCase(
       throw new Error("Case not found");
     }
 
-    const [, , updatedCase] = await prisma.$transaction([
-      prisma.case.update({
+    const updatedCase = await prisma.$transaction(async (tx) => {
+      const caseUpdateData: Prisma.CaseUpdateInput = {
+        ...casePayload,
+        caseType: CaseType.CIVIL,
+      };
+
+      if (!isManual && parsedCaseNumber) {
+        caseUpdateData.caseNumber = formatAutoCaseNumber(
+          parsedCaseNumber.area,
+          parsedCaseNumber.number,
+          parsedCaseNumber.year,
+        );
+        caseUpdateData.number = parsedCaseNumber.number;
+        caseUpdateData.area = parsedCaseNumber.area;
+        caseUpdateData.year = parsedCaseNumber.year;
+        caseUpdateData.isManual = false;
+      } else {
+        caseUpdateData.caseNumber = rawCaseNumber;
+        caseUpdateData.number = null;
+        caseUpdateData.area = null;
+        caseUpdateData.year = null;
+        caseUpdateData.isManual = true;
+      }
+
+      await tx.case.update({
         where: { id: caseId },
-        data: casePayload,
-      }),
-      prisma.civilCase.upsert({
+        data: caseUpdateData,
+      });
+
+      await tx.civilCase.upsert({
         where: { baseCaseID: caseId },
         update: detailData,
         create: {
           ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
-      }),
-      prisma.case.findUnique({
+      });
+
+      if (parsedCaseNumber) {
+        await syncCaseCounterToAtLeast(
+          tx,
+          CaseType.CIVIL,
+          parsedCaseNumber.area,
+          parsedCaseNumber.year,
+          parsedCaseNumber.number,
+        );
+      }
+
+      return tx.case.findUnique({
         where: { id: caseId },
         include: { civilCase: true },
-      }),
-    ]);
+      });
+    });
 
     if (!updatedCase) {
       throw new Error("Failed to update case");

@@ -223,7 +223,7 @@ export default function CivilCaseTester() {
     )
       return;
     setLoading(true);
-    const result = await deleteAllCases();
+    const result = await deleteAllCases(caseType);
     if (result.success) {
       setMessage({ type: "success", text: "All cases deleted successfully" });
       await loadCases();

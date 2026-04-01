@@ -1,10 +1,21 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
+import { CivilCaseSchema } from "../Case/Civil/schema";
 import { CriminalCaseSchema } from "../Case/Criminal/schema";
+import { NotarialSchema } from "../Case/Notarial/schema";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
+import { SheriffCaseSchema } from "../Case/Sherriff/schema";
+import { SpecialProceedingSchema } from "../Case/SpecialProceedings/schema";
 import { EmployeeSchema } from "../Employee/schema";
+
+function createUpdateSchema<T>(schema: z.ZodType<T>) {
+  return z.object({
+    from: schema,
+    to: schema,
+  });
+}
 
 export const CreateLogData = z
   .object({
@@ -42,23 +53,13 @@ export const CreateLogData = z
   .or(
     z.object({
       action: z.literal(LogAction.UPDATE_CASE),
-      details: z
-        .object({
-          from: CriminalCaseSchema,
-          to: CriminalCaseSchema,
-        })
-        .or(
-          z.object({
-            from: ReceivingLogSchema,
-            to: ReceivingLogSchema,
-          }),
-        )
-        .or(
-          z.object({
-            from: PetitionSchema,
-            to: PetitionSchema,
-          }),
-        ),
+      details: createUpdateSchema(CriminalCaseSchema)
+        .or(createUpdateSchema(CivilCaseSchema))
+        .or(createUpdateSchema(PetitionSchema))
+        .or(createUpdateSchema(SpecialProceedingSchema))
+        .or(createUpdateSchema(ReceivingLogSchema))
+        .or(createUpdateSchema(NotarialSchema))
+        .or(createUpdateSchema(SheriffCaseSchema)),
     }),
   )
   .or(

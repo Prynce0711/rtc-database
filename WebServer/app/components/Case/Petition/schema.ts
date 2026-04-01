@@ -46,6 +46,7 @@ export const createTempId = (): number => {
 /** Form entry used by the grid UI (Petition schema + UI metadata). */
 export type PetitionEntry = PetitionSchema & {
   id: number;
+  isManual: boolean;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
@@ -55,6 +56,7 @@ export type PetitionEntry = PetitionSchema & {
 export const petitionToEntry = (p: PetitionCaseData): PetitionEntry => ({
   ...p,
   id: p.id ?? createTempId(),
+  isManual: Boolean(p.isManual),
   errors: {},
   collapsed: false,
   saved: false,
@@ -77,6 +79,7 @@ export const initialPetitionFormData: Omit<PetitionSchema, "id" | "createdAt"> =
 export const createEmptyEntry = (): PetitionEntry => ({
   ...initialPetitionFormData,
   id: createTempId(),
+  isManual: false,
   errors: {},
   collapsed: false,
   saved: false,
