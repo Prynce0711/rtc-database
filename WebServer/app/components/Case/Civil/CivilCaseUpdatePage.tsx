@@ -130,7 +130,16 @@ const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
 const uid = () => Math.random().toString(36).slice(2, 9);
 const normalizeCaseNumber = (value: string) => value.trim();
 const AUTO_DEFAULT_AREA = "M";
+const TODAY = new Date().toISOString().slice(0, 10);
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
+const getAutoYearFromDate = (
+  value: string | Date | null | undefined,
+): number => {
+  if (!value) return AUTO_DEFAULT_YEAR;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return AUTO_DEFAULT_YEAR;
+  return date.getFullYear();
+};
 const normalizeAreaCode = (value: string) =>
   value
     .toUpperCase()
@@ -180,14 +189,19 @@ const formatCaseNumber = (area: string, number: number, year: number): string =>
 const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
   parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
 
-const applyAreaToCaseNumber = (value: string, area: string): string => {
+const applyAreaToCaseNumber = (
+  value: string,
+  area: string,
+  year?: number,
+): string => {
   const normalizedArea = normalizeAreaCode(area);
   const parsed = parseCaseNumberParts(value);
+  const resolvedYear = year ?? parsed?.year ?? AUTO_DEFAULT_YEAR;
   if (!parsed) {
-    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+    return formatCaseNumber(normalizedArea, 1, resolvedYear);
   }
 
-  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+  return formatCaseNumber(normalizedArea, parsed.number, resolvedYear);
 };
 
 const createEmptyEntry = (
@@ -196,12 +210,16 @@ const createEmptyEntry = (
 ): FormEntry => ({
   id,
   sourceId: undefined,
-  title: formatCaseNumber(normalizeAreaCode(defaultArea), 1, AUTO_DEFAULT_YEAR),
+  title: formatCaseNumber(
+    normalizeAreaCode(defaultArea),
+    1,
+    getAutoYearFromDate(TODAY),
+  ),
   isManual: false,
   name: "",
   atty: "",
   defendant: "",
-  date: "",
+  date: TODAY,
   notes: "",
   nature: "",
   file: null,
@@ -492,7 +510,7 @@ export const NotarialUpdatePage = ({
         return {
           entryId: entry.id,
           area: parsed?.area ?? "",
-          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+          year: getAutoYearFromDate(entry.date),
         };
       });
 
@@ -550,7 +568,11 @@ export const NotarialUpdatePage = ({
         entry.id === id
           ? {
               ...entry,
-              title: applyAreaToCaseNumber(entry.title, normalizedArea),
+              title: applyAreaToCaseNumber(
+                entry.title,
+                normalizedArea,
+                getAutoYearFromDate(entry.date),
+              ),
               errors: {
                 ...entry.errors,
                 title: "",
@@ -569,7 +591,11 @@ export const NotarialUpdatePage = ({
       prev.map((entry) => {
         return {
           ...entry,
-          title: applyAreaToCaseNumber(entry.title, effectiveDefaultArea),
+          title: applyAreaToCaseNumber(
+            entry.title,
+            effectiveDefaultArea,
+            getAutoYearFromDate(entry.date),
+          ),
         };
       }),
     );
@@ -791,7 +817,7 @@ export const NotarialUpdatePage = ({
           formatCaseNumber(
             getAreaFromCaseNumber(entry.title, ""),
             1,
-            AUTO_DEFAULT_YEAR,
+            getAutoYearFromDate(entry.date),
           )
         : entry.title.trim();
 
@@ -1251,7 +1277,8 @@ export const NotarialUpdatePage = ({
                           autoParsedCaseNumber?.number ?? 1,
                         ).padStart(2, "0");
                         const autoYearPart = String(
-                          autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                          autoParsedCaseNumber?.year ??
+                            getAutoYearFromDate(entry.date),
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           entry.title,

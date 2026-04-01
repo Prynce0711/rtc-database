@@ -115,6 +115,7 @@ const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const normalizeCaseNumber = (value: string) => value.trim();
+const TODAY = new Date().toISOString().slice(0, 10);
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
 
 const parseSheriffCaseNumberParts = (
@@ -139,6 +140,19 @@ const parseSheriffCaseNumberParts = (
 const formatSheriffCaseNumber = (number: number, year: number): string =>
   `${String(number).padStart(2, "0")}-${year}`;
 
+const getYearFromDateField = (value: string): number => {
+  if (!value) {
+    return AUTO_DEFAULT_YEAR;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return AUTO_DEFAULT_YEAR;
+  }
+
+  return parsed.getFullYear();
+};
+
 const createEmptyEntry = (id: string): FormEntry => ({
   id,
   sourceId: undefined,
@@ -147,7 +161,7 @@ const createEmptyEntry = (id: string): FormEntry => ({
   mortgagee: "",
   mortgagor: "",
   sheriffName: "",
-  date: "",
+  date: TODAY,
   remarks: "",
   errors: {},
   saved: false,
@@ -413,7 +427,7 @@ export const SherriffCaseUpdatePage = ({
         const parsed = parseSheriffCaseNumberParts(entry.title);
         return {
           entryId: entry.id,
-          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+          year: getYearFromDateField(entry.date),
         };
       });
 
@@ -664,7 +678,7 @@ export const SherriffCaseUpdatePage = ({
     const caseNumberForPayload =
       !isEdit && !entry.isManual
         ? autoCaseNumbersByRow[entry.id] ||
-          formatSheriffCaseNumber(1, AUTO_DEFAULT_YEAR)
+          formatSheriffCaseNumber(1, getYearFromDateField(entry.date))
         : entry.title.trim();
 
     const payload = {

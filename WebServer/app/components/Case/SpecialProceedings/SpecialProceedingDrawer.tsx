@@ -123,6 +123,7 @@ const REQUIRED_FIELDS: Array<
   keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
 > = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
 const normalizeCaseNumber = (value: string) => value.trim();
+const TODAY = new Date().toISOString().slice(0, 10);
 const AUTO_DEFAULT_AREA = "M";
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
 const normalizeAreaCode = (value: string) =>
@@ -174,14 +175,28 @@ const formatCaseNumber = (area: string, number: number, year: number): string =>
 const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
   parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
 
-const applyAreaToCaseNumber = (value: string, area: string): string => {
-  const normalizedArea = normalizeAreaCode(area);
-  const parsed = parseCaseNumberParts(value);
-  if (!parsed) {
-    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+const getYearFromDateField = (value?: string | Date | null): number => {
+  if (value == null || value === "") {
+    return AUTO_DEFAULT_YEAR;
   }
 
-  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return AUTO_DEFAULT_YEAR;
+  }
+
+  return parsed.getFullYear();
+};
+
+const applyAreaToCaseNumber = (
+  value: string,
+  area: string,
+  year: number,
+): string => {
+  const normalizedArea = normalizeAreaCode(area);
+  const parsed = parseCaseNumberParts(value);
+
+  return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
 };
 
 function validateEntry(
@@ -405,7 +420,13 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
-        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getYearFromDateField(TODAY),
+        ),
+        date: TODAY,
+        dateFiled: TODAY,
       },
     ];
   });
@@ -431,7 +452,13 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
-        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getYearFromDateField(TODAY),
+        ),
+        date: TODAY,
+        dateFiled: TODAY,
       },
     ]);
   }, [type, selectedCase, selectedCases, isEdit]);
@@ -470,7 +497,7 @@ const SpecialProceedingDrawer = ({
         return {
           entryId: entry.id,
           area: parsed?.area ?? "",
-          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+          year: getYearFromDateField(entry.date),
         };
       });
 
@@ -531,6 +558,7 @@ const SpecialProceedingDrawer = ({
               caseNumber: applyAreaToCaseNumber(
                 String(entry.caseNumber ?? ""),
                 normalizedArea,
+                getYearFromDateField(entry.date),
               ),
               errors: {
                 ...entry.errors,
@@ -553,6 +581,7 @@ const SpecialProceedingDrawer = ({
           caseNumber: applyAreaToCaseNumber(
             String(entry.caseNumber ?? ""),
             effectiveDefaultArea,
+            getYearFromDateField(entry.date),
           ),
         };
       }),
@@ -575,10 +604,12 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
+        date: TODAY,
+        dateFiled: TODAY,
         caseNumber: formatCaseNumber(
           normalizeAreaCode(defaultArea),
           1,
-          AUTO_DEFAULT_YEAR,
+          getYearFromDateField(TODAY),
         ),
       },
     ]);
@@ -602,10 +633,12 @@ const SpecialProceedingDrawer = ({
       {
         ...createEmptyEntry(),
         id: nextTempIdRef.current--,
+        date: TODAY,
+        dateFiled: TODAY,
         caseNumber: formatCaseNumber(
           normalizeAreaCode(defaultArea),
           1,
-          AUTO_DEFAULT_YEAR,
+          getYearFromDateField(TODAY),
         ),
       },
     ]);
@@ -796,7 +829,7 @@ const SpecialProceedingDrawer = ({
           formatCaseNumber(
             getAreaFromCaseNumber(String(entry.caseNumber ?? ""), ""),
             1,
-            AUTO_DEFAULT_YEAR,
+            getYearFromDateField(entry.date),
           )
         : String(entry.caseNumber ?? "");
 
@@ -1226,7 +1259,8 @@ const SpecialProceedingDrawer = ({
                           autoParsedCaseNumber?.number ?? 1,
                         ).padStart(2, "0");
                         const autoYearPart = String(
-                          autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                          autoParsedCaseNumber?.year ??
+                            getYearFromDateField(entry.date),
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           String(entry.caseNumber ?? ""),

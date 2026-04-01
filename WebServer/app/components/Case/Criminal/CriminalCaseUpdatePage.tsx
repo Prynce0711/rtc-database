@@ -56,6 +56,14 @@ const REQUIRED_FIELDS = ["name", "caseNumber"] as const;
 const normalizeCaseNumber = (value: string) => value.trim();
 const AUTO_DEFAULT_AREA = "M";
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
+const getAutoYearFromDate = (
+  value: string | Date | null | undefined,
+): number => {
+  if (!value) return AUTO_DEFAULT_YEAR;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return AUTO_DEFAULT_YEAR;
+  return date.getFullYear();
+};
 const normalizeAreaCode = (value: string) =>
   value
     .toUpperCase()
@@ -105,14 +113,19 @@ const formatCaseNumber = (area: string, number: number, year: number): string =>
 const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
   parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
 
-const applyAreaToCaseNumber = (value: string, area: string): string => {
+const applyAreaToCaseNumber = (
+  value: string,
+  area: string,
+  year?: number,
+): string => {
   const normalizedArea = normalizeAreaCode(area);
   const parsed = parseCaseNumberParts(value);
+  const resolvedYear = year ?? parsed?.year ?? AUTO_DEFAULT_YEAR;
   if (!parsed) {
-    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+    return formatCaseNumber(normalizedArea, 1, resolvedYear);
   }
 
-  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+  return formatCaseNumber(normalizedArea, parsed.number, resolvedYear);
 };
 
 type ColDef = {
@@ -818,10 +831,15 @@ const CriminalCaseUpdatePage = ({
 
   const [entries, setEntries] = useState<CaseEntry[]>(() => {
     if (isEdit) return editCases.map(makeFromCase);
+    const newEntry = createEmptyEntry();
     return [
       {
-        ...createEmptyEntry(),
-        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
       },
     ];
   });
@@ -835,10 +853,15 @@ const CriminalCaseUpdatePage = ({
       return;
     }
 
+    const newEntry = createEmptyEntry();
     setEntries([
       {
-        ...createEmptyEntry(),
-        caseNumber: formatCaseNumber(AUTO_DEFAULT_AREA, 1, AUTO_DEFAULT_YEAR),
+        ...newEntry,
+        caseNumber: formatCaseNumber(
+          AUTO_DEFAULT_AREA,
+          1,
+          getAutoYearFromDate(newEntry.dateFiled),
+        ),
       },
     ]);
   }, [isEdit, selectedCase, selectedCases]);
@@ -876,7 +899,7 @@ const CriminalCaseUpdatePage = ({
         return {
           entryId: entry.id,
           area: parsed?.area ?? "",
-          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+          year: getAutoYearFromDate(entry.dateFiled),
         };
       });
 
@@ -937,6 +960,7 @@ const CriminalCaseUpdatePage = ({
               caseNumber: applyAreaToCaseNumber(
                 String(entry.caseNumber ?? ""),
                 normalizedArea,
+                getAutoYearFromDate(entry.dateFiled),
               ),
               errors: {
                 ...entry.errors,
@@ -959,6 +983,7 @@ const CriminalCaseUpdatePage = ({
           caseNumber: applyAreaToCaseNumber(
             String(entry.caseNumber ?? ""),
             effectiveDefaultArea,
+            getAutoYearFromDate(entry.dateFiled),
           ),
         };
       }),
@@ -976,14 +1001,15 @@ const CriminalCaseUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
+    const newEntry = createEmptyEntry();
     setEntries((prev) => [
       ...prev,
       {
-        ...createEmptyEntry(),
+        ...newEntry,
         caseNumber: formatCaseNumber(
           normalizeAreaCode(defaultArea),
           1,
-          AUTO_DEFAULT_YEAR,
+          getAutoYearFromDate(newEntry.dateFiled),
         ),
       },
     ]);
@@ -1003,13 +1029,14 @@ const CriminalCaseUpdatePage = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
+    const newEntry = createEmptyEntry();
     setEntries([
       {
-        ...createEmptyEntry(),
+        ...newEntry,
         caseNumber: formatCaseNumber(
           normalizeAreaCode(defaultArea),
           1,
-          AUTO_DEFAULT_YEAR,
+          getAutoYearFromDate(newEntry.dateFiled),
         ),
       },
     ]);
@@ -1205,7 +1232,7 @@ const CriminalCaseUpdatePage = ({
           formatCaseNumber(
             getAreaFromCaseNumber(String(caseInput.caseNumber ?? ""), ""),
             1,
-            AUTO_DEFAULT_YEAR,
+            getAutoYearFromDate(caseInput.dateFiled),
           )
         : caseInput.caseNumber;
 
@@ -1720,7 +1747,8 @@ const CriminalCaseUpdatePage = ({
                             autoParsedCaseNumber?.number ?? 1,
                           ).padStart(2, "0");
                           const autoYearPart = String(
-                            autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                            autoParsedCaseNumber?.year ??
+                              getAutoYearFromDate(entry.dateFiled),
                           );
                           const autoAreaValue = getAreaFromCaseNumber(
                             String(entry.caseNumber ?? ""),

@@ -65,7 +65,7 @@ const emptyEntry = (
   caseNumber: formatCaseNumber(
     normalizeAreaCode(defaultArea),
     1,
-    AUTO_DEFAULT_YEAR,
+    new Date(today).getFullYear(),
   ),
   isManual: false,
   raffledToBranch: "",
@@ -131,14 +131,28 @@ const formatCaseNumber = (area: string, number: number, year: number): string =>
 const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
   parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
 
-const applyAreaToCaseNumber = (value: string, area: string): string => {
-  const normalizedArea = normalizeAreaCode(area);
-  const parsed = parseCaseNumberParts(value);
-  if (!parsed) {
-    return formatCaseNumber(normalizedArea, 1, AUTO_DEFAULT_YEAR);
+const getYearFromDateField = (value: string): number => {
+  if (!value) {
+    return AUTO_DEFAULT_YEAR;
   }
 
-  return formatCaseNumber(normalizedArea, parsed.number, parsed.year);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return AUTO_DEFAULT_YEAR;
+  }
+
+  return parsed.getFullYear();
+};
+
+const applyAreaToCaseNumber = (
+  value: string,
+  area: string,
+  year: number,
+): string => {
+  const normalizedArea = normalizeAreaCode(area);
+  const parsed = parseCaseNumberParts(value);
+
+  return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
 };
 
 const REQUIRED_FIELDS = [
@@ -503,7 +517,7 @@ const PetitionEntryPage = ({
         return {
           entryId: entry.id,
           area: parsed?.area ?? "",
-          year: parsed?.year ?? AUTO_DEFAULT_YEAR,
+          year: getYearFromDateField(entry.dateFiled),
         };
       });
 
@@ -564,6 +578,7 @@ const PetitionEntryPage = ({
               caseNumber: applyAreaToCaseNumber(
                 entry.caseNumber,
                 normalizedArea,
+                getYearFromDateField(entry.dateFiled),
               ),
               errors: {
                 ...entry.errors,
@@ -586,6 +601,7 @@ const PetitionEntryPage = ({
           caseNumber: applyAreaToCaseNumber(
             entry.caseNumber,
             effectiveDefaultArea,
+            getYearFromDateField(entry.dateFiled),
           ),
         };
       }),
@@ -810,7 +826,7 @@ const PetitionEntryPage = ({
           formatCaseNumber(
             getAreaFromCaseNumber(entry.caseNumber, ""),
             1,
-            AUTO_DEFAULT_YEAR,
+            getYearFromDateField(entry.dateFiled),
           )
         : entry.caseNumber;
 
@@ -1251,7 +1267,8 @@ const PetitionEntryPage = ({
                           autoParsedCaseNumber?.number ?? 1,
                         ).padStart(2, "0");
                         const autoYearPart = String(
-                          autoParsedCaseNumber?.year ?? AUTO_DEFAULT_YEAR,
+                          autoParsedCaseNumber?.year ??
+                            getYearFromDateField(entry.dateFiled),
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           entry.caseNumber,
