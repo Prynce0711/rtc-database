@@ -1,9 +1,22 @@
 "use server";
 
 import ActionResult from "@/app/components/ActionResult";
-import { SherriffSchema } from "@/app/components/Case/Sherriff/schema";
-import { LogAction, Prisma } from "@/app/generated/prisma/client";
+import {
+  SheriffCaseData,
+  SheriffCaseSchema,
+} from "@/app/components/Case/Sherriff/schema";
+import {
+  Case,
+  CaseType,
+  LogAction,
+  Prisma,
+  SheriffCase,
+} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
+import {
+  parseSheriffCaseNumber,
+  syncSheriffCaseCounterToAtLeast,
+} from "@/app/lib/caseNumbering";
 import {
   ExportExcelData,
   getExcelHeaderMap,
@@ -16,27 +29,15 @@ import {
   valuesAreEqual,
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
+import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import { BaseCaseSchema } from "../schema";
 
-const parseDateCell = (value: unknown): Date | undefined => {
-  if (value == null || value === "") return undefined;
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? undefined : value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-  }
-
-  return undefined;
-};
-
-export async function uploadSherriffExcel(
+export async function uploadSheriffExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -45,11 +46,16 @@ export async function uploadSherriffExcel(
       return sessionResult;
     }
 
+    console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
+
     const candidateCaseNumbers = new Set<string>();
 
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
+      console.log(
+        `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+      );
 
       for (const sheetName of workbook.SheetNames) {
         const worksheet = workbook.Sheets[sheetName];
@@ -57,8 +63,8 @@ export async function uploadSherriffExcel(
           XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
         for (const row of rows) {
-          const normalized = normalizeRowBySchema(SherriffSchema, row);
-          const caseNumber = normalized.ejfCaseNumber;
+          const normalized = normalizeRowBySchema(SheriffCaseSchema, row);
+          const caseNumber = normalized.caseNumber;
           if (typeof caseNumber !== "string") continue;
           const trimmed = caseNumber.trim();
           if (trimmed) {
@@ -68,7 +74,7 @@ export async function uploadSherriffExcel(
       }
     } catch (peekError) {
       console.warn(
-        "⚠ Unable to preview sheriff workbook for matching:",
+        "WARN Unable to preview sheriff workbook for matching:",
         peekError,
       );
     }
@@ -82,52 +88,52 @@ export async function uploadSherriffExcel(
       for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
         const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
 
-        const existingRecords = await prisma.sherriff.findMany({
+        const existingCases = await prisma.case.findMany({
           where: {
-            ejfCaseNumber: {
+            caseType: CaseType.SHERRIFF,
+            caseNumber: {
               in: caseNumberChunk,
             },
           },
+          include: {
+            sheriffCase: true,
+          },
         });
 
-        for (const existingRecord of existingRecords) {
-          if (!existingRecord.ejfCaseNumber) continue;
+        for (const existingCase of existingCases) {
+          if (!existingCase.sheriffCase || !existingCase.caseNumber) continue;
 
-          const key = existingRecord.ejfCaseNumber.trim();
+          const key = existingCase.caseNumber.trim();
           if (!key) continue;
 
+          const mergedCase = {
+            ...existingCase,
+            ...existingCase.sheriffCase,
+          } as Record<string, unknown>;
+
           const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(existingRecord as unknown as Record<string, unknown>);
+          bucket.push(mergedCase);
           existingByCaseNumber.set(key, bucket);
         }
       }
     }
 
-    const headerMap = getExcelHeaderMap(SherriffSchema);
-    const caseNumberHeaders = headerMap.ejfCaseNumber ?? ["EJF Case Number"];
+    const headerMap = getExcelHeaderMap(SheriffCaseSchema);
+    const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(SherriffSchema, row);
+      const values = normalizeRowBySchema(SheriffCaseSchema, row);
       return {
         ...values,
       };
     };
 
-    const result = await processExcelUpload<
-      Prisma.SherriffCreateManyInput,
-      ReturnType<typeof getMappedCells>
-    >({
+    const result = await processExcelUpload<SheriffCaseSchema>({
       file,
-      requiredHeaders: { "EJF Case Number": caseNumberHeaders },
-      schema: SherriffSchema,
+      requiredHeaders: { "Case Number": caseNumberHeaders },
+      schema: SheriffCaseSchema,
       getCells: getMappedCells,
-      skipRowsWithoutCell: [
-        "ejfCaseNumber",
-        "mortgagee",
-        "mortgagor",
-        "name",
-        "remarks",
-      ],
+      skipRowsWithoutCell: ["caseNumber"],
       checkExactMatch: async (_cells, mappedRow) => {
         const mappedEntries = Object.entries(mappedRow);
 
@@ -147,46 +153,47 @@ export async function uploadSherriffExcel(
 
         const cachedResult = exactMatchCache.get(cacheKey);
         if (cachedResult !== undefined) {
-          return { exists: cachedResult };
+          return {
+            exists: cachedResult,
+            fields: cachedResult ? mappedEntries.map(([key]) => key) : [],
+          };
         }
 
         const caseNumberKey =
-          typeof mappedRow.ejfCaseNumber === "string"
-            ? mappedRow.ejfCaseNumber.trim()
+          typeof mappedRow.caseNumber === "string"
+            ? mappedRow.caseNumber.trim()
             : "";
 
         const candidates = caseNumberKey
           ? (existingByCaseNumber.get(caseNumberKey) ?? [])
           : [];
 
-        const hasExactMatch = candidates.some((existingRecord) =>
+        const hasExactMatch = candidates.some((existingRow) =>
           mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRecord[key]),
+            valuesAreEqual(value, existingRow[key]),
           ),
         );
 
         exactMatchCache.set(cacheKey, hasExactMatch);
 
-        return { exists: hasExactMatch };
+        return {
+          exists: hasExactMatch,
+          fields: hasExactMatch ? mappedEntries.map(([key]) => key) : [],
+        };
       },
       mapRow: (row) => {
         const cells = getMappedCells(row);
-        if (isMappedRowEmpty(cells, ["date"])) {
+
+        if (isMappedRowEmpty(cells, ["caseNumber"])) {
           return { skip: true };
         }
 
-        const mapped: Prisma.SherriffCreateManyInput = {
-          ejfCaseNumber: cells.ejfCaseNumber
-            ? String(cells.ejfCaseNumber)
-            : undefined,
-          mortgagee: cells.mortgagee ? String(cells.mortgagee) : undefined,
-          mortgagor: cells.mortgagor ? String(cells.mortgagor) : undefined,
-          name: cells.name ? String(cells.name) : undefined,
-          date: parseDateCell(cells.date),
-          remarks: cells.remarks ? String(cells.remarks) : undefined,
+        const hydrated = {
+          ...cells,
+          caseType: CaseType.SHERRIFF,
         };
 
-        const validation = SherriffSchema.safeParse(mapped);
+        const validation = SheriffCaseSchema.safeParse(hydrated);
         if (!validation.success) {
           return {
             errorMessage: prettifyError(validation.error),
@@ -194,47 +201,113 @@ export async function uploadSherriffExcel(
         }
 
         return {
-          mapped,
+          mapped: validation.data,
         };
       },
       onBatchInsert: async (rows) => {
-        const created = await prisma.sherriff.createManyAndReturn({
-          data: rows,
+        return prisma.$transaction(async (tx) => {
+          const caseRows: Prisma.CaseCreateManyInput[] = [];
+
+          rows.forEach((row) => {
+            const { caseData } = splitCaseDataBySchema(row);
+            caseRows.push({
+              ...caseData,
+              caseType: CaseType.SHERRIFF,
+              isManual: true,
+              number: null,
+              area: null,
+              year: null,
+            });
+          });
+
+          const created = await tx.case.createManyAndReturn({
+            data: caseRows,
+          });
+
+          const sheriffRows: Prisma.SheriffCaseCreateManyInput[] = rows.map(
+            (row, index) => {
+              const { detailData } = splitCaseDataBySchema(row);
+              return {
+                ...(detailData as Prisma.SheriffCaseCreateWithoutCaseInput),
+                baseCaseID: created[index].id,
+              };
+            },
+          );
+
+          if (sheriffRows.length > 0) {
+            await tx.sheriffCase.createMany({ data: sheriffRows });
+          }
+
+          const maxPerYear = new Map<number, number>();
+
+          rows.forEach((row) => {
+            const parsed = parseSheriffCaseNumber(String(row.caseNumber ?? ""));
+            if (!parsed) return;
+
+            const current = maxPerYear.get(parsed.year);
+            if (!current || parsed.number > current) {
+              maxPerYear.set(parsed.year, parsed.number);
+            }
+          });
+
+          for (const [year, number] of maxPerYear.entries()) {
+            await syncSheriffCaseCounterToAtLeast(tx, year, number);
+          }
+
+          return { ids: created.map((c) => c.id), count: created.length };
         });
-        return {
-          ids: created.map((record) => record.id),
-          count: created.length,
-        };
       },
     });
 
-    if (!result.success) {
-      return {
-        success: false,
-        error: result.error,
-      };
+    if (result.success) {
+      const meta: ProcessExcelMeta = result.result?.meta;
+      const imported = meta.importedCount;
+      const errors = meta.errorCount;
+      const sheets = meta.sheetSummary;
+
+      console.log(
+        `OK Import completed: ${imported} sheriff cases imported, ${errors} row(s) failed validation`,
+      );
+      if (sheets.length > 0) {
+        sheets.forEach(
+          (s: {
+            sheet: string;
+            valid: number;
+            rows: number;
+            failed: number;
+          }) => {
+            console.log(
+              `  Sheet "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+            );
+          },
+        );
+      }
+
+      if (result.result?.failedExcel) {
+        console.log(
+          "WARN Failed rows file generated:",
+          result.result.failedExcel.fileName,
+        );
+      }
+
+      await createLog({
+        action: LogAction.IMPORT_CASES,
+        details: {
+          ids: meta.importedIds ?? [],
+        },
+      });
+    } else {
+      console.error("ERROR Import failed:", result.error);
     }
 
-    const meta: ProcessExcelMeta = result.result?.meta;
-
-    await createLog({
-      action: LogAction.IMPORT_CASES,
-      details: {
-        ids: meta.importedIds ?? [],
-      },
-    });
-
-    return {
-      success: true,
-      result: result.result,
-    };
+    return result;
   } catch (error) {
     console.error("Sheriff upload error:", error);
     return { success: false, error: "Upload failed" };
   }
 }
 
-export async function exportSherriffExcel(): Promise<
+export async function exportSheriffExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
@@ -243,51 +316,66 @@ export async function exportSherriffExcel(): Promise<
       return sessionResult;
     }
 
-    const records = await prisma.sherriff.findMany({
-      orderBy: { id: "asc" },
+    const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, {
+      all: ["id"],
     });
 
-    const headerMap = getExcelHeaderMap(SherriffSchema);
-    const headerKeys = [
-      "ejfCaseNumber",
-      "date",
-      "name",
-      "mortgagee",
-      "mortgagor",
-      "remarks",
-    ] as const;
-    type HeaderKey = (typeof headerKeys)[number];
-    const header = (key: HeaderKey, fallback: string) =>
+    const caseFieldKeys = getSchemaFieldKeys(SheriffCaseSchema, {
+      all: ["id"],
+      stringKeys: [...baseCaseFieldKeys.stringKeys],
+      dateKeys: [...baseCaseFieldKeys.dateKeys],
+    });
+
+    const dateKeys = [
+      caseFieldKeys.dateKeys,
+      baseCaseFieldKeys.dateKeys,
+    ].flat();
+
+    const cases = await prisma.case.findMany({
+      where: { caseType: CaseType.SHERRIFF },
+      orderBy: { id: "asc" },
+      include: { sheriffCase: true },
+    });
+
+    const caseCombined: SheriffCaseData[] = cases
+      .filter((c): c is Case & { sheriffCase: SheriffCase } => !!c.sheriffCase)
+      .map((c) => ({
+        ...c,
+        ...c.sheriffCase,
+      }));
+
+    const headerMap = getExcelHeaderMap(SheriffCaseSchema);
+    const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
+
+    const header = (key: keyof typeof headerMap, fallback: string) =>
       headerMap[key]?.[0] ?? fallback;
 
-    const rows = records.map((record) => {
-      let dateStr = "";
-      let timeStr = "";
-
-      if (record.date) {
-        const date = new Date(record.date);
-        dateStr = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
-        timeStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
-      }
-
-      return {
-        [header("ejfCaseNumber", "EJF Case Number")]:
-          record.ejfCaseNumber ?? "",
-        [header("date", "Date")]: dateStr,
-        Time: timeStr,
-        [header("name", "Name")]: record.name ?? "",
-        [header("mortgagee", "Mortgagee")]: record.mortgagee ?? "",
-        [header("mortgagor", "Mortgagor")]: record.mortgagor ?? "",
-        [header("remarks", "Remarks")]: record.remarks ?? "",
+    const rows = caseCombined.map((c) => {
+      const formatDate = (value: Date | null | undefined) => {
+        if (!value) return "";
+        const date = new Date(value);
+        return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${date.getFullYear()}`;
       };
+
+      return headerKeys.reduce(
+        (acc, key) => {
+          const headerName = header(key, key);
+          const value = dateKeys.includes(key)
+            ? formatDate(c[key] as Date | null | undefined)
+            : (c[key] ?? "");
+          acc[headerName] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
     });
 
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheriff");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheriff Cases");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
-    const fileName = `sheriff-export-${Date.now()}.xlsx`;
+    const fileName = `sheriff-cases-export-${Date.now()}.xlsx`;
 
     await createLog({
       action: LogAction.EXPORT_CASES,

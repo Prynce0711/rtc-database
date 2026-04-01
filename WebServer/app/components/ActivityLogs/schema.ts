@@ -6,7 +6,7 @@ import { CriminalCaseSchema } from "../Case/Criminal/schema";
 import { NotarialSchema } from "../Case/Notarial/schema";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
-import { SherriffSchema } from "../Case/Sherriff/schema";
+import { SheriffCaseSchema } from "../Case/Sherriff/schema";
 import { SpecialProceedingSchema } from "../Case/SpecialProceedings/schema";
 import { EmployeeSchema } from "../Employee/schema";
 
@@ -59,7 +59,7 @@ export const CreateLogData = z
         .or(createUpdateSchema(SpecialProceedingSchema))
         .or(createUpdateSchema(ReceivingLogSchema))
         .or(createUpdateSchema(NotarialSchema))
-        .or(createUpdateSchema(SherriffSchema)),
+        .or(createUpdateSchema(SheriffCaseSchema)),
     }),
   )
   .or(

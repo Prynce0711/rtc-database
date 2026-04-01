@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  getSherriffById,
-  getSherriffsByIds,
+  getSheriffCaseById,
+  getSheriffCasesByIds,
 } from "@/app/components/Case/Sherriff/SherriffActions";
-import SherriffDrawer, {
-  SherriffDrawerType,
-} from "@/app/components/Case/Sherriff/SherriffDrawer";
-import { Sherriff } from "@/app/generated/prisma/client";
+import { SherriffCaseUpdatePage } from "@/app/components/Case/Sherriff/SherriffCaseUpdatePage";
+import {
+  caseToRecord,
+  type SheriffRecord,
+} from "@/app/components/Case/Sherriff/SherriffTypes";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -15,14 +16,16 @@ const SheriffEditPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [selectedLog, setSelectedLog] = useState<Sherriff | null>(null);
-  const [selectedLogs, setSelectedLogs] = useState<Sherriff[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<SheriffRecord | null>(
+    null,
+  );
+  const [selectedRecords, setSelectedRecords] = useState<SheriffRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const idParam = searchParams.get("id");
     const idsParam = searchParams.get("ids");
+    const idParam = searchParams.get("id");
 
     const ids = idsParam
       ? Array.from(
@@ -41,82 +44,84 @@ const SheriffEditPage = () => {
       return;
     }
 
-    const loadLog = async () => {
+    const loadCases = async () => {
       setLoading(true);
 
       if (ids.length > 0) {
-        const result = await getSherriffsByIds(ids);
+        const result = await getSheriffCasesByIds(ids);
         if (!result.success || !result.result) {
-          const message =
-            !result.success && "error" in result
-              ? result.error || "Failed to load sheriff records"
-              : "Failed to load sheriff records";
+          const message = !result.success
+            ? result.error || "Failed to load cases"
+            : "Failed to load cases";
           setError(message);
           setLoading(false);
           return;
         }
 
-        const loadedLogs = result.result;
-        setSelectedLogs(loadedLogs);
-        setSelectedLog(loadedLogs[0] ?? null);
+        const loadedRecords = result.result.map(caseToRecord);
+
+        setSelectedRecords(loadedRecords);
+        setSelectedRecord(loadedRecords[0] ?? null);
         setError(null);
         setLoading(false);
         return;
       }
 
-      const parsedId = Number(idParam);
-      const result = await getSherriffById(parsedId);
-
+      const result = await getSheriffCaseById(idParam as string);
       if (!result.success || !result.result) {
-        const message =
-          !result.success && "error" in result
-            ? result.error || "Failed to load sheriff record"
-            : "Failed to load sheriff record";
+        const message = !result.success
+          ? result.error || "Failed to load case"
+          : "Failed to load case";
         setError(message);
         setLoading(false);
         return;
       }
 
-      setSelectedLog(result.result);
-      setSelectedLogs([result.result]);
+      const record = caseToRecord(result.result);
+      setSelectedRecord(record);
+      setSelectedRecords([record]);
       setError(null);
       setLoading(false);
     };
 
-    void loadLog();
+    void loadCases();
   }, [searchParams]);
 
-  const goBack = () => router.push("/user/cases/sheriff");
+  const goBackToList = () => {
+    router.push("/user/cases/sheriff");
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-base-100 p-6">
         <div className="alert">
-          <span>Loading entry...</span>
+          <span>Loading case...</span>
         </div>
       </div>
     );
   }
 
-  if (error || !selectedLog || selectedLogs.length === 0) {
+  if (error || !selectedRecord) {
     return (
       <div className="min-h-screen bg-base-100 p-6 space-y-4">
         <div className="alert alert-error">
-          <span>{error || "Entry not found"}</span>
+          <span>{error || "Case not found"}</span>
         </div>
-        <button className="btn btn-primary" onClick={goBack}>
-          Back to Sheriff Records
+        <button className="btn btn-primary" onClick={goBackToList}>
+          Back to Sheriff Cases
         </button>
       </div>
     );
   }
 
   return (
-    <SherriffDrawer
-      type={SherriffDrawerType.EDIT}
-      selectedLog={selectedLog}
-      selectedLogs={selectedLogs}
-      onClose={goBack}
+    <SherriffCaseUpdatePage
+      type="EDIT"
+      selectedRecord={selectedRecord}
+      selectedRecords={selectedRecords}
+      onCloseAction={goBackToList}
+      onCreateAction={goBackToList}
+      onUpdateAction={goBackToList}
     />
   );
 };

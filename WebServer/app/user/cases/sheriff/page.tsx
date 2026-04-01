@@ -1,7 +1,7 @@
-"use client";
+import Sherriff from "@/app/components/Case/Sherriff/Sherriff";
 
-import SherriffLogsPage from "@/app/components/Case/Sherriff/SherriffLogs";
+const page = () => {
+  return <Sherriff />;
+};
 
-export default function Page() {
-  return <SherriffLogsPage />;
-}
+export default page;

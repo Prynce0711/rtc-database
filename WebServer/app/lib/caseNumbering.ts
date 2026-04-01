@@ -8,8 +8,15 @@ type ParsedCaseNumber = {
   inputOrder: "area-first" | "number-first";
 };
 
+type ParsedSheriffCaseNumber = {
+  number: number;
+  year: number;
+  tail: string;
+};
+
 const AREA_FIRST_PATTERN = /^\s*([A-Za-z]+)-(\d+)-(\d{4})(.*)$/;
 const NUMBER_FIRST_PATTERN = /^\s*(\d+)-([A-Za-z]+)-(\d{4})(.*)$/;
+const SHERIFF_PATTERN = /^\s*(\d+)-(\d{4})(.*)$/;
 
 export const parseCaseNumber = (input: string): ParsedCaseNumber | null => {
   const trimmed = input.trim();
@@ -48,12 +55,38 @@ export const parseCaseNumber = (input: string): ParsedCaseNumber | null => {
   return null;
 };
 
+export const parseSheriffCaseNumber = (
+  input: string,
+): ParsedSheriffCaseNumber | null => {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(SHERIFF_PATTERN);
+  if (match) {
+    const number = Number.parseInt(match[1], 10);
+    const year = Number.parseInt(match[2], 10);
+    if (Number.isNaN(number) || Number.isNaN(year)) return null;
+
+    return {
+      number,
+      year,
+      tail: match[3].trim(),
+    };
+  }
+
+  return null;
+};
+
 export const formatAutoCaseNumber = (
   area: string,
   number: number,
   year: number,
 ): string => {
   return `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
+};
+
+export const formatSheriffCaseNumber = (number: number, year: number): string => {
+  return `${String(number).padStart(2, "0")}-${year}`;
 };
 
 export const getNextCaseNumber = async (
@@ -96,6 +129,40 @@ export const getNextCaseNumber = async (
   };
 };
 
+export const getNextSheriffCaseNumber = async (
+  tx: Prisma.TransactionClient,
+  year: number,
+): Promise<{
+  number: number;
+  caseNumber: string;
+  year: number;
+}> => {
+  const counter = await tx.caseCounter.upsert({
+    where: {
+      caseType_area_year: {
+        caseType: CaseType.SHERRIFF,
+        area: "",
+        year,
+      },
+    },
+    update: {
+      last: { increment: 1 },
+    },
+    create: {
+      caseType: CaseType.SHERRIFF,
+      area: "",
+      year,
+      last: 1,
+    },
+  });
+
+  return {
+    number: counter.last,
+    caseNumber: formatSheriffCaseNumber(counter.last, year),
+    year,
+  };
+};
+
 export const syncCaseCounterToAtLeast = async (
   tx: Prisma.TransactionClient,
   caseType: CaseType,
@@ -134,6 +201,51 @@ export const syncCaseCounterToAtLeast = async (
         caseType_area_year: {
           caseType,
           area: normalizedArea,
+          year,
+        },
+      },
+      data: {
+        last: candidateNumber,
+      },
+    });
+  }
+};
+
+export const syncSheriffCaseCounterToAtLeast = async (
+  tx: Prisma.TransactionClient,
+  year: number,
+  candidateNumber: number,
+): Promise<void> => {
+  if (!Number.isFinite(candidateNumber) || candidateNumber <= 0) return;
+
+  const existing = await tx.caseCounter.findUnique({
+    where: {
+      caseType_area_year: {
+        caseType: CaseType.SHERRIFF,
+        area: "",
+        year,
+      },
+    },
+  });
+
+  if (!existing) {
+    await tx.caseCounter.create({
+      data: {
+        caseType: CaseType.SHERRIFF,
+        area: "",
+        year,
+        last: candidateNumber,
+      },
+    });
+    return;
+  }
+
+  if (candidateNumber > existing.last) {
+    await tx.caseCounter.update({
+      where: {
+        caseType_area_year: {
+          caseType: CaseType.SHERRIFF,
+          area: "",
           year,
         },
       },

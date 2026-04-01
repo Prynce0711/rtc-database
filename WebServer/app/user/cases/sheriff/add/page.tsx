@@ -1,17 +1,21 @@
 "use client";
 
-import SherriffDrawer, {
-  SherriffDrawerType,
-} from "@/app/components/Case/Sherriff/SherriffDrawer";
+import { SherriffCaseUpdatePage } from "@/app/components/Case/Sherriff/SherriffCaseUpdatePage";
 import { useRouter } from "next/navigation";
 
 const SheriffAddPage = () => {
   const router = useRouter();
 
+  const goBackToList = () => {
+    router.push("/user/cases/sheriff");
+  };
+
   return (
-    <SherriffDrawer
-      type={SherriffDrawerType.ADD}
-      onClose={() => router.push("/user/cases/sheriff")}
+    <SherriffCaseUpdatePage
+      type="ADD"
+      onCloseAction={goBackToList}
+      onCreateAction={goBackToList}
+      onUpdateAction={goBackToList}
     />
   );
 };

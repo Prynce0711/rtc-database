@@ -12,7 +12,8 @@ type CaseRelationKey =
   | "criminalCase"
   | "civilCase"
   | "petition"
-  | "specialProceeding";
+  | "specialProceeding"
+  | "sheriffCase";
 
 export const buildCaseFind = <T extends z.ZodType>(
   schema: T,
