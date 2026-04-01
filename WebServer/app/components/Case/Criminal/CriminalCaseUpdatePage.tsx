@@ -943,9 +943,9 @@ const CriminalCaseUpdatePage = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every(
       (k) =>
-        (!e.isManual || isEdit || k !== "caseNumber") &&
-        e[k as keyof CaseEntry] &&
-        String(e[k as keyof CaseEntry]).trim() !== "",
+        (k === "caseNumber" && !e.isManual && !isEdit) ||
+        (e[k as keyof CaseEntry] &&
+          String(e[k as keyof CaseEntry]).trim() !== ""),
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;

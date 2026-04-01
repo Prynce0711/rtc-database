@@ -566,9 +566,8 @@ export const NotarialUpdatePage = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every(
       (k) =>
-        (!e.isManual || isEdit || k !== "title") &&
-        e[k] &&
-        String(e[k]).trim() !== "",
+        (k === "title" && !e.isManual && !isEdit) ||
+        (e[k] && String(e[k]).trim() !== ""),
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;
