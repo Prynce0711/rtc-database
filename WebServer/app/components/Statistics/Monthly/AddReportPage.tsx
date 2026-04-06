@@ -1,23 +1,24 @@
 "use client";
 
+import { getHeaderRowInfo } from "@/app/lib/excel";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiPlus,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
@@ -30,7 +31,6 @@ import type { MonthlyRow } from "./Schema";
 
 interface EditableRow {
   id: string;
-  category: string;
   branch: string;
   criminal: number;
   civil: number;
@@ -38,6 +38,7 @@ interface EditableRow {
 
 export interface AddReportPageProps {
   month: string;
+  initialCategory?: string;
   initialData?: MonthlyRow[];
   onBack: () => void;
   onSave: (rows: MonthlyRow[]) => void;
@@ -48,6 +49,55 @@ export interface AddReportPageProps {
 /* ------------------------------------------------------------------ */
 
 // category and branch options are defined in MonthlyFieldConfig
+
+type SheetCell = string | number | null | undefined;
+
+const normalizeImportHeader = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+
+const toCellText = (cell: SheetCell): string => {
+  if (cell === null || cell === undefined) return "";
+  return String(cell).replace(/\s+/g, " ").trim();
+};
+
+const toNumber = (value: SheetCell): number => {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const parsed = Number(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const resolveColumnIndex = (
+  normalizedHeaderRow: string[],
+  aliases: string[],
+): number => {
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  normalizedHeaderRow.forEach((header, index) => {
+    if (!header) return;
+
+    let score = 0;
+    if (aliases.includes(header)) {
+      score = 3;
+    } else if (
+      aliases.some((alias) => header.includes(alias) || alias.includes(header))
+    ) {
+      score = 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
+};
 
 const createRowId = (): string => {
   if (typeof globalThis !== "undefined") {
@@ -60,98 +110,8 @@ const createRowId = (): string => {
   return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const normalizeImportHeader = (value: string): string =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-
-const detectHeaderRowIndex = (
-  worksheet: XLSX.WorkSheet,
-  expectedHeaders: string[],
-): number => {
-  const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
-    header: 1,
-    range: 0,
-    blankrows: false,
-  }) as (string | number | null)[][];
-
-  const aliases = expectedHeaders
-    .map((header) => normalizeImportHeader(header))
-    .filter((header) => header.length > 0);
-  const aliasSet = new Set(aliases);
-
-  let bestIndex = 0;
-  let bestScore = -1;
-  let bestNonEmpty = -1;
-
-  for (let i = 0; i < Math.min(rows.length, 75); i += 1) {
-    const headers = rows[i]
-      .map((cell) => normalizeImportHeader(String(cell ?? "")))
-      .filter((value) => value.length > 0);
-
-    if (headers.length === 0) continue;
-
-    let score = 0;
-    for (const header of headers) {
-      if (aliasSet.has(header)) {
-        score += 2;
-        continue;
-      }
-      if (
-        aliases.some(
-          (alias) => alias.includes(header) || header.includes(alias),
-        )
-      ) {
-        score += 1;
-      }
-    }
-
-    if (
-      score > bestScore ||
-      (score === bestScore && headers.length > bestNonEmpty)
-    ) {
-      bestScore = score;
-      bestIndex = i;
-      bestNonEmpty = headers.length;
-    }
-  }
-
-  return bestScore > 0 ? bestIndex : 0;
-};
-
-const findColumnValue = (
-  row: Record<string, unknown>,
-  possibleNames: string[],
-): unknown => {
-  const aliases = possibleNames
-    .map((name) => normalizeImportHeader(name))
-    .filter((name) => name.length > 0);
-
-  const normalizedEntries = Object.entries(row)
-    .map(([key, value]) => ({
-      normalized: normalizeImportHeader(key),
-      value,
-    }))
-    .filter((entry) => entry.normalized.length > 0);
-
-  const exact = normalizedEntries.find((entry) =>
-    aliases.includes(entry.normalized),
-  );
-  if (exact) return exact.value;
-
-  const partial = normalizedEntries.find((entry) =>
-    aliases.some(
-      (alias) =>
-        entry.normalized.includes(alias) || alias.includes(entry.normalized),
-    ),
-  );
-  return partial?.value;
-};
-
 const emptyRow = (): EditableRow => ({
   id: createRowId(),
-  category: "",
   branch: "",
   criminal: 0,
   civil: 0,
@@ -163,15 +123,31 @@ const emptyRow = (): EditableRow => ({
 
 const AddReportPage: React.FC<AddReportPageProps> = ({
   month,
+  initialCategory,
   initialData,
   onBack,
   onSave,
 }) => {
+  const resolvedInitialCategory = useMemo(() => {
+    if (initialCategory && CATEGORY_OPTIONS.includes(initialCategory)) {
+      return initialCategory;
+    }
+
+    const categoryFromData = initialData?.find((row) =>
+      CATEGORY_OPTIONS.includes(row.category),
+    )?.category;
+
+    return categoryFromData ?? CATEGORY_OPTIONS[0] ?? "New Cases Filed";
+  }, [initialCategory, initialData]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    resolvedInitialCategory,
+  );
+
   const [rows, setRows] = useState<EditableRow[]>(() => {
     if (initialData && initialData.length > 0) {
       return initialData.map((r) => ({
         id: createRowId(),
-        category: r.category,
         branch: r.branch,
         criminal: r.criminal,
         civil: r.civil,
@@ -190,6 +166,17 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const categoryLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    CATEGORY_OPTIONS.forEach((category) => {
+      lookup.set(normalizeImportHeader(category), category);
+    });
+    return lookup;
+  }, []);
+
+  useEffect(() => {
+    setSelectedCategory(resolvedInitialCategory);
+  }, [resolvedInitialCategory]);
 
   useEffect(() => {
     if (!importFeedback) return;
@@ -204,64 +191,118 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const headerRowIndex = detectHeaderRowIndex(ws, [
+      const expectedHeaders = [
         "Category",
         "Case Category",
+        "Classification",
         "Branch",
+        "Branch No",
+        "Branch Number",
         "Branch/Station",
         "Station",
         "Criminal",
+        "Criminal Cases",
         "Crim",
         "Civil",
-      ]);
-      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-        range: headerRowIndex,
-        defval: "",
-      });
+        "Civil Cases",
+      ];
 
-      const importedRows: EditableRow[] = rawData.map((excelRow) => ({
-        id: createRowId(),
-        category: String(
-          findColumnValue(excelRow, ["Category", "Case Category"]) ?? "",
-        ).trim(),
-        branch: String(
-          findColumnValue(excelRow, ["Branch", "Branch/Station", "Station"]) ??
-            "",
-        ).trim(),
-        criminal: Number(
-          String(findColumnValue(excelRow, ["Criminal", "Crim"]) ?? "0")
-            .replace(/,/g, "")
-            .trim(),
-        ),
-        civil: Number(
-          String(findColumnValue(excelRow, ["Civil"]) ?? "0")
-            .replace(/,/g, "")
-            .trim(),
-        ),
-      }));
+      const importedRows: EditableRow[] = [];
+      let skippedCount = 0;
+      const detectedCategories = new Set<string>();
 
-      const imported = importedRows
-        .map((row) => ({
-          ...row,
-          criminal: Number.isFinite(row.criminal) ? row.criminal : 0,
-          civil: Number.isFinite(row.civil) ? row.civil : 0,
-        }))
-        .filter(
-          (row) => row.category || row.branch || row.criminal || row.civil,
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        if (!ws) continue;
+
+        const headerInfo = getHeaderRowInfo(ws, expectedHeaders);
+        const normalizedHeaderRow = headerInfo.headerRow.map((header) =>
+          normalizeImportHeader(String(header ?? "")),
         );
 
-      const skippedCount = importedRows.length - imported.length;
+        const categoryIndex = resolveColumnIndex(normalizedHeaderRow, [
+          "category",
+          "casecategory",
+          "classification",
+          "casetype",
+        ]);
+        const branchIndex = resolveColumnIndex(normalizedHeaderRow, [
+          "branch",
+          "branchstation",
+          "station",
+          "branchno",
+          "branchnumber",
+        ]);
+        const criminalIndex = resolveColumnIndex(normalizedHeaderRow, [
+          "criminal",
+          "criminalcases",
+          "criminalcount",
+          "crim",
+        ]);
+        const civilIndex = resolveColumnIndex(normalizedHeaderRow, [
+          "civil",
+          "civilcases",
+          "civilcount",
+        ]);
 
-      if (imported.length > 0) {
-        setRows((prev) => {
-          const hasData = prev.some(
-            (r) => r.category || r.branch || r.criminal || r.civil,
+        if (
+          categoryIndex < 0 &&
+          branchIndex < 0 &&
+          criminalIndex < 0 &&
+          civilIndex < 0
+        ) {
+          continue;
+        }
+
+        const rawRows = XLSX.utils.sheet_to_json<SheetCell[]>(ws, {
+          header: 1,
+          range: headerInfo.headerRowIndex + 1,
+          blankrows: false,
+        }) as SheetCell[][];
+
+        for (const excelRow of rawRows) {
+          const rawCategory =
+            categoryIndex >= 0 ? toCellText(excelRow[categoryIndex]) : "";
+          const matchedCategory = categoryLookup.get(
+            normalizeImportHeader(rawCategory),
           );
-          return hasData ? [...prev, ...imported] : imported;
+
+          if (matchedCategory) {
+            detectedCategories.add(matchedCategory);
+          }
+
+          const branch =
+            branchIndex >= 0 ? toCellText(excelRow[branchIndex]) : "";
+          const criminal =
+            criminalIndex >= 0 ? toNumber(excelRow[criminalIndex]) : 0;
+          const civil = civilIndex >= 0 ? toNumber(excelRow[civilIndex]) : 0;
+
+          if (!branch && criminal === 0 && civil === 0) {
+            skippedCount += 1;
+            continue;
+          }
+
+          importedRows.push({
+            id: createRowId(),
+            branch,
+            criminal,
+            civil,
+          });
+        }
+      }
+
+      if (importedRows.length > 0) {
+        if (detectedCategories.size === 1) {
+          setSelectedCategory(Array.from(detectedCategories)[0]);
+        }
+
+        setRows((prev) => {
+          const hasData = prev.some((r) => r.branch || r.criminal || r.civil);
+          return hasData ? [...prev, ...importedRows] : importedRows;
         });
+
         setImportFeedback(
-          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel${
+          `✓ ${importedRows.length} row${importedRows.length !== 1 ? "s" : ""} imported from Excel${
             skippedCount > 0
               ? ` (${skippedCount} row${skippedCount !== 1 ? "s" : ""} skipped)`
               : ""
@@ -269,7 +310,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
         );
       } else {
         setImportFeedback(
-          "No matching data found. Check headers like Category, Branch, Criminal, Civil.",
+          "No matching data found. Check headers like Branch, Criminal, Civil (Category is optional).",
         );
       }
     } catch (err) {
@@ -339,7 +380,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   /* ---------------------------------------------------------------- */
 
   const updateCell = useCallback(
-    (rowId: string, field: keyof EditableRow, value: string | number) => {
+    (
+      rowId: string,
+      field: Exclude<keyof EditableRow, "id">,
+      value: string | number,
+    ) => {
       setRows((prev) =>
         prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)),
       );
@@ -351,10 +396,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   /*  Keyboard navigation                                              */
   /* ---------------------------------------------------------------- */
 
-  const COLS = useMemo(
-    () => ["category", "branch", "criminal", "civil"] as const,
-    [],
-  );
+  const COLS = useMemo(() => ["branch", "criminal", "civil"] as const, []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, rowIdx: number, col: string) => {
@@ -418,47 +460,62 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   /*  Paste from Excel                                                 */
   /* ---------------------------------------------------------------- */
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const text = e.clipboardData.getData("text/plain");
-    if (!text.includes("\t") && !text.includes("\n")) return;
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const text = e.clipboardData.getData("text/plain");
+      if (!text.includes("\t") && !text.includes("\n")) return;
 
-    e.preventDefault();
+      e.preventDefault();
 
-    const pastedRows = text
-      .split(/\r?\n/)
-      .filter((line) => line.trim())
-      .map((line) => {
-        const cells = line.split("\t");
-        return {
-          id: createRowId(),
-          category: (cells[0] ?? "").trim(),
-          branch: (cells[1] ?? "").trim(),
-          criminal: Number(cells[2]) || 0,
-          civil: Number(cells[3]) || 0,
-        } as EditableRow;
-      });
+      const pastedCategories = new Set<string>();
 
-    if (pastedRows.length > 0) {
-      setRows((prev) => {
-        const hasData = prev.some(
-          (r) => r.category || r.branch || r.criminal || r.civil,
-        );
-        return hasData ? [...prev, ...pastedRows] : pastedRows;
-      });
-    }
-  }, []);
+      const pastedRows = text
+        .split(/\r?\n/)
+        .filter((line) => line.trim())
+        .map((line) => {
+          const cells = line.split("\t");
+          const firstCell = normalizeImportHeader(cells[0] ?? "");
+          const matchedCategory = categoryLookup.get(firstCell);
+
+          if (matchedCategory) {
+            pastedCategories.add(matchedCategory);
+          }
+
+          const startIndex = matchedCategory ? 1 : 0;
+          return {
+            id: createRowId(),
+            branch: (cells[startIndex] ?? "").trim(),
+            criminal: toNumber(cells[startIndex + 1] ?? ""),
+            civil: toNumber(cells[startIndex + 2] ?? ""),
+          } as EditableRow;
+        })
+        .filter((row) => row.branch || row.criminal || row.civil);
+
+      if (pastedRows.length > 0) {
+        if (pastedCategories.size === 1) {
+          setSelectedCategory(Array.from(pastedCategories)[0]);
+        }
+
+        setRows((prev) => {
+          const hasData = prev.some((r) => r.branch || r.criminal || r.civil);
+          return hasData ? [...prev, ...pastedRows] : pastedRows;
+        });
+      }
+    },
+    [categoryLookup],
+  );
 
   /* ---------------------------------------------------------------- */
   /*  Save                                                             */
   /* ---------------------------------------------------------------- */
 
   const handleSave = () => {
-    const validRows = rows.filter((r) => r.category && r.branch);
+    const validRows = rows.filter((r) => r.branch);
     if (validRows.length === 0) return;
 
     const mapped: MonthlyRow[] = validRows.map((r) => ({
       month,
-      category: r.category,
+      category: selectedCategory,
       branch: r.branch,
       criminal: r.criminal,
       civil: r.civil,
@@ -469,30 +526,18 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     onBack();
   };
 
-  const validCount = rows.filter((r) => r.category && r.branch).length;
+  const validCount = rows.filter((r) => r.branch).length;
 
-  const validRows = useMemo(
-    () => rows.filter((r) => r.category && r.branch),
-    [rows],
+  const validRows = useMemo(() => rows.filter((r) => r.branch), [rows]);
+
+  const selectedCategoryBadge = useMemo(
+    () =>
+      CATEGORY_BADGE[selectedCategory] ?? {
+        bg: "bg-neutral/10 text-neutral",
+        ring: "ring-neutral/20",
+      },
+    [selectedCategory],
   );
-
-  /* ---- Review grouped data ---- */
-  const reviewGrouped = useMemo(() => {
-    const map = new Map<
-      string,
-      { branch: string; criminal: number; civil: number; total: number }[]
-    >();
-    validRows.forEach((r) => {
-      if (!map.has(r.category)) map.set(r.category, []);
-      map.get(r.category)!.push({
-        branch: r.branch,
-        criminal: r.criminal,
-        civil: r.civil,
-        total: r.criminal + r.civil,
-      });
-    });
-    return map;
-  }, [validRows]);
 
   const reviewTotals = useMemo(
     () => ({
@@ -571,6 +616,13 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 <span className="xls-pill xls-pill-neutral">
                   <span className="xls-pill-dot" />
                   {rows.length} {rows.length === 1 ? "row" : "rows"}
+                </span>
+                <span className="xls-pill xls-pill-neutral" style={{ gap: 6 }}>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${selectedCategoryBadge.bg}`}
+                  >
+                    {selectedCategory}
+                  </span>
                 </span>
                 <span
                   className={`xls-pill ${validCount > 0 ? "xls-pill-ok" : "xls-pill-neutral"}`}
@@ -707,6 +759,59 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <button className="btn btn-warning btn-outline" onClick={clearAll}>
               Clear All
             </button>
+
+            <>
+              <div
+                style={{
+                  width: 1,
+                  height: 28,
+                  background: "var(--surface-border)",
+                  margin: "0 8px",
+                }}
+              />
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  background: "var(--surface-inset)",
+                  borderRadius: 12,
+                  padding: 4,
+                  gap: 4,
+                  border: "1px solid var(--surface-border)",
+                }}
+              >
+                {CATEGORY_OPTIONS.map((category) => {
+                  const isCurrent = selectedCategory === category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setSelectedCategory(category)}
+                      className="xls-btn"
+                      style={{
+                        height: 36,
+                        padding: "0 14px",
+                        fontSize: 13,
+                        borderRadius: 8,
+                        background: isCurrent
+                          ? "var(--color-primary)"
+                          : "transparent",
+                        color: isCurrent
+                          ? "var(--color-primary-content)"
+                          : "var(--color-muted)",
+                        boxShadow: isCurrent
+                          ? "0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent)"
+                          : "none",
+                        fontWeight: 700,
+                      }}
+                      title={`Set category to ${category}`}
+                    >
+                      {category}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           </div>
 
           {/* ── Sheet ── */}
@@ -720,8 +825,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 <colgroup>
                   <col style={{ width: 48 }} />
                   <col style={{ width: 44 }} />
-                  <col style={{ width: "28%" }} />
-                  <col style={{ width: "24%" }} />
+                  <col style={{ width: "34%" }} />
                   <col style={{ width: "18%" }} />
                   <col style={{ width: "18%" }} />
                   <col style={{ width: "12%" }} />
@@ -729,11 +833,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 <thead>
                   <tr className="xls-thead-group">
                     <th style={{ width: 48 }} />
-                    <th colSpan={1}>
-                      <div className="xls-group-label">#</div>
-                    </th>
                     <th colSpan={2}>
-                      <div className="xls-group-label">Classification</div>
+                      <div className="xls-group-label">Entries</div>
                     </th>
                     <th colSpan={3}>
                       <div className="xls-group-label">Counts</div>
@@ -751,7 +852,6 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                       />
                     </th>
                     <th style={{ textAlign: "center" }}>#</th>
-                    <th>Category</th>
                     <th>Branch</th>
                     <th style={{ textAlign: "center" }}>Criminal</th>
                     <th style={{ textAlign: "center" }}>Civil</th>
@@ -792,42 +892,6 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         {/* Row number */}
                         <td className="td-num">
                           <span className="xls-rownum">{idx + 1}</span>
-                        </td>
-
-                        {/* Category */}
-                        <td
-                          style={
-                            isActive("category")
-                              ? {
-                                  boxShadow: `inset 0 0 0 2px var(--color-primary)`,
-                                  borderRadius: 4,
-                                }
-                              : undefined
-                          }
-                          onClick={() =>
-                            setActiveCell({ rowIdx: idx, col: "category" })
-                          }
-                        >
-                          <select
-                            className="xls-input"
-                            value={row.category}
-                            onChange={(e) =>
-                              updateCell(row.id, "category", e.target.value)
-                            }
-                            onFocus={() =>
-                              setActiveCell({ rowIdx: idx, col: "category" })
-                            }
-                            onKeyDown={(e) => handleKeyDown(e, idx, "category")}
-                          >
-                            <option value="" disabled>
-                              Select category…
-                            </option>
-                            {CATEGORY_OPTIONS.map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                          </select>
                         </td>
 
                         {/* Branch */}
@@ -973,7 +1037,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 rows ready
               </span>
               <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
-                Paste from Excel: Category, Branch, Criminal, Civil columns
+                Paste from Excel: Branch, Criminal, Civil columns (Category
+                optional)
               </span>
             </div>
             <div className="xls-footer-right">
@@ -1007,7 +1072,13 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                   <strong style={{ color: "var(--color-primary)" }}>
                     {monthLabel}
                   </strong>
-                  . Confirm the details are correct.
+                  . Confirm the details for{" "}
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${selectedCategoryBadge.bg}`}
+                  >
+                    {selectedCategory}
+                  </span>
+                  .
                 </p>
               </div>
             </div>
@@ -1052,17 +1123,16 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <div className="xls-table-outer">
               <table className="xls-table" style={{ width: "100%" }}>
                 <colgroup>
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "24%" }} />
-                  <col style={{ width: "22%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "40%" }} />
                   <col style={{ width: "16%" }} />
                   <col style={{ width: "16%" }} />
-                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "18%" }} />
                 </colgroup>
                 <thead>
                   <tr className="xls-thead-group">
-                    <th colSpan={3}>
-                      <div className="xls-group-label">Classification</div>
+                    <th colSpan={2}>
+                      <div className="xls-group-label">Entries</div>
                     </th>
                     <th colSpan={3}>
                       <div className="xls-group-label">Counts</div>
@@ -1070,7 +1140,6 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                   </tr>
                   <tr className="xls-thead-cols">
                     <th style={{ textAlign: "center" }}>#</th>
-                    <th>Category</th>
                     <th>Branch</th>
                     <th style={{ textAlign: "center" }}>Criminal</th>
                     <th style={{ textAlign: "center" }}>Civil</th>
@@ -1078,166 +1147,58 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from(reviewGrouped.entries()).map(
-                    ([category, catRows]) => {
-                      const badge = CATEGORY_BADGE[category] ?? {
-                        bg: "bg-neutral/10 text-neutral",
-                        ring: "ring-neutral/20",
-                      };
-                      return (
-                        <React.Fragment key={category}>
-                          {catRows.map((r, rIdx) => (
-                            <tr
-                              key={`${category}-${r.branch}-${rIdx}`}
-                              className="xls-row"
-                            >
-                              {rIdx === 0 && (
-                                <td
-                                  rowSpan={catRows.length}
-                                  className="td-num"
-                                  style={{
-                                    verticalAlign: "middle",
-                                    borderRight:
-                                      "1px solid var(--surface-border)",
-                                  }}
-                                >
-                                  <span className="xls-rownum">
-                                    {Array.from(reviewGrouped.keys()).indexOf(
-                                      category,
-                                    ) + 1}
-                                  </span>
-                                </td>
-                              )}
-                              {rIdx === 0 && (
-                                <td
-                                  rowSpan={catRows.length}
-                                  style={{
-                                    padding: "12px 14px",
-                                    verticalAlign: "middle",
-                                    borderRight:
-                                      "1px solid var(--surface-border)",
-                                  }}
-                                >
-                                  <span
-                                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${badge.bg}`}
-                                  >
-                                    {category}
-                                  </span>
-                                </td>
-                              )}
-                              <td
-                                style={{
-                                  padding: "12px 14px",
-                                  fontWeight: 500,
-                                  fontSize: 15,
-                                }}
-                              >
-                                {r.branch}
-                              </td>
-                              <td
-                                className="xls-mono"
-                                style={{
-                                  padding: "12px 14px",
-                                  textAlign: "center",
-                                  fontSize: 15,
-                                }}
-                              >
-                                {r.criminal.toLocaleString()}
-                              </td>
-                              <td
-                                className="xls-mono"
-                                style={{
-                                  padding: "12px 14px",
-                                  textAlign: "center",
-                                  fontSize: 15,
-                                }}
-                              >
-                                {r.civil.toLocaleString()}
-                              </td>
-                              <td
-                                className="xls-mono"
-                                style={{
-                                  padding: "12px 14px",
-                                  textAlign: "center",
-                                  fontSize: 15,
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {r.total.toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
-
-                          {/* Category subtotal */}
-                          <tr
-                            style={{
-                              background: "var(--surface-inset)",
-                              borderBottom:
-                                "1px solid var(--surface-border-strong)",
-                            }}
-                          >
-                            <td
-                              colSpan={3}
-                              style={{
-                                padding: "10px 14px",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                                color: "var(--color-muted)",
-                              }}
-                            >
-                              Subtotal — {category}
-                            </td>
-                            <td
-                              className="xls-mono"
-                              style={{
-                                padding: "10px 14px",
-                                textAlign: "center",
-                                fontWeight: 700,
-                                fontSize: 15,
-                              }}
-                            >
-                              {catRows
-                                .reduce((s, r) => s + r.criminal, 0)
-                                .toLocaleString()}
-                            </td>
-                            <td
-                              className="xls-mono"
-                              style={{
-                                padding: "10px 14px",
-                                textAlign: "center",
-                                fontWeight: 700,
-                                fontSize: 15,
-                              }}
-                            >
-                              {catRows
-                                .reduce((s, r) => s + r.civil, 0)
-                                .toLocaleString()}
-                            </td>
-                            <td
-                              className="xls-mono"
-                              style={{
-                                padding: "10px 14px",
-                                textAlign: "center",
-                                fontWeight: 800,
-                                fontSize: 15,
-                              }}
-                            >
-                              {catRows
-                                .reduce((s, r) => s + r.total, 0)
-                                .toLocaleString()}
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      );
-                    },
-                  )}
+                  {validRows.map((row, idx) => (
+                    <tr key={row.id} className="xls-row">
+                      <td className="td-num">
+                        <span className="xls-rownum">{idx + 1}</span>
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 14px",
+                          fontWeight: 500,
+                          fontSize: 15,
+                        }}
+                      >
+                        {row.branch}
+                      </td>
+                      <td
+                        className="xls-mono"
+                        style={{
+                          padding: "12px 14px",
+                          textAlign: "center",
+                          fontSize: 15,
+                        }}
+                      >
+                        {row.criminal.toLocaleString()}
+                      </td>
+                      <td
+                        className="xls-mono"
+                        style={{
+                          padding: "12px 14px",
+                          textAlign: "center",
+                          fontSize: 15,
+                        }}
+                      >
+                        {row.civil.toLocaleString()}
+                      </td>
+                      <td
+                        className="xls-mono"
+                        style={{
+                          padding: "12px 14px",
+                          textAlign: "center",
+                          fontSize: 15,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {(row.criminal + row.civil).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
 
                   {/* Grand total */}
                   <tr className="bg-primary/80 text-primary-content">
                     <td
-                      colSpan={3}
+                      colSpan={2}
                       style={{
                         padding: "14px 14px",
                         fontWeight: 900,
