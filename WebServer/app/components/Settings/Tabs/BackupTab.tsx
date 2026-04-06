@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FiDatabase, FiPlus, FiTrash2, FiXCircle } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
@@ -12,6 +12,7 @@ import {
   saveBackupConfiguration,
   type BackupDashboardData,
 } from "../BackupActions";
+import MultiSelectPopoverDropdown from "../MultiSelectPopoverDropdown";
 import {
   InputField,
   SaveButton,
@@ -23,8 +24,6 @@ import {
 
 const BackupTab = () => {
   const popup = usePopup();
-  const intervalDropdownRef = useRef<HTMLDetailsElement | null>(null);
-  const remoteDropdownRef = useRef<HTMLDetailsElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,38 +98,6 @@ const BackupTab = () => {
 
     void load();
   }, [popup]);
-
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      const intervalDropdown = intervalDropdownRef.current;
-      if (
-        intervalDropdown &&
-        intervalDropdown.open &&
-        !intervalDropdown.contains(target)
-      ) {
-        intervalDropdown.open = false;
-      }
-
-      const remoteDropdown = remoteDropdownRef.current;
-      if (
-        remoteDropdown &&
-        remoteDropdown.open &&
-        !remoteDropdown.contains(target)
-      ) {
-        remoteDropdown.open = false;
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, []);
 
   const handleSave = async () => {
     if (enabled && selectedRemoteNames.length === 0) {
@@ -384,6 +351,18 @@ const BackupTab = () => {
         : "Choose destination accounts"
       : `${selectedRemoteLabels.length} account${selectedRemoteLabels.length > 1 ? "s" : ""} selected`;
 
+  const intervalDropdownOptions = intervalOptions.map((interval) => ({
+    value: interval.value,
+    label: interval.label,
+    description: `Folder: ${interval.folderName}`,
+  }));
+
+  const remoteDropdownOptions = remotes.map((remote) => ({
+    value: remote.name,
+    label: remote.name,
+    description: remote.provider.toUpperCase(),
+  }));
+
   return (
     <div className="space-y-6">
       <SettingsCard
@@ -401,39 +380,15 @@ const BackupTab = () => {
           description="Select one or more schedules. Each interval writes to its own folder and replaces the previous backup in that folder."
         >
           <div className="w-full">
-            <details ref={intervalDropdownRef} className="dropdown w-full">
-              <summary className="btn btn-outline btn-sm sm:btn-md w-full justify-between normal-case font-normal">
-                <span className="truncate">{intervalSummary}</span>
-                <span className="text-xs text-base-content/45">Select</span>
-              </summary>
-              <ul className="dropdown-content z-30 mt-2 w-full p-2 rounded-xl border border-base-300 bg-base-100 shadow max-h-80 overflow-auto space-y-1">
-                {intervalOptions.map((interval) => (
-                  <li key={interval.value}>
-                    <label className="flex items-start gap-3 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-base-200/60">
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm mt-0.5"
-                        checked={selectedIntervals.includes(interval.value)}
-                        onChange={() => toggleIntervalSelection(interval.value)}
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-base-content">
-                          {interval.label}
-                        </span>
-                        <span className="block text-xs text-base-content/45">
-                          Folder: {interval.folderName}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            {selectedIntervalLabels.length > 0 && (
-              <p className="text-xs text-base-content/45 mt-2 line-clamp-2">
-                Active: {selectedIntervalLabels.join(", ")}
-              </p>
-            )}
+            <MultiSelectPopoverDropdown
+              popoverId="backup-intervals-popover"
+              anchorName="--backup-intervals-anchor"
+              summary={intervalSummary}
+              options={intervalDropdownOptions}
+              selectedValues={selectedIntervals}
+              onToggle={toggleIntervalSelection}
+              emptyLabel="No intervals available."
+            />
           </div>
         </SettingsRow>
         <SettingsRow
@@ -444,39 +399,15 @@ const BackupTab = () => {
             <p className="text-sm text-base-content/45">No accounts yet.</p>
           ) : (
             <div className="w-full">
-              <details ref={remoteDropdownRef} className="dropdown w-full">
-                <summary className="btn btn-outline btn-sm sm:btn-md w-full justify-between normal-case font-normal">
-                  <span className="truncate">{remoteSummary}</span>
-                  <span className="text-xs text-base-content/45">Select</span>
-                </summary>
-                <ul className="dropdown-content z-30 mt-2 w-full p-2 rounded-xl border border-base-300 bg-base-100 shadow max-h-80 overflow-auto space-y-1">
-                  {remotes.map((remote) => (
-                    <li key={remote.name}>
-                      <label className="flex items-start gap-3 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-base-200/60">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm mt-0.5"
-                          checked={selectedRemoteNames.includes(remote.name)}
-                          onChange={() => toggleRemoteSelection(remote.name)}
-                        />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-base-content">
-                            {remote.name}
-                          </span>
-                          <span className="block text-xs text-base-content/45 uppercase tracking-wide">
-                            {remote.provider}
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-              {selectedRemoteLabels.length > 0 && (
-                <p className="text-xs text-base-content/45 mt-2 line-clamp-2">
-                  Active: {selectedRemoteLabels.join(", ")}
-                </p>
-              )}
+              <MultiSelectPopoverDropdown
+                popoverId="backup-remotes-popover"
+                anchorName="--backup-remotes-anchor"
+                summary={remoteSummary}
+                options={remoteDropdownOptions}
+                selectedValues={selectedRemoteNames}
+                onToggle={toggleRemoteSelection}
+                emptyLabel="No accounts yet."
+              />
             </div>
           )}
         </SettingsRow>
