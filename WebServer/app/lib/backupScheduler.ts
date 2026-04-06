@@ -1,8 +1,18 @@
 import "server-only";
 
+import Database from "better-sqlite3";
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
-import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 
 const BACKUP_INTERVAL_DEFINITIONS = [
@@ -101,6 +111,30 @@ const BACKUP_INTERVAL_LOOKUP = new Map<
 const DEFAULT_SELECTED_INTERVALS: BackupIntervalKey[] = ["1h"];
 const MANUAL_BACKUP_FOLDER = "manual";
 
+export type BackupImportSourceKey = "manual" | BackupIntervalKey;
+
+export interface BackupImportSourceOption {
+  value: BackupImportSourceKey;
+  label: string;
+  description: string;
+  folderName: string;
+}
+
+export const BACKUP_IMPORT_SOURCE_OPTIONS: BackupImportSourceOption[] = [
+  {
+    value: "manual",
+    label: "Manual Backup",
+    description: "Import from the manual backup folder",
+    folderName: MANUAL_BACKUP_FOLDER,
+  },
+  ...BACKUP_INTERVAL_OPTIONS.map((interval) => ({
+    value: interval.value,
+    label: interval.label,
+    description: `Import from ${interval.folderName} backups`,
+    folderName: interval.folderName,
+  })),
+];
+
 export type BackupRunStatus =
   | "IDLE"
   | "RUNNING"
@@ -189,7 +223,13 @@ export const BACKUP_PROVIDER_OPTIONS: BackupProviderOption[] = [
 const BACKUP_DATA_DIR = path.join(process.cwd(), "data", "backup");
 const BACKUP_CONFIG_PATH = path.join(BACKUP_DATA_DIR, "backup-config.json");
 const RCLONE_CONFIG_PATH = path.join(BACKUP_DATA_DIR, "rclone.conf");
+const PRISMA_SCHEMA_PATH = path.join(process.cwd(), "prisma", "schema.prisma");
 const FIXED_BACKUP_SOURCE_PATH = path.join(process.cwd(), "dev.db");
+const IMPORT_TEMP_DB_PATH = path.join(BACKUP_DATA_DIR, "import-temp.db");
+const PRE_IMPORT_BACKUP_PATH = path.join(
+  BACKUP_DATA_DIR,
+  "dev.db.pre-import.bak",
+);
 const RCLONE_EXECUTABLE_NAME =
   process.platform === "win32" ? "rclone.exe" : "rclone";
 const MAX_BACKUP_LOG_ENTRIES = 500;
@@ -218,6 +258,21 @@ let backupLogs: BackupLogEntry[] = [];
 let accountSetupRunning = false;
 let activeAccountSetupProcess: ChildProcess | null = null;
 let accountSetupStartedAt = 0;
+let cachedPrismaSchemaExpectations: PrismaTableExpectation[] | null = null;
+
+interface PrismaTableExpectation {
+  modelName: string;
+  tableName: string;
+  requiredColumns: string[];
+}
+
+interface SqliteTableRow {
+  name: string;
+}
+
+interface SqliteColumnRow {
+  name: string;
+}
 
 function isBackupRunStatus(value: unknown): value is BackupRunStatus {
   return (
@@ -237,6 +292,15 @@ function isBackupIntervalKey(value: unknown): value is BackupIntervalKey {
   return (
     typeof value === "string" &&
     BACKUP_INTERVAL_LOOKUP.has(value as BackupIntervalKey)
+  );
+}
+
+function isBackupImportSourceKey(
+  value: unknown,
+): value is BackupImportSourceKey {
+  return (
+    value === "manual" ||
+    (typeof value === "string" && isBackupIntervalKey(value))
   );
 }
 
@@ -366,6 +430,214 @@ function joinRemotePath(...segments: string[]): string {
     .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
     .filter((segment) => !!segment)
     .join("/");
+}
+
+function quoteSqliteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function parsePrismaSchemaExpectations(
+  schemaContent: string,
+): PrismaTableExpectation[] {
+  const modelNames = new Set<string>();
+  const modelNamePattern = /^\s*model\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/gm;
+
+  for (const match of schemaContent.matchAll(modelNamePattern)) {
+    modelNames.add(match[1]);
+  }
+
+  const expectations: PrismaTableExpectation[] = [];
+  const modelPattern =
+    /^\s*model\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([\s\S]*?)^\s*\}/gm;
+
+  for (const match of schemaContent.matchAll(modelPattern)) {
+    const modelName = match[1];
+    const body = match[2] ?? "";
+    const mappedName = body.match(/@@map\("([^"]+)"\)/)?.[1]?.trim();
+    const tableName = mappedName || modelName;
+    const requiredColumns = new Set<string>();
+
+    for (const rawLine of body.split(/\r?\n/)) {
+      const line = rawLine.trim();
+
+      if (
+        !line ||
+        line.startsWith("//") ||
+        line.startsWith("///") ||
+        line.startsWith("@@")
+      ) {
+        continue;
+      }
+
+      const [fieldName, fieldType] = line.split(/\s+/, 3);
+      if (!fieldName || !fieldType || fieldName.startsWith("@")) {
+        continue;
+      }
+
+      if (fieldType.endsWith("[]") || line.includes("@relation(")) {
+        continue;
+      }
+
+      const normalizedFieldType = fieldType.replace(/\?/g, "");
+      if (modelNames.has(normalizedFieldType)) {
+        continue;
+      }
+
+      requiredColumns.add(fieldName);
+    }
+
+    expectations.push({
+      modelName,
+      tableName,
+      requiredColumns: Array.from(requiredColumns),
+    });
+  }
+
+  return expectations;
+}
+
+async function getPrismaSchemaExpectations(): Promise<
+  PrismaTableExpectation[]
+> {
+  if (cachedPrismaSchemaExpectations) {
+    return cachedPrismaSchemaExpectations;
+  }
+
+  let schemaContent: string;
+  try {
+    schemaContent = await readFile(PRISMA_SCHEMA_PATH, "utf8");
+  } catch {
+    throw new Error(
+      `Cannot validate backup file: schema.prisma not found at ${PRISMA_SCHEMA_PATH}.`,
+    );
+  }
+
+  const expectations = parsePrismaSchemaExpectations(schemaContent);
+  if (expectations.length === 0) {
+    throw new Error(
+      "Cannot validate backup file: no Prisma models were found in schema.prisma.",
+    );
+  }
+
+  cachedPrismaSchemaExpectations = expectations;
+  return expectations;
+}
+
+async function validateDatabaseAgainstPrismaSchema(
+  databasePath: string,
+): Promise<void> {
+  const expectations = await getPrismaSchemaExpectations();
+
+  let database: Database.Database | null = null;
+  try {
+    database = new Database(databasePath, {
+      readonly: true,
+      fileMustExist: true,
+    });
+  } catch {
+    throw new Error("Selected backup file is not a valid SQLite database.");
+  }
+
+  try {
+    const tableRows = database
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all() as SqliteTableRow[];
+
+    const existingTableNames = new Set(
+      tableRows.map((row) => String(row.name || "").toLowerCase()),
+    );
+
+    const missingTables = expectations
+      .filter(
+        (expectation) =>
+          !existingTableNames.has(expectation.tableName.toLowerCase()),
+      )
+      .map((expectation) => expectation.tableName);
+
+    if (missingTables.length > 0) {
+      const preview = missingTables.slice(0, 8).join(", ");
+      const suffix =
+        missingTables.length > 8 ? ` and ${missingTables.length - 8} more` : "";
+
+      throw new Error(
+        `Backup file schema mismatch with schema.prisma: missing required tables (${preview}${suffix}).`,
+      );
+    }
+
+    const missingColumns: string[] = [];
+
+    for (const expectation of expectations) {
+      const columns = database
+        .prepare(
+          `PRAGMA table_info(${quoteSqliteIdentifier(expectation.tableName)})`,
+        )
+        .all() as SqliteColumnRow[];
+
+      const existingColumns = new Set(
+        columns.map((column) => String(column.name || "").toLowerCase()),
+      );
+
+      for (const columnName of expectation.requiredColumns) {
+        if (!existingColumns.has(columnName.toLowerCase())) {
+          missingColumns.push(`${expectation.tableName}.${columnName}`);
+        }
+      }
+    }
+
+    if (missingColumns.length > 0) {
+      const preview = missingColumns.slice(0, 10).join(", ");
+      const suffix =
+        missingColumns.length > 10
+          ? ` and ${missingColumns.length - 10} more`
+          : "";
+
+      throw new Error(
+        `Backup file schema mismatch with schema.prisma: missing required columns (${preview}${suffix}).`,
+      );
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function resolveImportSourceFolder(source: BackupImportSourceKey): string {
+  if (source === "manual") {
+    return MANUAL_BACKUP_FOLDER;
+  }
+
+  return getIntervalDefinition(source).folderName;
+}
+
+async function applyImportedDatabaseFromTempFile(
+  tempFilePath: string,
+): Promise<void> {
+  await access(tempFilePath);
+  await validateDatabaseAgainstPrismaSchema(tempFilePath);
+
+  try {
+    await copyFile(FIXED_BACKUP_SOURCE_PATH, PRE_IMPORT_BACKUP_PATH);
+  } catch {
+    // Ignore pre-import backup failures and continue with import.
+  }
+
+  try {
+    await copyFile(tempFilePath, FIXED_BACKUP_SOURCE_PATH);
+  } catch (error) {
+    const message = formatBackupError(error);
+    const lowered = message.toLowerCase();
+
+    if (
+      lowered.includes("ebusy") ||
+      lowered.includes("eperm") ||
+      lowered.includes("access is denied")
+    ) {
+      throw new Error(
+        "Database file is currently in use. Close active connections and try again.",
+      );
+    }
+
+    throw error instanceof Error ? error : new Error(message);
+  }
 }
 
 function normalizeIsoDate(value: unknown): string | null {
@@ -1407,6 +1679,260 @@ export async function runBackupNow(): Promise<BackupConfig> {
   return runBackup("manual");
 }
 
+export async function importBackupFromRemote(
+  remoteName: string,
+  source: string,
+): Promise<BackupConfig> {
+  const normalizedRemoteName = normalizeRemoteName(remoteName);
+  if (!normalizedRemoteName) {
+    throw new Error("Remote name is required.");
+  }
+
+  if (!isBackupImportSourceKey(source)) {
+    throw new Error("Invalid backup source.");
+  }
+
+  const config = await readBackupConfigFile();
+  const remoteSourceRelativePath = joinRemotePath(
+    config.remotePath,
+    resolveImportSourceFolder(source),
+    path.basename(FIXED_BACKUP_SOURCE_PATH),
+  );
+  const remoteSource = buildRcloneDestination(
+    normalizedRemoteName,
+    remoteSourceRelativePath,
+  );
+
+  if (backupRunning) {
+    throw new Error("A backup or database update is already running.");
+  }
+
+  let current = await readBackupConfigFile();
+
+  backupRunning = true;
+  cancelBackupRequested = false;
+
+  current = await writeBackupConfigFile({
+    ...current,
+    lastRunStatus: "RUNNING",
+    lastRunMessage: "Updating database from remote backup...",
+  });
+  appendBackupLog(
+    "warn",
+    `Updating database from remote backup ${normalizedRemoteName}:${remoteSourceRelativePath}`,
+  );
+
+  try {
+    await runRcloneCommand(
+      ["copyto", remoteSource, IMPORT_TEMP_DB_PATH],
+      {
+        "check-first": true,
+      },
+      {
+        trackAsActiveBackup: true,
+      },
+    );
+
+    await applyImportedDatabaseFromTempFile(IMPORT_TEMP_DB_PATH);
+
+    const nowIso = new Date().toISOString();
+    const message = `Database updated from remote ${normalizedRemoteName}.`;
+
+    const updated = await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "SUCCESS",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("info", message);
+
+    return updated;
+  } catch (error) {
+    const message = formatBackupError(error);
+    const nowIso = new Date().toISOString();
+
+    await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "FAILED",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("error", message);
+
+    throw new Error(message);
+  } finally {
+    activeBackupProcess = null;
+    cancelBackupRequested = false;
+    backupRunning = false;
+
+    try {
+      await unlink(IMPORT_TEMP_DB_PATH);
+    } catch {
+      // Ignore temp cleanup failures.
+    }
+  }
+}
+
+export async function importBackupFromLocalPath(
+  localFilePath: string,
+): Promise<BackupConfig> {
+  const trimmedPath = localFilePath.trim();
+  if (!trimmedPath) {
+    throw new Error("Local backup file path is required.");
+  }
+
+  const resolvedPath = path.resolve(trimmedPath);
+  if (resolvedPath === FIXED_BACKUP_SOURCE_PATH) {
+    throw new Error("Selected file is already the active database.");
+  }
+
+  let sourceStats;
+  try {
+    sourceStats = await stat(resolvedPath);
+  } catch {
+    throw new Error(`Local file not found: ${resolvedPath}`);
+  }
+
+  if (!sourceStats.isFile()) {
+    throw new Error("Selected local backup path is not a file.");
+  }
+
+  if (backupRunning) {
+    throw new Error("A backup or database update is already running.");
+  }
+
+  let current = await readBackupConfigFile();
+
+  backupRunning = true;
+  cancelBackupRequested = false;
+
+  current = await writeBackupConfigFile({
+    ...current,
+    lastRunStatus: "RUNNING",
+    lastRunMessage: "Updating database from local backup file...",
+  });
+  appendBackupLog("warn", `Updating database from local file ${resolvedPath}`);
+
+  try {
+    await copyFile(resolvedPath, IMPORT_TEMP_DB_PATH);
+    await applyImportedDatabaseFromTempFile(IMPORT_TEMP_DB_PATH);
+
+    const nowIso = new Date().toISOString();
+    const message = `Database updated from local file ${resolvedPath}.`;
+
+    const updated = await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "SUCCESS",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("info", message);
+
+    return updated;
+  } catch (error) {
+    const message = formatBackupError(error);
+    const nowIso = new Date().toISOString();
+
+    await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "FAILED",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("error", message);
+
+    throw new Error(message);
+  } finally {
+    activeBackupProcess = null;
+    cancelBackupRequested = false;
+    backupRunning = false;
+
+    try {
+      await unlink(IMPORT_TEMP_DB_PATH);
+    } catch {
+      // Ignore temp cleanup failures.
+    }
+  }
+}
+
+export async function importBackupFromLocalUpload(
+  fileName: string,
+  fileBytes: Uint8Array,
+): Promise<BackupConfig> {
+  const normalizedFileName =
+    path.basename(fileName || "").trim() || "uploaded-backup.db";
+
+  if (!(fileBytes instanceof Uint8Array) || fileBytes.byteLength === 0) {
+    throw new Error("Selected backup file is empty.");
+  }
+
+  if (backupRunning) {
+    throw new Error("A backup or database update is already running.");
+  }
+
+  let current = await readBackupConfigFile();
+
+  backupRunning = true;
+  cancelBackupRequested = false;
+
+  current = await writeBackupConfigFile({
+    ...current,
+    lastRunStatus: "RUNNING",
+    lastRunMessage: "Updating database from uploaded backup file...",
+  });
+  appendBackupLog(
+    "warn",
+    `Updating database from uploaded file ${normalizedFileName}`,
+  );
+
+  try {
+    await writeFile(IMPORT_TEMP_DB_PATH, fileBytes);
+    await applyImportedDatabaseFromTempFile(IMPORT_TEMP_DB_PATH);
+
+    const nowIso = new Date().toISOString();
+    const message = `Database updated from uploaded file ${normalizedFileName}.`;
+
+    const updated = await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "SUCCESS",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("info", message);
+
+    return updated;
+  } catch (error) {
+    const message = formatBackupError(error);
+    const nowIso = new Date().toISOString();
+
+    await writeBackupConfigFile({
+      ...current,
+      lastRunAt: nowIso,
+      lastRunStatus: "FAILED",
+      lastRunMessage: message,
+    });
+
+    appendBackupLog("error", message);
+
+    throw new Error(message);
+  } finally {
+    activeBackupProcess = null;
+    cancelBackupRequested = false;
+    backupRunning = false;
+
+    try {
+      await unlink(IMPORT_TEMP_DB_PATH);
+    } catch {
+      // Ignore temp cleanup failures.
+    }
+  }
+}
+
 export async function listBackupRemotes(): Promise<BackupRemote[]> {
   await ensureBackupArtifacts();
 
@@ -1576,6 +2102,7 @@ export async function getBackupOverview(): Promise<{
   config: BackupConfig;
   remotes: BackupRemote[];
   providers: BackupProviderOption[];
+  importSourceOptions: BackupImportSourceOption[];
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
 }> {
@@ -1588,6 +2115,7 @@ export async function getBackupOverview(): Promise<{
     config,
     remotes,
     providers: BACKUP_PROVIDER_OPTIONS,
+    importSourceOptions: BACKUP_IMPORT_SOURCE_OPTIONS,
     logs: getBackupLogsSnapshot(),
     accountSetupInProgress: accountSetupRunning,
   };

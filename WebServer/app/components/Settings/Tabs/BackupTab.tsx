@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { FiDatabase, FiPlus, FiTrash2, FiXCircle } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
@@ -8,6 +8,8 @@ import {
   createBackupAccount,
   deleteBackupAccount,
   getBackupDashboard,
+  importBackupFromLocalFileAction,
+  importBackupFromRemoteAction,
   runBackupNowAction,
   saveBackupConfiguration,
   type BackupDashboardData,
@@ -31,11 +33,16 @@ const BackupTab = () => {
   const [cancellingBackup, setCancellingBackup] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
   const [accountSetupInProgress, setAccountSetupInProgress] = useState(false);
+  const [importingRemote, setImportingRemote] = useState(false);
+  const [importingLocal, setImportingLocal] = useState(false);
 
   const [enabled, setEnabled] = useState(false);
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
   const [remotePath, setRemotePath] = useState("rtc-backups");
+  const [importRemoteName, setImportRemoteName] = useState("");
+  const [importSource, setImportSource] = useState("manual");
+  const [localImportFile, setLocalImportFile] = useState<File | null>(null);
 
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
   const [lastRunStatus, setLastRunStatus] = useState("IDLE");
@@ -44,6 +51,9 @@ const BackupTab = () => {
 
   const [intervalOptions, setIntervalOptions] = useState<
     BackupDashboardData["intervalOptions"]
+  >([]);
+  const [importSourceOptions, setImportSourceOptions] = useState<
+    BackupDashboardData["importSourceOptions"]
   >([]);
   const [remotes, setRemotes] = useState<
     Array<{ name: string; provider: string }>
@@ -55,6 +65,7 @@ const BackupTab = () => {
   const [newRemoteName, setNewRemoteName] = useState("");
   const [newProvider, setNewProvider] = useState("drive");
   const [newOptionsJson, setNewOptionsJson] = useState("{}");
+  const localImportInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAccountAuthConflictError = (message: string): boolean => {
     const lowered = message.toLowerCase();
@@ -78,8 +89,33 @@ const BackupTab = () => {
     setRemotes(data.remotes);
     setProviders(data.providers);
     setIntervalOptions(data.intervalOptions);
+    setImportSourceOptions(data.importSourceOptions);
     setAccountSetupInProgress(data.accountSetupInProgress);
     setNewProvider(data.providers[0]?.value ?? "drive");
+
+    const availableRemoteNames = data.remotes.map((remote) => remote.name);
+    setImportRemoteName((previous) => {
+      if (previous && availableRemoteNames.includes(previous)) {
+        return previous;
+      }
+
+      const preferred = data.config.selectedRemoteNames.find((remoteName) =>
+        availableRemoteNames.includes(remoteName),
+      );
+
+      return preferred ?? availableRemoteNames[0] ?? "";
+    });
+
+    const sourceValues = data.importSourceOptions.map((option) =>
+      String(option.value),
+    );
+    setImportSource((previous) => {
+      if (previous && sourceValues.includes(previous)) {
+        return previous;
+      }
+
+      return sourceValues[0] ?? "manual";
+    });
   };
 
   useEffect(() => {
@@ -289,6 +325,85 @@ const BackupTab = () => {
     popup.showSuccess("Backup account removed.");
   };
 
+  const handleImportFromRemote = async () => {
+    if (!importRemoteName.trim()) {
+      popup.showError("Select a remote account to import from.");
+      return;
+    }
+
+    const confirmed = await popup.showWarning(
+      "This will update database (dev.db) from the selected remote backup. This might log out the current user. Continue?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setImportingRemote(true);
+    popup.showLoading("Updating database from remote backup...");
+
+    const result = await importBackupFromRemoteAction({
+      remoteName: importRemoteName.trim(),
+      source: importSource,
+    });
+
+    setImportingRemote(false);
+    if (!result.success) {
+      popup.showError(result.error || "Failed to import backup from remote");
+      return;
+    }
+
+    applyDashboardData(result.result);
+    popup.showSuccess("Database updated from remote backup.");
+  };
+
+  const handleOpenLocalFilePicker = () => {
+    localImportInputRef.current?.click();
+  };
+
+  const handleLocalImportFileSelected = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+    setLocalImportFile(selectedFile);
+  };
+
+  const handleImportFromLocalFile = async () => {
+    if (!localImportFile) {
+      popup.showError("Choose a local backup file to import.");
+      return;
+    }
+
+    const confirmed = await popup.showWarning(
+      `This will update database (dev.db) from \"${localImportFile.name}\". This might log out the current user. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setImportingLocal(true);
+    popup.showLoading("Updating database from local backup file...");
+
+    const formData = new FormData();
+    formData.set("file", localImportFile);
+
+    const result = await importBackupFromLocalFileAction(formData);
+
+    setImportingLocal(false);
+    if (!result.success) {
+      popup.showError(
+        result.error || "Failed to import backup from local file",
+      );
+      return;
+    }
+
+    applyDashboardData(result.result);
+    setLocalImportFile(null);
+    if (localImportInputRef.current) {
+      localImportInputRef.current.value = "";
+    }
+    popup.showSuccess("Database updated from local backup file.");
+  };
+
   const toggleIntervalSelection = (intervalValue: string) => {
     setSelectedIntervals((previous) => {
       if (previous.includes(intervalValue)) {
@@ -329,6 +444,8 @@ const BackupTab = () => {
     selectedRemoteNames.length > 0 &&
     !runningBackup &&
     !cancellingBackup &&
+    !importingRemote &&
+    !importingLocal &&
     !isBackupRunning;
 
   const selectedIntervalLabels = intervalOptions
@@ -510,6 +627,102 @@ const BackupTab = () => {
       </SettingsCard>
 
       <SettingsCard
+        title="Import Backup"
+        description="Restore from a remote backup folder or a local backup file from this PC. This updates the database file (dev.db)."
+      >
+        <SettingsRow
+          label="Import from Remote"
+          description="Choose an account and backup source folder, then update database."
+        >
+          <div className="w-full space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <SelectField
+                value={importRemoteName}
+                onChange={setImportRemoteName}
+                options={[
+                  {
+                    value: "",
+                    label: remotes.length
+                      ? "Select remote account"
+                      : "No accounts available",
+                  },
+                  ...remotes.map((remote) => ({
+                    value: remote.name,
+                    label: `${remote.name} (${remote.provider})`,
+                  })),
+                ]}
+              />
+              <SelectField
+                value={importSource}
+                onChange={setImportSource}
+                options={importSourceOptions.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} (${option.folderName})`,
+                }))}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromRemote()}
+                disabled={
+                  importingRemote || importingLocal || !importRemoteName
+                }
+                className="btn btn-warning btn-sm"
+              >
+                Import from Remote
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Import from Local File"
+          description="Choose a backup file from this PC, then update database."
+        >
+          <div className="w-full space-y-2">
+            <input
+              ref={localImportInputRef}
+              type="file"
+              onChange={handleLocalImportFileSelected}
+              className="hidden"
+              accept=".db,.sqlite,.sqlite3,.bak,.backup"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenLocalFilePicker}
+                disabled={importingLocal || importingRemote}
+                className="btn btn-outline btn-sm"
+              >
+                Choose Local Backup File
+              </button>
+              <p className="text-xs text-base-content/55 break-all">
+                {localImportFile
+                  ? `Selected: ${localImportFile.name}`
+                  : "No file selected."}
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromLocalFile()}
+                disabled={importingLocal || importingRemote || !localImportFile}
+                className="btn btn-warning btn-sm"
+              >
+                Import Selected File
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <div className="px-7 pb-5">
+          <p className="text-xs text-warning">
+            Importing backup means updating database (dev.db) and might log out
+            the current user. Make sure the selected backup file is correct.
+          </p>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
         title="Run Status"
         description="Trigger a manual backup and monitor latest execution details."
       >
@@ -616,7 +829,13 @@ const BackupTab = () => {
       <div className="flex justify-end">
         <SaveButton
           onClick={
-            saving || runningBackup || cancellingBackup ? undefined : handleSave
+            saving ||
+            runningBackup ||
+            cancellingBackup ||
+            importingRemote ||
+            importingLocal
+              ? undefined
+              : handleSave
           }
         />
       </div>

@@ -7,10 +7,13 @@ import {
   createBackupRemote,
   deleteBackupRemote,
   getBackupOverview,
+  importBackupFromLocalUpload,
+  importBackupFromRemote,
   runBackupNow,
   startBackupScheduler,
   updateBackupConfig,
   type BackupConfig,
+  type BackupImportSourceOption,
   type BackupIntervalOption,
   type BackupLogEntry,
   type BackupProviderOption,
@@ -25,6 +28,7 @@ export interface BackupDashboardData {
   remotes: BackupRemote[];
   providers: BackupProviderOption[];
   intervalOptions: BackupIntervalOption[];
+  importSourceOptions: BackupImportSourceOption[];
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
 }
@@ -41,6 +45,11 @@ const CreateRemoteSchema = z.object({
   provider: z.string().min(2).max(64),
   options: z.record(z.string(), z.string()).optional().default({}),
   forceRestart: z.boolean().optional().default(false),
+});
+
+const ImportRemoteSchema = z.object({
+  remoteName: z.string().min(1),
+  source: z.string().min(1),
 });
 
 async function getDashboardData(): Promise<BackupDashboardData> {
@@ -134,6 +143,78 @@ export async function runBackupNowAction(): Promise<
       success: false,
       error:
         error instanceof Error ? error.message : "Failed to run backup now",
+    };
+  }
+}
+
+export async function importBackupFromRemoteAction(
+  data: Record<string, unknown>,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = ImportRemoteSchema.safeParse(data);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid remote import payload" };
+    }
+
+    await startBackupScheduler();
+    await importBackupFromRemote(parsed.data.remoteName, parsed.data.source);
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error importing backup from remote:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to import backup from remote",
+    };
+  }
+}
+
+export async function importBackupFromLocalFileAction(
+  formData: FormData,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return { success: false, error: "Select a backup file to import" };
+    }
+
+    if (file.size <= 0) {
+      return { success: false, error: "Selected backup file is empty" };
+    }
+
+    await startBackupScheduler();
+
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
+    await importBackupFromLocalUpload(file.name, fileBytes);
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error importing backup from local file:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to import backup from local file",
     };
   }
 }
