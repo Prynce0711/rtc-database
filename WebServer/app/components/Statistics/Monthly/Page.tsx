@@ -5,9 +5,9 @@ import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
 import {
-  deleteMonthlyStatistic,
-  getMonthlyStatistics,
-  upsertMonthlyStatistics,
+    deleteMonthlyStatistic,
+    getMonthlyStatistics,
+    upsertMonthlyStatistics,
 } from "./MonthlyActions";
 import type { MonthlyRow } from "./Schema";
 
@@ -187,6 +187,7 @@ export default function MonthlyPage() {
     return (
       <AddReportPage
         month={selectedMonth}
+        initialCategory={activeCategoryView}
         initialData={editMode ? monthlyData : undefined}
         onBack={() => {
           setShowAddPage(false);

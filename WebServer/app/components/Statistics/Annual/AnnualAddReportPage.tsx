@@ -97,6 +97,27 @@ const toCellText = (cell: SheetCell | undefined): string => {
   return asString.replace(/\s+/g, " ").trim();
 };
 
+const normalizeDateOnly = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  if (text === "") return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+};
+
+const normalizeYearOnly = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).trim();
+  if (text === "") return "";
+  if (/^\d{4}$/.test(text)) return text;
+
+  const normalizedDate = normalizeDateOnly(text);
+  return normalizedDate ? normalizedDate.slice(0, 4) : "";
+};
+
 const extractYearFromHeader = (value: string): number | undefined => {
   const match = value.match(/(?:19|20)\d{2}/);
   if (!match) return undefined;
@@ -365,6 +386,10 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       fieldLabelByName.get(field.name) ?? field.label,
     [fieldLabelByName],
   );
+  const dateFilterField = useMemo(
+    () => fields.find((f) => f.type === "date") ?? null,
+    [fields],
+  );
 
   /* ---- Editable field keys (only non-date fields users type into) ---- */
   const editableFields = useMemo(
@@ -569,11 +594,80 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     col: string;
   } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [dateFilter, setDateFilter] = useState<string>("");
   const [step, setStep] = useState<"edit" | "review">("edit");
   const tableRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const effectiveYearFilter = useMemo(
+    () => (/^\d{4}$/.test(dateFilter) ? dateFilter : ""),
+    [dateFilter],
+  );
+
+  const handleYearFilterChange = useCallback((value: string) => {
+    const sanitized = value.replace(/\D/g, "").slice(0, 4);
+    setDateFilter(sanitized);
+  }, []);
+
+  const indexedRows = useMemo(
+    () => rows.map((row, sourceIndex) => ({ row, sourceIndex })),
+    [rows],
+  );
+
+  const yearFilterOptions = useMemo(() => {
+    const years = new Set<string>();
+    const currentYear = new Date().getFullYear().toString();
+    years.add(currentYear);
+
+    if (/^\d{4}$/.test(yearLabel)) {
+      years.add(yearLabel);
+    }
+
+    if (dateFilterField) {
+      for (const row of rows) {
+        const rowYear = normalizeYearOnly(row[dateFilterField.name]);
+        if (rowYear) {
+          years.add(rowYear);
+        }
+      }
+    }
+
+    if (/^\d{4}$/.test(dateFilter)) {
+      years.add(dateFilter);
+    }
+
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [rows, dateFilterField, yearLabel, dateFilter]);
+
+  const displayedRows = useMemo(() => {
+    if (!dateFilterField || effectiveYearFilter === "") return indexedRows;
+    return indexedRows.filter(
+      ({ row }) =>
+        normalizeYearOnly(row[dateFilterField.name]) === effectiveYearFilter,
+    );
+  }, [indexedRows, dateFilterField, effectiveYearFilter]);
+
+  const displayedRowIds = useMemo(
+    () => displayedRows.map(({ row }) => row._rowId),
+    [displayedRows],
+  );
+
+  const visibleSourceIndexes = useMemo(
+    () => displayedRows.map(({ sourceIndex }) => sourceIndex),
+    [displayedRows],
+  );
+  const isDateFilterActive = Boolean(
+    dateFilterField && effectiveYearFilter !== "",
+  );
+  const selectedVisibleCount = useMemo(
+    () =>
+      displayedRowIds.reduce(
+        (count, rowId) => (selectedRows.has(rowId) ? count + 1 : count),
+        0,
+      ),
+    [displayedRowIds, selectedRows],
+  );
 
   useEffect(() => {
     if (!importFeedback) return;
@@ -714,6 +808,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
       for (const excelRow of rawRows) {
         const row = buildEmptyRow(fields);
+        if (dateFilterField && effectiveYearFilter !== "") {
+          row[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
+        }
         let matchedFieldCount = 0;
         let hasMappedContent = false;
 
@@ -799,10 +896,16 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     (count: number = 1) => {
       setRows((prev) => [
         ...prev,
-        ...Array.from({ length: count }, () => buildEmptyRow(fields)),
+        ...Array.from({ length: count }, () => {
+          const nextRow = buildEmptyRow(fields);
+          if (dateFilterField && effectiveYearFilter !== "") {
+            nextRow[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
+          }
+          return nextRow;
+        }),
       ]);
     },
-    [fields],
+    [fields, dateFilterField, effectiveYearFilter],
   );
 
   const deleteSelectedRows = () => {
@@ -836,11 +939,22 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   };
 
   const toggleSelectAll = () => {
-    if (selectedRows.size === rows.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(rows.map((r) => r._rowId)));
-    }
+    if (displayedRowIds.length === 0) return;
+
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      const allVisibleSelected = displayedRowIds.every((rowId) =>
+        next.has(rowId),
+      );
+
+      if (allVisibleSelected) {
+        displayedRowIds.forEach((rowId) => next.delete(rowId));
+      } else {
+        displayedRowIds.forEach((rowId) => next.add(rowId));
+      }
+
+      return next;
+    });
   };
 
   /* ---------------------------------------------------------------- */
@@ -867,6 +981,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
       let nextRow = rowIdx;
       let nextCol = colIdx;
+      let rowStep = 0;
 
       switch (e.key) {
         case "Tab":
@@ -876,42 +991,62 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             if (nextCol < 0) {
               nextCol = COLS.length - 1;
               nextRow--;
+              rowStep = -1;
             }
           } else {
             nextCol++;
             if (nextCol >= COLS.length) {
               nextCol = 0;
               nextRow++;
+              rowStep = 1;
             }
           }
           break;
         case "Enter":
           e.preventDefault();
           nextRow++;
+          rowStep = 1;
           break;
         case "ArrowDown":
           e.preventDefault();
           nextRow++;
+          rowStep = 1;
           break;
         case "ArrowUp":
           e.preventDefault();
           nextRow--;
+          rowStep = -1;
           break;
         default:
           return;
       }
 
-      if (nextRow < 0) nextRow = 0;
-      if (nextRow >= rows.length) {
-        addRows(1);
-        nextRow = rows.length;
+      if (isDateFilterActive && rowStep !== 0) {
+        const currentVisibleIndex = visibleSourceIndexes.indexOf(rowIdx);
+        if (currentVisibleIndex !== -1 && visibleSourceIndexes.length > 0) {
+          const targetVisibleIndex = Math.max(
+            0,
+            Math.min(
+              visibleSourceIndexes.length - 1,
+              currentVisibleIndex + rowStep,
+            ),
+          );
+          nextRow = visibleSourceIndexes[targetVisibleIndex];
+        }
+      } else {
+        if (nextRow < 0) nextRow = 0;
+        if (nextRow >= rows.length) {
+          addRows(1);
+          nextRow = rows.length;
+        }
       }
+
       if (nextCol < 0) nextCol = 0;
       if (nextCol >= COLS.length) nextCol = COLS.length - 1;
 
       setActiveCell({ rowIdx: nextRow, col: COLS[nextCol] });
     },
-    [rows.length, COLS, addRows],
+    [rows.length, COLS, addRows, isDateFilterActive, visibleSourceIndexes],
   );
 
   /* ---------------------------------------------------------------- */
@@ -931,6 +1066,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         .map((line) => {
           const cells = line.split("\t");
           const row = buildEmptyRow(fields);
+          if (dateFilterField && effectiveYearFilter !== "") {
+            row[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
+          }
           editableFields.forEach((f, i) => {
             if (i < cells.length) {
               const v = cells[i].trim();
@@ -962,7 +1100,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         });
       }
     },
-    [fields, editableFields, isNumericField],
+    [
+      fields,
+      editableFields,
+      isNumericField,
+      dateFilterField,
+      effectiveYearFilter,
+    ],
   );
 
   /* ---------------------------------------------------------------- */
@@ -989,9 +1133,26 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     [rows, isRowValid],
   );
 
-  const validRows = useMemo(() => rows.filter(isRowValid), [rows, isRowValid]);
+  const displayedValidRows = useMemo(
+    () =>
+      displayedRows.filter(({ row }) => isRowValid(row)).map(({ row }) => row),
+    [displayedRows, isRowValid],
+  );
+
+  const displayedValidCount = displayedValidRows.length;
 
   const handleSave = () => {
+    const sourceRows = displayedRows.map(({ row }) => row);
+
+    if (sourceRows.length === 0) {
+      setImportFeedback(
+        isDateFilterActive
+          ? "No rows match the selected year filter."
+          : "No rows to save.",
+      );
+      return;
+    }
+
     const inventoryLocationFields = [
       "region",
       "province",
@@ -1006,7 +1167,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     const rowsForSave = isInventoryForm
       ? (() => {
           const carryForwardValues = new Map<string, string>();
-          return rows.map((sourceRow) => {
+          return sourceRows.map((sourceRow) => {
             const nextRow: EditableRow = { ...sourceRow };
 
             for (const fieldName of inventoryLocationFields) {
@@ -1035,7 +1196,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             return nextRow;
           });
         })()
-      : rows;
+      : sourceRows;
 
     const validRowsForSave = rowsForSave.filter(isRowValid);
 
@@ -1060,9 +1221,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       return record;
     });
 
-    if (validRowsForSave.length < rows.length) {
+    if (validRowsForSave.length < rowsForSave.length) {
       setImportFeedback(
-        `Saving ${validRowsForSave.length} row${validRowsForSave.length !== 1 ? "s" : ""}. ${rows.length - validRowsForSave.length} row${rows.length - validRowsForSave.length !== 1 ? "s" : ""} skipped due missing required fields.`,
+        `Saving ${validRowsForSave.length} row${validRowsForSave.length !== 1 ? "s" : ""}. ${rowsForSave.length - validRowsForSave.length} row${rowsForSave.length - validRowsForSave.length !== 1 ? "s" : ""} skipped due missing required fields.`,
       );
     }
 
@@ -1148,6 +1309,12 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   <span className="xls-pill-dot" />
                   {rows.length} {rows.length === 1 ? "row" : "rows"}
                 </span>
+                {isDateFilterActive && (
+                  <span className="xls-pill xls-pill-neutral">
+                    <span className="xls-pill-dot" />
+                    {displayedRows.length} shown
+                  </span>
+                )}
                 <span
                   className={`xls-pill ${validCount > 0 ? "xls-pill-ok" : "xls-pill-neutral"}`}
                 >
@@ -1341,6 +1508,57 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 </div>
               </>
             )}
+
+            {dateFilterField && (
+              <>
+                <div
+                  style={{
+                    width: 1,
+                    height: 28,
+                    background: "var(--surface-border)",
+                    margin: "0 4px",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>
+                    Year Filter
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    list="annual-year-filter-options"
+                    className="xls-input"
+                    value={dateFilter}
+                    onChange={(e) => handleYearFilterChange(e.target.value)}
+                    placeholder="YYYY"
+                    style={{ width: 120, height: 36 }}
+                  />
+                  <datalist id="annual-year-filter-options">
+                    {yearFilterOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </datalist>
+                  {dateFilter && (
+                    <button
+                      className="btn btn-outline"
+                      onClick={() => setDateFilter("")}
+                      style={{ height: 36 }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── FIELD TABS (compact / inventory) ── */}
@@ -1373,7 +1591,8 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                         type="checkbox"
                         className="xls-checkbox"
                         checked={
-                          rows.length > 0 && selectedRows.size === rows.length
+                          displayedRows.length > 0 &&
+                          selectedVisibleCount === displayedRows.length
                         }
                         onChange={toggleSelectAll}
                       />
@@ -1398,7 +1617,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 </thead>
 
                 <tbody>
-                  {rows.map((row, idx) => {
+                  {displayedRows.map(({ row, sourceIndex }, idx) => {
                     const isSelected = selectedRows.has(row._rowId);
 
                     return (
@@ -1433,7 +1652,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                         {visibleFields.map((f) => {
                           const isNum = isNumericField(f.name);
                           const isActive =
-                            activeCell?.rowIdx === idx &&
+                            activeCell?.rowIdx === sourceIndex &&
                             activeCell?.col === f.name;
 
                           return (
@@ -1448,7 +1667,10 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                                   : undefined
                               }
                               onClick={() =>
-                                setActiveCell({ rowIdx: idx, col: f.name })
+                                setActiveCell({
+                                  rowIdx: sourceIndex,
+                                  col: f.name,
+                                })
                               }
                             >
                               {f.type === "select" && f.options ? (
@@ -1463,10 +1685,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                                     )
                                   }
                                   onFocus={() =>
-                                    setActiveCell({ rowIdx: idx, col: f.name })
+                                    setActiveCell({
+                                      rowIdx: sourceIndex,
+                                      col: f.name,
+                                    })
                                   }
                                   onKeyDown={(e) =>
-                                    handleKeyDown(e, idx, f.name)
+                                    handleKeyDown(e, sourceIndex, f.name)
                                   }
                                 >
                                   <option value="" disabled>
@@ -1501,11 +1726,14 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                                     )
                                   }
                                   onFocus={(e) => {
-                                    setActiveCell({ rowIdx: idx, col: f.name });
+                                    setActiveCell({
+                                      rowIdx: sourceIndex,
+                                      col: f.name,
+                                    });
                                     e.target.select();
                                   }}
                                   onKeyDown={(e) =>
-                                    handleKeyDown(e, idx, f.name)
+                                    handleKeyDown(e, sourceIndex, f.name)
                                   }
                                 />
                               ) : (
@@ -1522,10 +1750,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                                     )
                                   }
                                   onFocus={() =>
-                                    setActiveCell({ rowIdx: idx, col: f.name })
+                                    setActiveCell({
+                                      rowIdx: sourceIndex,
+                                      col: f.name,
+                                    })
                                   }
                                   onKeyDown={(e) =>
-                                    handleKeyDown(e, idx, f.name)
+                                    handleKeyDown(e, sourceIndex, f.name)
                                   }
                                 />
                               )}
@@ -1569,8 +1800,12 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                             padding: "10px 14px",
                           }}
                         >
-                          {rows
-                            .reduce((s, r) => s + (Number(r[f.name]) || 0), 0)
+                          {displayedRows
+                            .reduce(
+                              (s, entry) =>
+                                s + (Number(entry.row[f.name]) || 0),
+                              0,
+                            )
                             .toLocaleString()}
                         </td>
                       );
@@ -1595,8 +1830,8 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           <div className="xls-footer">
             <div className="xls-footer-meta">
               <span>
-                <strong>{validCount}</strong> of <strong>{rows.length}</strong>{" "}
-                rows ready
+                <strong>{displayedValidCount}</strong> of{" "}
+                <strong>{displayedRows.length}</strong> rows ready
               </span>
               <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
                 Paste from Excel supported. Use Tab/Enter to navigate cells.
@@ -1609,11 +1844,12 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               <button
                 className="xls-btn xls-btn-primary"
                 onClick={() => setStep("review")}
-                disabled={rows.length === 0}
-                style={{ opacity: rows.length === 0 ? 0.5 : 1 }}
+                disabled={displayedRows.length === 0}
+                style={{ opacity: displayedRows.length === 0 ? 0.5 : 1 }}
               >
                 <FiEye size={15} />
-                Review{rows.length > 0 ? ` (${rows.length})` : ""}
+                Review
+                {displayedRows.length > 0 ? ` (${displayedRows.length})` : ""}
               </button>
             </div>
           </div>
@@ -1625,8 +1861,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             <div className="rv-summary-left">
               <div>
                 <p className="text-4xl font-black">
-                  Review {rows.length} {rows.length === 1 ? "entry" : "entries"}{" "}
-                  before saving
+                  Review {displayedRows.length}{" "}
+                  {displayedRows.length === 1 ? "entry" : "entries"} before
+                  saving
                 </p>
                 <p className="font-light text-md mt-1">
                   Data for{" "}
@@ -1634,9 +1871,18 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                     {yearLabel}
                   </strong>
                   . Confirm the details are correct.{" "}
-                  <strong>{validCount}</strong>{" "}
-                  {validCount === 1 ? "row is" : "rows are"} ready to save.
+                  <strong>{displayedValidCount}</strong>{" "}
+                  {displayedValidCount === 1 ? "row is" : "rows are"} ready to
+                  save.
                 </p>
+                {isDateFilterActive && (
+                  <p
+                    className="font-light text-sm mt-1"
+                    style={{ color: "var(--color-subtle)" }}
+                  >
+                    Showing records for year {effectiveYearFilter}.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1649,7 +1895,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               )
               .slice(0, 2)
               .map((f) => {
-                const total = validRows.reduce(
+                const total = displayedValidRows.reduce(
                   (s, r) => s + (Number(r[f.name]) || 0),
                   0,
                 );
@@ -1672,7 +1918,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   Grand Total
                 </p>
                 <p className="text-3xl font-black text-primary">
-                  {validRows
+                  {displayedValidRows
                     .reduce((s, r) => {
                       let t = 0;
                       editableFields.forEach((f) => {
@@ -1759,7 +2005,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   )}
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => {
+                  {displayedRows.map(({ row }, idx) => {
                     // Build a Record<string, unknown> for column renderers
                     const record: Record<string, unknown> = {};
                     for (const f of fields) {
@@ -1819,8 +2065,8 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             >
               <FiSave size={17} />
               Confirm & Save
-              {validCount > 0 &&
-                ` (${validCount} row${validCount !== 1 ? "s" : ""})`}
+              {displayedValidCount > 0 &&
+                ` (${displayedValidCount} row${displayedValidCount !== 1 ? "s" : ""})`}
             </button>
           </div>
         </div>
