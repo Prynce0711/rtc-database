@@ -22,6 +22,7 @@ export type CompleteLogData = z.infer<typeof CompleteLogData>;
 
 export const CaseSchema = z.object({
   id: z.number().int().optional(),
+  reportYear: z.number().int().min(1900).max(2100).optional(),
   branch: z.string().min(1, "Branch is required"),
   pendingLastYear: z.union([z.string(), z.number()]).optional(),
   RaffledOrAdded: z.union([z.string(), z.number()]).optional(),

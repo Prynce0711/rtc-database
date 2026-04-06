@@ -392,22 +392,28 @@ model FileData {
 
 model RegionalTrialCourt {
   id                      Int     @id @default(autoincrement())
+  reportYear              Int?
   branch                  String
   pendingLastYear         String?
   RaffledOrAdded          String?
   Disposed                String?
   pendingThisYear         String?
   percentageOfDisposition String?
+
+  @@index([reportYear])
 }
 
 model MunicipalTrialCourt {
   id                      Int     @id @default(autoincrement())
+  reportYear              Int?
   branch                  String
   pendingLastYear         String?
   RaffledOrAdded          String?
   Disposed                String?
   pendingThisYear         String?
   percentageOfDisposition String?
+
+  @@index([reportYear])
 }
 
 model InventoryDocument {

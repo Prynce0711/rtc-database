@@ -9,8 +9,7 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import RadioButton from "../../Filter/RadioButton";
-import Inventory from "./Inventory";
+import Inventory, { type InventoryCourtFilter } from "./Inventory";
 import MTC from "./MTC";
 import RTC from "./RTC";
 
@@ -64,11 +63,10 @@ const INVENTORY_EXPORT_HEADERS = [
 
 export default function AnnualPage() {
   const [activeView, setActiveView] = useState<AnnualView>("MTC");
+  const [inventoryCourtFilter, setInventoryCourtFilter] =
+    useState<InventoryCourtFilter>("RTC");
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString(),
-  );
-  const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7),
   );
   const [requestAdd, setRequestAdd] = useState(0);
   const [isChildActive, setIsChildActive] = useState(false);
@@ -83,10 +81,6 @@ export default function AnnualPage() {
   const exportDataRef = useRef<Record<string, unknown>[]>([]);
 
   const yearLabel = selectedYear;
-  const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString(
-    "en-US",
-    { month: "long", year: "numeric" },
-  );
   const todayLabel = new Date().toLocaleDateString("en-US", {
     day: "numeric",
     month: "long",
@@ -99,6 +93,16 @@ export default function AnnualPage() {
     Inventory:
       "Court Document Inventory — Overview of document counts and status",
   };
+
+  const inventoryFilterSubtitle =
+    inventoryCourtFilter === "RTC"
+      ? "Regional Trial Court"
+      : "Municipal Trial Court";
+
+  const activeSubtitle =
+    activeView === "Inventory"
+      ? `${viewSubtitles.Inventory} — ${inventoryFilterSubtitle}`
+      : viewSubtitles[activeView];
 
   const handleExport = () => {
     const data = exportDataRef.current;
@@ -173,7 +177,7 @@ export default function AnnualPage() {
                 <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
                   <FiCalendar className="shrink-0 w-4 h-4" />
                   <span>
-                    {viewSubtitles[activeView]} — {yearLabel} — {todayLabel}
+                    {activeSubtitle} — {yearLabel} — {todayLabel}
                   </span>
                 </p>
               </div>
@@ -214,14 +218,84 @@ export default function AnnualPage() {
         </header>
       )}
 
-      {/* ── VIEW SELECTOR — Segmented tabs ── */}
+      {/* ── VIEW SELECTOR — Segmented tabs with inventory submenu ── */}
       {!isChildActive && (
-        <div className="flex justify-start overflow-x-auto pb-1">
-          <RadioButton
-            options={views}
-            value={activeView}
-            onChange={setActiveView}
-          />
+        <div className="flex justify-start pb-1 overflow-visible">
+          <div className="relative flex p-1.5 rounded-full bg-base-200 border border-base-200 w-fit">
+            {views.map((option) => {
+              const Icon = option.icon;
+              const isActive = activeView === option.value;
+              const isInventoryOption = option.value === "Inventory";
+
+              return (
+                <div
+                  key={option.value}
+                  className={`relative ${isInventoryOption ? "group/inventory" : ""}`}
+                >
+                  <button
+                    onClick={() => {
+                      if (isInventoryOption) {
+                        setActiveView("Inventory");
+                        return;
+                      }
+
+                      setActiveView(option.value);
+                    }}
+                    className={[
+                      "relative z-10 px-5 py-2.5 rounded-full text-[14px] font-bold transition-colors duration-150 flex items-center gap-2",
+                      isActive
+                        ? "bg-base-100 text-primary shadow-sm"
+                        : "text-base-content/40 hover:text-base-content/70",
+                    ].join(" ")}
+                  >
+                    {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+                    <span className="text-left leading-tight">
+                      <span className="block whitespace-nowrap">
+                        {option.label}
+                      </span>
+                      {option.description ? (
+                        <span className="block text-[10px] font-medium opacity-70 whitespace-nowrap">
+                          {option.description}
+                        </span>
+                      ) : null}
+                    </span>
+                    {isInventoryOption && (
+                      <span
+                        className={[
+                          "px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4.5 text-center",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "bg-base-300 text-base-content/40",
+                        ].join(" ")}
+                      >
+                        {inventoryCourtFilter}
+                      </span>
+                    )}
+                  </button>
+
+                  {isInventoryOption && (
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-30 rounded-xl border border-base-300 bg-base-100 shadow-lg p-1 flex items-center gap-1 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover/inventory:opacity-100 group-hover/inventory:pointer-events-auto group-hover/inventory:translate-y-0 group-focus-within/inventory:opacity-100 group-focus-within/inventory:pointer-events-auto group-focus-within/inventory:translate-y-0">
+                      {(["RTC", "MTC"] as const).map((filter) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          className={`btn btn-xs ${inventoryCourtFilter === filter ? "btn-primary" : "btn-outline"}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setInventoryCourtFilter(filter);
+                            setActiveView("Inventory");
+                          }}
+                        >
+                          {filter}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -254,6 +328,7 @@ export default function AnnualPage() {
         <Inventory
           selectedYear={selectedYear}
           requestAdd={requestAdd}
+          courtFilter={inventoryCourtFilter}
           onDataReady={(d) => {
             exportDataRef.current = d;
           }}

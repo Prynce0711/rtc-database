@@ -1,5 +1,6 @@
 export interface CourtLog {
   id: number;
+  reportYear?: number | null;
   branch?: string | null;
   notes?: string | null;
   pendingLastYear?: string | number | null;

@@ -60,6 +60,95 @@ const createRowId = (): string => {
   return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+const normalizeImportHeader = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+
+const detectHeaderRowIndex = (
+  worksheet: XLSX.WorkSheet,
+  expectedHeaders: string[],
+): number => {
+  const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
+    header: 1,
+    range: 0,
+    blankrows: false,
+  }) as (string | number | null)[][];
+
+  const aliases = expectedHeaders
+    .map((header) => normalizeImportHeader(header))
+    .filter((header) => header.length > 0);
+  const aliasSet = new Set(aliases);
+
+  let bestIndex = 0;
+  let bestScore = -1;
+  let bestNonEmpty = -1;
+
+  for (let i = 0; i < Math.min(rows.length, 75); i += 1) {
+    const headers = rows[i]
+      .map((cell) => normalizeImportHeader(String(cell ?? "")))
+      .filter((value) => value.length > 0);
+
+    if (headers.length === 0) continue;
+
+    let score = 0;
+    for (const header of headers) {
+      if (aliasSet.has(header)) {
+        score += 2;
+        continue;
+      }
+      if (
+        aliases.some(
+          (alias) => alias.includes(header) || header.includes(alias),
+        )
+      ) {
+        score += 1;
+      }
+    }
+
+    if (
+      score > bestScore ||
+      (score === bestScore && headers.length > bestNonEmpty)
+    ) {
+      bestScore = score;
+      bestIndex = i;
+      bestNonEmpty = headers.length;
+    }
+  }
+
+  return bestScore > 0 ? bestIndex : 0;
+};
+
+const findColumnValue = (
+  row: Record<string, unknown>,
+  possibleNames: string[],
+): unknown => {
+  const aliases = possibleNames
+    .map((name) => normalizeImportHeader(name))
+    .filter((name) => name.length > 0);
+
+  const normalizedEntries = Object.entries(row)
+    .map(([key, value]) => ({
+      normalized: normalizeImportHeader(key),
+      value,
+    }))
+    .filter((entry) => entry.normalized.length > 0);
+
+  const exact = normalizedEntries.find((entry) =>
+    aliases.includes(entry.normalized),
+  );
+  if (exact) return exact.value;
+
+  const partial = normalizedEntries.find((entry) =>
+    aliases.some(
+      (alias) =>
+        entry.normalized.includes(alias) || alias.includes(entry.normalized),
+    ),
+  );
+  return partial?.value;
+};
+
 const emptyRow = (): EditableRow => ({
   id: createRowId(),
   category: "",
@@ -116,23 +205,53 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      const headerRowIndex = detectHeaderRowIndex(ws, [
+        "Category",
+        "Case Category",
+        "Branch",
+        "Branch/Station",
+        "Station",
+        "Criminal",
+        "Crim",
+        "Civil",
+      ]);
+      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+        range: headerRowIndex,
+        defval: "",
+      });
 
-      // Case-insensitive column lookup
-      const findCol = (row: Record<string, unknown>, name: string) => {
-        const key = Object.keys(row).find(
-          (k) => k.trim().toLowerCase() === name.toLowerCase(),
-        );
-        return key !== undefined ? row[key] : undefined;
-      };
-
-      const imported: EditableRow[] = rawData.map((excelRow) => ({
+      const importedRows: EditableRow[] = rawData.map((excelRow) => ({
         id: createRowId(),
-        category: String(findCol(excelRow, "Category") ?? ""),
-        branch: String(findCol(excelRow, "Branch") ?? ""),
-        criminal: Number(findCol(excelRow, "Criminal") ?? 0),
-        civil: Number(findCol(excelRow, "Civil") ?? 0),
+        category: String(
+          findColumnValue(excelRow, ["Category", "Case Category"]) ?? "",
+        ).trim(),
+        branch: String(
+          findColumnValue(excelRow, ["Branch", "Branch/Station", "Station"]) ??
+            "",
+        ).trim(),
+        criminal: Number(
+          String(findColumnValue(excelRow, ["Criminal", "Crim"]) ?? "0")
+            .replace(/,/g, "")
+            .trim(),
+        ),
+        civil: Number(
+          String(findColumnValue(excelRow, ["Civil"]) ?? "0")
+            .replace(/,/g, "")
+            .trim(),
+        ),
       }));
+
+      const imported = importedRows
+        .map((row) => ({
+          ...row,
+          criminal: Number.isFinite(row.criminal) ? row.criminal : 0,
+          civil: Number.isFinite(row.civil) ? row.civil : 0,
+        }))
+        .filter(
+          (row) => row.category || row.branch || row.criminal || row.civil,
+        );
+
+      const skippedCount = importedRows.length - imported.length;
 
       if (imported.length > 0) {
         setRows((prev) => {
@@ -142,11 +261,15 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
           return hasData ? [...prev, ...imported] : imported;
         });
         setImportFeedback(
-          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel`,
+          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel${
+            skippedCount > 0
+              ? ` (${skippedCount} row${skippedCount !== 1 ? "s" : ""} skipped)`
+              : ""
+          }`,
         );
       } else {
         setImportFeedback(
-          "No data found. Make sure columns are: Category, Branch, Criminal, Civil",
+          "No matching data found. Check headers like Category, Branch, Criminal, Civil.",
         );
       }
     } catch (err) {
