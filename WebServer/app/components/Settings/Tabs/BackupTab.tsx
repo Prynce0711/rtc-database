@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { FiDatabase, FiPlus, FiTrash2, FiXCircle } from "react-icons/fi";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
+import {
+  FiDatabase,
+  FiEdit2,
+  FiPlus,
+  FiTrash2,
+  FiXCircle,
+} from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
   cancelBackupNowAction,
@@ -12,6 +24,7 @@ import {
   importBackupFromRemoteAction,
   runBackupNowAction,
   saveBackupConfiguration,
+  updateBackupAccount,
   type BackupDashboardData,
 } from "../BackupActions";
 import MultiSelectPopoverDropdown from "../MultiSelectPopoverDropdown";
@@ -23,6 +36,125 @@ import {
   SettingsRow,
   Toggle,
 } from "../SettingsPrimitives";
+
+type ProviderFieldConfig = {
+  key: string;
+  label: string;
+  placeholder: string;
+  required?: boolean;
+  type?: "text" | "password";
+};
+
+const OAUTH_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
+
+const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
+  s3: [
+    {
+      key: "access_key_id",
+      label: "Access Key ID",
+      placeholder: "AKIA...",
+      required: true,
+    },
+    {
+      key: "secret_access_key",
+      label: "Secret Access Key",
+      placeholder: "Secret key",
+      required: true,
+      type: "password",
+    },
+    {
+      key: "region",
+      label: "Region",
+      placeholder: "ap-southeast-1",
+    },
+    {
+      key: "endpoint",
+      label: "Endpoint (optional)",
+      placeholder: "https://s3.amazonaws.com",
+    },
+  ],
+  b2: [
+    {
+      key: "account",
+      label: "Account ID",
+      placeholder: "Backblaze account ID",
+      required: true,
+    },
+    {
+      key: "key",
+      label: "Application Key",
+      placeholder: "Application key",
+      required: true,
+      type: "password",
+    },
+  ],
+  ftp: [
+    {
+      key: "host",
+      label: "Host",
+      placeholder: "ftp.example.com",
+      required: true,
+    },
+    {
+      key: "user",
+      label: "Username",
+      placeholder: "ftp-user",
+    },
+    {
+      key: "pass",
+      label: "Password",
+      placeholder: "FTP password",
+      type: "password",
+    },
+    {
+      key: "port",
+      label: "Port",
+      placeholder: "21",
+    },
+  ],
+  sftp: [
+    {
+      key: "host",
+      label: "Host",
+      placeholder: "sftp.example.com",
+      required: true,
+    },
+    {
+      key: "user",
+      label: "Username",
+      placeholder: "sftp-user",
+      required: true,
+    },
+    {
+      key: "pass",
+      label: "Password",
+      placeholder: "SFTP password",
+      type: "password",
+    },
+    {
+      key: "port",
+      label: "Port",
+      placeholder: "22",
+    },
+  ],
+  local: [],
+};
+
+const getProviderFields = (provider: string): ProviderFieldConfig[] =>
+  PROVIDER_FIELD_MAP[provider] ?? [];
+
+const pickProviderOptionValues = (
+  provider: string,
+  options: Record<string, string>,
+): Record<string, string> => {
+  const values: Record<string, string> = {};
+
+  for (const field of getProviderFields(provider)) {
+    values[field.key] = options[field.key] ?? "";
+  }
+
+  return values;
+};
 
 const BackupTab = () => {
   const popup = usePopup();
@@ -55,16 +187,19 @@ const BackupTab = () => {
   const [importSourceOptions, setImportSourceOptions] = useState<
     BackupDashboardData["importSourceOptions"]
   >([]);
-  const [remotes, setRemotes] = useState<
-    Array<{ name: string; provider: string }>
-  >([]);
+  const [remotes, setRemotes] = useState<BackupDashboardData["remotes"]>([]);
   const [providers, setProviders] = useState<
     Array<{ value: string; label: string; description: string }>
   >([]);
 
   const [newRemoteName, setNewRemoteName] = useState("");
   const [newProvider, setNewProvider] = useState("drive");
-  const [newOptionsJson, setNewOptionsJson] = useState("{}");
+  const [editingRemoteName, setEditingRemoteName] = useState<string | null>(
+    null,
+  );
+  const [providerOptionValues, setProviderOptionValues] = useState<
+    Record<string, string>
+  >({});
   const localImportInputRef = useRef<HTMLInputElement | null>(null);
 
   const isAccountAuthConflictError = (message: string): boolean => {
@@ -77,46 +212,68 @@ const BackupTab = () => {
     );
   };
 
-  const applyDashboardData = (data: BackupDashboardData) => {
-    setEnabled(data.config.enabled);
-    setSelectedIntervals(data.config.selectedIntervals);
-    setSelectedRemoteNames(data.config.selectedRemoteNames);
-    setRemotePath(data.config.remotePath);
-    setLastRunAt(data.config.lastRunAt);
-    setLastRunStatus(data.config.lastRunStatus);
-    setLastRunMessage(data.config.lastRunMessage);
-    setLogs(data.logs);
-    setRemotes(data.remotes);
-    setProviders(data.providers);
-    setIntervalOptions(data.intervalOptions);
-    setImportSourceOptions(data.importSourceOptions);
-    setAccountSetupInProgress(data.accountSetupInProgress);
-    setNewProvider(data.providers[0]?.value ?? "drive");
+  const applyDashboardData = useCallback(
+    (data: BackupDashboardData) => {
+      setEnabled(data.config.enabled);
+      setSelectedIntervals(data.config.selectedIntervals);
+      setSelectedRemoteNames(data.config.selectedRemoteNames);
+      setRemotePath(data.config.remotePath);
+      setLastRunAt(data.config.lastRunAt);
+      setLastRunStatus(data.config.lastRunStatus);
+      setLastRunMessage(data.config.lastRunMessage);
+      setLogs(data.logs);
+      setRemotes(data.remotes);
+      setProviders(data.providers);
+      setIntervalOptions(data.intervalOptions);
+      setImportSourceOptions(data.importSourceOptions);
+      setAccountSetupInProgress(data.accountSetupInProgress);
 
-    const availableRemoteNames = data.remotes.map((remote) => remote.name);
-    setImportRemoteName((previous) => {
-      if (previous && availableRemoteNames.includes(previous)) {
-        return previous;
+      if (
+        editingRemoteName &&
+        !data.remotes.some((remote) => remote.name === editingRemoteName)
+      ) {
+        setEditingRemoteName(null);
+        setProviderOptionValues({});
+        setNewRemoteName("");
       }
 
-      const preferred = data.config.selectedRemoteNames.find((remoteName) =>
-        availableRemoteNames.includes(remoteName),
+      setNewProvider((previous) => {
+        if (
+          previous &&
+          data.providers.some((entry) => entry.value === previous)
+        ) {
+          return previous;
+        }
+
+        return data.providers[0]?.value ?? "drive";
+      });
+
+      const availableRemoteNames = data.remotes.map((remote) => remote.name);
+      setImportRemoteName((previous) => {
+        if (previous && availableRemoteNames.includes(previous)) {
+          return previous;
+        }
+
+        const preferred = data.config.selectedRemoteNames.find((remoteName) =>
+          availableRemoteNames.includes(remoteName),
+        );
+
+        return preferred ?? availableRemoteNames[0] ?? "";
+      });
+
+      const sourceValues = data.importSourceOptions.map((option) =>
+        String(option.value),
       );
+      setImportSource((previous) => {
+        if (previous && sourceValues.includes(previous)) {
+          return previous;
+        }
 
-      return preferred ?? availableRemoteNames[0] ?? "";
-    });
-
-    const sourceValues = data.importSourceOptions.map((option) =>
-      String(option.value),
-    );
-    setImportSource((previous) => {
-      if (previous && sourceValues.includes(previous)) {
-        return previous;
-      }
-
-      return sourceValues[0] ?? "manual";
-    });
-  };
+        return sourceValues[0] ?? "manual";
+      });
+    },
+    [editingRemoteName],
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -133,7 +290,7 @@ const BackupTab = () => {
     };
 
     void load();
-  }, [popup]);
+  }, [popup, applyDashboardData]);
 
   const handleSave = async () => {
     if (enabled && selectedRemoteNames.length === 0) {
@@ -202,6 +359,65 @@ const BackupTab = () => {
     popup.showSuccess("Backup cancelled.");
   };
 
+  const resetAccountForm = () => {
+    setEditingRemoteName(null);
+    setNewRemoteName("");
+    setProviderOptionValues({});
+    setNewProvider(providers[0]?.value ?? "drive");
+  };
+
+  const handleProviderChange = (providerValue: string) => {
+    setNewProvider(providerValue);
+    setProviderOptionValues({});
+  };
+
+  const setProviderOptionValue = (key: string, value: string) => {
+    setProviderOptionValues((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  };
+
+  const buildAccountOptions = (providerValue: string) => {
+    const fields = getProviderFields(providerValue);
+    const options: Record<string, string> = {};
+
+    for (const field of fields) {
+      const rawValue = providerOptionValues[field.key] ?? "";
+      const trimmedValue = rawValue.trim();
+
+      if (field.required && !trimmedValue) {
+        popup.showError(`${field.label} is required.`);
+        return null;
+      }
+
+      if (trimmedValue) {
+        options[field.key] = trimmedValue;
+      }
+    }
+
+    return options;
+  };
+
+  const handleStartEditAccount = (accountName: string) => {
+    const remote = remotes.find((entry) => entry.name === accountName);
+    if (!remote) {
+      popup.showError("Selected backup account could not be found.");
+      return;
+    }
+
+    setEditingRemoteName(remote.name);
+    setNewRemoteName(remote.name);
+    setNewProvider(remote.provider);
+    setProviderOptionValues(
+      pickProviderOptionValues(remote.provider, remote.options ?? {}),
+    );
+  };
+
+  const handleCancelEditAccount = () => {
+    resetAccountForm();
+  };
+
   const handleCreateAccount = async () => {
     let forceRestart = false;
 
@@ -217,35 +433,17 @@ const BackupTab = () => {
       forceRestart = true;
     }
 
-    let options: Record<string, string> = {};
-
-    if (newOptionsJson.trim()) {
-      try {
-        const parsed = JSON.parse(newOptionsJson) as unknown;
-        if (typeof parsed !== "object" || !parsed || Array.isArray(parsed)) {
-          popup.showError("Account options must be a JSON object.");
-          return;
-        }
-
-        options = Object.fromEntries(
-          Object.entries(parsed as Record<string, unknown>).map(
-            ([key, value]) => [key, String(value)],
-          ),
-        );
-      } catch {
-        popup.showError("Invalid options JSON.");
-        return;
-      }
-    }
-
     if (!newRemoteName.trim()) {
       popup.showError("Account name is required.");
       return;
     }
 
-    const requiresAuthFlow = ["drive", "onedrive", "dropbox"].includes(
-      newProvider,
-    );
+    const options = buildAccountOptions(newProvider);
+    if (!options) {
+      return;
+    }
+
+    const requiresAuthFlow = OAUTH_PROVIDERS.has(newProvider);
 
     setAccountSaving(true);
     popup.showLoading(
@@ -297,9 +495,61 @@ const BackupTab = () => {
       setSelectedRemoteNames((previous) => [...previous, normalizedNewRemote]);
     }
 
-    setNewRemoteName("");
-    setNewOptionsJson("{}");
+    resetAccountForm();
     popup.showSuccess("Backup account added.");
+  };
+
+  const handleUpdateAccount = async () => {
+    if (!editingRemoteName) {
+      popup.showError("No backup account selected for editing.");
+      return;
+    }
+
+    if (!newRemoteName.trim()) {
+      popup.showError("Account name is required.");
+      return;
+    }
+
+    const currentRemote = remotes.find(
+      (remote) => remote.name === editingRemoteName,
+    );
+
+    if (!currentRemote) {
+      popup.showError("Selected backup account no longer exists.");
+      return;
+    }
+
+    if (currentRemote.provider !== newProvider) {
+      popup.showError(
+        "Changing provider type is not supported. Create a new account instead.",
+      );
+      return;
+    }
+
+    const options = buildAccountOptions(newProvider);
+    if (!options) {
+      return;
+    }
+
+    setAccountSaving(true);
+    popup.showLoading("Updating backup account...");
+
+    const result = await updateBackupAccount({
+      currentRemoteName: editingRemoteName,
+      nextRemoteName: newRemoteName.trim(),
+      provider: newProvider,
+      options,
+    });
+
+    setAccountSaving(false);
+    if (!result.success) {
+      popup.showError(result.error || "Failed to update account");
+      return;
+    }
+
+    applyDashboardData(result.result);
+    resetAccountForm();
+    popup.showSuccess("Backup account updated.");
   };
 
   const handleDeleteAccount = async (accountName: string) => {
@@ -322,6 +572,11 @@ const BackupTab = () => {
     }
 
     applyDashboardData(result.result);
+
+    if (editingRemoteName === accountName) {
+      resetAccountForm();
+    }
+
     popup.showSuccess("Backup account removed.");
   };
 
@@ -480,6 +735,10 @@ const BackupTab = () => {
     description: remote.provider.toUpperCase(),
   }));
 
+  const isEditingAccount = editingRemoteName !== null;
+  const accountProviderFields = getProviderFields(newProvider);
+  const requiresAuthFlowForProvider = OAUTH_PROVIDERS.has(newProvider);
+
   return (
     <div className="space-y-6">
       <SettingsCard
@@ -542,7 +801,7 @@ const BackupTab = () => {
 
       <SettingsCard
         title="Backup Accounts"
-        description="Add cloud destinations like Google Drive using rclone from this UI."
+        description="Create and edit backup destinations. OAuth providers use browser login, while non-OAuth providers use direct connection fields."
       >
         <div className="px-7 py-5 space-y-4">
           {remotes.length === 0 ? (
@@ -564,17 +823,34 @@ const BackupTab = () => {
                       {remote.provider}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteAccount(remote.name)}
-                    disabled={accountSaving}
-                    className="btn btn-ghost btn-sm text-error/80 hover:text-error rounded-lg"
-                  >
-                    <FiTrash2 size={14} /> Remove
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditAccount(remote.name)}
+                      disabled={accountSaving}
+                      className="btn btn-ghost btn-sm rounded-lg"
+                    >
+                      <FiEdit2 size={14} /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteAccount(remote.name)}
+                      disabled={accountSaving}
+                      className="btn btn-ghost btn-sm text-error/80 hover:text-error rounded-lg"
+                    >
+                      <FiTrash2 size={14} /> Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+          )}
+
+          {isEditingAccount && (
+            <p className="text-xs text-info">
+              Editing <span className="font-semibold">{editingRemoteName}</span>
+              . Provider type cannot be changed for existing accounts.
+            </p>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -585,7 +861,8 @@ const BackupTab = () => {
             />
             <SelectField
               value={newProvider}
-              onChange={setNewProvider}
+              onChange={handleProviderChange}
+              disabled={isEditingAccount}
               options={providers.map((provider) => ({
                 value: provider.value,
                 label: provider.label,
@@ -593,31 +870,71 @@ const BackupTab = () => {
             />
           </div>
 
-          <div>
-            <p className="text-xs text-base-content/35 mb-1.5">
-              Provider options JSON (optional). Example for non-interactive
-              setup: <span className="font-mono">{'{"scope":"drive"}'}</span>
+          {accountProviderFields.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {accountProviderFields.map((field) => (
+                <div key={field.key}>
+                  <p className="text-xs text-base-content/35 mb-1.5">
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </p>
+                  <input
+                    type={field.type ?? "text"}
+                    value={providerOptionValues[field.key] ?? ""}
+                    onChange={(event) =>
+                      setProviderOptionValue(field.key, event.target.value)
+                    }
+                    placeholder={field.placeholder}
+                    disabled={accountSaving}
+                    className="input input-bordered h-10 w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : requiresAuthFlowForProvider ? (
+            <p className="text-xs text-base-content/45">
+              This provider uses browser login and does not require manual
+              connection fields.
             </p>
-            <textarea
-              value={newOptionsJson}
-              onChange={(e) => setNewOptionsJson(e.target.value)}
-              rows={4}
-              className="textarea textarea-bordered w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-xl"
-            />
-          </div>
+          ) : newProvider === "local" ? (
+            <p className="text-xs text-base-content/45">
+              Local Folder does not require credentials. Set the target path in
+              <span className="font-semibold"> Destination Folder</span> under
+              Backup Schedule.
+            </p>
+          ) : (
+            <p className="text-xs text-base-content/45">
+              No extra fields are required for this provider.
+            </p>
+          )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {isEditingAccount && (
+              <button
+                type="button"
+                onClick={handleCancelEditAccount}
+                disabled={accountSaving}
+                className="btn btn-ghost btn-sm"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void handleCreateAccount()}
+              onClick={() =>
+                void (isEditingAccount
+                  ? handleUpdateAccount()
+                  : handleCreateAccount())
+              }
               disabled={accountSaving}
               className="btn btn-outline btn-sm gap-2"
             >
-              <FiPlus size={15} /> Add Account
+              <FiPlus size={15} />
+              {isEditingAccount ? "Save Account" : "Add Account"}
             </button>
           </div>
 
-          {accountSetupInProgress && (
+          {!isEditingAccount && accountSetupInProgress && (
             <p className="text-xs text-warning">
               Account authorization is already running. Click Add Account to
               override and cancel the current sign-in flow.

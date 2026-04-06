@@ -162,6 +162,7 @@ export interface BackupConfig {
 export interface BackupRemote {
   name: string;
   provider: string;
+  options: Record<string, string>;
 }
 
 export interface BackupProviderOption {
@@ -236,6 +237,7 @@ const MAX_BACKUP_LOG_ENTRIES = 500;
 const MAX_TIMER_MS = 2_147_000_000;
 const ACCOUNT_SETUP_STALE_MS = 3 * 60 * 1000;
 const DEFAULT_AUTH_CALLBACK_PORT = 53682;
+const OAUTH_ACCOUNT_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
 
 type RclonePromiseApi = ((...args: unknown[]) => Promise<Buffer>) &
   Record<string, (...args: unknown[]) => Promise<Buffer>>;
@@ -272,6 +274,11 @@ interface SqliteTableRow {
 
 interface SqliteColumnRow {
   name: string;
+}
+
+interface ParsedRemoteConfig {
+  provider: string;
+  options: Record<string, string>;
 }
 
 function isBackupRunStatus(value: unknown): value is BackupRunStatus {
@@ -660,6 +667,26 @@ function normalizeIsoDate(value: unknown): string | null {
 
 function normalizeRemoteName(value: string): string {
   return value.trim().replace(/:+$/, "");
+}
+
+function buildRemoteOptionArgs(options: Record<string, string>): string[] {
+  const optionArgs: string[] = [];
+
+  for (const [key, value] of Object.entries(options)) {
+    const cleanKey = key.trim();
+    if (!cleanKey) {
+      continue;
+    }
+
+    const cleanValue = value.trim();
+    if (!cleanValue) {
+      continue;
+    }
+
+    optionArgs.push(cleanKey, cleanValue);
+  }
+
+  return optionArgs;
 }
 
 function formatBackupError(error: unknown): string {
@@ -1096,27 +1123,45 @@ async function writeBackupConfigFile(
   return toWrite;
 }
 
-async function getRemoteTypeMap(): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
+async function getRemoteConfigMap(): Promise<Map<string, ParsedRemoteConfig>> {
+  const map = new Map<string, ParsedRemoteConfig>();
 
   try {
     const raw = await readFile(RCLONE_CONFIG_PATH, "utf8");
     let activeRemote = "";
+    let activeConfig: ParsedRemoteConfig | null = null;
 
     for (const line of raw.split(/\r?\n/)) {
       const section = line.match(/^\[(.+)]\s*$/);
       if (section) {
-        activeRemote = section[1].trim();
+        activeRemote = normalizeRemoteName(section[1]);
+        activeConfig = {
+          provider: "unknown",
+          options: {},
+        };
+        map.set(activeRemote, activeConfig);
         continue;
       }
 
-      if (!activeRemote) {
+      if (!activeRemote || !activeConfig) {
         continue;
       }
 
-      const typeField = line.match(/^\s*type\s*=\s*(.+)\s*$/);
-      if (typeField) {
-        map.set(activeRemote, typeField[1].trim());
+      const kvField = line.match(/^\s*([^=]+?)\s*=\s*(.+)\s*$/);
+      if (!kvField) {
+        continue;
+      }
+
+      const key = kvField[1].trim();
+      const value = kvField[2].trim();
+      if (!key) {
+        continue;
+      }
+
+      if (key === "type") {
+        activeConfig.provider = value || "unknown";
+      } else {
+        activeConfig.options[key] = value;
       }
     }
   } catch {
@@ -1938,16 +1983,21 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
 
   try {
     const output = await runRcloneCommand(["listremotes"]);
-    const typeMap = await getRemoteTypeMap();
+    const configMap = await getRemoteConfigMap();
 
     return output
       .split(/\r?\n/)
       .map((line) => normalizeRemoteName(line))
       .filter((line) => !!line)
-      .map((name) => ({
-        name,
-        provider: typeMap.get(name) || "unknown",
-      }));
+      .map((name) => {
+        const config = configMap.get(name);
+
+        return {
+          name,
+          provider: config?.provider || "unknown",
+          options: config?.options ?? {},
+        };
+      });
   } catch (error) {
     const message = formatBackupError(error).toLowerCase();
 
@@ -1986,20 +2036,7 @@ export async function createBackupRemote(
 
   await ensureAccountSetupIsAvailable(forceRestart);
 
-  const optionArgs: string[] = [];
-  for (const [key, value] of Object.entries(options)) {
-    const cleanKey = key.trim();
-    if (!cleanKey) {
-      continue;
-    }
-
-    const cleanValue = value.trim();
-    if (!cleanValue) {
-      continue;
-    }
-
-    optionArgs.push(cleanKey, cleanValue);
-  }
+  const optionArgs = buildRemoteOptionArgs(options);
 
   const configCreateArgs: string[] = [
     "config",
@@ -2063,6 +2100,101 @@ export async function createBackupRemote(
     }
 
     throw new Error(message);
+  }
+
+  return listBackupRemotes();
+}
+
+export async function updateBackupRemote(
+  currentRemoteName: string,
+  nextRemoteName: string,
+  provider: string,
+  options: Record<string, string> = {},
+): Promise<BackupRemote[]> {
+  await ensureBackupArtifacts();
+
+  const normalizedCurrent = normalizeRemoteName(currentRemoteName);
+  const normalizedNext = normalizeRemoteName(nextRemoteName);
+  const normalizedProvider = provider.trim().toLowerCase();
+
+  if (!normalizedCurrent) {
+    throw new Error("Current remote name is required.");
+  }
+
+  if (!normalizedNext) {
+    throw new Error("Remote name is required.");
+  }
+
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(normalizedNext)) {
+    throw new Error(
+      "Remote name must start with a letter/number and only use letters, numbers, _ or -.",
+    );
+  }
+
+  const configMap = await getRemoteConfigMap();
+  const existing = configMap.get(normalizedCurrent);
+
+  if (!existing) {
+    throw new Error(`Remote ${normalizedCurrent} was not found.`);
+  }
+
+  const existingProvider = existing.provider.trim().toLowerCase();
+  if (normalizedProvider && existingProvider !== normalizedProvider) {
+    throw new Error(
+      "Changing provider type is not supported for existing accounts. Create a new account instead.",
+    );
+  }
+
+  let targetRemoteName = normalizedCurrent;
+
+  if (normalizedNext !== normalizedCurrent) {
+    await runRcloneCommand([
+      "config",
+      "rename",
+      normalizedCurrent,
+      normalizedNext,
+    ]);
+    targetRemoteName = normalizedNext;
+  }
+
+  const optionArgs = buildRemoteOptionArgs(options);
+
+  if (optionArgs.length > 0) {
+    if (OAUTH_ACCOUNT_PROVIDERS.has(existingProvider)) {
+      throw new Error(
+        "Google Drive, OneDrive, and Dropbox accounts use browser authorization. Remove and re-add the account to change login settings.",
+      );
+    }
+
+    await runRcloneCommand([
+      "config",
+      "update",
+      targetRemoteName,
+      ...optionArgs,
+    ]);
+  }
+
+  if (targetRemoteName !== normalizedCurrent) {
+    const currentConfig = await readBackupConfigFile();
+
+    const updatedSelectedRemoteNames = Array.from(
+      new Set(
+        currentConfig.selectedRemoteNames
+          .map((name) =>
+            normalizeRemoteName(name) === normalizedCurrent
+              ? targetRemoteName
+              : normalizeRemoteName(name),
+          )
+          .filter((name) => !!name),
+      ),
+    );
+
+    const updatedConfig = await writeBackupConfigFile({
+      ...currentConfig,
+      selectedRemoteNames: updatedSelectedRemoteNames,
+    });
+
+    scheduleFromConfig(updatedConfig);
   }
 
   return listBackupRemotes();

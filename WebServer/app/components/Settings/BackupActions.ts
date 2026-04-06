@@ -12,6 +12,7 @@ import {
   runBackupNow,
   startBackupScheduler,
   updateBackupConfig,
+  updateBackupRemote,
   type BackupConfig,
   type BackupImportSourceOption,
   type BackupIntervalOption,
@@ -50,6 +51,13 @@ const CreateRemoteSchema = z.object({
 const ImportRemoteSchema = z.object({
   remoteName: z.string().min(1),
   source: z.string().min(1),
+});
+
+const UpdateRemoteSchema = z.object({
+  currentRemoteName: z.string().min(1),
+  nextRemoteName: z.string().min(1),
+  provider: z.string().min(1),
+  options: z.record(z.string(), z.string()).optional().default({}),
 });
 
 async function getDashboardData(): Promise<BackupDashboardData> {
@@ -278,6 +286,44 @@ export async function createBackupAccount(
         error instanceof Error
           ? error.message
           : "Failed to create backup account",
+    };
+  }
+}
+
+export async function updateBackupAccount(
+  data: Record<string, unknown>,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = UpdateRemoteSchema.safeParse(data);
+    if (!parsed.success) {
+      return { success: false, error: "Invalid backup account update payload" };
+    }
+
+    await startBackupScheduler();
+    await updateBackupRemote(
+      parsed.data.currentRemoteName,
+      parsed.data.nextRemoteName,
+      parsed.data.provider,
+      parsed.data.options,
+    );
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error updating backup account:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update backup account",
     };
   }
 }
