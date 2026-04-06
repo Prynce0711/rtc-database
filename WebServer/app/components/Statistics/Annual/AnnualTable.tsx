@@ -3,7 +3,7 @@
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "../../Popup/PopupProvider";
@@ -175,10 +175,62 @@ function AnnualTable<T extends Record<string, unknown>>({
     if (!selectedYear) return data;
     return data.filter((row) => {
       const d = row[dateKey];
-      if (d == null) return true; // include rows without a date field
-      return String(d).startsWith(selectedYear);
+      if (d == null || d === "") {
+        return selectedYear === String(new Date().getFullYear());
+      }
+      const yearValue = String(d).trim();
+      if (/^\d{4}$/.test(yearValue)) {
+        return yearValue === selectedYear;
+      }
+      return yearValue.startsWith(selectedYear);
     });
   }, [data, selectedYear, dateKey]);
+
+  const selectedReportYear = useMemo(() => {
+    const parsed = Number(selectedYear);
+    if (Number.isInteger(parsed) && parsed >= 1900 && parsed <= 2100) {
+      return parsed;
+    }
+    return new Date().getFullYear();
+  }, [selectedYear]);
+
+  const normalizeInventoryDateToSelectedYear = useCallback(
+    (value: unknown): string => {
+      let month = "01";
+      let day = "01";
+
+      if (typeof value === "string") {
+        const isoMatch = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) {
+          month = isoMatch[2];
+          day = isoMatch[3];
+        }
+      }
+
+      if (month === "01" && day === "01" && value instanceof Date) {
+        if (Number.isFinite(value.getTime())) {
+          month = String(value.getMonth() + 1).padStart(2, "0");
+          day = String(value.getDate()).padStart(2, "0");
+        }
+      }
+
+      if (
+        month === "01" &&
+        day === "01" &&
+        typeof value === "string" &&
+        value.trim() !== ""
+      ) {
+        const parsedDate = new Date(value);
+        if (Number.isFinite(parsedDate.getTime())) {
+          month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+          day = String(parsedDate.getDate()).padStart(2, "0");
+        }
+      }
+
+      return `${selectedReportYear}-${month}-${day}`;
+    },
+    [selectedReportYear],
+  );
 
   // Compute KPI cards based on variant
   const kpiCards: AnnualKPICardLocal[] = useMemo(() => {
@@ -220,13 +272,13 @@ function AnnualTable<T extends Record<string, unknown>>({
           icon: Gavel,
           delay: 100,
         },
-        {
-          label: "Grand Total",
-          value: grandTotal,
-          subtitle: "All cases combined",
-          icon: BarChart3,
-          delay: 200,
-        },
+        // {
+        //   label: "Grand Total",
+        //   value: grandTotal,
+        //   subtitle: "All cases combined",
+        //   icon: BarChart3,
+        //   delay: 200,
+        // },
       ];
     }
     // inventory
@@ -321,52 +373,48 @@ function AnnualTable<T extends Record<string, unknown>>({
   };
 
   const handleCreate = async (newRecord: Record<string, unknown>) => {
+    const payload: Record<string, unknown> =
+      variant === "court"
+        ? { ...newRecord, reportYear: selectedReportYear }
+        : variant === "inventory"
+          ? {
+              ...newRecord,
+              dateRecorded: normalizeInventoryDateToSelectedYear(
+                newRecord.dateRecorded,
+              ),
+            }
+          : newRecord;
+
     if (onAdd) {
-      await onAdd(newRecord);
+      await onAdd(payload);
     } else {
       const nextId = Math.max(0, ...data.map((r) => (r.id as number) ?? 0)) + 1;
-      onChange([{ ...newRecord, id: nextId } as unknown as T, ...data]);
+      onChange([{ ...payload, id: nextId } as unknown as T, ...data]);
     }
   };
 
   const handleUpdate = async (updated: Record<string, unknown>) => {
+    const payload: Record<string, unknown> =
+      variant === "court"
+        ? { ...updated, reportYear: selectedReportYear }
+        : variant === "inventory"
+          ? {
+              ...updated,
+              dateRecorded: normalizeInventoryDateToSelectedYear(
+                updated.dateRecorded,
+              ),
+            }
+          : updated;
+
     if (onUpdate) {
-      await onUpdate(updated);
+      await onUpdate(payload);
     } else {
-      onChange(data.map((r) => (r.id === updated.id ? (updated as T) : r)));
+      onChange(data.map((r) => (r.id === payload.id ? (payload as T) : r)));
     }
   };
 
   const hasGroups = columns.some(isGroupColumn);
   const leafColumns = flattenColumns(columns);
-
-  // Compute per-column totals for numeric columns
-  const columnTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const col of leafColumns) {
-      // For virtual columns with computeValue, sum the computed values
-      if (col.computeValue) {
-        let sum = 0;
-        for (const row of filteredAndSorted) {
-          sum += col.computeValue(row as Record<string, unknown>);
-        }
-        totals[col.key] = sum;
-        continue;
-      }
-      let sum = 0;
-      let hasNumeric = false;
-      for (const row of filteredAndSorted) {
-        const raw = (row as Record<string, unknown>)[col.key];
-        const num = Number(raw);
-        if (raw != null && raw !== "" && !isNaN(num)) {
-          sum += num;
-          hasNumeric = true;
-        }
-      }
-      if (hasNumeric) totals[col.key] = sum;
-    }
-    return totals;
-  }, [filteredAndSorted, leafColumns]);
 
   const sortIcon = (key: string) => {
     if (sortConfig.key !== key) return null;
@@ -664,39 +712,6 @@ function AnnualTable<T extends Record<string, unknown>>({
                     }
                   />
                 ))
-              )}
-
-              {/* ── Grand total row ── */}
-              {filteredAndSorted.length > 0 && (
-                <tr className="bg-primary/80 text-primary-content">
-                  {isSelecting && <td />}
-                  {leafColumns.map((col) => {
-                    const total = columnTotals[col.key];
-                    const isFirstCol = col === leafColumns[0];
-                    return (
-                      <td
-                        key={col.key}
-                        className={`px-5 py-4 font-black tabular-nums text-base ${
-                          col.align === "center"
-                            ? "text-center"
-                            : col.align === "right"
-                              ? "text-right"
-                              : "text-left"
-                        }`}
-                      >
-                        {isFirstCol ? (
-                          <span className="text-sm uppercase tracking-widest">
-                            Grand Total :
-                          </span>
-                        ) : total != null ? (
-                          total.toLocaleString()
-                        ) : (
-                          ""
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
               )}
             </tbody>
           </table>

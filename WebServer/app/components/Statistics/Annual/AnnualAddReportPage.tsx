@@ -77,6 +77,253 @@ const createRowId = (): string => {
   return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+type SheetCell = string | number | null;
+
+type HeaderRowInfo = {
+  headerRowIndex: number;
+  headerRow: string[];
+  matchScore: number;
+};
+
+const normalizeImportHeader = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+
+const toCellText = (cell: SheetCell | undefined): string => {
+  if (cell === null || cell === undefined) return "";
+  const asString = typeof cell === "string" ? cell : String(cell);
+  return asString.replace(/\s+/g, " ").trim();
+};
+
+const extractYearFromHeader = (value: string): number | undefined => {
+  const match = value.match(/(?:19|20)\d{2}/);
+  if (!match) return undefined;
+  const year = Number(match[0]);
+  return Number.isInteger(year) ? year : undefined;
+};
+
+const isPercentageFieldName = (fieldName: string): boolean =>
+  normalizeImportHeader(fieldName).includes("percentage");
+
+const toPercentNumber = (value: string | number): number | undefined => {
+  const rawText = typeof value === "number" ? String(value) : value;
+  const cleaned = rawText.replace(/,/g, "").trim();
+  if (cleaned === "") return undefined;
+
+  const hasPercentSign = cleaned.includes("%");
+  const parsed = Number(cleaned.replace(/%/g, ""));
+  if (!Number.isFinite(parsed)) return undefined;
+
+  const percentValue =
+    !hasPercentSign && parsed >= 0 && parsed <= 1 ? parsed * 100 : parsed;
+  return Number(percentValue.toFixed(2));
+};
+
+const buildFieldAliases = (field: FieldConfig): string[] => {
+  const normalizedName = normalizeImportHeader(field.name);
+  const camelWords = field.name.replace(/([a-z])([A-Z])/g, "$1 $2");
+
+  const aliases = [field.name, field.label, camelWords];
+
+  if (normalizedName === "branch" || normalizedName === "branchno") {
+    aliases.push("Branches", "Branches No.", "Branch No", "Branch Number");
+  }
+
+  if (normalizedName === "pendingthisyear") {
+    aliases.push("Pending This Year", "Pending Year Now");
+  }
+
+  if (normalizedName === "raffledoradded") {
+    aliases.push("Raffled/Added", "Raffled Added");
+  }
+
+  if (normalizedName === "percentageofdisposition") {
+    aliases.push("% Disposition", "Disposition Percentage");
+  }
+
+  return Array.from(
+    new Set(
+      aliases
+        .map((candidate) => normalizeImportHeader(candidate))
+        .filter((candidate) => candidate.length > 0),
+    ),
+  );
+};
+
+type InventoryMetricFieldName =
+  | "civilSmallClaimsFiled"
+  | "criminalCasesFiled"
+  | "civilSmallClaimsDisposed"
+  | "criminalCasesDisposed";
+
+const includesAnyToken = (value: string, tokens: string[]): boolean =>
+  tokens.some((token) => value.includes(token));
+
+const getInventoryMetricColumnIndexes = (
+  normalizedHeaders: string[],
+): Partial<Record<InventoryMetricFieldName, number>> => {
+  const isCivilHeader = (header: string): boolean =>
+    includesAnyToken(header, ["civil", "smallclaims", "spproc", "lrc"]);
+  const isCriminalHeader = (header: string): boolean =>
+    header.includes("criminal");
+  const isFiledHeader = (header: string): boolean => header.includes("filed");
+  const isDisposedHeader = (header: string): boolean =>
+    header.includes("disposed");
+
+  const findByPhaseAndType = (
+    phaseMatcher: (header: string) => boolean,
+    typeMatcher: (header: string) => boolean,
+  ): number =>
+    normalizedHeaders.findIndex(
+      (header) =>
+        header.length > 0 && phaseMatcher(header) && typeMatcher(header),
+    );
+
+  const civilIndexes = normalizedHeaders
+    .map((header, index) => (isCivilHeader(header) ? index : -1))
+    .filter((index) => index >= 0);
+  const criminalIndexes = normalizedHeaders
+    .map((header, index) => (isCriminalHeader(header) ? index : -1))
+    .filter((index) => index >= 0);
+
+  const result: Partial<Record<InventoryMetricFieldName, number>> = {
+    civilSmallClaimsFiled: findByPhaseAndType(isFiledHeader, isCivilHeader),
+    criminalCasesFiled: findByPhaseAndType(isFiledHeader, isCriminalHeader),
+    civilSmallClaimsDisposed: findByPhaseAndType(
+      isDisposedHeader,
+      isCivilHeader,
+    ),
+    criminalCasesDisposed: findByPhaseAndType(
+      isDisposedHeader,
+      isCriminalHeader,
+    ),
+  };
+
+  if ((result.civilSmallClaimsFiled ?? -1) < 0 && civilIndexes.length > 0) {
+    result.civilSmallClaimsFiled = civilIndexes[0];
+  }
+  if ((result.civilSmallClaimsDisposed ?? -1) < 0 && civilIndexes.length > 1) {
+    result.civilSmallClaimsDisposed = civilIndexes[1];
+  }
+  if ((result.criminalCasesFiled ?? -1) < 0 && criminalIndexes.length > 0) {
+    result.criminalCasesFiled = criminalIndexes[0];
+  }
+  if ((result.criminalCasesDisposed ?? -1) < 0 && criminalIndexes.length > 1) {
+    result.criminalCasesDisposed = criminalIndexes[1];
+  }
+
+  return result;
+};
+
+const buildCompositeHeaderRow = (
+  rows: SheetCell[][],
+  headerRowIndex: number,
+): string[] => {
+  const rowLengths = [
+    rows[headerRowIndex]?.length ?? 0,
+    rows[headerRowIndex - 1]?.length ?? 0,
+    rows[headerRowIndex - 2]?.length ?? 0,
+  ];
+  const maxCols = Math.max(...rowLengths);
+
+  const nonEmptyCounts = rows.map(
+    (row) => row.filter((cell) => toCellText(cell) !== "").length,
+  );
+
+  return Array.from({ length: maxCols }).map((_, colIndex) => {
+    const parts: string[] = [];
+
+    for (let offset = 2; offset >= 1; offset -= 1) {
+      const rowIndex = headerRowIndex - offset;
+      if (rowIndex < 0) continue;
+      if (nonEmptyCounts[rowIndex] < 2) continue;
+      const value = toCellText(rows[rowIndex]?.[colIndex]);
+      if (value) parts.push(value);
+    }
+
+    const headerValue = toCellText(rows[headerRowIndex]?.[colIndex]);
+    if (headerValue) parts.push(headerValue);
+
+    return parts.join(" ").trim();
+  });
+};
+
+const detectHeaderRowInfo = (
+  worksheet: XLSX.WorkSheet,
+  fields: FieldConfig[],
+): HeaderRowInfo => {
+  const rows = XLSX.utils.sheet_to_json<SheetCell[]>(worksheet, {
+    header: 1,
+    range: 0,
+    blankrows: false,
+  }) as SheetCell[][];
+
+  const aliases = Array.from(
+    new Set(fields.flatMap((field) => buildFieldAliases(field))),
+  );
+  const aliasSet = new Set(aliases);
+
+  let bestIndex = 0;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let bestNonEmpty = -1;
+
+  for (let i = 0; i < Math.min(rows.length, 75); i += 1) {
+    const composite = buildCompositeHeaderRow(rows, i)
+      .map((cell) => normalizeImportHeader(cell))
+      .filter((value) => value.length > 0);
+
+    const currentRow = (rows[i] ?? [])
+      .map((cell) => normalizeImportHeader(toCellText(cell)))
+      .filter((value) => value.length > 0);
+
+    const headers = composite.length > 0 ? composite : currentRow;
+
+    if (headers.length === 0) continue;
+
+    let score = 0;
+    for (const header of headers) {
+      if (aliasSet.has(header)) {
+        score += 2;
+        continue;
+      }
+
+      if (
+        aliases.some(
+          (alias) => alias.includes(header) || header.includes(alias),
+        )
+      ) {
+        score += 1;
+      }
+    }
+
+    if (
+      score > bestScore ||
+      (score === bestScore && headers.length > bestNonEmpty)
+    ) {
+      bestScore = score;
+      bestIndex = i;
+      bestNonEmpty = headers.length;
+    }
+  }
+
+  const headerRowIndex = bestScore > 0 ? bestIndex : 0;
+  const compositeHeaderRow = buildCompositeHeaderRow(rows, headerRowIndex);
+  const fallbackHeaderRow = (rows[headerRowIndex] ?? []).map((cell) =>
+    toCellText(cell),
+  );
+  const headerRow = compositeHeaderRow.some((value) => value !== "")
+    ? compositeHeaderRow
+    : fallbackHeaderRow;
+
+  return {
+    headerRowIndex,
+    headerRow,
+    matchScore: Number.isFinite(bestScore) ? bestScore : 0,
+  };
+};
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -102,8 +349,22 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   onSave,
 }) => {
   const yearLabel = selectedYear ?? new Date().getFullYear().toString();
+  const selectedReportYear = Number(yearLabel);
+  const hasValidYear = Number.isInteger(selectedReportYear);
   const leafColumns = useMemo(() => flattenColumns(columns), [columns]);
   const hasGroups = columns.some(isGroupColumn);
+  const fieldLabelByName = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const col of leafColumns) {
+      labels.set(col.key, col.label);
+    }
+    return labels;
+  }, [leafColumns]);
+  const getFieldDisplayLabel = useCallback(
+    (field: FieldConfig): string =>
+      fieldLabelByName.get(field.name) ?? field.label,
+    [fieldLabelByName],
+  );
 
   /* ---- Editable field keys (only non-date fields users type into) ---- */
   const editableFields = useMemo(
@@ -276,12 +537,6 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   /* ---- Column keys for keyboard nav (only visible fields) ---- */
   const COLS = useMemo(() => visibleFields.map((f) => f.name), [visibleFields]);
 
-  /* ---- Does visible tab have any numeric fields? ---- */
-  const hasVisibleNumeric = useMemo(
-    () => visibleFields.some((f) => isNumericField(f.name)),
-    [visibleFields, isNumericField],
-  );
-
   /* ---- State ---- */
   const [rows, setRows] = useState<EditableRow[]>(() => {
     if (initialData && initialData.length > 0) {
@@ -291,6 +546,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           const val = r[f.name];
           if (f.type === "date" && val) {
             row[f.name] = String(val).slice(0, 10);
+          } else if (isPercentageFieldName(f.name) && val != null) {
+            const normalizedPercentage = toPercentNumber(
+              typeof val === "number" ? val : String(val),
+            );
+            row[f.name] =
+              normalizedPercentage ??
+              (typeof val === "number" ? val : String(val));
           } else {
             row[f.name] =
               val != null ? (typeof val === "number" ? val : String(val)) : "";
@@ -326,28 +588,174 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-      const imported = rawData.map((excelRow) => {
-        const row = buildEmptyRow(fields);
-        const excelKeys = Object.keys(excelRow);
-        for (const f of editableFields) {
-          const matchKey = excelKeys.find(
-            (k) =>
-              k.trim().toLowerCase() === f.name.toLowerCase() ||
-              k.trim().toLowerCase() === (f.label ?? "").toLowerCase(),
-          );
-          if (matchKey !== undefined) {
-            const v = excelRow[matchKey];
-            const numVal = Number(v);
-            row[f.name] =
-              !Number.isNaN(numVal) && v !== "" && v !== null
-                ? numVal
-                : String(v ?? "");
+      const bestSheet = wb.SheetNames.map((sheetName) => {
+        const worksheet = wb.Sheets[sheetName];
+        return {
+          sheetName,
+          worksheet,
+          headerInfo: detectHeaderRowInfo(worksheet, fields),
+        };
+      }).sort(
+        (left, right) =>
+          right.headerInfo.matchScore - left.headerInfo.matchScore,
+      )[0];
+
+      if (!bestSheet) {
+        setImportFeedback("No worksheet found in this Excel file.");
+        return;
+      }
+
+      const { worksheet, headerInfo } = bestSheet;
+      const rawRows = XLSX.utils.sheet_to_json<SheetCell[]>(worksheet, {
+        header: 1,
+        range: headerInfo.headerRowIndex + 1,
+        blankrows: false,
+      });
+
+      const normalizedHeaderRow = headerInfo.headerRow.map((header) =>
+        normalizeImportHeader(header),
+      );
+
+      const pendingYearColumns = headerInfo.headerRow
+        .map((header, index) => {
+          const normalized = normalizeImportHeader(header);
+          if (!normalized.includes("pending")) return null;
+
+          const yearFromRaw = extractYearFromHeader(header);
+          const yearFromNormalized = extractYearFromHeader(normalized);
+          const year = yearFromRaw ?? yearFromNormalized;
+
+          if (!year) return null;
+          return { index, year };
+        })
+        .filter(
+          (item): item is { index: number; year: number } => item != null,
+        );
+
+      const inferredReportYear = hasValidYear
+        ? selectedReportYear
+        : pendingYearColumns.length > 0
+          ? Math.max(...pendingYearColumns.map((item) => item.year))
+          : new Date().getFullYear();
+
+      const getPendingColumnIndex = (year: number): number =>
+        pendingYearColumns.find((item) => item.year === year)?.index ?? -1;
+
+      const resolveColumnIndex = (aliases: string[]): number => {
+        let bestIndex = -1;
+        let bestScore = 0;
+
+        normalizedHeaderRow.forEach((header, index) => {
+          if (!header) return;
+
+          let score = 0;
+          if (aliases.includes(header)) {
+            score = 3;
+          } else if (
+            aliases.some(
+              (alias) => header.includes(alias) || alias.includes(header),
+            )
+          ) {
+            score = 1;
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+          }
+        });
+
+        return bestIndex;
+      };
+
+      const fieldColumnIndex = new Map<string, number>();
+      editableFields.forEach((field) => {
+        let colIndex = -1;
+
+        if (field.name === "pendingLastYear") {
+          colIndex = getPendingColumnIndex(inferredReportYear - 1);
+        } else if (field.name === "pendingThisYear") {
+          colIndex = getPendingColumnIndex(inferredReportYear);
+        }
+
+        if (colIndex < 0) {
+          colIndex = resolveColumnIndex(buildFieldAliases(field));
+        }
+
+        if (colIndex >= 0) {
+          fieldColumnIndex.set(field.name, colIndex);
+        }
+      });
+
+      const inventoryMetricFieldNames: InventoryMetricFieldName[] = [
+        "civilSmallClaimsFiled",
+        "criminalCasesFiled",
+        "civilSmallClaimsDisposed",
+        "criminalCasesDisposed",
+      ];
+      const hasInventoryMetricFields = inventoryMetricFieldNames.some((name) =>
+        editableFields.some((field) => field.name === name),
+      );
+
+      if (hasInventoryMetricFields) {
+        const inventoryMetricIndexes =
+          getInventoryMetricColumnIndexes(normalizedHeaderRow);
+
+        for (const fieldName of inventoryMetricFieldNames) {
+          const index = inventoryMetricIndexes[fieldName];
+          if (index !== undefined && index >= 0) {
+            fieldColumnIndex.set(fieldName, index);
           }
         }
-        return row;
-      });
+      }
+
+      const imported: EditableRow[] = [];
+      let skippedCount = 0;
+
+      for (const excelRow of rawRows) {
+        const row = buildEmptyRow(fields);
+        let matchedFieldCount = 0;
+        let hasMappedContent = false;
+
+        for (const f of editableFields) {
+          const colIndex = fieldColumnIndex.get(f.name);
+          if (colIndex === undefined) continue;
+
+          matchedFieldCount += 1;
+          const rawValue = excelRow[colIndex];
+          const textValue = toCellText(rawValue);
+
+          if (isNumericField(f.name)) {
+            if (textValue === "") {
+              row[f.name] = "";
+              continue;
+            }
+
+            if (isPercentageFieldName(f.name)) {
+              const percentage = toPercentNumber(textValue);
+              row[f.name] = percentage ?? textValue;
+              hasMappedContent = true;
+              continue;
+            }
+
+            const parsed = Number(textValue.replace(/,/g, ""));
+            row[f.name] = Number.isFinite(parsed) ? parsed : textValue;
+            hasMappedContent = true;
+          } else {
+            row[f.name] = textValue;
+            if (textValue !== "") {
+              hasMappedContent = true;
+            }
+          }
+        }
+
+        if (matchedFieldCount > 0 && hasMappedContent) {
+          imported.push(row);
+        } else {
+          skippedCount += 1;
+        }
+      }
+
       if (imported.length > 0) {
         setRows((prev) => {
           const hasData = prev.some((r) =>
@@ -358,12 +766,18 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           );
           return hasData ? [...prev, ...imported] : imported;
         });
+
+        setStep("edit");
         setImportFeedback(
-          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel`,
+          `✓ ${imported.length} row${imported.length !== 1 ? "s" : ""} imported from Excel${
+            skippedCount > 0
+              ? ` (${skippedCount} row${skippedCount !== 1 ? "s" : ""} skipped)`
+              : ""
+          }`,
         );
       } else {
         setImportFeedback(
-          "No data found. Check the Excel file has data rows with matching column headers.",
+          "No matching data found. Check the Excel headers and ensure rows contain values.",
         );
       }
     } catch (err) {
@@ -381,12 +795,15 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   /*  Row helpers                                                      */
   /* ---------------------------------------------------------------- */
 
-  const addRows = (count: number = 1) => {
-    setRows((prev) => [
-      ...prev,
-      ...Array.from({ length: count }, () => buildEmptyRow(fields)),
-    ]);
-  };
+  const addRows = useCallback(
+    (count: number = 1) => {
+      setRows((prev) => [
+        ...prev,
+        ...Array.from({ length: count }, () => buildEmptyRow(fields)),
+      ]);
+    },
+    [fields],
+  );
 
   const deleteSelectedRows = () => {
     if (selectedRows.size === 0) return;
@@ -494,7 +911,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
       setActiveCell({ rowIdx: nextRow, col: COLS[nextCol] });
     },
-    [rows.length, COLS],
+    [rows.length, COLS, addRows],
   );
 
   /* ---------------------------------------------------------------- */
@@ -517,9 +934,17 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           editableFields.forEach((f, i) => {
             if (i < cells.length) {
               const v = cells[i].trim();
-              // Try to parse as number for numeric fields
-              const numVal = Number(v);
-              row[f.name] = !Number.isNaN(numVal) && v !== "" ? numVal : v;
+              if (isNumericField(f.name)) {
+                if (isPercentageFieldName(f.name)) {
+                  const percentage = toPercentNumber(v);
+                  row[f.name] = percentage ?? v;
+                } else {
+                  const numVal = Number(v);
+                  row[f.name] = !Number.isNaN(numVal) && v !== "" ? numVal : v;
+                }
+              } else {
+                row[f.name] = v;
+              }
             }
           });
           return row;
@@ -537,7 +962,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         });
       }
     },
-    [fields, editableFields],
+    [fields, editableFields, isNumericField],
   );
 
   /* ---------------------------------------------------------------- */
@@ -567,35 +992,82 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   const validRows = useMemo(() => rows.filter(isRowValid), [rows, isRowValid]);
 
   const handleSave = () => {
-    if (validRows.length === 0) return;
-    const mapped = validRows.map((r) => {
+    const inventoryLocationFields = [
+      "region",
+      "province",
+      "court",
+      "cityMunicipality",
+      "branch",
+    ];
+    const isInventoryForm = inventoryLocationFields.every((name) =>
+      fields.some((field) => field.name === name),
+    );
+
+    const rowsForSave = isInventoryForm
+      ? (() => {
+          const carryForwardValues = new Map<string, string>();
+          return rows.map((sourceRow) => {
+            const nextRow: EditableRow = { ...sourceRow };
+
+            for (const fieldName of inventoryLocationFields) {
+              const value = String(nextRow[fieldName] ?? "").trim();
+              if (value !== "") {
+                carryForwardValues.set(fieldName, value);
+                continue;
+              }
+
+              const previousValue = carryForwardValues.get(fieldName);
+              if (previousValue !== undefined) {
+                nextRow[fieldName] = previousValue;
+              }
+            }
+
+            const branchValue = String(nextRow.branch ?? "").trim();
+            if (branchValue === "") {
+              const cityMunicipalityValue = String(
+                nextRow.cityMunicipality ?? "",
+              ).trim();
+              if (cityMunicipalityValue !== "") {
+                nextRow.branch = cityMunicipalityValue;
+              }
+            }
+
+            return nextRow;
+          });
+        })()
+      : rows;
+
+    const validRowsForSave = rowsForSave.filter(isRowValid);
+
+    if (validRowsForSave.length === 0) {
+      setImportFeedback("No valid rows to save. Fill required fields first.");
+      return;
+    }
+
+    const mapped = validRowsForSave.map((r) => {
       const record: Record<string, unknown> = {};
       for (const f of fields) {
-        record[f.name] = r[f.name];
+        const value = r[f.name];
+        if (
+          isPercentageFieldName(f.name) &&
+          (typeof value === "number" || typeof value === "string")
+        ) {
+          record[f.name] = toPercentNumber(value) ?? value;
+        } else {
+          record[f.name] = value;
+        }
       }
       return record;
     });
+
+    if (validRowsForSave.length < rows.length) {
+      setImportFeedback(
+        `Saving ${validRowsForSave.length} row${validRowsForSave.length !== 1 ? "s" : ""}. ${rows.length - validRowsForSave.length} row${rows.length - validRowsForSave.length !== 1 ? "s" : ""} skipped due missing required fields.`,
+      );
+    }
+
     onSave(mapped);
   };
-
-  /* ---- Review totals (sum of all numeric fields) ---- */
-  const reviewColumnTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const col of leafColumns) {
-      if (col.key.startsWith("_")) continue; // skip computed columns
-      let sum = 0;
-      let hasNum = false;
-      for (const row of validRows) {
-        const n = Number(row[col.key]);
-        if (!Number.isNaN(n) && row[col.key] !== "") {
-          sum += n;
-          hasNum = true;
-        }
-      }
-      if (hasNum) totals[col.key] = sum;
-    }
-    return totals;
-  }, [validRows, leafColumns]);
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
@@ -663,6 +1135,14 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 <kbd className="xls-kbd">Tab</kbd> /{" "}
                 <kbd className="xls-kbd">Enter</kbd> to move between cells.
               </p>
+              {hasValidYear && (
+                <p className="text-sm" style={{ color: "var(--color-subtle)" }}>
+                  For this report: <strong>Pending Last Year</strong> refers to{" "}
+                  {selectedReportYear - 1}, and{" "}
+                  <strong>Pending Year Now</strong> refers to{" "}
+                  {selectedReportYear}.
+                </p>
+              )}
               <div className="xls-pills" style={{ marginTop: 10 }}>
                 <span className="xls-pill xls-pill-neutral">
                   <span className="xls-pill-dot" />
@@ -906,31 +1386,20 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                           textAlign: isNumericField(f.name) ? "center" : "left",
                           whiteSpace: "nowrap",
                         }}
-                        title={f.label}
+                        title={getFieldDisplayLabel(f)}
                       >
-                        {f.label}
+                        {getFieldDisplayLabel(f)}
                         {f.required && (
                           <span className="text-error ml-1">*</span>
                         )}
                       </th>
                     ))}
-                    {(!isCompact || hasVisibleNumeric) && (
-                      <th style={{ textAlign: "center" }}>Total</th>
-                    )}
                   </tr>
                 </thead>
 
                 <tbody>
                   {rows.map((row, idx) => {
                     const isSelected = selectedRows.has(row._rowId);
-
-                    // Compute total from all numeric fields
-                    let total = 0;
-                    editableFields.forEach((f) => {
-                      if (isNumericField(f.name)) {
-                        total += Number(row[f.name]) || 0;
-                      }
-                    });
 
                     return (
                       <tr
@@ -1015,13 +1484,20 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                                   min={0}
                                   className="xls-input xls-mono"
                                   style={{ textAlign: "center" }}
-                                  value={row[f.name] || ""}
+                                  value={
+                                    row[f.name] === undefined ||
+                                    row[f.name] === ""
+                                      ? ""
+                                      : row[f.name]
+                                  }
                                   placeholder="0"
                                   onChange={(e) =>
                                     updateCell(
                                       row._rowId,
                                       f.name,
-                                      Number(e.target.value) || 0,
+                                      e.target.value === ""
+                                        ? ""
+                                        : Number(e.target.value),
                                     )
                                   }
                                   onFocus={(e) => {
@@ -1056,25 +1532,6 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                             </td>
                           );
                         })}
-
-                        {/* Total (auto) */}
-                        {(!isCompact || hasVisibleNumeric) && (
-                          <td
-                            className="td-num"
-                            style={{ fontWeight: 700, fontSize: 15 }}
-                          >
-                            <span
-                              style={{
-                                color:
-                                  total > 0
-                                    ? "var(--color-base-content)"
-                                    : "var(--color-muted)",
-                              }}
-                            >
-                              {total > 0 ? total.toLocaleString() : "—"}
-                            </span>
-                          </td>
-                        )}
                       </tr>
                     );
                   })}
@@ -1118,28 +1575,6 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                         </td>
                       );
                     })}
-                    {(!isCompact || hasVisibleNumeric) && (
-                      <td
-                        className="xls-mono"
-                        style={{
-                          textAlign: "center",
-                          fontWeight: 800,
-                          fontSize: 15,
-                          padding: "10px 14px",
-                        }}
-                      >
-                        {rows
-                          .reduce((s, r) => {
-                            let t = 0;
-                            editableFields.forEach((f) => {
-                              if (isNumericField(f.name))
-                                t += Number(r[f.name]) || 0;
-                            });
-                            return s + t;
-                          }, 0)
-                          .toLocaleString()}
-                      </td>
-                    )}
                   </tr>
                 </tfoot>
               </table>
@@ -1174,11 +1609,11 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               <button
                 className="xls-btn xls-btn-primary"
                 onClick={() => setStep("review")}
-                disabled={validCount === 0}
-                style={{ opacity: validCount === 0 ? 0.5 : 1 }}
+                disabled={rows.length === 0}
+                style={{ opacity: rows.length === 0 ? 0.5 : 1 }}
               >
                 <FiEye size={15} />
-                Review{validCount > 0 ? ` (${validCount})` : ""}
+                Review{rows.length > 0 ? ` (${rows.length})` : ""}
               </button>
             </div>
           </div>
@@ -1190,7 +1625,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             <div className="rv-summary-left">
               <div>
                 <p className="text-4xl font-black">
-                  Review {validCount} {validCount === 1 ? "entry" : "entries"}{" "}
+                  Review {rows.length} {rows.length === 1 ? "entry" : "entries"}{" "}
                   before saving
                 </p>
                 <p className="font-light text-md mt-1">
@@ -1198,7 +1633,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   <strong style={{ color: "var(--color-primary)" }}>
                     {yearLabel}
                   </strong>
-                  . Confirm the details are correct.
+                  . Confirm the details are correct.{" "}
+                  <strong>{validCount}</strong>{" "}
+                  {validCount === 1 ? "row is" : "rows are"} ready to save.
                 </p>
               </div>
             </div>
@@ -1207,7 +1644,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
           {/* ── Summary cards ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {editableFields
-              .filter((f) => isNumericField(f.name))
+              .filter(
+                (f) => isNumericField(f.name) && !isPercentageFieldName(f.name),
+              )
               .slice(0, 2)
               .map((f) => {
                 const total = validRows.reduce(
@@ -1237,7 +1676,12 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                     .reduce((s, r) => {
                       let t = 0;
                       editableFields.forEach((f) => {
-                        if (isNumericField(f.name)) t += Number(r[f.name]) || 0;
+                        if (
+                          isNumericField(f.name) &&
+                          !isPercentageFieldName(f.name)
+                        ) {
+                          t += Number(r[f.name]) || 0;
+                        }
                       });
                       return s + t;
                     }, 0)
@@ -1315,7 +1759,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   )}
                 </thead>
                 <tbody>
-                  {validRows.map((row, idx) => {
+                  {rows.map((row, idx) => {
                     // Build a Record<string, unknown> for column renderers
                     const record: Record<string, unknown> = {};
                     for (const f of fields) {
@@ -1347,45 +1791,6 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                       </tr>
                     );
                   })}
-
-                  {/* Grand total */}
-                  {validRows.length > 0 && (
-                    <tr className="bg-primary/80 text-primary-content">
-                      <td
-                        style={{
-                          padding: "14px 14px",
-                          fontWeight: 900,
-                          fontSize: 13,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                        }}
-                      >
-                        Grand Total
-                      </td>
-                      {leafColumns.map((col) => {
-                        const total = reviewColumnTotals[col.key];
-                        return (
-                          <td
-                            key={col.key}
-                            className="xls-mono"
-                            style={{
-                              padding: "14px 14px",
-                              textAlign:
-                                col.align === "center"
-                                  ? "center"
-                                  : col.align === "right"
-                                    ? "right"
-                                    : "left",
-                              fontWeight: 900,
-                              fontSize: 16,
-                            }}
-                          >
-                            {total != null ? total.toLocaleString() : ""}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>

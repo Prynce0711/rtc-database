@@ -5,6 +5,23 @@ const asCourt = (r: Record<string, unknown>) => r as unknown as CourtLog;
 const asInventory = (r: Record<string, unknown>) =>
   r as unknown as InventoryLog;
 
+const formatPercentValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "—";
+
+  const text = String(value).trim();
+  if (text === "") return "—";
+
+  if (text.endsWith("%")) return text;
+
+  const normalized = Number(text.replace(/,/g, ""));
+  if (!Number.isFinite(normalized)) return text;
+
+  const percentValue =
+    normalized >= 0 && normalized <= 1 ? normalized * 100 : normalized;
+
+  return `${Number(percentValue.toFixed(2)).toLocaleString()}%`;
+};
+
 export interface ColumnDef {
   key: string;
   label: string;
@@ -71,31 +88,7 @@ export const courtColumns: ColumnDef[] = [
     label: "percentage of Disposition",
     sortable: true,
     align: "center",
-    render: (r) => asCourt(r).percentageOfDisposition || "—",
-  },
-  {
-    key: "_total",
-    label: "Total",
-    sortable: true,
-    align: "center",
-    computeValue: (r) => {
-      const row = asCourt(r);
-      return (
-        (Number(row.pendingLastYear) || 0) +
-        (Number(row.RaffledOrAdded) || 0) +
-        (Number(row.Disposed) || 0) +
-        (Number(row.pendingThisYear) || 0)
-      );
-    },
-    render: (r) => {
-      const row = asCourt(r);
-      const sum =
-        (Number(row.pendingLastYear) || 0) +
-        (Number(row.RaffledOrAdded) || 0) +
-        (Number(row.Disposed) || 0) +
-        (Number(row.pendingThisYear) || 0);
-      return <span className="font-semibold">{sum.toLocaleString()}</span>;
-    },
+    render: (r) => formatPercentValue(asCourt(r).percentageOfDisposition),
   },
 ];
 
@@ -174,29 +167,5 @@ export const inventoryColumns: AnyColumnDef[] = [
         render: (r) => asInventory(r).criminalCasesDisposed ?? "—",
       },
     ],
-  },
-  {
-    key: "_total",
-    label: "Total",
-    sortable: true,
-    align: "center",
-    computeValue: (r) => {
-      const row = asInventory(r);
-      return (
-        (Number(row.civilSmallClaimsFiled) || 0) +
-        (Number(row.criminalCasesFiled) || 0) +
-        (Number(row.civilSmallClaimsDisposed) || 0) +
-        (Number(row.criminalCasesDisposed) || 0)
-      );
-    },
-    render: (r) => {
-      const row = asInventory(r);
-      const sum =
-        (Number(row.civilSmallClaimsFiled) || 0) +
-        (Number(row.criminalCasesFiled) || 0) +
-        (Number(row.civilSmallClaimsDisposed) || 0) +
-        (Number(row.criminalCasesDisposed) || 0);
-      return <span className="font-semibold">{sum.toLocaleString()}</span>;
-    },
   },
 ];

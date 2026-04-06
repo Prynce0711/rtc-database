@@ -70,14 +70,14 @@ const MTC = ({
 
   return (
     <AnnualTable<CourtLog & Record<string, unknown>>
-      title="MTC Receiving Log"
-      subtitle="Municipal Trial Court — Track all received documents and case filings"
+      // title="MTC Receiving Log"
+      // subtitle="Municipal Trial Court — Track all received documents and case filings"
       variant="court"
       data={records as (CourtLog & Record<string, unknown>)[]}
       columns={courtColumns}
       fields={courtLogFields}
-      dateKey="dateRecorded"
-      sortDefaultKey="dateRecorded"
+      dateKey="reportYear"
+      sortDefaultKey="reportYear"
       selectedYear={selectedYear}
       requestAdd={requestAdd}
       onChange={(data) => setRecords(data as CourtLog[])}

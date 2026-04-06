@@ -13,6 +13,14 @@ import {
   InventoryDocumentSchema,
 } from "./Schema";
 
+const normalizeReportYear = (value: unknown): number => {
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed >= 1900 && parsed <= 2100) {
+    return parsed;
+  }
+  return new Date().getFullYear();
+};
+
 export async function getLogs(): Promise<ActionResult<CompleteLogData[]>> {
   try {
     const sessionValidation = await validateSession();
@@ -141,6 +149,7 @@ export async function getRegionalTrialCourts(): Promise<
       success: true,
       result: records.map((r) => ({
         ...r,
+        reportYear: r.reportYear ?? undefined,
         pendingLastYear: r.pendingLastYear ?? undefined,
         RaffledOrAdded: r.RaffledOrAdded ?? undefined,
         Disposed: r.Disposed ?? undefined,
@@ -168,6 +177,7 @@ export async function createRegionalTrialCourt(
 
     const record = await prisma.regionalTrialCourt.create({
       data: {
+        reportYear: normalizeReportYear(validation.data.reportYear),
         branch: validation.data.branch,
         pendingLastYear: validation.data.pendingLastYear?.toString(),
         RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
@@ -181,6 +191,7 @@ export async function createRegionalTrialCourt(
       success: true,
       result: {
         ...record,
+        reportYear: record.reportYear ?? undefined,
         pendingLastYear: record.pendingLastYear ?? undefined,
         RaffledOrAdded: record.RaffledOrAdded ?? undefined,
         Disposed: record.Disposed ?? undefined,
@@ -210,6 +221,7 @@ export async function updateRegionalTrialCourt(
     const record = await prisma.regionalTrialCourt.update({
       where: { id },
       data: {
+        reportYear: normalizeReportYear(validation.data.reportYear),
         branch: validation.data.branch,
         pendingLastYear: validation.data.pendingLastYear?.toString(),
         RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
@@ -223,6 +235,7 @@ export async function updateRegionalTrialCourt(
       success: true,
       result: {
         ...record,
+        reportYear: record.reportYear ?? undefined,
         pendingLastYear: record.pendingLastYear ?? undefined,
         RaffledOrAdded: record.RaffledOrAdded ?? undefined,
         Disposed: record.Disposed ?? undefined,
@@ -265,6 +278,7 @@ export async function getMunicipalTrialCourts(): Promise<
       success: true,
       result: records.map((r) => ({
         ...r,
+        reportYear: r.reportYear ?? undefined,
         pendingLastYear: r.pendingLastYear ?? undefined,
         RaffledOrAdded: r.RaffledOrAdded ?? undefined,
         Disposed: r.Disposed ?? undefined,
@@ -292,6 +306,7 @@ export async function createMunicipalTrialCourt(
 
     const record = await prisma.municipalTrialCourt.create({
       data: {
+        reportYear: normalizeReportYear(validation.data.reportYear),
         branch: validation.data.branch,
         pendingLastYear: validation.data.pendingLastYear?.toString(),
         RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
@@ -305,6 +320,7 @@ export async function createMunicipalTrialCourt(
       success: true,
       result: {
         ...record,
+        reportYear: record.reportYear ?? undefined,
         pendingLastYear: record.pendingLastYear ?? undefined,
         RaffledOrAdded: record.RaffledOrAdded ?? undefined,
         Disposed: record.Disposed ?? undefined,
@@ -334,6 +350,7 @@ export async function updateMunicipalTrialCourt(
     const record = await prisma.municipalTrialCourt.update({
       where: { id },
       data: {
+        reportYear: normalizeReportYear(validation.data.reportYear),
         branch: validation.data.branch,
         pendingLastYear: validation.data.pendingLastYear?.toString(),
         RaffledOrAdded: validation.data.RaffledOrAdded?.toString(),
@@ -347,6 +364,7 @@ export async function updateMunicipalTrialCourt(
       success: true,
       result: {
         ...record,
+        reportYear: record.reportYear ?? undefined,
         pendingLastYear: record.pendingLastYear ?? undefined,
         RaffledOrAdded: record.RaffledOrAdded ?? undefined,
         Disposed: record.Disposed ?? undefined,
