@@ -11,6 +11,7 @@ import {
   FiDatabase,
   FiEdit2,
   FiPlus,
+  FiRefreshCw,
   FiTrash2,
   FiXCircle,
 } from "react-icons/fi";
@@ -22,6 +23,7 @@ import {
   getBackupDashboard,
   importBackupFromLocalFileAction,
   importBackupFromRemoteAction,
+  reloginBackupAccount,
   runBackupNowAction,
   saveBackupConfiguration,
   updateBackupAccount,
@@ -164,6 +166,9 @@ const BackupTab = () => {
   const [runningBackup, setRunningBackup] = useState(false);
   const [cancellingBackup, setCancellingBackup] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
+  const [reloggingRemoteName, setReloggingRemoteName] = useState<string | null>(
+    null,
+  );
   const [accountSetupInProgress, setAccountSetupInProgress] = useState(false);
   const [importingRemote, setImportingRemote] = useState(false);
   const [importingLocal, setImportingLocal] = useState(false);
@@ -552,6 +557,83 @@ const BackupTab = () => {
     popup.showSuccess("Backup account updated.");
   };
 
+  const handleReloginAccount = async (remoteName: string, provider: string) => {
+    if (!OAUTH_PROVIDERS.has(provider.toLowerCase())) {
+      popup.showError(
+        "Re-login is only available for Google Drive, OneDrive, and Dropbox.",
+      );
+      return;
+    }
+
+    let forceRestart = false;
+
+    if (accountSetupInProgress) {
+      const confirmed = await popup.showConfirm(
+        "Account authorization is already running. Remove the existing sign-in flow and continue?",
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      forceRestart = true;
+    }
+
+    setReloggingRemoteName(remoteName);
+    popup.showLoading(
+      "Waiting for authorization code. Complete re-login in the browser...",
+    );
+
+    let result = await reloginBackupAccount({
+      remoteName,
+      forceRestart,
+    });
+
+    if (
+      !result.success &&
+      !forceRestart &&
+      isAccountAuthConflictError(result.error || "")
+    ) {
+      const confirmed = await popup.showConfirm(
+        "Another account authorization is using the local callback port. Remove the existing authorization and retry?",
+      );
+
+      if (confirmed) {
+        popup.showLoading("Removing existing authorization and retrying...");
+        result = await reloginBackupAccount({
+          remoteName,
+          forceRestart: true,
+        });
+      }
+    }
+
+    setReloggingRemoteName(null);
+
+    if (!result.success) {
+      popup.showError(result.error || "Failed to re-login backup account");
+      return;
+    }
+
+    applyDashboardData(result.result);
+
+    if (editingRemoteName === remoteName) {
+      const refreshedRemote = result.result.remotes.find(
+        (remote) => remote.name === remoteName,
+      );
+
+      if (refreshedRemote) {
+        setProviderOptionValues(
+          pickProviderOptionValues(
+            refreshedRemote.provider,
+            refreshedRemote.options ?? {},
+          ),
+        );
+      }
+    }
+
+    popup.showSuccess(`Backup account ${remoteName} re-logged successfully.`);
+  };
+
   const handleDeleteAccount = async (accountName: string) => {
     const confirmed = await popup.showWarning(
       `Delete backup account ${accountName}?`,
@@ -707,9 +789,28 @@ const BackupTab = () => {
     .filter((interval) => selectedIntervals.includes(interval.value))
     .map((interval) => interval.label);
 
+  const providerLabelLookup = new Map(
+    providers.map((provider) => [provider.value.toLowerCase(), provider.label]),
+  );
+
+  const getProviderLabel = (providerValue: string): string =>
+    providerLabelLookup.get(providerValue.toLowerCase()) || providerValue;
+
+  const getRemoteProviderDetails = (
+    remote: BackupDashboardData["remotes"][number],
+  ): string => {
+    const providerLabel = getProviderLabel(remote.provider);
+
+    if (remote.accountIdentity) {
+      return `${providerLabel} - ${remote.accountIdentity}`;
+    }
+
+    return providerLabel;
+  };
+
   const selectedRemoteLabels = remotes
     .filter((remote) => selectedRemoteNames.includes(remote.name))
-    .map((remote) => `${remote.name} (${remote.provider})`);
+    .map((remote) => `${remote.name} (${getRemoteProviderDetails(remote)})`);
 
   const intervalSummary =
     selectedIntervalLabels.length === 0
@@ -732,10 +833,11 @@ const BackupTab = () => {
   const remoteDropdownOptions = remotes.map((remote) => ({
     value: remote.name,
     label: remote.name,
-    description: remote.provider.toUpperCase(),
+    description: getRemoteProviderDetails(remote),
   }));
 
   const isEditingAccount = editingRemoteName !== null;
+  const accountActionBusy = accountSaving || reloggingRemoteName !== null;
   const accountProviderFields = getProviderFields(newProvider);
   const requiresAuthFlowForProvider = OAUTH_PROVIDERS.has(newProvider);
 
@@ -819,15 +921,30 @@ const BackupTab = () => {
                     <p className="text-sm font-semibold text-base-content truncate">
                       {remote.name}
                     </p>
-                    <p className="text-xs text-base-content/40 uppercase tracking-wide mt-0.5">
-                      {remote.provider}
+                    <p className="text-xs text-base-content/40 tracking-wide mt-0.5 break-all">
+                      {getRemoteProviderDetails(remote)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {OAUTH_PROVIDERS.has(remote.provider.toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleReloginAccount(
+                            remote.name,
+                            remote.provider,
+                          )
+                        }
+                        disabled={accountActionBusy}
+                        className="btn btn-ghost btn-sm text-info rounded-lg"
+                      >
+                        <FiRefreshCw size={14} /> Re-login
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleStartEditAccount(remote.name)}
-                      disabled={accountSaving}
+                      disabled={accountActionBusy}
                       className="btn btn-ghost btn-sm rounded-lg"
                     >
                       <FiEdit2 size={14} /> Edit
@@ -835,7 +952,7 @@ const BackupTab = () => {
                     <button
                       type="button"
                       onClick={() => void handleDeleteAccount(remote.name)}
-                      disabled={accountSaving}
+                      disabled={accountActionBusy}
                       className="btn btn-ghost btn-sm text-error/80 hover:text-error rounded-lg"
                     >
                       <FiTrash2 size={14} /> Remove
@@ -851,6 +968,26 @@ const BackupTab = () => {
               Editing <span className="font-semibold">{editingRemoteName}</span>
               . Provider type cannot be changed for existing accounts.
             </p>
+          )}
+
+          {isEditingAccount && requiresAuthFlowForProvider && (
+            <div className="flex items-center justify-between rounded-lg border border-info/25 bg-info/5 px-3 py-2">
+              <p className="text-xs text-info/90">
+                To switch the connected cloud account, use re-login.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  editingRemoteName
+                    ? void handleReloginAccount(editingRemoteName, newProvider)
+                    : undefined
+                }
+                disabled={accountActionBusy || !editingRemoteName}
+                className="btn btn-ghost btn-sm text-info"
+              >
+                <FiRefreshCw size={14} /> Re-login
+              </button>
+            </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -885,7 +1022,7 @@ const BackupTab = () => {
                       setProviderOptionValue(field.key, event.target.value)
                     }
                     placeholder={field.placeholder}
-                    disabled={accountSaving}
+                    disabled={accountActionBusy}
                     className="input input-bordered h-10 w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
                   />
                 </div>
@@ -913,7 +1050,7 @@ const BackupTab = () => {
               <button
                 type="button"
                 onClick={handleCancelEditAccount}
-                disabled={accountSaving}
+                disabled={accountActionBusy}
                 className="btn btn-ghost btn-sm"
               >
                 Cancel
@@ -926,7 +1063,7 @@ const BackupTab = () => {
                   ? handleUpdateAccount()
                   : handleCreateAccount())
               }
-              disabled={accountSaving}
+              disabled={accountActionBusy}
               className="btn btn-outline btn-sm gap-2"
             >
               <FiPlus size={15} />
@@ -965,7 +1102,7 @@ const BackupTab = () => {
                   },
                   ...remotes.map((remote) => ({
                     value: remote.name,
-                    label: `${remote.name} (${remote.provider})`,
+                    label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
                   })),
                 ]}
               />

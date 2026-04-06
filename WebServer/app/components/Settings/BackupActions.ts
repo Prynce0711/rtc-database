@@ -9,6 +9,7 @@ import {
   getBackupOverview,
   importBackupFromLocalUpload,
   importBackupFromRemote,
+  reloginBackupRemote,
   runBackupNow,
   startBackupScheduler,
   updateBackupConfig,
@@ -58,6 +59,11 @@ const UpdateRemoteSchema = z.object({
   nextRemoteName: z.string().min(1),
   provider: z.string().min(1),
   options: z.record(z.string(), z.string()).optional().default({}),
+});
+
+const ReLoginRemoteSchema = z.object({
+  remoteName: z.string().min(1),
+  forceRestart: z.boolean().optional().default(false),
 });
 
 async function getDashboardData(): Promise<BackupDashboardData> {
@@ -324,6 +330,42 @@ export async function updateBackupAccount(
         error instanceof Error
           ? error.message
           : "Failed to update backup account",
+    };
+  }
+}
+
+export async function reloginBackupAccount(
+  data: Record<string, unknown>,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = ReLoginRemoteSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Invalid backup account re-login payload",
+      };
+    }
+
+    await startBackupScheduler();
+    await reloginBackupRemote(parsed.data.remoteName, parsed.data.forceRestart);
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error re-logging backup account:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to re-login backup account",
     };
   }
 }

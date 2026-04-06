@@ -163,6 +163,7 @@ export interface BackupRemote {
   name: string;
   provider: string;
   options: Record<string, string>;
+  accountIdentity: string | null;
 }
 
 export interface BackupProviderOption {
@@ -238,6 +239,13 @@ const MAX_TIMER_MS = 2_147_000_000;
 const ACCOUNT_SETUP_STALE_MS = 3 * 60 * 1000;
 const DEFAULT_AUTH_CALLBACK_PORT = 53682;
 const OAUTH_ACCOUNT_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
+const USERINFO_EMAIL_FIELD_KEYS = new Set([
+  "email",
+  "emailaddress",
+  "mail",
+  "primaryemail",
+  "userprincipalname",
+]);
 
 type RclonePromiseApi = ((...args: unknown[]) => Promise<Buffer>) &
   Record<string, (...args: unknown[]) => Promise<Buffer>>;
@@ -687,6 +695,104 @@ function buildRemoteOptionArgs(options: Record<string, string>): string[] {
   }
 
   return optionArgs;
+}
+
+function findEmailInText(value: string): string | null {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (!match || !match[0]) {
+    return null;
+  }
+
+  return match[0];
+}
+
+function findValueByKnownKeys(
+  value: unknown,
+  keys: Set<string>,
+): string | null {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = findValueByKnownKeys(entry, keys);
+      if (nested) {
+        return nested;
+      }
+    }
+
+    return null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const normalizedKey = rawKey.trim().toLowerCase();
+
+    if (keys.has(normalizedKey) && typeof rawValue === "string") {
+      const trimmed = rawValue.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+
+    const nested = findValueByKnownKeys(rawValue, keys);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function findEmailInUnknownValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    return findEmailInText(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = findEmailInUnknownValue(entry);
+      if (nested) {
+        return nested;
+      }
+    }
+
+    return null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  for (const nestedValue of Object.values(value)) {
+    const nested = findEmailInUnknownValue(nestedValue);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function extractAccountIdentityFromUserInfo(
+  parsed: unknown,
+  rawText?: string,
+): string | null {
+  const keyedValue = findValueByKnownKeys(parsed, USERINFO_EMAIL_FIELD_KEYS);
+  if (keyedValue) {
+    return keyedValue;
+  }
+
+  const emailLike = findEmailInUnknownValue(parsed);
+  if (emailLike) {
+    return emailLike;
+  }
+
+  if (!rawText) {
+    return null;
+  }
+
+  return findEmailInText(rawText);
 }
 
 function formatBackupError(error: unknown): string {
@@ -1265,14 +1371,18 @@ async function runRcloneCommand(
   options: {
     trackAsActiveBackup?: boolean;
     trackAsActiveAccountSetup?: boolean;
+    silent?: boolean;
   } = {},
 ): Promise<string> {
   try {
     const api = await getRcloneApi();
-    appendBackupLog(
-      "info",
-      `Executing rclone ${args.map((arg) => String(arg)).join(" ")}`,
-    );
+
+    if (!options.silent) {
+      appendBackupLog(
+        "info",
+        `Executing rclone ${args.map((arg) => String(arg)).join(" ")}`,
+      );
+    }
 
     const subprocess = api(...args, {
       config: RCLONE_CONFIG_PATH,
@@ -1303,13 +1413,19 @@ async function runRcloneCommand(
       subprocess.stdout?.on("data", (chunk) => {
         const bufferChunk = Buffer.from(chunk);
         stdoutChunks.push(bufferChunk);
-        appendBackupChunk("info", bufferChunk);
+
+        if (!options.silent) {
+          appendBackupChunk("info", bufferChunk);
+        }
       });
 
       subprocess.stderr?.on("data", (chunk) => {
         const bufferChunk = Buffer.from(chunk);
         stderrChunks.push(bufferChunk);
-        appendBackupChunk("warn", bufferChunk);
+
+        if (!options.silent) {
+          appendBackupChunk("warn", bufferChunk);
+        }
       });
 
       subprocess.on("error", (error) => {
@@ -1326,7 +1442,10 @@ async function runRcloneCommand(
           accountSetupStartedAt = 0;
         }
 
-        appendBackupLog("error", formatBackupError(error));
+        if (!options.silent) {
+          appendBackupLog("error", formatBackupError(error));
+        }
+
         reject(error);
       });
 
@@ -1348,17 +1467,22 @@ async function runRcloneCommand(
         const stderrText = Buffer.concat(stderrChunks).toString("utf8").trim();
 
         if ((code ?? 0) === 0) {
-          appendBackupLog("info", "rclone command completed successfully.");
+          if (!options.silent) {
+            appendBackupLog("info", "rclone command completed successfully.");
+          }
+
           resolve(stdoutText);
           return;
         }
 
-        appendBackupLog(
-          "error",
-          stderrText ||
-            stdoutText ||
-            `rclone command failed with exit code ${String(code)}`,
-        );
+        if (!options.silent) {
+          appendBackupLog(
+            "error",
+            stderrText ||
+              stdoutText ||
+              `rclone command failed with exit code ${String(code)}`,
+          );
+        }
 
         reject(
           new Error(
@@ -1978,6 +2102,41 @@ export async function importBackupFromLocalUpload(
   }
 }
 
+async function getRemoteAccountIdentity(
+  remoteName: string,
+  provider: string,
+): Promise<string | null> {
+  if (!OAUTH_ACCOUNT_PROVIDERS.has(provider.trim().toLowerCase())) {
+    return null;
+  }
+
+  const normalizedName = normalizeRemoteName(remoteName);
+
+  try {
+    const output = await runRcloneCommand(
+      ["config", "userinfo", `${normalizedName}:`],
+      {},
+      {
+        silent: true,
+      },
+    );
+
+    const trimmedOutput = output.trim();
+    if (!trimmedOutput) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmedOutput) as unknown;
+      return extractAccountIdentityFromUserInfo(parsed, trimmedOutput);
+    } catch {
+      return extractAccountIdentityFromUserInfo(trimmedOutput, trimmedOutput);
+    }
+  } catch {
+    return null;
+  }
+}
+
 export async function listBackupRemotes(): Promise<BackupRemote[]> {
   await ensureBackupArtifacts();
 
@@ -1985,19 +2144,24 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
     const output = await runRcloneCommand(["listremotes"]);
     const configMap = await getRemoteConfigMap();
 
-    return output
+    const remoteNames = output
       .split(/\r?\n/)
       .map((line) => normalizeRemoteName(line))
-      .filter((line) => !!line)
-      .map((name) => {
+      .filter((line) => !!line);
+
+    return Promise.all(
+      remoteNames.map(async (name) => {
         const config = configMap.get(name);
+        const provider = config?.provider || "unknown";
 
         return {
           name,
-          provider: config?.provider || "unknown",
+          provider,
           options: config?.options ?? {},
+          accountIdentity: await getRemoteAccountIdentity(name, provider),
         };
-      });
+      }),
+    );
   } catch (error) {
     const message = formatBackupError(error).toLowerCase();
 
@@ -2049,7 +2213,9 @@ export async function createBackupRemote(
   const runCreateCommand = async (): Promise<void> => {
     await runRcloneCommand(
       configCreateArgs,
-      {},
+      {
+        "auto-confirm": true,
+      },
       {
         trackAsActiveAccountSetup: true,
       },
@@ -2074,6 +2240,94 @@ export async function createBackupRemote(
 
           try {
             await runCreateCommand();
+          } catch (retryError) {
+            const retryMessage = formatBackupError(retryError);
+
+            if (isAuthServerPortConflictError(retryMessage)) {
+              throw new Error(
+                `Could not take over the local callback port (${String(callbackPort)}). Close any previous browser sign-in flow and try again.`,
+              );
+            }
+
+            throw new Error(retryMessage);
+          }
+
+          return listBackupRemotes();
+        }
+
+        throw new Error(
+          `Could not release the local callback port (${String(callbackPort)}). Close any previous browser sign-in flow and try again.`,
+        );
+      }
+
+      throw new Error(
+        "Another account authorization is already using the local callback port (http://localhost:53682/). If you refreshed during sign-in, finish or close the earlier browser auth flow, then try again.",
+      );
+    }
+
+    throw new Error(message);
+  }
+
+  return listBackupRemotes();
+}
+
+export async function reloginBackupRemote(
+  remoteName: string,
+  forceRestart = false,
+): Promise<BackupRemote[]> {
+  await ensureBackupArtifacts();
+
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    throw new Error("Remote name is required.");
+  }
+
+  const configMap = await getRemoteConfigMap();
+  const existing = configMap.get(normalizedName);
+
+  if (!existing) {
+    throw new Error(`Remote ${normalizedName} was not found.`);
+  }
+
+  const existingProvider = existing.provider.trim().toLowerCase();
+  if (!OAUTH_ACCOUNT_PROVIDERS.has(existingProvider)) {
+    throw new Error(
+      "Re-login is only supported for Google Drive, OneDrive, and Dropbox accounts.",
+    );
+  }
+
+  await ensureAccountSetupIsAvailable(forceRestart);
+
+  const runReconnectCommand = async (): Promise<void> => {
+    await runRcloneCommand(
+      ["config", "reconnect", `${normalizedName}:`],
+      {
+        "auto-confirm": true,
+      },
+      {
+        trackAsActiveAccountSetup: true,
+      },
+    );
+  };
+
+  try {
+    await runReconnectCommand();
+  } catch (error) {
+    const message = formatBackupError(error);
+
+    if (isAuthServerPortConflictError(message)) {
+      if (forceRestart) {
+        const callbackPort = extractAuthCallbackPort(message);
+        const released = await forceReleaseAuthCallbackPort(callbackPort);
+
+        if (released) {
+          appendBackupLog(
+            "warn",
+            "Retrying account re-login after releasing callback port.",
+          );
+
+          try {
+            await runReconnectCommand();
           } catch (retryError) {
             const retryMessage = formatBackupError(retryError);
 
