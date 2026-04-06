@@ -11,6 +11,7 @@ import {
   startBackupScheduler,
   updateBackupConfig,
   type BackupConfig,
+  type BackupIntervalOption,
   type BackupLogEntry,
   type BackupProviderOption,
   type BackupRemote,
@@ -23,16 +24,15 @@ export interface BackupDashboardData {
   config: BackupConfig;
   remotes: BackupRemote[];
   providers: BackupProviderOption[];
-  intervalOptions: number[];
+  intervalOptions: BackupIntervalOption[];
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
 }
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
-  intervalMinutes: z.coerce.number().int(),
-  nextRunAt: z.string().nullable(),
-  remoteName: z.string(),
+  selectedIntervals: z.array(z.string()).default([]),
+  selectedRemoteNames: z.array(z.string()).default([]),
   remotePath: z.string(),
 });
 
@@ -91,9 +91,8 @@ export async function saveBackupConfiguration(
 
     await updateBackupConfig({
       enabled: parsed.data.enabled,
-      intervalMinutes: parsed.data.intervalMinutes,
-      nextRunAt: parsed.data.nextRunAt,
-      remoteName: parsed.data.remoteName,
+      selectedIntervals: parsed.data.selectedIntervals,
+      selectedRemoteNames: parsed.data.selectedRemoteNames,
       remotePath: parsed.data.remotePath,
     });
 

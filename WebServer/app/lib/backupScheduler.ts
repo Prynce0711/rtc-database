@@ -5,11 +5,102 @@ import { execFile } from "node:child_process";
 import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export const BACKUP_INTERVAL_OPTIONS = [
-  5, 10, 15, 30, 60, 120, 360, 720, 1440,
+const BACKUP_INTERVAL_DEFINITIONS = [
+  {
+    value: "5m",
+    label: "Every 5 minutes",
+    description: "Automatic backup every 5 minutes",
+    folderName: "every-5-minutes",
+    unit: "minutes",
+    amount: 5,
+  },
+  {
+    value: "15m",
+    label: "Every 15 minutes",
+    description: "Automatic backup every 15 minutes",
+    folderName: "every-15-minutes",
+    unit: "minutes",
+    amount: 15,
+  },
+  {
+    value: "1h",
+    label: "Every 1 hour",
+    description: "Automatic backup every hour",
+    folderName: "every-1-hour",
+    unit: "hours",
+    amount: 1,
+  },
+  {
+    value: "1d",
+    label: "Every 1 day",
+    description: "Automatic backup every day",
+    folderName: "every-1-day",
+    unit: "days",
+    amount: 1,
+  },
+  {
+    value: "1w",
+    label: "Every 1 week",
+    description: "Automatic backup every week",
+    folderName: "every-1-week",
+    unit: "weeks",
+    amount: 1,
+  },
+  {
+    value: "1mo",
+    label: "Every 1 month",
+    description: "Automatic backup every month",
+    folderName: "every-1-month",
+    unit: "months",
+    amount: 1,
+  },
+  {
+    value: "1y",
+    label: "Every 1 year",
+    description: "Automatic backup every year",
+    folderName: "every-1-year",
+    unit: "years",
+    amount: 1,
+  },
 ] as const;
 
-export type BackupIntervalMinutes = (typeof BACKUP_INTERVAL_OPTIONS)[number];
+export type BackupIntervalKey =
+  (typeof BACKUP_INTERVAL_DEFINITIONS)[number]["value"];
+
+export interface BackupIntervalOption {
+  value: BackupIntervalKey;
+  label: string;
+  description: string;
+  folderName: string;
+}
+
+export const BACKUP_INTERVAL_OPTIONS: BackupIntervalOption[] =
+  BACKUP_INTERVAL_DEFINITIONS.map((definition) => ({
+    value: definition.value,
+    label: definition.label,
+    description: definition.description,
+    folderName: definition.folderName,
+  }));
+
+const BACKUP_INTERVAL_KEYS: BackupIntervalKey[] = BACKUP_INTERVAL_OPTIONS.map(
+  (option) => option.value,
+);
+
+const BACKUP_INTERVAL_LOOKUP = new Map<
+  BackupIntervalKey,
+  (typeof BACKUP_INTERVAL_DEFINITIONS)[number]
+>(
+  BACKUP_INTERVAL_DEFINITIONS.map((definition) => [
+    definition.value,
+    definition,
+  ]) as Array<
+    [BackupIntervalKey, (typeof BACKUP_INTERVAL_DEFINITIONS)[number]]
+  >,
+);
+
+const DEFAULT_SELECTED_INTERVALS: BackupIntervalKey[] = ["1h"];
+const MANUAL_BACKUP_FOLDER = "manual";
+
 export type BackupRunStatus =
   | "IDLE"
   | "RUNNING"
@@ -25,9 +116,8 @@ export interface BackupLogEntry {
 
 export interface BackupConfig {
   enabled: boolean;
-  intervalMinutes: BackupIntervalMinutes;
-  nextRunAt: string | null;
-  remoteName: string;
+  selectedIntervals: BackupIntervalKey[];
+  selectedRemoteNames: string[];
   remotePath: string;
   lastRunAt: string | null;
   lastRunStatus: BackupRunStatus;
@@ -48,9 +138,8 @@ export interface BackupProviderOption {
 
 export interface BackupConfigPatch {
   enabled?: boolean;
-  intervalMinutes?: number;
-  nextRunAt?: string | null;
-  remoteName?: string;
+  selectedIntervals?: string[];
+  selectedRemoteNames?: string[];
   remotePath?: string;
 }
 
@@ -118,7 +207,10 @@ type RcloneApi = ((...args: unknown[]) => ChildProcess) & {
 let rcloneApi: RcloneApi | null = null;
 
 let schedulerStarted = false;
-let scheduleTimer: ReturnType<typeof setTimeout> | null = null;
+const scheduleTimers: Partial<
+  Record<BackupIntervalKey, ReturnType<typeof setTimeout>>
+> = {};
+const intervalNextRunTargets: Partial<Record<BackupIntervalKey, string>> = {};
 let backupRunning = false;
 let activeBackupProcess: ChildProcess | null = null;
 let cancelBackupRequested = false;
@@ -141,13 +233,139 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeInterval(value: unknown): BackupIntervalMinutes {
+function isBackupIntervalKey(value: unknown): value is BackupIntervalKey {
+  return (
+    typeof value === "string" &&
+    BACKUP_INTERVAL_LOOKUP.has(value as BackupIntervalKey)
+  );
+}
+
+function mapLegacyIntervalToKey(value: unknown): BackupIntervalKey | null {
   const parsed = typeof value === "number" ? value : Number(value);
-  if (BACKUP_INTERVAL_OPTIONS.includes(parsed as BackupIntervalMinutes)) {
-    return parsed as BackupIntervalMinutes;
+
+  if (!Number.isFinite(parsed)) {
+    return null;
   }
 
-  return 60;
+  switch (parsed) {
+    case 5:
+      return "5m";
+    case 15:
+      return "15m";
+    case 60:
+      return "1h";
+    case 1440:
+      return "1d";
+    case 10080:
+      return "1w";
+    case 43200:
+      return "1mo";
+    case 525600:
+      return "1y";
+    default:
+      return null;
+  }
+}
+
+function normalizeSelectedIntervals(
+  value: unknown,
+  legacyIntervalMinutes?: unknown,
+  fallbackToDefault = true,
+): BackupIntervalKey[] {
+  if (Array.isArray(value)) {
+    const normalized = Array.from(
+      new Set(
+        value.filter((entry): entry is BackupIntervalKey =>
+          isBackupIntervalKey(entry),
+        ),
+      ),
+    );
+
+    if (normalized.length > 0 || !fallbackToDefault) {
+      return normalized;
+    }
+  }
+
+  const legacy = mapLegacyIntervalToKey(legacyIntervalMinutes);
+  if (legacy) {
+    return [legacy];
+  }
+
+  return fallbackToDefault ? [...DEFAULT_SELECTED_INTERVALS] : [];
+}
+
+function normalizeSelectedRemoteNames(
+  value: unknown,
+  legacyRemoteName?: unknown,
+  fallbackToLegacy = true,
+): string[] {
+  if (Array.isArray(value)) {
+    const normalized = Array.from(
+      new Set(
+        value
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => normalizeRemoteName(entry))
+          .filter((entry) => !!entry),
+      ),
+    );
+
+    if (normalized.length > 0 || !fallbackToLegacy) {
+      return normalized;
+    }
+  }
+
+  if (typeof legacyRemoteName === "string") {
+    const normalizedLegacy = normalizeRemoteName(legacyRemoteName);
+    if (normalizedLegacy) {
+      return [normalizedLegacy];
+    }
+  }
+
+  return [];
+}
+
+function getIntervalDefinition(intervalKey: BackupIntervalKey) {
+  const definition = BACKUP_INTERVAL_LOOKUP.get(intervalKey);
+  if (!definition) {
+    throw new Error(`Unsupported backup interval: ${intervalKey}`);
+  }
+
+  return definition;
+}
+
+function addIntervalToDate(base: Date, intervalKey: BackupIntervalKey): Date {
+  const definition = getIntervalDefinition(intervalKey);
+  const target = new Date(base);
+
+  switch (definition.unit) {
+    case "minutes":
+      target.setMinutes(target.getMinutes() + definition.amount);
+      break;
+    case "hours":
+      target.setHours(target.getHours() + definition.amount);
+      break;
+    case "days":
+      target.setDate(target.getDate() + definition.amount);
+      break;
+    case "weeks":
+      target.setDate(target.getDate() + 7 * definition.amount);
+      break;
+    case "months":
+      target.setMonth(target.getMonth() + definition.amount);
+      break;
+    case "years":
+      target.setFullYear(target.getFullYear() + definition.amount);
+      break;
+  }
+
+  return target;
+}
+
+function joinRemotePath(...segments: string[]): string {
+  return segments
+    .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
+    .filter((segment) => !!segment)
+    .join("/");
 }
 
 function normalizeIsoDate(value: unknown): string | null {
@@ -531,9 +749,8 @@ async function ensureBackupArtifacts(): Promise<void> {
 async function getDefaultBackupConfig(): Promise<BackupConfig> {
   return {
     enabled: false,
-    intervalMinutes: 60,
-    nextRunAt: null,
-    remoteName: "",
+    selectedIntervals: [...DEFAULT_SELECTED_INTERVALS],
+    selectedRemoteNames: [],
     remotePath: "rtc-backups",
     lastRunAt: null,
     lastRunStatus: "IDLE",
@@ -546,16 +763,22 @@ async function normalizeBackupConfig(
   value: Partial<BackupConfig>,
 ): Promise<BackupConfig> {
   const defaults = await getDefaultBackupConfig();
+  const legacy = value as Partial<BackupConfig> & {
+    intervalMinutes?: unknown;
+    remoteName?: unknown;
+  };
 
   return {
     enabled:
       typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
-    intervalMinutes: normalizeInterval(value.intervalMinutes),
-    nextRunAt: normalizeIsoDate(value.nextRunAt),
-    remoteName:
-      typeof value.remoteName === "string"
-        ? normalizeRemoteName(value.remoteName)
-        : defaults.remoteName,
+    selectedIntervals: normalizeSelectedIntervals(
+      legacy.selectedIntervals,
+      legacy.intervalMinutes,
+    ),
+    selectedRemoteNames: normalizeSelectedRemoteNames(
+      legacy.selectedRemoteNames,
+      legacy.remoteName,
+    ),
     remotePath:
       typeof value.remotePath === "string"
         ? value.remotePath.trim()
@@ -641,32 +864,82 @@ function buildRcloneDestination(
   return cleanedPath ? `${cleanedRemote}:${cleanedPath}` : `${cleanedRemote}:`;
 }
 
-function clearScheduleTimer(): void {
-  if (!scheduleTimer) {
+function clearScheduleTimer(intervalKey: BackupIntervalKey): void {
+  const timer = scheduleTimers[intervalKey];
+  if (!timer) {
     return;
   }
 
-  clearTimeout(scheduleTimer);
-  scheduleTimer = null;
+  clearTimeout(timer);
+  delete scheduleTimers[intervalKey];
 }
 
-function resolveNextRunDate(config: BackupConfig): Date {
-  const intervalMs = config.intervalMinutes * 60 * 1000;
+function clearAllScheduleTimers(): void {
+  for (const intervalKey of BACKUP_INTERVAL_KEYS) {
+    clearScheduleTimer(intervalKey);
+  }
+}
 
-  if (!config.nextRunAt) {
-    return new Date(Date.now() + intervalMs);
+function clearIntervalScheduleState(intervalKey: BackupIntervalKey): void {
+  clearScheduleTimer(intervalKey);
+  delete intervalNextRunTargets[intervalKey];
+}
+
+function scheduleIntervalTimer(
+  intervalKey: BackupIntervalKey,
+  targetDate: Date,
+): void {
+  clearScheduleTimer(intervalKey);
+
+  const remainingMs = targetDate.getTime() - Date.now();
+  if (remainingMs <= 1000) {
+    scheduleTimers[intervalKey] = setTimeout(() => {
+      void runScheduledBackup(intervalKey);
+    }, 1000);
+    return;
   }
 
-  const parsed = new Date(config.nextRunAt);
-  if (Number.isNaN(parsed.getTime())) {
-    return new Date(Date.now() + intervalMs);
+  if (remainingMs > MAX_TIMER_MS) {
+    scheduleTimers[intervalKey] = setTimeout(() => {
+      scheduleIntervalTimer(intervalKey, targetDate);
+    }, MAX_TIMER_MS);
+    return;
   }
 
-  if (parsed.getTime() <= Date.now()) {
-    return new Date(Date.now() + 1000);
+  scheduleTimers[intervalKey] = setTimeout(() => {
+    void runScheduledBackup(intervalKey);
+  }, remainingMs);
+}
+
+function scheduleNextIntervalRun(
+  intervalKey: BackupIntervalKey,
+  fromDate: Date = new Date(),
+): void {
+  const nextTarget = addIntervalToDate(fromDate, intervalKey);
+  intervalNextRunTargets[intervalKey] = nextTarget.toISOString();
+  scheduleIntervalTimer(intervalKey, nextTarget);
+}
+
+function ensureIntervalScheduled(intervalKey: BackupIntervalKey): void {
+  const targetIso = intervalNextRunTargets[intervalKey];
+
+  if (!targetIso) {
+    scheduleNextIntervalRun(intervalKey);
+    return;
   }
 
-  return parsed;
+  const targetDate = new Date(targetIso);
+  if (
+    Number.isNaN(targetDate.getTime()) ||
+    targetDate.getTime() <= Date.now()
+  ) {
+    scheduleNextIntervalRun(intervalKey);
+    return;
+  }
+
+  if (!scheduleTimers[intervalKey]) {
+    scheduleIntervalTimer(intervalKey, targetDate);
+  }
 }
 
 async function runRcloneCommand(
@@ -795,6 +1068,7 @@ async function runRcloneCommand(
 
 async function runBackup(
   trigger: "manual" | "scheduled",
+  scheduledInterval?: BackupIntervalKey,
 ): Promise<BackupConfig> {
   if (backupRunning) {
     throw new Error("A backup is already running.");
@@ -802,11 +1076,33 @@ async function runBackup(
 
   let current = await readBackupConfigFile();
 
-  if (trigger === "scheduled" && !current.enabled) {
+  let intervalKey: BackupIntervalKey | null = null;
+
+  if (trigger === "scheduled") {
+    if (!scheduledInterval || !isBackupIntervalKey(scheduledInterval)) {
+      throw new Error("Invalid scheduled backup interval.");
+    }
+
+    intervalKey = scheduledInterval;
+  }
+
+  if (intervalKey && !current.enabled) {
     return current;
   }
 
-  if (!current.remoteName) {
+  if (intervalKey && !current.selectedIntervals.includes(intervalKey)) {
+    return current;
+  }
+
+  const selectedRemoteNames = Array.from(
+    new Set(
+      current.selectedRemoteNames
+        .map((remoteName) => normalizeRemoteName(remoteName))
+        .filter((remoteName) => !!remoteName),
+    ),
+  );
+
+  if (selectedRemoteNames.length === 0) {
     throw new Error("No backup account selected.");
   }
 
@@ -821,57 +1117,83 @@ async function runBackup(
   backupRunning = true;
   cancelBackupRequested = false;
 
+  const intervalDefinition =
+    intervalKey !== null ? getIntervalDefinition(intervalKey) : null;
+
+  const runLabel =
+    trigger === "manual"
+      ? "Manual backup"
+      : `${intervalDefinition?.label ?? "Scheduled"} backup`;
+
+  const targetFolder =
+    trigger === "manual" || !intervalDefinition
+      ? MANUAL_BACKUP_FOLDER
+      : intervalDefinition.folderName;
+
+  const destinationRelativePath = joinRemotePath(
+    current.remotePath,
+    targetFolder,
+    path.basename(sourcePath),
+  );
+
   current = await writeBackupConfigFile({
     ...current,
     lastRunStatus: "RUNNING",
-    lastRunMessage:
-      trigger === "manual"
-        ? "Manual backup started..."
-        : "Scheduled backup started...",
+    lastRunMessage: `${runLabel} started...`,
   });
 
-  const destination = buildRcloneDestination(
-    current.remoteName,
-    current.remotePath,
-  );
   appendBackupLog(
     "info",
-    `Backup started from ${sourcePath} to ${destination}`,
+    `${runLabel} started from ${sourcePath} to ${selectedRemoteNames.length} remote(s).`,
   );
 
   try {
-    const output = await runRcloneCommand(
-      ["copy", sourcePath, destination],
-      {
-        "create-empty-src-dirs": true,
-        "check-first": true,
-      },
-      {
-        trackAsActiveBackup: true,
-      },
-    );
+    const remoteOutputs: string[] = [];
+
+    for (const remoteName of selectedRemoteNames) {
+      const destination = buildRcloneDestination(
+        remoteName,
+        destinationRelativePath,
+      );
+
+      appendBackupLog(
+        "info",
+        `Syncing ${runLabel.toLowerCase()} to remote ${remoteName}: ${destination}`,
+      );
+
+      const output = await runRcloneCommand(
+        ["copyto", sourcePath, destination],
+        {
+          "check-first": true,
+        },
+        {
+          trackAsActiveBackup: true,
+        },
+      );
+
+      if (output) {
+        remoteOutputs.push(`${remoteName}: ${output}`);
+      }
+
+      appendBackupLog("info", `Completed sync to remote ${remoteName}.`);
+    }
 
     const nowIso = new Date().toISOString();
-
-    let nextRunAt = current.nextRunAt;
-    if (trigger === "scheduled" && current.enabled) {
-      nextRunAt = new Date(
-        Date.now() + current.intervalMinutes * 60 * 1000,
-      ).toISOString();
-    }
+    const completionMessage =
+      remoteOutputs.length > 0
+        ? remoteOutputs.join("\n")
+        : `${runLabel} completed for ${selectedRemoteNames.length} remote(s).`;
 
     const updated = await writeBackupConfigFile({
       ...current,
-      nextRunAt,
       lastRunAt: nowIso,
       lastRunStatus: "SUCCESS",
-      lastRunMessage: output || "Backup completed.",
+      lastRunMessage: completionMessage,
     });
-    appendBackupLog("info", "Backup completed successfully.");
-
-    if (trigger === "scheduled") {
-      scheduleFromConfig(updated);
-    }
+    appendBackupLog(
+      "info",
+      `${runLabel} completed successfully for ${selectedRemoteNames.length} remote(s).`,
+    );
 
     return updated;
   } catch (error) {
@@ -879,16 +1201,8 @@ async function runBackup(
     const wasCancelled = cancelBackupRequested;
     const nowIso = new Date().toISOString();
 
-    let nextRunAt = current.nextRunAt;
-    if (trigger === "scheduled" && current.enabled) {
-      nextRunAt = new Date(
-        Date.now() + current.intervalMinutes * 60 * 1000,
-      ).toISOString();
-    }
-
     const updated = await writeBackupConfigFile({
       ...current,
-      nextRunAt,
       lastRunAt: nowIso,
       lastRunStatus: wasCancelled ? "CANCELLED" : "FAILED",
       lastRunMessage: wasCancelled ? "Backup cancelled by user." : message,
@@ -898,9 +1212,8 @@ async function runBackup(
       wasCancelled ? "Backup cancelled by user." : message,
     );
 
-    if (trigger === "scheduled") {
-      console.error("Scheduled backup failed:", message);
-      scheduleFromConfig(updated);
+    if (intervalKey) {
+      console.error(`Scheduled backup failed for ${intervalKey}:`, message);
       return updated;
     }
 
@@ -952,42 +1265,68 @@ export async function cancelRunningBackup(): Promise<BackupConfig> {
   return readBackupConfigFile();
 }
 
-async function runScheduledBackup(): Promise<void> {
-  scheduleTimer = null;
+async function runScheduledBackup(
+  intervalKey: BackupIntervalKey,
+): Promise<void> {
+  clearScheduleTimer(intervalKey);
+  delete intervalNextRunTargets[intervalKey];
 
   try {
-    await runBackup("scheduled");
+    await runBackup("scheduled", intervalKey);
   } catch (error) {
-    console.error("Error in scheduled backup:", formatBackupError(error));
+    console.error(
+      `Error in scheduled backup for ${intervalKey}:`,
+      formatBackupError(error),
+    );
+  } finally {
+    try {
+      const latest = await readBackupConfigFile();
+
+      if (latest.enabled && latest.selectedIntervals.includes(intervalKey)) {
+        scheduleNextIntervalRun(intervalKey);
+      } else {
+        clearIntervalScheduleState(intervalKey);
+      }
+    } catch (error) {
+      console.error(
+        `Failed to reschedule interval ${intervalKey}:`,
+        formatBackupError(error),
+      );
+    }
   }
 }
 
 function scheduleFromConfig(config: BackupConfig): void {
-  clearScheduleTimer();
-
   if (!config.enabled) {
+    clearAllScheduleTimers();
+
+    for (const intervalKey of BACKUP_INTERVAL_KEYS) {
+      delete intervalNextRunTargets[intervalKey];
+    }
+
     return;
   }
 
-  const targetDate = resolveNextRunDate(config);
-  const msUntilRun = targetDate.getTime() - Date.now();
+  if (config.selectedRemoteNames.length === 0) {
+    clearAllScheduleTimers();
 
-  if (msUntilRun > MAX_TIMER_MS) {
-    scheduleTimer = setTimeout(() => {
-      void scheduleFromLatestConfig();
-    }, MAX_TIMER_MS);
+    for (const intervalKey of BACKUP_INTERVAL_KEYS) {
+      delete intervalNextRunTargets[intervalKey];
+    }
+
     return;
   }
 
-  const safeDelay = Math.max(msUntilRun, 1000);
-  scheduleTimer = setTimeout(() => {
-    void runScheduledBackup();
-  }, safeDelay);
-}
+  const selectedIntervals = new Set(config.selectedIntervals);
 
-async function scheduleFromLatestConfig(): Promise<void> {
-  const latest = await readBackupConfigFile();
-  scheduleFromConfig(latest);
+  for (const intervalKey of BACKUP_INTERVAL_KEYS) {
+    if (!selectedIntervals.has(intervalKey)) {
+      clearIntervalScheduleState(intervalKey);
+      continue;
+    }
+
+    ensureIntervalScheduled(intervalKey);
+  }
 }
 
 export async function startBackupScheduler(): Promise<void> {
@@ -1027,40 +1366,35 @@ export async function updateBackupConfig(
     next.enabled = patch.enabled;
   }
 
-  if (patch.intervalMinutes !== undefined) {
-    const interval = Number(patch.intervalMinutes);
-
-    if (!BACKUP_INTERVAL_OPTIONS.includes(interval as BackupIntervalMinutes)) {
-      throw new Error("Unsupported backup interval.");
-    }
-
-    next.intervalMinutes = interval as BackupIntervalMinutes;
+  if (patch.selectedIntervals !== undefined) {
+    next.selectedIntervals = normalizeSelectedIntervals(
+      patch.selectedIntervals,
+      undefined,
+      false,
+    );
   }
 
-  if (patch.nextRunAt !== undefined) {
-    if (patch.nextRunAt === null || patch.nextRunAt === "") {
-      next.nextRunAt = null;
-    } else {
-      const parsed = new Date(patch.nextRunAt);
-      if (Number.isNaN(parsed.getTime())) {
-        throw new Error("Invalid next backup date/time.");
-      }
-
-      next.nextRunAt = parsed.toISOString();
-    }
-  }
-
-  if (patch.remoteName !== undefined) {
-    next.remoteName = normalizeRemoteName(patch.remoteName);
+  if (patch.selectedRemoteNames !== undefined) {
+    next.selectedRemoteNames = normalizeSelectedRemoteNames(
+      patch.selectedRemoteNames,
+      undefined,
+      false,
+    );
   }
 
   if (patch.remotePath !== undefined) {
     next.remotePath = patch.remotePath.trim();
   }
 
-  if (next.enabled && !next.remoteName) {
+  if (next.enabled && next.selectedRemoteNames.length === 0) {
     throw new Error(
-      "Select a backup account before enabling automatic backups.",
+      "Select at least one destination account before enabling automatic backups.",
+    );
+  }
+
+  if (next.enabled && next.selectedIntervals.length === 0) {
+    throw new Error(
+      "Select at least one backup interval before enabling automatic backups.",
     );
   }
 
@@ -1219,12 +1553,17 @@ export async function deleteBackupRemote(
   await runRcloneCommand(["config", "delete", normalizedName]);
 
   const current = await readBackupConfigFile();
-  if (normalizeRemoteName(current.remoteName) === normalizedName) {
+  const updatedSelectedRemoteNames = current.selectedRemoteNames.filter(
+    (remoteName) => normalizeRemoteName(remoteName) !== normalizedName,
+  );
+
+  if (
+    updatedSelectedRemoteNames.length !== current.selectedRemoteNames.length
+  ) {
     const updated = await writeBackupConfigFile({
       ...current,
-      remoteName: "",
-      enabled: false,
-      nextRunAt: null,
+      selectedRemoteNames: updatedSelectedRemoteNames,
+      enabled: updatedSelectedRemoteNames.length > 0 ? current.enabled : false,
     });
 
     scheduleFromConfig(updated);

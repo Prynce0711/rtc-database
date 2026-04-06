@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FiDatabase, FiPlus, FiTrash2, FiXCircle } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
@@ -21,38 +21,11 @@ import {
   Toggle,
 } from "../SettingsPrimitives";
 
-const toLocalDateTimeInput = (iso: string | null): string => {
-  if (!iso) {
-    return "";
-  }
-
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (value: number) => value.toString().padStart(2, "0");
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
-const toIsoOrNull = (value: string): string | null => {
-  if (!value.trim()) {
-    return null;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toISOString();
-};
-
 const BackupTab = () => {
   const popup = usePopup();
+  const intervalDropdownRef = useRef<HTMLDetailsElement | null>(null);
+  const remoteDropdownRef = useRef<HTMLDetailsElement | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [runningBackup, setRunningBackup] = useState(false);
@@ -61,9 +34,8 @@ const BackupTab = () => {
   const [accountSetupInProgress, setAccountSetupInProgress] = useState(false);
 
   const [enabled, setEnabled] = useState(false);
-  const [intervalMinutes, setIntervalMinutes] = useState("60");
-  const [nextRunAt, setNextRunAt] = useState("");
-  const [remoteName, setRemoteName] = useState("");
+  const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
+  const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
   const [remotePath, setRemotePath] = useState("rtc-backups");
 
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
@@ -71,7 +43,9 @@ const BackupTab = () => {
   const [lastRunMessage, setLastRunMessage] = useState<string | null>(null);
   const [logs, setLogs] = useState<BackupDashboardData["logs"]>([]);
 
-  const [intervalOptions, setIntervalOptions] = useState<number[]>([60]);
+  const [intervalOptions, setIntervalOptions] = useState<
+    BackupDashboardData["intervalOptions"]
+  >([]);
   const [remotes, setRemotes] = useState<
     Array<{ name: string; provider: string }>
   >([]);
@@ -95,9 +69,8 @@ const BackupTab = () => {
 
   const applyDashboardData = (data: BackupDashboardData) => {
     setEnabled(data.config.enabled);
-    setIntervalMinutes(String(data.config.intervalMinutes));
-    setNextRunAt(toLocalDateTimeInput(data.config.nextRunAt));
-    setRemoteName(data.config.remoteName);
+    setSelectedIntervals(data.config.selectedIntervals);
+    setSelectedRemoteNames(data.config.selectedRemoteNames);
     setRemotePath(data.config.remotePath);
     setLastRunAt(data.config.lastRunAt);
     setLastRunStatus(data.config.lastRunStatus);
@@ -127,17 +100,50 @@ const BackupTab = () => {
     void load();
   }, [popup]);
 
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      const intervalDropdown = intervalDropdownRef.current;
+      if (
+        intervalDropdown &&
+        intervalDropdown.open &&
+        !intervalDropdown.contains(target)
+      ) {
+        intervalDropdown.open = false;
+      }
+
+      const remoteDropdown = remoteDropdownRef.current;
+      if (
+        remoteDropdown &&
+        remoteDropdown.open &&
+        !remoteDropdown.contains(target)
+      ) {
+        remoteDropdown.open = false;
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
+
   const handleSave = async () => {
-    if (enabled && !remoteName.trim()) {
+    if (enabled && selectedRemoteNames.length === 0) {
       popup.showError(
-        "Select a destination account before enabling auto backup.",
+        "Select at least one destination account before enabling auto backup.",
       );
       return;
     }
 
-    const nextRunIso = toIsoOrNull(nextRunAt);
-    if (nextRunAt.trim() && !nextRunIso) {
-      popup.showError("Invalid next backup date/time.");
+    if (enabled && selectedIntervals.length === 0) {
+      popup.showError(
+        "Select at least one backup interval before enabling automatic backups.",
+      );
       return;
     }
 
@@ -146,9 +152,8 @@ const BackupTab = () => {
 
     const result = await saveBackupConfiguration({
       enabled,
-      intervalMinutes: Number(intervalMinutes),
-      nextRunAt: nextRunIso,
-      remoteName: remoteName.trim(),
+      selectedIntervals,
+      selectedRemoteNames,
       remotePath: remotePath.trim(),
     });
 
@@ -280,9 +285,15 @@ const BackupTab = () => {
     }
 
     applyDashboardData(result.result);
-    if (!remoteName) {
-      setRemoteName(newRemoteName.trim());
+
+    const normalizedNewRemote = newRemoteName.trim();
+    if (
+      normalizedNewRemote &&
+      !selectedRemoteNames.includes(normalizedNewRemote)
+    ) {
+      setSelectedRemoteNames((previous) => [...previous, normalizedNewRemote]);
     }
+
     setNewRemoteName("");
     setNewOptionsJson("{}");
     popup.showSuccess("Backup account added.");
@@ -311,6 +322,26 @@ const BackupTab = () => {
     popup.showSuccess("Backup account removed.");
   };
 
+  const toggleIntervalSelection = (intervalValue: string) => {
+    setSelectedIntervals((previous) => {
+      if (previous.includes(intervalValue)) {
+        return previous.filter((value) => value !== intervalValue);
+      }
+
+      return [...previous, intervalValue];
+    });
+  };
+
+  const toggleRemoteSelection = (remoteValue: string) => {
+    setSelectedRemoteNames((previous) => {
+      if (previous.includes(remoteValue)) {
+        return previous.filter((value) => value !== remoteValue);
+      }
+
+      return [...previous, remoteValue];
+    });
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -328,7 +359,30 @@ const BackupTab = () => {
 
   const isBackupRunning = lastRunStatus === "RUNNING";
   const canRunNow =
-    !!remoteName && !runningBackup && !cancellingBackup && !isBackupRunning;
+    selectedRemoteNames.length > 0 &&
+    !runningBackup &&
+    !cancellingBackup &&
+    !isBackupRunning;
+
+  const selectedIntervalLabels = intervalOptions
+    .filter((interval) => selectedIntervals.includes(interval.value))
+    .map((interval) => interval.label);
+
+  const selectedRemoteLabels = remotes
+    .filter((remote) => selectedRemoteNames.includes(remote.name))
+    .map((remote) => `${remote.name} (${remote.provider})`);
+
+  const intervalSummary =
+    selectedIntervalLabels.length === 0
+      ? "Choose intervals to activate"
+      : `${selectedIntervalLabels.length} interval${selectedIntervalLabels.length > 1 ? "s" : ""} selected`;
+
+  const remoteSummary =
+    selectedRemoteLabels.length === 0
+      ? remotes.length === 0
+        ? "No accounts available"
+        : "Choose destination accounts"
+      : `${selectedRemoteLabels.length} account${selectedRemoteLabels.length > 1 ? "s" : ""} selected`;
 
   return (
     <div className="space-y-6">
@@ -343,51 +397,92 @@ const BackupTab = () => {
           <Toggle checked={enabled} onChange={setEnabled} />
         </SettingsRow>
         <SettingsRow
-          label="Backup Interval"
-          description="How often to run backups (for example every 5 or 10 minutes)."
+          label="Backup Intervals"
+          description="Select one or more schedules. Each interval writes to its own folder and replaces the previous backup in that folder."
         >
-          <SelectField
-            value={intervalMinutes}
-            onChange={setIntervalMinutes}
-            options={intervalOptions.map((minutes) => ({
-              value: String(minutes),
-              label: `Every ${minutes} minute${minutes > 1 ? "s" : ""}`,
-            }))}
-          />
+          <div className="w-full">
+            <details ref={intervalDropdownRef} className="dropdown w-full">
+              <summary className="btn btn-outline btn-sm sm:btn-md w-full justify-between normal-case font-normal">
+                <span className="truncate">{intervalSummary}</span>
+                <span className="text-xs text-base-content/45">Select</span>
+              </summary>
+              <ul className="dropdown-content z-30 mt-2 w-full p-2 rounded-xl border border-base-300 bg-base-100 shadow max-h-80 overflow-auto space-y-1">
+                {intervalOptions.map((interval) => (
+                  <li key={interval.value}>
+                    <label className="flex items-start gap-3 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-base-200/60">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm mt-0.5"
+                        checked={selectedIntervals.includes(interval.value)}
+                        onChange={() => toggleIntervalSelection(interval.value)}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-base-content">
+                          {interval.label}
+                        </span>
+                        <span className="block text-xs text-base-content/45">
+                          Folder: {interval.folderName}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            {selectedIntervalLabels.length > 0 && (
+              <p className="text-xs text-base-content/45 mt-2 line-clamp-2">
+                Active: {selectedIntervalLabels.join(", ")}
+              </p>
+            )}
+          </div>
         </SettingsRow>
         <SettingsRow
-          label="First Backup Date & Time"
-          description="Optional. If empty, backup starts after one interval."
+          label="Destination Accounts"
+          description="Select one or more configured cloud accounts to receive each backup run."
         >
-          <input
-            type="datetime-local"
-            value={nextRunAt}
-            onChange={(e) => setNextRunAt(e.target.value)}
-            className="input input-bordered text-sm h-10 min-w-48 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg"
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Destination Account"
-          description="Select which configured cloud account receives the backup."
-        >
-          <SelectField
-            value={remoteName}
-            onChange={setRemoteName}
-            options={[
-              {
-                value: "",
-                label: remotes.length ? "Select account" : "No accounts yet",
-              },
-              ...remotes.map((remote) => ({
-                value: remote.name,
-                label: `${remote.name} (${remote.provider})`,
-              })),
-            ]}
-          />
+          {remotes.length === 0 ? (
+            <p className="text-sm text-base-content/45">No accounts yet.</p>
+          ) : (
+            <div className="w-full">
+              <details ref={remoteDropdownRef} className="dropdown w-full">
+                <summary className="btn btn-outline btn-sm sm:btn-md w-full justify-between normal-case font-normal">
+                  <span className="truncate">{remoteSummary}</span>
+                  <span className="text-xs text-base-content/45">Select</span>
+                </summary>
+                <ul className="dropdown-content z-30 mt-2 w-full p-2 rounded-xl border border-base-300 bg-base-100 shadow max-h-80 overflow-auto space-y-1">
+                  {remotes.map((remote) => (
+                    <li key={remote.name}>
+                      <label className="flex items-start gap-3 rounded-lg px-2.5 py-2 cursor-pointer hover:bg-base-200/60">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm mt-0.5"
+                          checked={selectedRemoteNames.includes(remote.name)}
+                          onChange={() => toggleRemoteSelection(remote.name)}
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-base-content">
+                            {remote.name}
+                          </span>
+                          <span className="block text-xs text-base-content/45 uppercase tracking-wide">
+                            {remote.provider}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+              {selectedRemoteLabels.length > 0 && (
+                <p className="text-xs text-base-content/45 mt-2 line-clamp-2">
+                  Active: {selectedRemoteLabels.join(", ")}
+                </p>
+              )}
+            </div>
+          )}
         </SettingsRow>
         <SettingsRow
           label="Destination Folder"
-          description="Folder path inside the selected remote destination."
+          description="Base folder path inside the selected remote. Automatic backups create one subfolder per interval; manual backups use a manual folder."
         >
           <InputField
             value={remotePath}
@@ -539,9 +634,10 @@ const BackupTab = () => {
               <FiDatabase size={15} /> Backup Now
             </button>
           )}
-          {!remoteName && (
+          {selectedRemoteNames.length === 0 && (
             <p className="text-xs text-base-content/35 mt-2">
-              Select or create a destination account to enable manual backup.
+              Select or create at least one destination account to enable manual
+              backup.
             </p>
           )}
         </div>
