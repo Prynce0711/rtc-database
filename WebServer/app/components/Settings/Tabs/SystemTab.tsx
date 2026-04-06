@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { FiDatabase, FiEye, FiEyeOff, FiGlobe, FiInfo } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiInfo } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
 import { getSystemSettings, updateSystemSettings } from "../SettingsActions";
 import {
@@ -19,8 +19,6 @@ const SystemTab = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [auditRetention, setAuditRetention] = useState("THREE_MONTHS");
-  const [backupFrequency, setBackupFrequency] = useState("MANUAL");
   const [passwordExpiration, setPasswordExpiration] = useState("NEVER");
   const [lockoutThreshold, setLockoutThreshold] = useState("NONE");
   const [sessionTimeout, setSessionTimeout] = useState("THIRTY_MINUTES");
@@ -44,8 +42,6 @@ const SystemTab = () => {
 
       const settings = result.result;
       setMaintenanceMode(settings.maintainanceMode);
-      setAuditRetention(settings.logRetention);
-      setBackupFrequency(settings.backupFrequency);
       setPasswordExpiration(settings.passwordExpiration);
       setLockoutThreshold(settings.lockoutThreshold);
       setSessionTimeout(settings.sessionTimeout);
@@ -82,8 +78,6 @@ const SystemTab = () => {
       senderName: senderName.trim() || null,
       senderEmail: senderEmail.trim() || null,
       senderPassword: senderPassword === "" ? null : senderPassword,
-      backupFrequency,
-      logRetention: auditRetention,
       passwordExpiration,
       lockoutThreshold,
       sessionTimeout,
@@ -236,40 +230,9 @@ const SystemTab = () => {
       </SettingsCard>
 
       <SettingsCard
-        title="Backup & Audit"
-        description="Database backup and activity log management."
+        title="Security Policies"
+        description="Configure password and session policies for user accounts."
       >
-        <SettingsRow
-          label="Automatic Backup Frequency"
-          description="Schedule database backups."
-        >
-          <SelectField
-            value={backupFrequency}
-            onChange={setBackupFrequency}
-            options={[
-              { value: "MANUAL", label: "Manual only" },
-              { value: "DAILY", label: "Daily" },
-              { value: "WEEKLY", label: "Weekly" },
-              { value: "MONTHLY", label: "Monthly" },
-            ]}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Audit Log Retention"
-          description="Automatically purge old activity logs."
-        >
-          <SelectField
-            value={auditRetention}
-            onChange={setAuditRetention}
-            options={[
-              { value: "ONE_MONTH", label: "1 month" },
-              { value: "THREE_MONTHS", label: "3 months" },
-              { value: "SIX_MONTHS", label: "6 months" },
-              { value: "ONE_YEAR", label: "1 year" },
-              { value: "INDEFINITELY", label: "Keep forever" },
-            ]}
-          />
-        </SettingsRow>
         <SettingsRow
           label="Password Expiration"
           description="Force users to rotate passwords."
@@ -319,14 +282,6 @@ const SystemTab = () => {
             ]}
           />
         </SettingsRow>
-        <div className="px-7 py-5 flex gap-3">
-          <button className="btn btn-outline btn-sm gap-2.5 text-sm rounded-lg">
-            <FiDatabase size={15} /> Backup Now
-          </button>
-          <button className="btn btn-ghost btn-sm gap-2.5 text-sm text-base-content/40 rounded-lg">
-            <FiGlobe size={15} /> Export Audit Logs
-          </button>
-        </div>
       </SettingsCard>
 
       <div className="flex justify-end">

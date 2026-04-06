@@ -26,6 +26,7 @@
     "next-runtime-env": "^3.3.0",
     "next-ws": "^2.1.16",
     "nodemailer": "^8.0.1",
+    "rclone.js": "^0.6.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-icons": "^5.5.0",

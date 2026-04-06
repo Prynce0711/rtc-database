@@ -5,6 +5,7 @@ import React from "react";
 import {
   FiBell,
   FiCalendar,
+  FiDatabase,
   FiMonitor,
   FiServer,
   FiShield,
@@ -47,6 +48,12 @@ export const TABS: TabConfig[] = [
     id: "system",
     label: "System",
     icon: <FiServer size={18} />,
+    roles: [Roles.ADMIN],
+  },
+  {
+    id: "backup",
+    label: "Backup",
+    icon: <FiDatabase size={18} />,
     roles: [Roles.ADMIN],
   },
   {
