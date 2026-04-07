@@ -11,6 +11,7 @@ import AnnualToolbar from "../Annual/AnnualToolbar";
 import JudgementAddReportPage from "./JudgementAddReportPage";
 import {
   AnyColumnDef,
+  ColumnDef,
   flattenColumns,
   isGroupColumn,
 } from "./JudgementColumnDef";
@@ -18,14 +19,6 @@ import { FieldConfig } from "./JudgementFieldConfig";
 import JudgementViewPage from "./JudgementViewPage";
 
 const PAGE_SIZE = 10;
-
-type KPICard = {
-  label: string;
-  value: number;
-  subtitle: string;
-  icon: React.ElementType;
-  delay: number;
-};
 
 export interface JudgementTableProps<T extends Record<string, unknown>> {
   title: string;
@@ -286,25 +279,47 @@ function JudgementTable<T extends Record<string, unknown>>({
     statusPopup.showSuccess("Entry deleted successfully");
   };
 
-  const handleCreate = async (newRecord: Record<string, unknown>) => {
-    if (onAdd) {
-      await onAdd(newRecord);
-    } else {
-      const nextId = Math.max(0, ...data.map((r) => (r.id as number) ?? 0)) + 1;
-      onChange([{ ...newRecord, id: nextId } as unknown as T, ...data]);
-    }
-  };
+  const normalizedColumns = useMemo(() => {
+    const defaultCivilVColumn: ColumnDef = {
+      key: "civilV",
+      label: "Civil V",
+      align: "center",
+      render: (row) =>
+        (row["civilV"] as string | number | null | undefined) ?? "—",
+    };
 
-  const handleUpdate = async (updated: Record<string, unknown>) => {
-    if (onUpdate) {
-      await onUpdate(updated);
-    } else {
-      onChange(data.map((r) => (r.id === updated.id ? (updated as T) : r)));
-    }
-  };
+    return columns.map((col) => {
+      if (!isGroupColumn(col)) return col;
 
-  const hasGroups = columns.some(isGroupColumn);
-  const leafColumns = flattenColumns(columns);
+      const normalizedTitle = col.title.toLowerCase();
+      if (!normalizedTitle.includes("cases heard")) return col;
+
+      const children = [...col.children];
+      let civilVIndex = children.findIndex((child) => child.key === "civilV");
+      const civilInCIndex = children.findIndex(
+        (child) => child.key === "civilInC",
+      );
+
+      if (civilVIndex === -1) {
+        const insertAt = civilInCIndex >= 0 ? civilInCIndex : 0;
+        children.splice(insertAt, 0, defaultCivilVColumn);
+        civilVIndex = insertAt;
+      }
+
+      if (civilInCIndex >= 0 && civilVIndex > civilInCIndex) {
+        const [civilV] = children.splice(civilVIndex, 1);
+        const targetIndex = children.findIndex(
+          (child) => child.key === "civilInC",
+        );
+        children.splice(targetIndex >= 0 ? targetIndex : 0, 0, civilV);
+      }
+
+      return { ...col, children };
+    });
+  }, [columns]);
+
+  const hasGroups = normalizedColumns.some(isGroupColumn);
+  const leafColumns = flattenColumns(normalizedColumns);
 
   /* ── Column totals ──────────────────────────────────────────────── */
   const columnTotals = useMemo(() => {
@@ -348,7 +363,7 @@ function JudgementTable<T extends Record<string, unknown>>({
       <JudgementAddReportPage
         title={title}
         fields={fields}
-        columns={columns}
+        columns={normalizedColumns}
         selectedYear={selectedYear}
         initialData={editInitialData}
         onBack={() => {
@@ -371,7 +386,7 @@ function JudgementTable<T extends Record<string, unknown>>({
         title={title}
         subtitle={subtitle}
         data={filteredAndSorted as unknown as Record<string, unknown>[]}
-        columns={columns}
+        columns={normalizedColumns}
         selectedYear={selectedYear}
         onBack={() => {
           setShowViewPage(false);
@@ -491,7 +506,7 @@ function JudgementTable<T extends Record<string, unknown>>({
                     />
                   </th>
                 )}
-                {columns.map((col, i) => {
+                {normalizedColumns.map((col, i) => {
                   if (isGroupColumn(col)) {
                     return (
                       <th
@@ -528,7 +543,7 @@ function JudgementTable<T extends Record<string, unknown>>({
               {/* Second header row – group children only */}
               {hasGroups && (
                 <tr className="bg-base-300/80 text-base-content text-xs uppercase tracking-widest">
-                  {columns.flatMap((col, gi) => {
+                  {normalizedColumns.flatMap((col, gi) => {
                     if (!isGroupColumn(col)) return [];
                     return col.children.map((child) => (
                       <th
