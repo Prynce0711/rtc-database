@@ -7,6 +7,7 @@ import {
   ensureBackupArtifacts,
   getRemoteConfigMap,
   normalizeRemoteName,
+  readBackupConfigFile,
   type ParsedRemoteConfig,
 } from "../configStore";
 
@@ -138,12 +139,14 @@ export interface ListOneDriveRemoteDriveOptionsDeps {
 
 export interface OneDriveRemoteIdentityFallbackDeps {
   getRemoteConfigMap: () => Promise<Map<string, ParsedRemoteConfig>>;
+  readBackupConfigFile: () => Promise<{ remotePath: string }>;
   runRcloneCommand: RunRcloneCommand;
 }
 
 const DEFAULT_ONEDRIVE_REMOTE_IDENTITY_FALLBACK_DEPS: OneDriveRemoteIdentityFallbackDeps =
   {
     getRemoteConfigMap,
+    readBackupConfigFile,
     runRcloneCommand: runRcloneCommandWithDefaultConfig,
   };
 
@@ -301,6 +304,7 @@ async function fetchJsonWithBearerToken(
     }
 
     const rawText = (await response.text()).trim();
+    console.log(`Fetched from ${endpoint}: ${rawText}`);
     if (!rawText) {
       return null;
     }
@@ -561,6 +565,120 @@ export async function getOneDriveAccountIdentityFromAccessToken(
   return extractOneDriveAccountIdentityFromAccessTokenClaims(accessToken);
 }
 
+function joinRemotePathSegments(...segments: string[]): string {
+  return segments
+    .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
+    .filter((segment) => !!segment)
+    .join("/");
+}
+
+function buildRemoteDestination(
+  remoteName: string,
+  remotePath: string,
+): string {
+  const cleanedPath = remotePath.trim().replace(/^\/+/, "");
+
+  return cleanedPath ? `${remoteName}:${cleanedPath}` : `${remoteName}:`;
+}
+
+function extractOneDriveDisplayNameFromLsjsonMetadata(
+  output: string,
+): string | null {
+  const trimmedOutput = output.trim();
+  if (!trimmedOutput) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedOutput) as unknown;
+    const entries = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+
+      const metadata = (entry as { Metadata?: unknown }).Metadata;
+      if (!metadata || typeof metadata !== "object") {
+        continue;
+      }
+
+      const metadataRecord = metadata as Record<string, unknown>;
+      const displayNameCandidates = [
+        metadataRecord["created-by-display-name"],
+        metadataRecord["last-modified-by-display-name"],
+      ];
+
+      for (const candidate of displayNameCandidates) {
+        if (typeof candidate !== "string") {
+          continue;
+        }
+
+        const normalizedCandidate = candidate.trim();
+        if (normalizedCandidate) {
+          return normalizedCandidate;
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function getOneDriveAccountIdentityFromMetadataProbe(
+  normalizedRemoteName: string,
+  deps: OneDriveRemoteIdentityFallbackDeps,
+): Promise<string | null> {
+  const backupConfig = await deps.readBackupConfigFile();
+  const probeRelativePath = joinRemotePathSegments(
+    backupConfig.remotePath,
+    ".rtc-account-identity-probe",
+  );
+  const probeDestination = buildRemoteDestination(
+    normalizedRemoteName,
+    probeRelativePath,
+  );
+  const lowRetryFlags = {
+    retries: 1,
+    "low-level-retries": 1,
+  };
+
+  try {
+    await deps.runRcloneCommand(["delete", probeDestination], lowRetryFlags, {
+      silent: true,
+    });
+  } catch {
+    // Ignore initial delete failures (e.g. path not found).
+  }
+
+  try {
+    await deps.runRcloneCommand(["touch", probeDestination], lowRetryFlags, {
+      silent: true,
+    });
+    const metadataOutput = await deps.runRcloneCommand(
+      ["lsjson", "--metadata", probeDestination],
+      lowRetryFlags,
+      {
+        silent: true,
+      },
+    );
+
+    return extractOneDriveDisplayNameFromLsjsonMetadata(metadataOutput);
+  } catch {
+    return null;
+  } finally {
+    try {
+      await deps.runRcloneCommand(["delete", probeDestination], lowRetryFlags, {
+        silent: true,
+      });
+    } catch {
+      // Ignore cleanup delete failures.
+    }
+  }
+}
+
 export async function getOneDriveAccountIdentityFallback(
   normalizedRemoteName: string,
   deps: OneDriveRemoteIdentityFallbackDeps = DEFAULT_ONEDRIVE_REMOTE_IDENTITY_FALLBACK_DEPS,
@@ -611,7 +729,15 @@ export async function getOneDriveAccountIdentityFallback(
     // Ignore; token may still refresh depending on provider behavior.
   }
 
-  return fetchFromCurrentConfig();
+  const identityAfterRefresh = await fetchFromCurrentConfig();
+  if (identityAfterRefresh) {
+    return identityAfterRefresh;
+  }
+
+  return getOneDriveAccountIdentityFromMetadataProbe(
+    normalizedRemoteName,
+    deps,
+  );
 }
 
 export async function listOneDriveRemoteDriveOptions(

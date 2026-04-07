@@ -39,6 +39,7 @@ import {
   type BackupProviderOption,
 } from "./constants";
 import { configureBackupImporter } from "./importer";
+import { getDropboxAccountIdentityFallback } from "./remotes/dropbox";
 import {
   extractAccountIdentityFromUserInfo,
   getGoogleDriveAccountIdentityFallback,
@@ -915,9 +916,17 @@ async function getRemoteAccountIdentity(
     });
   }
 
+  if (normalizedProvider === "dropbox") {
+    return getDropboxAccountIdentityFallback(normalizedName, {
+      getRemoteConfigMap,
+      runRcloneCommand,
+    });
+  }
+
   if (normalizedProvider === "onedrive") {
     return getOneDriveAccountIdentityFallback(normalizedName, {
       getRemoteConfigMap,
+      readBackupConfigFile,
       runRcloneCommand,
     });
   }
