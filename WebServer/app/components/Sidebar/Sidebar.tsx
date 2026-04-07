@@ -390,6 +390,8 @@ const caseNavItems: NavItem[] = [
 const caseManagementNavItem: NavItem = caseNavItems[0];
 const statisticsNavItem: NavItem = caseNavItems[1];
 const adminStatisticsNavItem: NavItem = caseNavItems[2];
+const archivesNavItem: NavItem = caseNavItems[3];
+const notarialNavItem: NavItem = caseNavItems[4];
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
@@ -835,6 +837,199 @@ function staffSidebar({
   );
 }
 
+function archiveSidebar({
+  isExpanded,
+  activeView,
+  openDropdown,
+  setOpenDropdown,
+  onExpandSidebar,
+  theme,
+  onToggleTheme,
+  onOpenMessages,
+  onOpenNotifications,
+  onOpenSettings,
+}: SidebarMenuProps) {
+  return (
+    <>
+      {/* Main */}
+      <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
+        <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "30ms" }}>
+        <NavBtn
+          item={{
+            icon: <FiHome />,
+            href: "dashboard",
+            label: "Dashboard",
+          }}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+
+      {/* Cases */}
+      <div className="sidebar-stagger" style={{ animationDelay: "60ms" }}>
+        <SectionLabel label="Cases" isExpanded={isExpanded} />
+      </div>
+
+      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+        <NavBtn
+          item={statisticsNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+
+      {/* Communication */}
+      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
+        <SectionLabel label="Communication" isExpanded={isExpanded} />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
+        <ActionBtn
+          icon={<FiMessageSquare />}
+          label="Messages"
+          badge={3}
+          isExpanded={isExpanded}
+          onClick={onOpenMessages}
+        />
+        <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+          <ActionBtn
+            icon={<FiBell />}
+            label="Notifications"
+            badge={5}
+            isExpanded={isExpanded}
+            onClick={onOpenNotifications}
+          />
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+        <SectionLabel label="Settings" isExpanded={isExpanded} />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+        <ActionBtn
+          icon={<FiSettings />}
+          label="Settings"
+          isExpanded={isExpanded}
+          onClick={onOpenSettings}
+        />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+        <ActionBtn
+          icon={theme === "winter" ? <FiMoon /> : <FiSun />}
+          label={theme === "winter" ? "Dark Mode" : "Light Mode"}
+          isExpanded={isExpanded}
+          onClick={onToggleTheme}
+        />
+      </div>
+    </>
+  );
+}
+
+function notarialSidebar({
+  isExpanded,
+  activeView,
+  openDropdown,
+  setOpenDropdown,
+  onExpandSidebar,
+  theme,
+  onToggleTheme,
+  onOpenMessages,
+  onOpenNotifications,
+  onOpenSettings,
+}: SidebarMenuProps) {
+  return (
+    <>
+      {/* Main */}
+      <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
+        <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "30ms" }}>
+        <NavBtn
+          item={{
+            icon: <FiHome />,
+            href: "dashboard",
+            label: "Dashboard",
+          }}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+
+      {/* Cases */}
+      <div className="sidebar-stagger" style={{ animationDelay: "60ms" }}>
+        <SectionLabel label="Cases" isExpanded={isExpanded} />
+      </div>
+
+      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+        <NavBtn
+          item={statisticsNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+
+      {/* Communication */}
+      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
+        <SectionLabel label="Communication" isExpanded={isExpanded} />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
+        <ActionBtn
+          icon={<FiMessageSquare />}
+          label="Messages"
+          badge={3}
+          isExpanded={isExpanded}
+          onClick={onOpenMessages}
+        />
+      </div>
+
+      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+        <ActionBtn
+          icon={<FiBell />}
+          label="Notifications"
+          badge={5}
+          isExpanded={isExpanded}
+          onClick={onOpenNotifications}
+        />
+      </div>
+
+      {/* Settings */}
+      <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+        <SectionLabel label="Settings" isExpanded={isExpanded} />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+        <ActionBtn
+          icon={<FiSettings />}
+          label="Settings"
+          isExpanded={isExpanded}
+          onClick={onOpenSettings}
+        />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+        <ActionBtn
+          icon={theme === "winter" ? <FiMoon /> : <FiSun />}
+          label={theme === "winter" ? "Dark Mode" : "Light Mode"}
+          isExpanded={isExpanded}
+          onClick={onToggleTheme}
+        />
+      </div>
+    </>
+  );
+}
+
 // ─── User card with tooltip ───────────────────────────────────────────────────
 const UserCard = ({
   name,
@@ -1071,8 +1266,12 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
               : normalizedRole === "statistics" || normalizedRole === "stats"
                 ? statsSidebar(menuProps)
                 : normalizedRole === "user" || normalizedRole === "staff"
-                  ? staffSidebar(menuProps)
-                  : staffSidebar(menuProps)}
+                  ? archiveSidebar(menuProps)
+                  : normalizedRole === "archives"
+                    ? notarialSidebar(menuProps)
+                    : normalizedRole === "notarial"
+                      ? notarialSidebar(menuProps)
+                      : staffSidebar(menuProps)}
         </nav>
 
         {/* ── Collapse toggle ────────────────────────── */}
