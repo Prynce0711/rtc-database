@@ -613,46 +613,59 @@ const Civil: React.FC = () => {
       </header>
 
       {/* Search and Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-          <input
-            type="text"
-            placeholder="Search case number, branch..."
-            className="input input-bordered w-full pl-11"
-            value={appliedFilters?.caseNumber || ""}
-            onChange={(e) =>
-              setAppliedFilters((prev) => ({
-                ...prev,
-                caseNumber: e.target.value,
-              }))
-            }
-          />
-        </div>
-
-        <button
-          className={`btn btn-md btn-outline gap-2 ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
-          onClick={() => setFilterModalOpen((prev) => !prev)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-              clipRule="evenodd"
+      <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+            <input
+              type="text"
+              placeholder="Search case number, branch..."
+              className="input input-bordered w-full pl-11"
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
-          </svg>
-          Filter
-          {appliedFilters && Object.keys(appliedFilters).length > 0 && (
-            <span className="badge badge-sm badge-primary ml-1">
-              {Object.keys(appliedFilters).length}
-            </span>
-          )}
-        </button>
+          </div>
+
+          <button
+            type="button"
+            className={`btn btn-md btn-outline gap-2 ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
+            onClick={() => {
+              console.log(
+                "Civil Filter button clicked, current state:",
+                filterModalOpen,
+              );
+              setFilterModalOpen((prev) => !prev);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Filter
+            {appliedFilters && Object.keys(appliedFilters).length > 0 && (
+              <span className="badge badge-sm badge-primary ml-1">
+                {Object.keys(appliedFilters).length}
+              </span>
+            )}
+          </button>
+
+          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+            {totalCount} case{totalCount !== 1 && "s"}
+          </span>
+        </div>
 
         <FilterDropdown
           isOpen={filterModalOpen}
@@ -662,216 +675,215 @@ const Civil: React.FC = () => {
           searchValue={appliedFilters}
           getSuggestions={getCaseSuggestions}
         />
-
-        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-          {totalCount} case{totalCount !== 1 && "s"}
-        </span>
       </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            {
-              label: "TOTAL CASES",
-              value: (stats.totalCases ?? 0).toLocaleString(),
-              subtitle: "All civil cases",
-              icon: FiBarChart2,
-            },
-            {
-              label: "RECENTLY FILED",
-              value: (stats.recentlyFiled ?? 0).toLocaleString(),
-              subtitle: "Filed in the last 30 days",
-              icon: FiFileText,
-            },
-            {
-              label: "RE-RAFFLED",
-              value: (stats.reRaffledCases ?? 0).toLocaleString(),
-              subtitle: "Re-raffled cases",
-              icon: FiUsers,
-            },
-            {
-              label: "REMANDED",
-              value: (stats.remandedCases ?? 0).toLocaleString(),
-              subtitle: "Cases remanded",
-              icon: FiLock,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-              >
-                <div className="card-body relative overflow-hidden p-4 sm:p-6">
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
-                    <Icon className="h-full w-full" />
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          {
+            label: "TOTAL CASES",
+            value: (stats.totalCases ?? 0).toLocaleString(),
+            subtitle: "All civil cases",
+            icon: FiBarChart2,
+          },
+          {
+            label: "RECENTLY FILED",
+            value: (stats.recentlyFiled ?? 0).toLocaleString(),
+            subtitle: "Filed in the last 30 days",
+            icon: FiFileText,
+          },
+          {
+            label: "RE-RAFFLED",
+            value: (stats.reRaffledCases ?? 0).toLocaleString(),
+            subtitle: "Re-raffled cases",
+            icon: FiUsers,
+          },
+          {
+            label: "REMANDED",
+            value: (stats.remandedCases ?? 0).toLocaleString(),
+            subtitle: "Cases remanded",
+            icon: FiLock,
+          },
+        ].map((card, idx) => {
+          const Icon = card.icon as React.ComponentType<
+            React.SVGProps<SVGSVGElement>
+          >;
+          return (
+            <div
+              key={idx}
+              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <div className="card-body relative overflow-hidden p-4 sm:p-6">
+                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
+                  <Icon className="h-full w-full" />
+                </div>
+                <div className="relative text-center">
+                  <div className="mb-2">
+                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
+                      {card.label}
+                    </span>
                   </div>
-                  <div className="relative text-center">
-                    <div className="mb-2">
-                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
-                      {card.value}
-                    </p>
-                    <p className="text-xs sm:text-sm font-medium text-base-content/60">
-                      {card.subtitle}
-                    </p>
-                  </div>
+                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
+                    {card.value}
+                  </p>
+                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
+                    {card.subtitle}
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Selected Records Bar */}
-        {isAdminOrAtty && (
-          <AnimatePresence>
-            {selectedRecordIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
-                    {selectedRecordIds.length} case
-                    {selectedRecordIds.length > 1 ? "s" : ""} selected
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/civil/edit?ids=${selectedRecordIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedRecords}
-                      disabled={deletingSelected}
-                    >
-                      <FiTrash2 className="h-4 w-4" />
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedRecordIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
+      {/* Selected Records Bar */}
+      {isAdminOrAtty && (
+        <AnimatePresence>
+          {selectedRecordIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-primary">
+                  {selectedRecordIds.length} case
+                  {selectedRecordIds.length > 1 ? "s" : ""} selected
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      router.push(
+                        `/user/cases/civil/edit?ids=${selectedRecordIds.join(",")}`,
+                      )
+                    }
+                  >
+                    Edit Selected
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                    onClick={handleDeleteSelectedRecords}
+                    disabled={deletingSelected}
+                  >
+                    <FiTrash2 className="h-4 w-4" />
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedRecordIds([])}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
-        {/* Table */}
-        <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
-          <div className="overflow-x-auto">
-            <table className="table table-sm w-full text-center">
-              <thead>
-                <tr className="bg-base-200/50 border-b border-base-200">
-                  {isAdminOrAtty && (
-                    <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                      Actions
-                    </th>
-                  )}
-                  <SortTh
-                    label="Case Number"
-                    colKey="caseNumber"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  />
-                  <SortTh
-                    label="Branch"
-                    colKey="branch"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  />
-                  <SortTh
-                    label="Petitioner/s"
-                    colKey="petitioners"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  />
-                  <SortTh
-                    label="Defendant/s"
-                    colKey="defendants"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  />
-                  <SortTh
-                    label="Date Filed"
-                    colKey="dateFiled"
-                    sortConfig={sortConfig}
-                    onSort={handleSort}
-                  />
+      {/* Table */}
+      <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
+        <div className="overflow-x-auto">
+          <table className="table table-sm w-full text-center">
+            <thead>
+              <tr className="bg-base-200/50 border-b border-base-200">
+                {isAdminOrAtty && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Notes/Appealed
+                    Actions
                   </th>
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Nature of Petition
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.length === 0 ? (
-                  <tr>
-                    <td colSpan={isAdminOrAtty ? 8 : 7} className="py-16 text-center text-base-content/40">
-                      <div className="flex flex-col items-center justify-center py-12">
-                        <FiFileText className="w-16 h-16 opacity-20 mb-4" />
-                        <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
-                          No records found
-                        </p>
-                        <p className="text-sm mt-2 text-base-content/35">
-                          No civil cases match your current filters.
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  records.map((r) => (
-                    <CivilCaseRow
-                      key={r.id}
-                      record={r}
-                      onEdit={(item) => {
-                        router.push(`/user/cases/civil/edit?id=${item.id}`);
-                      }}
-                      onDelete={handleDelete}
-                      onRowClick={(item) => {
-                        try {
-                          localStorage.setItem(
-                            "__temp_case",
-                            JSON.stringify(item),
-                          );
-                          localStorage.setItem(
-                            "__temp_cases",
-                            JSON.stringify(records || []),
-                          );
-                        } catch (e) {
-                          // ignore
-                        }
-                        router.push(`/user/cases/civil/${item.id}`);
-                      }}
-                      selected={selectedRecordIds.includes(r.id)}
-                      onToggleSelect={handleToggleRecordSelection}
-                    />
-                  ))
                 )}
-              </tbody>
-            </table>
-          </div>
+                <SortTh
+                  label="Case Number"
+                  colKey="caseNumber"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <SortTh
+                  label="Branch"
+                  colKey="branch"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <SortTh
+                  label="Petitioner/s"
+                  colKey="petitioners"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <SortTh
+                  label="Defendant/s"
+                  colKey="defendants"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <SortTh
+                  label="Date Filed"
+                  colKey="dateFiled"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
+                <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                  Notes/Appealed
+                </th>
+                <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                  Nature of Petition
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={isAdminOrAtty ? 8 : 7}
+                    className="py-16 text-center text-base-content/40"
+                  >
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <FiFileText className="w-16 h-16 opacity-20 mb-4" />
+                      <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
+                        No records found
+                      </p>
+                      <p className="text-sm mt-2 text-base-content/35">
+                        No civil cases match your current filters.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                records.map((r) => (
+                  <CivilCaseRow
+                    key={r.id}
+                    record={r}
+                    onEdit={(item) => {
+                      router.push(`/user/cases/civil/edit?id=${item.id}`);
+                    }}
+                    onDelete={handleDelete}
+                    onRowClick={(item) => {
+                      try {
+                        localStorage.setItem(
+                          "__temp_case",
+                          JSON.stringify(item),
+                        );
+                        localStorage.setItem(
+                          "__temp_cases",
+                          JSON.stringify(records || []),
+                        );
+                      } catch (e) {
+                        // ignore
+                      }
+                      router.push(`/user/cases/civil/${item.id}`);
+                    }}
+                    selected={selectedRecordIds.includes(r.id)}
+                    onToggleSelect={handleToggleRecordSelection}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
 
       {/* Pagination */}
       <div className="flex items-center justify-between">

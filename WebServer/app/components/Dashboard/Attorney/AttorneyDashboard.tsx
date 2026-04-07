@@ -14,20 +14,13 @@ import {
   RefreshCw,
   Scale,
   Server,
-  TrendingUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,9 +37,7 @@ const AttorneyDashboard: React.FC<Props> = () => {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<UnifiedCaseData[]>([]);
   const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<"overview">("overview");
   const [isVisible, setIsVisible] = useState(false);
   const router = useRouter();
   const getCssVar = (name: string) =>
@@ -196,9 +187,7 @@ const AttorneyDashboard: React.FC<Props> = () => {
             <h2 className="text-3xl font-bold text-base-content mb-2">
               Loading Attorney Dashboard
             </h2>
-            <p className="text-lg text-base-content/60">
-              Fetching case analytics...
-            </p>
+            <p className="text-lg text-base-content/60">Fetching cases...</p>
             <div className="flex items-center justify-center gap-2 mt-4">
               {[0, 150, 300].map((delay) => (
                 <div
@@ -236,25 +225,16 @@ const AttorneyDashboard: React.FC<Props> = () => {
 
                   <div className="flex gap-3 flex-wrap">
                     <div className="relative flex p-1 rounded-full bg-base-200 border border-base-300 flex-1 sm:flex-initial">
-                      {/* Sliding Indicator */}
                       <div
                         className="absolute top-1 bottom-1 rounded-full bg-base-100 shadow-md transition-all duration-300"
                         style={{
-                          width: "calc(50% - 4px)",
-                          left:
-                            activeTab === "overview"
-                              ? "4px"
-                              : "calc(50% + 0px)",
+                          width: "calc(100% - 4px)",
+                          left: "4px",
                         }}
                       />
 
                       {[
                         { id: "overview", label: "Overview", icon: BarChart3 },
-                        {
-                          id: "analytics",
-                          label: "Analytics",
-                          icon: TrendingUp,
-                        },
                       ].map((tab) => {
                         const Icon = tab.icon;
 
@@ -456,118 +436,7 @@ const AttorneyDashboard: React.FC<Props> = () => {
               </div>
             )}
 
-            {/* ANALYTICS */}
-            {activeTab === "analytics" && (
-              <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
-                {/* DETENTION BREAKDOWN */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-2xl sm:text-3xl font-black mb-3">
-                      Detention Breakdown
-                    </h2>
-                    <p className="text-base sm:text-lg font-medium text-base-content/60 mb-6">
-                      Status distribution
-                    </p>
-
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            {
-                              name: "Detained",
-                              value: stats.detained,
-                              fill: getCssVar("--color-warning"),
-                            },
-                            {
-                              name: "Released",
-                              value: stats.total - stats.detained,
-                              fill: getCssVar("--color-success"),
-                            },
-                          ]}
-                          dataKey="value"
-                          outerRadius={110}
-                          label={({ name, percent }) =>
-                            `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
-                          }
-                        >
-                          <Cell fill={getCssVar("--color-warning")} />
-
-                          <Cell fill={getCssVar("--color-success")} />
-                        </Pie>
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={40}
-                          iconType="circle"
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    <div className="grid grid-cols-2 gap-4 mt-6">
-                      <div className="stats bg-warning/10 border-2 border-warning/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-warning">
-                            Detained
-                          </div>
-                          <div className="stat-value text-3xl text-warning">
-                            {stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="stats bg-success/10 border-2 border-success/20 hover:scale-105 transition-transform">
-                        <div className="stat p-4 text-center">
-                          <div className="stat-title text-sm font-bold text-success">
-                            Released
-                          </div>
-                          <div className="stat-value text-3xl text-success">
-                            {stats.total - stats.detained}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* BRANCH DISTRIBUTION */}
-                <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                  <div className="card-body p-4 sm:p-6 lg:p-8">
-                    <h2 className="card-title text-2xl sm:text-3xl font-black mb-3">
-                      Branch Distribution
-                    </h2>
-                    <p className="text-base sm:text-lg font-medium text-base-content/60 mb-6">
-                      Cases by location
-                    </p>
-
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={branchPerformance}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke={getCssVar("--color-base-content")}
-                        />
-                        <XAxis
-                          dataKey="branch"
-                          fontSize={12}
-                          fontWeight={600}
-                          stroke={getCssVar("--color-base-content")}
-                        />
-                        <YAxis
-                          fontSize={12}
-                          fontWeight={600}
-                          stroke={getCssVar("--color-base-content")}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar
-                          dataKey="cases"
-                          fill={getCssVar("--color-primary")}
-                          radius={[8, 8, 0, 0]}
-                          name="Cases"
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Analytics removed */}
           </div>
         </div>
       </div>

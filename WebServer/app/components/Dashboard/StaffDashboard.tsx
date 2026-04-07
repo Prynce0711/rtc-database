@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Calendar,
-  FileText,
-  Lock,
-  Scale,
-  Server,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { Calendar, FileText, Lock, Scale, Server } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -211,94 +203,7 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
               ))}
             </section>
 
-            {/* INSIGHTS */}
-            <section className="grid gap-6 lg:grid-cols-2">
-              {/* Detention Rate */}
-              <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                <div className="card-body p-4 sm:p-6">
-                  <h2 className="card-title text-3xl font-black mb-3">
-                    Detention Rate
-                  </h2>
-
-                  <div className="flex items-center gap-4 p-4 rounded-lg bg-base-200">
-                    <div
-                      className={`p-3 rounded-lg ${stats.detained > stats.notDetained ? "bg-warning/20" : "bg-success/20"}`}
-                    >
-                      {stats.detained > stats.notDetained ? (
-                        <TrendingUp className="text-warning h-8 w-8" />
-                      ) : (
-                        <TrendingDown className="text-success h-8 w-8" />
-                      )}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="text-2xl font-black text-base-content mb-1">
-                        {stats.detainedPercentage.toFixed(1)}%
-                      </div>
-                      <p className="text-sm sm:text-base font-medium text-base-content/70">
-                        of your cases involve detention
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <progress
-                      className="progress progress-warning w-full h-3"
-                      value={stats.detainedPercentage}
-                      max="100"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Case Summary */}
-              <div className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-                <div className="card-body p-4 sm:p-6">
-                  <h2 className="card-title text-3xl font-black mb-3">
-                    Case Summary
-                  </h2>
-
-                  <div className="space-y-3">
-                    {[
-                      {
-                        label: "Total Assigned Cases",
-                        value: stats.total,
-                        color: "primary",
-                      },
-                      {
-                        label: "Pending Raffle",
-                        value: stats.pending,
-                        color: "info",
-                      },
-                      {
-                        label: "Detained Clients",
-                        value: stats.detained,
-                        color: "warning",
-                      },
-                      {
-                        label: "Released Clients",
-                        value: stats.notDetained,
-                        color: "success",
-                      },
-                    ].map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-3 rounded-lg bg-base-200 transition-colors"
-                      >
-                        <span className="text-sm sm:text-base font-semibold text-base-content/70">
-                          {item.label}
-                        </span>
-                        <span
-                          className={`text-lg sm:text-xl font-black text-${item.color}`}
-                        >
-                          {item.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
+            {/* Insights removed from Staff Dashboard */}
 
             {/* RECENT CASES */}
             <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">

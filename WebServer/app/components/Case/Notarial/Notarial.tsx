@@ -490,7 +490,7 @@ const NotarialPage: React.FC = () => {
             : undefined
         }
       />
-      
+
       {/* Header */}
       <header className="card bg-base-100 shadow-xl">
         <div className="card-body p-4 sm:p-6">
@@ -507,7 +507,9 @@ const NotarialPage: React.FC = () => {
 
             <div className="flex flex-col items-end gap-3">
               <div className="flex items-center gap-2 flex-nowrap">
-                <NotarialExcelUploader onSuccess={async () => await fetchData()} />
+                <NotarialExcelUploader
+                  onUploadCompleted={async () => await refreshFromBackend()}
+                />
                 <button
                   className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
                   onClick={handleExport}
@@ -532,46 +534,59 @@ const NotarialPage: React.FC = () => {
       </header>
 
       {/* Search and Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-          <input
-            type="text"
-            placeholder="Search by title..."
-            className="input input-bordered w-full pl-11"
-            value={appliedFilters?.title || ""}
-            onChange={(e) =>
-              setAppliedFilters((prev) => ({
-                ...prev,
-                title: e.target.value,
-              }))
-            }
-          />
-        </div>
-
-        <button
-          className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-          onClick={() => setFilterModalOpen((prev) => !prev)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-              clipRule="evenodd"
+      <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+            <input
+              type="text"
+              placeholder="Search by title..."
+              className="input input-bordered w-full pl-11"
+              value={appliedFilters?.title || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  title: e.target.value,
+                }))
+              }
             />
-          </svg>
-          Filter
-          {activeFilterCount > 0 && (
-            <span className="badge badge-sm badge-primary ml-1">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+          </div>
+
+          <button
+            type="button"
+            className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+            onClick={() => {
+              console.log(
+                "Notarial Filter button clicked, current state:",
+                filterModalOpen,
+              );
+              setFilterModalOpen((prev) => !prev);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Filter
+            {activeFilterCount > 0 && (
+              <span className="badge badge-sm badge-primary ml-1">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+            {totalCount} record{totalCount !== 1 && "s"}
+          </span>
+        </div>
 
         <FilterDropdown
           isOpen={filterModalOpen}
@@ -581,10 +596,6 @@ const NotarialPage: React.FC = () => {
           searchValue={appliedFilters}
           getSuggestions={getSuggestions}
         />
-
-        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-          {totalCount} record{totalCount !== 1 && "s"}
-        </span>
       </div>
 
       {isAdminOrAtty && (

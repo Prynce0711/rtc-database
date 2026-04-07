@@ -134,7 +134,7 @@ export async function getCases(
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
-    const [cases, total] = await prisma.$transaction([
+    const [cases, totalRaw] = await prisma.$transaction([
       prisma.case.findMany({
         where,
         orderBy,
@@ -149,6 +149,8 @@ export async function getCases(
       }),
       prisma.case.count({ where }),
     ]);
+
+    const total = typeof totalRaw === "bigint" ? Number(totalRaw) : totalRaw;
 
     return {
       success: true,
@@ -179,7 +181,7 @@ export async function getCaseStats(
     const includeCriminalStats =
       !options?.caseType || options.caseType === "CRIMINAL";
 
-    const [total, recentCount] = await prisma.$transaction([
+    const [totalRaw, recentCountRaw] = await prisma.$transaction([
       prisma.case.count({ where }),
       prisma.case.count({
         where: {
@@ -188,11 +190,17 @@ export async function getCaseStats(
       }),
     ]);
 
+    const total = typeof totalRaw === "bigint" ? Number(totalRaw) : totalRaw;
+    const recentCount =
+      typeof recentCountRaw === "bigint"
+        ? Number(recentCountRaw)
+        : recentCountRaw;
+
     let detainedCount = 0;
     let pendingCount = 0;
 
     if (includeCriminalStats) {
-      [detainedCount, pendingCount] = await prisma.$transaction([
+      const [detainedCountRaw, pendingCountRaw] = await prisma.$transaction([
         prisma.case.count({
           where: {
             AND: [
@@ -231,6 +239,16 @@ export async function getCaseStats(
           },
         }),
       ]);
+
+      // coerce any bigint results
+      detainedCount =
+        typeof detainedCountRaw === "bigint"
+          ? Number(detainedCountRaw)
+          : detainedCountRaw;
+      pendingCount =
+        typeof pendingCountRaw === "bigint"
+          ? Number(pendingCountRaw)
+          : pendingCountRaw;
     }
 
     return {

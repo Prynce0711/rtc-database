@@ -26,17 +26,9 @@ import {
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  RadialBar,
-  RadialBarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -75,9 +67,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview" | "analytics">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<"overview">("overview");
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const getCssVar = (name: string) =>
@@ -316,7 +306,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
             <h2 className="text-3xl font-bold text-base-content mb-2">
               Loading Dashboard
             </h2>
-            <p className="text-lg text-muted">Fetching system analytics...</p>
+            <p className="text-lg text-muted">Fetching dashboard data...</p>
             <div className="flex items-center justify-center gap-2 mt-4">
               {[0, 150, 300].map((delay) => (
                 <div
@@ -377,21 +367,13 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                           borderRadius: "var(--radius-pill)",
                           boxShadow: "var(--shadow-soft)",
                           transitionDuration: "var(--transition-base)",
-                          width: "calc(50% - 4px)",
-                          left:
-                            activeTab === "overview"
-                              ? "4px"
-                              : "calc(50% + 0px)",
+                          width: "calc(100% - 4px)",
+                          left: "4px",
                         }}
                       />
 
                       {[
                         { id: "overview", label: "Overview", icon: BarChart3 },
-                        {
-                          id: "analytics",
-                          label: "Analytics",
-                          icon: TrendingUp,
-                        },
                       ].map((tab) => {
                         const Icon = tab.icon;
 
@@ -759,147 +741,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
               </div>
             )}
 
-            {/* ANALYTICS TAB */}
-            {activeTab === "analytics" && (
-              <div
-                className="grid lg:grid-cols-2 animate-fade-in"
-                style={{ gap: "var(--space-section-gap)" }}
-              >
-                {/* DETENTION ANALYSIS */}
-                <div className="card surface-card animate-slide-up">
-                  <div className="card-body">
-                    <h2 className="card-title font-black">
-                      Detention Status Analysis
-                    </h2>
-
-                    <ResponsiveContainer width="100%" height={260}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: "Detained", value: stats.detained },
-                            {
-                              name: "Released",
-                              value: stats.totalCases - stats.detained,
-                            },
-                          ]}
-                          dataKey="value"
-                          outerRadius={100}
-                        >
-                          <Cell fill={getCssVar("--color-warning")} />
-                          <Cell fill={getCssVar("--color-success")} />
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* BRANCH EFFICIENCY */}
-                <div className="card surface-card animate-slide-up">
-                  <div className="card-body">
-                    <h2 className="card-title font-black">
-                      Branch Processing Efficiency
-                    </h2>
-
-                    <div className="space-y-4 mt-4">
-                      {branchPerformance.slice(0, 5).map((branch) => (
-                        <div key={branch.branch}>
-                          <div className="flex justify-between font-bold">
-                            <span>{branch.branch}</span>
-                            <span>{branch.efficiency.toFixed(1)}%</span>
-                          </div>
-
-                          <progress
-                            className="progress progress-primary w-full"
-                            value={branch.efficiency}
-                            max="100"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* BRANCH WORKLOAD */}
-                <div className="lg:col-span-2 card surface-card animate-slide-up">
-                  <div className="card-body">
-                    <h2 className="card-title font-black">Branch Workload</h2>
-
-                    <ResponsiveContainer width="100%" height={350}>
-                      <BarChart
-                        data={branchPerformance.slice(0, 5)}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis dataKey="branch" type="category" />
-                        <Tooltip content={<CustomTooltip />} />
-
-                        <Bar
-                          dataKey="cases"
-                          fill={getCssVar("--color-primary")}
-                          radius={[0, 8, 8, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* CASE FILING TRENDS */}
-                <div className="lg:col-span-2 card surface-card animate-slide-up">
-                  <div className="card-body">
-                    <h2 className="card-title font-black">
-                      Case Filing Trends
-                    </h2>
-
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={monthlyTrends}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip content={<CustomTooltip />} />
-
-                        <Area
-                          type="monotone"
-                          dataKey="cases"
-                          stroke={getCssVar("--color-primary")}
-                          fillOpacity={0.3}
-                          fill={getCssVar("--color-primary")}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* DATA QUALITY */}
-                <div className="lg:col-span-2 card surface-card animate-slide-up">
-                  <div className="card-body">
-                    <h2 className="card-title font-black">Data Quality</h2>
-
-                    <ResponsiveContainer width="100%" height={220}>
-                      <RadialBarChart
-                        cx="50%"
-                        cy="50%"
-                        innerRadius="60%"
-                        outerRadius="100%"
-                        data={[
-                          {
-                            name: "Quality",
-                            value: dataQuality.quality,
-                            fill: getCssVar("--color-success"),
-                          },
-                        ]}
-                        startAngle={90}
-                        endAngle={-270}
-                      >
-                        <RadialBar dataKey="value" cornerRadius={10} />
-                      </RadialBarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Analytics removed from Admin Dashboard */}
           </div>
         </div>
       </div>

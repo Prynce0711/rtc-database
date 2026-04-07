@@ -511,41 +511,54 @@ const CriminalCasePage: React.FC = () => {
       </header>
 
       {/* Search and Filter Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-          <input
-            type="text"
-            placeholder="Search case number..."
-            className="input input-bordered w-full pl-11"
-            value={appliedFilters?.caseNumber || ""}
-            onChange={(e) =>
-              setAppliedFilters((prev) => ({
-                ...prev,
-                caseNumber: e.target.value,
-              }))
-            }
-          />
-        </div>
-
-        <button
-          className="btn btn-md btn-outline gap-2"
-          onClick={() => setFilterModalOpen((prev) => !prev)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-              clipRule="evenodd"
+      <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+            <input
+              type="text"
+              placeholder="Search case number..."
+              className="input input-bordered w-full pl-11"
+              value={appliedFilters?.caseNumber || ""}
+              onChange={(e) =>
+                setAppliedFilters((prev) => ({
+                  ...prev,
+                  caseNumber: e.target.value,
+                }))
+              }
             />
-          </svg>
-          Filter
-        </button>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-md btn-outline gap-2"
+            onClick={() => {
+              console.log(
+                "Criminal Filter button clicked, current state:",
+                filterModalOpen,
+              );
+              setFilterModalOpen((prev) => !prev);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Filter
+          </button>
+
+          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+            {totalCount} case{totalCount !== 1 && "s"}
+          </span>
+        </div>
 
         <FilterDropdown
           isOpen={filterModalOpen}
@@ -555,203 +568,199 @@ const CriminalCasePage: React.FC = () => {
           searchValue={appliedFilters}
           getSuggestions={getCaseSuggestions}
         />
-
-        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-          {totalCount} case{totalCount !== 1 && "s"}
-        </span>
       </div>
 
-        {/* Stats Cards (KPI style) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[
-            {
-              label: "Total Cases",
-              value: stats.totalCases ?? 0,
-              subtitle: `${(stats.recentlyFiled ?? 0).toLocaleString()} filed recently`,
-              icon: FiBarChart2,
-            },
-            {
-              label: "In Detention",
-              value: stats.detainedCases ?? 0,
-              subtitle: `${(((stats.detainedCases ?? 0) / Math.max(1, stats.totalCases ?? 1)) * 100).toFixed(1)}% of total`,
-              icon: FiLock,
-            },
-            {
-              label: "Pending Raffle",
-              value: stats.pendingCases ?? 0,
-              subtitle: `Requires raffle assignment`,
-              icon: FiFileText,
-            },
-            {
-              label: "Recently Filed",
-              value: stats.recentlyFiled ?? 0,
-              subtitle: `Last 30 days`,
-              icon: FiUsers,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-              >
-                <div className="card-body relative overflow-hidden p-4 sm:p-6">
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
-                    <Icon className="h-full w-full" />
+      {/* Stats Cards (KPI style) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Total Cases",
+            value: stats.totalCases ?? 0,
+            subtitle: `${(stats.recentlyFiled ?? 0).toLocaleString()} filed recently`,
+            icon: FiBarChart2,
+          },
+          {
+            label: "In Detention",
+            value: stats.detainedCases ?? 0,
+            subtitle: `${(((stats.detainedCases ?? 0) / Math.max(1, stats.totalCases ?? 1)) * 100).toFixed(1)}% of total`,
+            icon: FiLock,
+          },
+          {
+            label: "Pending Raffle",
+            value: stats.pendingCases ?? 0,
+            subtitle: `Requires raffle assignment`,
+            icon: FiFileText,
+          },
+          {
+            label: "Recently Filed",
+            value: stats.recentlyFiled ?? 0,
+            subtitle: `Last 30 days`,
+            icon: FiUsers,
+          },
+        ].map((card, idx) => {
+          const Icon = card.icon as React.ComponentType<
+            React.SVGProps<SVGSVGElement>
+          >;
+          return (
+            <div
+              key={idx}
+              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <div className="card-body relative overflow-hidden p-4 sm:p-6">
+                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
+                  <Icon className="h-full w-full" />
+                </div>
+                <div className="relative text-center">
+                  <div className="mb-2">
+                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
+                      {card.label}
+                    </span>
                   </div>
-                  <div className="relative text-center">
-                    <div className="mb-2">
-                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
-                      {card.value.toLocaleString()}
-                    </p>
-                    <p className="text-xs sm:text-sm font-medium text-base-content/60">
-                      {card.subtitle}
-                    </p>
-                  </div>
+                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
+                    {card.subtitle}
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Cases Table */}
-        {/* Selected Cases Bar */}
-        {isAdminOrAtty && (
-          <AnimatePresence>
-            {selectedCaseIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
-                    {selectedCaseIds.length} case
-                    {selectedCaseIds.length > 1 ? "s" : ""} selected
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/criminal/edit?ids=${selectedCaseIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedCases}
-                      disabled={deletingSelected}
-                    >
-                      <FiTrash2 className="h-4 w-4" />
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedCaseIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
+      {/* Cases Table */}
+      {/* Selected Cases Bar */}
+      {isAdminOrAtty && (
+        <AnimatePresence>
+          {selectedCaseIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-primary">
+                  {selectedCaseIds.length} case
+                  {selectedCaseIds.length > 1 ? "s" : ""} selected
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      router.push(
+                        `/user/cases/criminal/edit?ids=${selectedCaseIds.join(",")}`,
+                      )
+                    }
+                  >
+                    Edit Selected
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                    onClick={handleDeleteSelectedCases}
+                    disabled={deletingSelected}
+                  >
+                    <FiTrash2 className="h-4 w-4" />
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedCaseIds([])}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
-        <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
-          <Table
-            headers={[
-              ...(isAdminOrAtty
-                ? [
-                    {
-                      key: "actions",
-                      label: "Actions",
-                      align: "center" as const,
-                    },
-                  ]
-                : []),
-              { key: "caseNumber", label: "Case Number", sortable: true },
-              {
-                key: "branch",
-                label: "Branch",
-                sortable: true,
-              },
-              {
-                key: "assistantBranch",
-                label: "Assistant Branch",
-                sortable: true,
-              },
-              { key: "dateFiled", label: "Date Filed", sortable: true },
-              { key: "caseType", label: "Case Type", sortable: true },
-              { key: "name", label: "Name", sortable: true },
-              { key: "charge", label: "Charge", sortable: true },
-              { key: "infoSheet", label: "Info Sheet", sortable: true },
-              { key: "court", label: "Court", sortable: true },
-              {
-                key: "detained",
-                label: "Detained",
-                sortable: true,
-                align: "center",
-              },
-              { key: "consolidation", label: "Consolidation", sortable: true },
-              { key: "eqcNumber", label: "EQC Number", sortable: true },
-              { key: "bond", label: "Bond", sortable: true },
-              { key: "raffleDate", label: "Raffle Date", sortable: true },
-              { key: "committee1", label: "Committee 1", sortable: true },
-              { key: "committee2", label: "Committee 2", sortable: true },
-              { key: "judge", label: "Judge", sortable: true },
-              { key: "ao", label: "AO", sortable: true },
-              { key: "complainant", label: "Complainant", sortable: true },
-              { key: "houseNo", label: "House No.", sortable: true },
-              { key: "street", label: "Street", sortable: true },
-              { key: "barangay", label: "Barangay", sortable: true },
-              { key: "municipality", label: "Municipality", sortable: true },
-              { key: "province", label: "Province", sortable: true },
-              { key: "counts", label: "Counts", sortable: true },
-              { key: "jdf", label: "JDF", sortable: true },
-              { key: "sajj", label: "SAJJ", sortable: true },
-              { key: "sajj2", label: "SAJJ2", sortable: true },
-              { key: "mf", label: "MF", sortable: true },
-              { key: "stf", label: "STF", sortable: true },
-              { key: "lrf", label: "LRF", sortable: true },
-              { key: "vcf", label: "VCF", sortable: true },
-              { key: "total", label: "Total", sortable: true },
-              {
-                key: "amountInvolved",
-                label: "Amount Involved",
-                sortable: true,
-              },
-            ]}
-            data={cases}
-            rowsPerPage={pageSize}
-            showPagination={false}
-            sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
-            onSort={(k) => handleSort(k as SortKey)}
-            renderRow={(caseItem) => (
-              <CriminalCaseRow
-                key={caseItem.id}
-                caseItem={caseItem}
-                handleDeleteCase={handleDeleteCase}
-                onEdit={(item) => {
-                  router.push(`/user/cases/criminal/edit?id=${item.id}`);
-                }}
-                selected={selectedCaseIds.includes(caseItem.id)}
-                onToggleSelect={handleToggleCaseSelection}
-              />
-            )}
-          />
-        </div>
+      <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
+        <Table
+          headers={[
+            ...(isAdminOrAtty
+              ? [
+                  {
+                    key: "actions",
+                    label: "Actions",
+                    align: "center" as const,
+                  },
+                ]
+              : []),
+            { key: "caseNumber", label: "Case Number", sortable: true },
+            {
+              key: "branch",
+              label: "Branch",
+              sortable: true,
+            },
+            {
+              key: "assistantBranch",
+              label: "Assistant Branch",
+              sortable: true,
+            },
+            { key: "dateFiled", label: "Date Filed", sortable: true },
+            { key: "caseType", label: "Case Type", sortable: true },
+            { key: "name", label: "Name", sortable: true },
+            { key: "charge", label: "Charge", sortable: true },
+            { key: "infoSheet", label: "Info Sheet", sortable: true },
+            { key: "court", label: "Court", sortable: true },
+            {
+              key: "detained",
+              label: "Detained",
+              sortable: true,
+              align: "center",
+            },
+            { key: "consolidation", label: "Consolidation", sortable: true },
+            { key: "eqcNumber", label: "EQC Number", sortable: true },
+            { key: "bond", label: "Bond", sortable: true },
+            { key: "raffleDate", label: "Raffle Date", sortable: true },
+            { key: "committee1", label: "Committee 1", sortable: true },
+            { key: "committee2", label: "Committee 2", sortable: true },
+            { key: "judge", label: "Judge", sortable: true },
+            { key: "ao", label: "AO", sortable: true },
+            { key: "complainant", label: "Complainant", sortable: true },
+            { key: "houseNo", label: "House No.", sortable: true },
+            { key: "street", label: "Street", sortable: true },
+            { key: "barangay", label: "Barangay", sortable: true },
+            { key: "municipality", label: "Municipality", sortable: true },
+            { key: "province", label: "Province", sortable: true },
+            { key: "counts", label: "Counts", sortable: true },
+            { key: "jdf", label: "JDF", sortable: true },
+            { key: "sajj", label: "SAJJ", sortable: true },
+            { key: "sajj2", label: "SAJJ2", sortable: true },
+            { key: "mf", label: "MF", sortable: true },
+            { key: "stf", label: "STF", sortable: true },
+            { key: "lrf", label: "LRF", sortable: true },
+            { key: "vcf", label: "VCF", sortable: true },
+            { key: "total", label: "Total", sortable: true },
+            {
+              key: "amountInvolved",
+              label: "Amount Involved",
+              sortable: true,
+            },
+          ]}
+          data={cases}
+          rowsPerPage={pageSize}
+          showPagination={false}
+          sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
+          onSort={(k) => handleSort(k as SortKey)}
+          renderRow={(caseItem) => (
+            <CriminalCaseRow
+              key={caseItem.id}
+              caseItem={caseItem}
+              handleDeleteCase={handleDeleteCase}
+              onEdit={(item) => {
+                router.push(`/user/cases/criminal/edit?id=${item.id}`);
+              }}
+              selected={selectedCaseIds.includes(caseItem.id)}
+              onToggleSelect={handleToggleCaseSelection}
+            />
+          )}
+        />
+      </div>
 
       {/* Pagination */}
       <div className="flex items-center justify-between">

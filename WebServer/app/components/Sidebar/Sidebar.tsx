@@ -462,7 +462,7 @@ function adminSidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={adminStatisticsNavItem}
+          item={caseNavItems[2]}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -588,7 +588,7 @@ function attySidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={caseNavItems[1]}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -683,7 +683,7 @@ function statsSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={caseNavItems[1]}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -779,7 +779,7 @@ function staffSidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={caseNavItems[1]}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -964,7 +964,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
       <motion.aside
         animate={{ width: isExpanded ? 264 : 72 }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-        className="relative flex flex-col shrink-0 z-30 overflow-hidden sidebar-gradient"
+        className="sticky top-0 h-screen relative flex flex-col shrink-0 z-30 overflow-hidden sidebar-gradient"
       >
         {/* Animated accent glow at top */}
         <div className="absolute top-0 left-0 right-0 h-40 bg-linear-to-b from-primary/6 to-transparent z-0 pointer-events-none" />
