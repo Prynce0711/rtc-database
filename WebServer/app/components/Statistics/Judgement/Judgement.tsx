@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
@@ -8,6 +8,24 @@ import JudgementMTC from "./JudgementMTC";
 import JudgementRTC from "./JudgementRTC";
 
 type JudgementView = "MTC" | "RTC";
+
+const extractYear = (value: unknown): string | null => {
+  if (value instanceof Date && Number.isFinite(value.getTime())) {
+    return String(value.getFullYear());
+  }
+
+  const asString = String(value ?? "").trim();
+  if (!asString) return null;
+
+  const exactYear = asString.match(/^(19|20)\d{2}$/);
+  if (exactYear) return exactYear[0];
+
+  const isoYear = asString.match(/^(19|20)\d{2}/);
+  if (isoYear) return isoYear[0];
+
+  const genericYear = asString.match(/(19|20)\d{2}/);
+  return genericYear ? genericYear[0] : null;
+};
 
 const views: {
   label: string;
@@ -31,9 +49,12 @@ const views: {
 
 export default function Judgement() {
   const [activeView, setActiveView] = useState<JudgementView>("MTC");
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10),
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString(),
   );
+  const [currentViewData, setCurrentViewData] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [requestAdd, setRequestAdd] = useState(0);
   const [isChildActive, setIsChildActive] = useState(false);
 
@@ -43,15 +64,25 @@ export default function Judgement() {
   };
 
   const exportDataRef = useRef<Record<string, unknown>[]>([]);
-  const selectedYear = selectedDate.slice(0, 4);
-  const selectedDateLabel = new Date(selectedDate).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const yearOptions = useMemo(() => {
+    const years = new Set<string>();
+    const currentYear = new Date().getFullYear().toString();
+
+    years.add(currentYear);
+    years.add(selectedYear);
+
+    for (const row of currentViewData) {
+      const year = extractYear(row["dateRecorded"]);
+      if (year) years.add(year);
+    }
+
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [currentViewData, selectedYear]);
 
   const handleExport = () => {
-    const data = exportDataRef.current;
+    const data = exportDataRef.current.filter(
+      (row) => extractYear(row["dateRecorded"]) === selectedYear,
+    );
     if (!data || data.length === 0) return;
 
     const rows = data.map((r) => {
@@ -75,8 +106,6 @@ export default function Judgement() {
     );
   };
 
-  // yearOptions no longer needed — selection is by full date
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
@@ -91,18 +120,24 @@ export default function Judgement() {
                 <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
                   <FiCalendar className="shrink-0" />
                   <span>
-                    Judgment day statistics and reports for {selectedDateLabel}
+                    Judgment day statistics and reports for {selectedYear}
                   </span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                <input
-                  type="date"
-                  className="input input-bordered input-md w-66"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                />
+                <select
+                  className="select select-bordered select-md w-40"
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  aria-label="Year filter"
+                >
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
                 <div className="flex items-center gap-2 flex-nowrap">
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
@@ -140,9 +175,11 @@ export default function Judgement() {
       {activeView === "MTC" && (
         <JudgementMTC
           selectedYear={selectedYear}
+          onSelectedYearChange={setSelectedYear}
           requestAdd={requestAdd}
           onDataReady={(d) => {
             exportDataRef.current = d;
+            setCurrentViewData(d);
           }}
           onActivePageChange={setIsChildActive}
           activeView={activeView}
@@ -152,9 +189,11 @@ export default function Judgement() {
       {activeView === "RTC" && (
         <JudgementRTC
           selectedYear={selectedYear}
+          onSelectedYearChange={setSelectedYear}
           requestAdd={requestAdd}
           onDataReady={(d) => {
             exportDataRef.current = d;
+            setCurrentViewData(d);
           }}
           onActivePageChange={setIsChildActive}
           activeView={activeView}

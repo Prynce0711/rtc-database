@@ -204,6 +204,7 @@ const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
       {...(rest as AnnualAddReportPageProps)}
       fields={displayFields}
       columns={displayColumns}
+      yearFilterInputMode="select"
       customTabs={judgementTabs}
       initialData={initialData}
       onBack={onBack}

@@ -27,6 +27,7 @@ type MtcDisplayRow = MTCJudgementLog & {
 
 interface JudgementMTCProps {
   selectedYear?: string;
+  onSelectedYearChange?: (year: string) => void;
   requestAdd?: number;
   onDataReady?: (data: Record<string, unknown>[]) => void;
   onActivePageChange?: (active: boolean) => void;
@@ -36,6 +37,7 @@ interface JudgementMTCProps {
 
 const JudgementMTC = ({
   selectedYear,
+  onSelectedYearChange,
   requestAdd,
   onDataReady,
   onActivePageChange,
@@ -68,7 +70,10 @@ const JudgementMTC = ({
   }
 
   useEffect(() => {
-    loadRecords();
+    const load = async () => {
+      await loadRecords();
+    };
+    void load();
   }, []);
 
   useEffect(() => {
@@ -79,8 +84,8 @@ const JudgementMTC = ({
 
   return (
     <JudgementTable<MtcDisplayRow & Record<string, unknown>>
-      // title="MTC Judgment Week"
-      // subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
+      title="MTC Judgment Week"
+      subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
       data={tableRecords as (MtcDisplayRow & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}
@@ -109,6 +114,7 @@ const JudgementMTC = ({
         if (!res.success) throw new Error(res.error || "Delete failed");
         await loadRecords();
       }}
+      onSelectedYearChange={onSelectedYearChange}
       onActivePageChange={onActivePageChange}
       activeView={activeView}
       onSwitchView={onSwitchView}

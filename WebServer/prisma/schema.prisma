@@ -446,6 +446,7 @@ model monthlyStatistics {
 model JudgementMunicipal {
   id              Int     @id @default(autoincrement())
   branchNo        String?
+  dateRecorded    DateTime @default(now())
   civilV          Int
   civilInc        Int
   criminalV       Int
@@ -473,6 +474,7 @@ model JudgementMunicipal {
 model JudgementRegional {
   id              Int     @id @default(autoincrement())
   branchNo        String?
+  dateRecorded    DateTime @default(now())
   civilV          Int
   civilInc        Int
   criminalV       Int
