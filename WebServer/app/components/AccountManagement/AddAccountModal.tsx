@@ -72,7 +72,9 @@ const AddAccountModal = ({
               >
                 <option value={Roles.USER}>Staff</option>
                 <option value={Roles.ATTY}>Atty</option>
-                <option value={Roles.USER}>Clerk</option>
+                <option value={Roles.STATISTICS}>Statistics</option>
+                <option value={Roles.NOTARIAL}>Notarial</option>
+                <option value={Roles.ARCHIVE}>Archive</option>
               </select>
             </div>
 

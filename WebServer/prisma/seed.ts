@@ -51,7 +51,7 @@ async function main() {
 
   // Create Statistics Account
   try {
-    const attyResult = await auth.api.signUpEmail({
+    const statsResult = await auth.api.signUpEmail({
       body: {
         email: "stats@stats.com",
         password: "stats12345",
@@ -59,7 +59,7 @@ async function main() {
       },
     });
 
-    if (attyResult) {
+    if (statsResult) {
       console.log("Created statistics user successfully");
     }
   } catch (error: any) {
@@ -69,6 +69,50 @@ async function main() {
   await prisma.user.update({
     where: { email: "stats@stats.com" },
     data: { role: "statistics", status: Status.ACTIVE },
+  });
+
+  // Create Notarial Account
+  try {
+    const notarialResult = await auth.api.signUpEmail({
+      body: {
+        email: "notarial@notarial.com",
+        password: "notarial12345",
+        name: "Notarial",
+      },
+    });
+
+    if (notarialResult) {
+      console.log("Created notarial user successfully");
+    }
+  } catch (error: any) {
+    console.error(`Failed to create notarial user: ${error.message}`);
+  }
+
+  await prisma.user.update({
+    where: { email: "notarial@notarial.com" },
+    data: { role: "notarial", status: Status.ACTIVE },
+  });
+
+  // Create Archive Account
+  try {
+    const archiveResult = await auth.api.signUpEmail({
+      body: {
+        email: "archive@archive.com",
+        password: "archive12345",
+        name: "Archive",
+      },
+    });
+
+    if (archiveResult) {
+      console.log("Created archive user successfully");
+    }
+  } catch (error: any) {
+    console.error(`Failed to create archive user: ${error.message}`);
+  }
+
+  await prisma.user.update({
+    where: { email: "archive@archive.com" },
+    data: { role: "archive", status: Status.ACTIVE },
   });
 
   // Create staff user
