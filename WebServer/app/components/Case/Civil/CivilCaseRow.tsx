@@ -41,10 +41,13 @@ const CivilCaseRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm"
       onClick={() => onRowClick(record)}
     >
-      <td onClick={(e) => e.stopPropagation()} className="text-center">
+      <td
+        onClick={(e) => e.stopPropagation()}
+        className="px-4 py-3.5 text-center"
+      >
         <div className="flex items-center justify-center gap-2">
           <input
             type="checkbox"
@@ -101,18 +104,41 @@ const CivilCaseRow = ({
         label="Case Number"
         value={record.title}
         truncate
-        className="font-semibold"
+        className="font-semibold px-4 py-3.5"
       />
-      <TipCell label="Branch" value={record.name} truncate />
-      <TipCell label="Petitioner/s" value={record.atty} truncate />
-      <TipCell label="Defendant/s" value={record.defendant} truncate />
+      <TipCell
+        label="Branch"
+        value={record.name}
+        truncate
+        className="px-4 py-3.5"
+      />
+      <TipCell
+        label="Petitioner/s"
+        value={record.atty}
+        truncate
+        className="px-4 py-3.5"
+      />
+      <TipCell
+        label="Defendant/s"
+        value={record.defendant}
+        truncate
+        className="px-4 py-3.5"
+      />
       <TipCell
         label="Date Filed"
         value={formatDate(record.date)}
-        className="text-base-content/70"
+        className="text-base-content/70 px-4 py-3.5"
       />
-      <TipCell label="Notes/Appealed" value={record.notes} />
-      <TipCell label="Nature of Petition" value={record.nature} />
+      <TipCell
+        label="Notes/Appealed"
+        value={record.notes}
+        className="px-4 py-3.5"
+      />
+      <TipCell
+        label="Nature of Petition"
+        value={record.nature}
+        className="px-4 py-3.5"
+      />
     </tr>
   );
 };

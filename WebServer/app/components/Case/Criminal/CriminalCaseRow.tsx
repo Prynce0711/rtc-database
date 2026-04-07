@@ -60,7 +60,7 @@ const CriminalCaseRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
+      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-xs"
       onClick={() => {
         console.log(caseItem);
         router.push(`/user/cases/criminal/${caseItem.id}`);
@@ -70,7 +70,7 @@ const CriminalCaseRow = ({
       {isAdminOrAtty && (
         <td
           onClick={(e) => e.stopPropagation()}
-          className="relative text-center"
+          className="relative text-center px-4 py-3.5"
         >
           <div className="flex items-center justify-center gap-2">
             <input

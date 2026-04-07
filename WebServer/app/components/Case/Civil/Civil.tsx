@@ -73,7 +73,7 @@ const SortTh = ({
   onSort: (k: SortKey) => void;
 }) => (
   <th
-    className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
+    className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 cursor-pointer select-none hover:bg-base-200/50 transition-colors"
     onClick={() => onSort(colKey)}
   >
     {label}
@@ -555,170 +555,145 @@ const Civil: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-base-100">
-      <main className="w-full">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Civil Cases
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Manage civil cases and filings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
-          </div>
-        </div>
-
-        {/* Search and Actions */}
-        <div className="relative mb-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-              <input
-                type="text"
-                placeholder="Search by case number, branch, petitioner..."
-                className="input input-bordered input-lg w-full pl-12 text-base"
-                value={appliedFilters?.caseNumber || ""}
-                onChange={(e) =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    caseNumber: e.target.value,
-                  }))
-                }
-              />
+    <div className="space-y-6 sm:space-y-8">
+      {/* Header */}
+      <header className="card bg-base-100 shadow-xl">
+        <div className="card-body p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+                Civil Cases
+              </h1>
+              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
+                <FiFileText className="shrink-0" />
+                <span>Manage civil cases and filings</span>
+              </p>
             </div>
 
-            <button
-              className={`btn btn-outline ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
-              onClick={() => setFilterModalOpen((prev) => !prev)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                  clipRule="evenodd"
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex items-center gap-2 flex-nowrap">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImport}
                 />
-              </svg>
-              Filter
-              {appliedFilters && Object.keys(appliedFilters).length > 0 && (
-                <span className="badge badge-sm badge-primary ml-1">
-                  {Object.keys(appliedFilters).length}
-                </span>
-              )}
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleImport}
-            />
-
-            {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <FiUpload className="h-5 w-5" />
-                {uploading ? "Importing..." : "Import Excel"}
-              </button>
-            )}
-            {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${exporting ? "loading" : ""}`}
-                onClick={handleExport}
-                disabled={exporting}
-              >
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
-              </button>
-            )}
-            {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => router.push("/user/cases/civil/add")}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Record
-              </button>
-            )}
+                {isAdminOrAtty && (
+                  <>
+                    <button
+                      className={`btn btn-outline btn-md gap-2 ${uploading ? "loading" : ""}`}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <FiUpload className="h-5 w-5" />
+                      {uploading ? "Importing..." : "Import"}
+                    </button>
+                    <button
+                      className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
+                      onClick={handleExport}
+                      disabled={exporting}
+                    >
+                      <FiDownload className="h-5 w-5" />
+                      {exporting ? "Exporting..." : "Export"}
+                    </button>
+                    <button
+                      className="btn btn-success btn-md gap-2"
+                      onClick={() => router.push("/user/cases/civil/add")}
+                    >
+                      <FiFileText className="h-5 w-5" />
+                      Add Record
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
+        </div>
+      </header>
 
-          <FilterDropdown
-            isOpen={filterModalOpen}
-            onClose={() => setFilterModalOpen(false)}
-            options={CASE_FILTER_OPTIONS}
-            onApply={handleApplyFilters}
-            searchValue={appliedFilters}
-            getSuggestions={getCaseSuggestions}
+      {/* Search and Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+          <input
+            type="text"
+            placeholder="Search case number, branch..."
+            className="input input-bordered w-full pl-11"
+            value={appliedFilters?.caseNumber || ""}
+            onChange={(e) =>
+              setAppliedFilters((prev) => ({
+                ...prev,
+                caseNumber: e.target.value,
+              }))
+            }
           />
         </div>
 
+        <button
+          className={`btn btn-md btn-outline gap-2 ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
+          onClick={() => setFilterModalOpen((prev) => !prev)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Filter
+          {appliedFilters && Object.keys(appliedFilters).length > 0 && (
+            <span className="badge badge-sm badge-primary ml-1">
+              {Object.keys(appliedFilters).length}
+            </span>
+          )}
+        </button>
+
+        <FilterDropdown
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          options={CASE_FILTER_OPTIONS}
+          onApply={handleApplyFilters}
+          searchValue={appliedFilters}
+          getSuggestions={getCaseSuggestions}
+        />
+
+        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {totalCount} case{totalCount !== 1 && "s"}
+        </span>
+      </div>
+
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
             {
               label: "TOTAL CASES",
               value: (stats.totalCases ?? 0).toLocaleString(),
               subtitle: "All civil cases",
               icon: FiBarChart2,
-              delay: 0,
             },
             {
               label: "RECENTLY FILED",
               value: (stats.recentlyFiled ?? 0).toLocaleString(),
               subtitle: "Filed in the last 30 days",
               icon: FiFileText,
-              delay: 100,
             },
             {
               label: "RE-RAFFLED",
               value: (stats.reRaffledCases ?? 0).toLocaleString(),
               subtitle: "Re-raffled cases",
               icon: FiUsers,
-              delay: 200,
             },
             {
               label: "REMANDED",
               value: (stats.remandedCases ?? 0).toLocaleString(),
               subtitle: "Cases remanded",
               icon: FiLock,
-              delay: 300,
             },
           ].map((card, idx) => {
             const Icon = card.icon as React.ComponentType<
@@ -727,29 +702,22 @@ const Civil: React.FC = () => {
             return (
               <div
                 key={idx}
-                className={`transform hover:scale-105 card surface-card-hover group`}
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
+                className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
               >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                <div className="card-body relative overflow-hidden p-4 sm:p-6">
+                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
                     <Icon className="h-full w-full" />
                   </div>
                   <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
+                    <div className="mb-2">
+                      <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
                         {card.label}
                       </span>
                     </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                    <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
                       {card.value}
                     </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
+                    <p className="text-xs sm:text-sm font-medium text-base-content/60">
                       {card.subtitle}
                     </p>
                   </div>
@@ -759,7 +727,7 @@ const Civil: React.FC = () => {
           })}
         </div>
 
-        {/* Table */}
+        {/* Selected Records Bar */}
         {isAdminOrAtty && (
           <AnimatePresence>
             {selectedRecordIds.length > 0 && (
@@ -768,7 +736,7 @@ const Civil: React.FC = () => {
                 animate={{ opacity: 1, y: 0, height: "auto" }}
                 exit={{ opacity: 0, y: -10, height: 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mb-4 overflow-hidden"
+                className="overflow-hidden"
               >
                 <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-primary">
@@ -807,107 +775,118 @@ const Civil: React.FC = () => {
           </AnimatePresence>
         )}
 
-        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
-          <table className="table table-zebra w-full text-center">
-            <thead className="bg-base-300">
-              <tr className="text-center">
-                {isAdminOrAtty && <th>ACTIONS</th>}
-                <SortTh
-                  label="CASE NUMBER"
-                  colKey="caseNumber"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="BRANCH"
-                  colKey="branch"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="PETITIONER/S"
-                  colKey="petitioners"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="DEFENDANT/S"
-                  colKey="defendants"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="DATE FILED"
-                  colKey="dateFiled"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <th>NOTES/APPEALED</th>
-                <th>NATURE OF PETITION</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={isAdminOrAtty ? 8 : 7}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-55">
-                      <div className="flex items-center justify-center mb-4">
-                        <FiFileText className="w-15 h-15 opacity-50" />
-                      </div>
-                      <p className="text-lg uppercase font-semibold text-base-content/50">
-                        No records found
-                      </p>
-                      <p className="text-sm mt-1 uppercase text-base-content/35">
-                        No civil cases match your current filters.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                records.map((r) => (
-                  <CivilCaseRow
-                    key={r.id}
-                    record={r}
-                    onEdit={(item) => {
-                      router.push(`/user/cases/civil/edit?id=${item.id}`);
-                    }}
-                    onDelete={handleDelete}
-                    onRowClick={(item) => {
-                      try {
-                        localStorage.setItem(
-                          "__temp_case",
-                          JSON.stringify(item),
-                        );
-                        localStorage.setItem(
-                          "__temp_cases",
-                          JSON.stringify(records || []),
-                        );
-                      } catch (e) {
-                        // ignore
-                      }
-                      router.push(`/user/cases/civil/${item.id}`);
-                    }}
-                    selected={selectedRecordIds.includes(r.id)}
-                    onToggleSelect={handleToggleRecordSelection}
+        {/* Table */}
+        <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="table table-sm w-full text-center">
+              <thead>
+                <tr className="bg-base-200/50 border-b border-base-200">
+                  {isAdminOrAtty && (
+                    <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                      Actions
+                    </th>
+                  )}
+                  <SortTh
+                    label="Case Number"
+                    colKey="caseNumber"
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
                   />
-                ))
-              )}
-            </tbody>
-          </table>
+                  <SortTh
+                    label="Branch"
+                    colKey="branch"
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
+                  />
+                  <SortTh
+                    label="Petitioner/s"
+                    colKey="petitioners"
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
+                  />
+                  <SortTh
+                    label="Defendant/s"
+                    colKey="defendants"
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
+                  />
+                  <SortTh
+                    label="Date Filed"
+                    colKey="dateFiled"
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
+                  />
+                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                    Notes/Appealed
+                  </th>
+                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                    Nature of Petition
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdminOrAtty ? 8 : 7} className="py-16 text-center text-base-content/40">
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <FiFileText className="w-16 h-16 opacity-20 mb-4" />
+                        <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
+                          No records found
+                        </p>
+                        <p className="text-sm mt-2 text-base-content/35">
+                          No civil cases match your current filters.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  records.map((r) => (
+                    <CivilCaseRow
+                      key={r.id}
+                      record={r}
+                      onEdit={(item) => {
+                        router.push(`/user/cases/civil/edit?id=${item.id}`);
+                      }}
+                      onDelete={handleDelete}
+                      onRowClick={(item) => {
+                        try {
+                          localStorage.setItem(
+                            "__temp_case",
+                            JSON.stringify(item),
+                          );
+                          localStorage.setItem(
+                            "__temp_cases",
+                            JSON.stringify(records || []),
+                          );
+                        } catch (e) {
+                          // ignore
+                        }
+                        router.push(`/user/cases/civil/${item.id}`);
+                      }}
+                      selected={selectedRecordIds.includes(r.id)}
+                      onToggleSelect={handleToggleRecordSelection}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Pagination */}
-        <div className="mt-4 flex justify-end">
-          <Pagination
-            pageCount={pageCount}
-            currentPage={currentPage}
-            onPageChange={(page) => {
-              setCurrentPage(page);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
-        </div>
-      </main>
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-base-content/40">
+          Showing page {currentPage} of {pageCount}
+        </p>
+        <Pagination
+          pageCount={pageCount}
+          currentPage={currentPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </div>
     </div>
   );
 };
