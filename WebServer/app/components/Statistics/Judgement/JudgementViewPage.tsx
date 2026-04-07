@@ -4,9 +4,9 @@ import { BarChart3, FileText, LayoutList } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { FiArrowLeft, FiCalendar } from "react-icons/fi";
 import {
-  AnyColumnDef,
-  flattenColumns,
-  isGroupColumn,
+    AnyColumnDef,
+    flattenColumns,
+    isGroupColumn,
 } from "./JudgementColumnDef";
 
 /* ------------------------------------------------------------------ */
@@ -349,7 +349,12 @@ const JudgementViewPage: React.FC<JudgementViewPageProps> = ({
               <thead>
                 {/* Primary header row */}
                 <tr className="bg-base-200/50 border-b border-base-200 text-base-content/50 text-sm uppercase tracking-wider">
-                  <th className="py-4 px-4 text-center font-bold">#</th>
+                  <th
+                    rowSpan={hasGroups ? 2 : 1}
+                    className="py-4 px-4 text-center font-bold align-middle"
+                  >
+                    #
+                  </th>
                   {columns.map((col, i) => {
                     if (isGroupColumn(col)) {
                       return (
