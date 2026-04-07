@@ -1,25 +1,25 @@
 "use client";
 
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiGrid,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiGrid,
+    FiPlus,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
@@ -275,7 +275,7 @@ const shouldIgnoreAnnualImportRow = ({
 };
 
 const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
-  branchno: ["Branches", "Branches No.", "Branch No", "Branch Number"],
+  branchno: ["Branches", "Branches No.", "Branch No", "Branch Number", "No."],
   civilv: [
     "Civil V",
     "Civil Voluntary",
@@ -316,18 +316,27 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
     "Disposed Civil",
     "Cases Disposed Civil",
     "Number of Cases Disposed Civil",
+    "Civil Heard",
   ],
   disposedcrim: [
     "Disposed Crim",
     "Disposed Criminal",
     "Cases Disposed Criminal",
     "Number of Cases Disposed Criminal",
+    "Crim Heard",
+    "Criminal Heard",
   ],
   summaryproc: ["Summary Proc", "Summary Procedure", "Cases Proc"],
   casesdisposed: [
     "Cases Disposed",
     "Total Cases Disposed",
     "TOTAL Cases Disposed",
+  ],
+  totaldisposed: [
+    "Total Cases Disposed",
+    "TOTAL Cases Disposed",
+    "Cases Disposed",
+    "Total Disposed",
   ],
   pdlm: ["PDL M", "PDL/CICL M", "PDL CICL M"],
   pdlf: ["PDL F", "PDL/CICL F", "PDL CICL F"],
@@ -339,6 +348,7 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
     "Detainees Ordered Released Total",
   ],
   pdlv: ["PDL Released V", "Released V"],
+  pdli: ["PDL I", "PDL In-C", "PDL Inc", "Released In-C"],
   pdlinc: ["PDL Released In-C", "PDL In-C", "PDL Inc", "Released In-C"],
   pdlbail: ["PDL Bail", "Bail", "Released on Bail"],
   pdlrecognizance: [
@@ -356,17 +366,26 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
   pdldismissal: ["PDL Dismissal", "Dismissal", "Cases Dismissed"],
   pdlacquittal: ["PDL Acquittal", "Acquittal", "Acquitted"],
   pdlminsentence: ["PDL Min Sentence", "Min Sentence"],
+  pdlothers: ["PDL Others", "Others"],
   pdlprobation: ["PDL Probation", "Probation", "Others"],
-  ciclm: ["CICL M"],
-  ciclf: ["CICL F"],
-  ciclv: ["CICL V"],
-  ciclinc: ["CICL In-C", "CICL Inc", "CICL InC", "CICL L"],
+  ciclm: ["CICL M", "PDL Released M"],
+  ciclf: ["CICL F", "PDL Released F"],
+  ciclv: ["CICL V", "PDL Released V"],
+  ciclinc: [
+    "CICL In-C",
+    "CICL Inc",
+    "CICL InC",
+    "CICL L",
+    "PDL Released In-c",
+    "PDL Released In-C",
+  ],
   fine: [
     "Fine",
     "Full Service of Sentence,Fine,etc",
     "Full Service of Sentence Fine etc",
+    "PDL Released Fine",
   ],
-  total: ["TOTAL", "Grand Total"],
+  total: ["TOTAL", "Grand Total", "PDL Released TOTAL"],
 };
 
 const buildFieldAliases = (field: FieldConfig): string[] => {
@@ -966,14 +985,19 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       }
 
       const { worksheet, headerInfo } = bestSheet;
+      const isJudgementLayout =
+        editableFields.some((field) => field.name === "branchNo") &&
+        editableFields.some((field) => field.name === "civilV") &&
+        editableFields.some((field) => field.name === "totalHeard");
       const isJudgementRtcLayout =
         editableFields.some((field) => field.name === "branchNo") &&
         editableFields.some((field) => field.name === "casesDisposed") &&
         editableFields.some((field) => field.name === "pdlProbation");
+      const isJudgementStrictMode = isJudgementLayout;
 
       const rawRows = XLSX.utils.sheet_to_json<SheetCell[]>(worksheet, {
         header: 1,
-        range: isJudgementRtcLayout ? 0 : headerInfo.headerRowIndex + 1,
+        range: isJudgementLayout ? 0 : headerInfo.headerRowIndex + 1,
         blankrows: false,
       });
 
@@ -1006,7 +1030,46 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       const getPendingColumnIndex = (year: number): number =>
         pendingYearColumns.find((item) => item.year === year)?.index ?? -1;
 
-      const resolveColumnIndex = (aliases: string[]): number => {
+      const resolveColumnIndex = (
+        fieldName: string,
+        aliases: string[],
+      ): number => {
+        // For Judgement imports, only allow exact normalized header matches.
+        // This prevents values from being pulled from similarly named columns.
+        const exactMatchIndexes: number[] = [];
+        for (let index = 0; index < normalizedHeaderRow.length; index += 1) {
+          const header = normalizedHeaderRow[index];
+          if (!header) continue;
+          if (aliases.includes(header)) {
+            exactMatchIndexes.push(index);
+          }
+        }
+
+        if (exactMatchIndexes.length > 0 && isJudgementStrictMode) {
+          // RTC templates can contain duplicate labels for PDL and CICL sub-sections.
+          // Keep mapping exact by choosing first-match for PDL fields and last-match
+          // for CICL/fine/total fields that live in the trailing section.
+          const preferLastFields = new Set([
+            "ciclM",
+            "ciclF",
+            "ciclV",
+            "ciclInC",
+            "fine",
+            "total",
+          ]);
+          return preferLastFields.has(fieldName)
+            ? exactMatchIndexes[exactMatchIndexes.length - 1]
+            : exactMatchIndexes[0];
+        }
+
+        if (exactMatchIndexes.length > 0) {
+          return exactMatchIndexes[0];
+        }
+
+        if (isJudgementStrictMode) {
+          return -1;
+        }
+
         let bestIndex = -1;
         let bestScore = 0;
 
@@ -1044,7 +1107,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         }
 
         if (colIndex < 0) {
-          colIndex = resolveColumnIndex(buildFieldAliases(field));
+          colIndex = resolveColumnIndex(field.name, buildFieldAliases(field));
         }
 
         if (colIndex >= 0) {
@@ -1052,7 +1115,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         }
       });
 
-      if (isJudgementRtcLayout) {
+      if (isJudgementRtcLayout && !isJudgementStrictMode) {
         const findHeaderIndex = (
           predicate: (header: string) => boolean,
           fromEnd: boolean = false,
