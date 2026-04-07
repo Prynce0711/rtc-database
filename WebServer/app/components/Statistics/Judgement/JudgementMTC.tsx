@@ -1,16 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  createMunicipalJudgement,
-  deleteMunicipalJudgement,
-  getMunicipalJudgements,
-  updateMunicipalJudgement,
+    createMunicipalJudgement,
+    deleteMunicipalJudgement,
+    getMunicipalJudgements,
+    updateMunicipalJudgement,
 } from "./judgementActions";
-import { mtcColumns } from "./JudgementColumnDef";
-import { mtcJudgementFields } from "./JudgementFieldConfig";
+import { rtcColumns } from "./JudgementColumnDef";
+import { rtcJudgementFields } from "./JudgementFieldConfig";
 import { MTCJudgementLog } from "./JudgementRecord";
 import JudgementTable from "./JudgementTable";
+
+type MtcDisplayRow = MTCJudgementLog & {
+  summaryProc: number;
+  casesDisposed: number;
+  pdlCICL: number;
+  pdlInC: number;
+  pdlProbation: number;
+  ciclM: number;
+  ciclF: number;
+  ciclV: number;
+  ciclInC: number;
+  fine: number;
+};
 
 interface JudgementMTCProps {
   selectedYear?: string;
@@ -31,6 +44,24 @@ const JudgementMTC = ({
 }: JudgementMTCProps) => {
   const [records, setRecords] = useState<MTCJudgementLog[]>([]);
 
+  const tableRecords = useMemo<MtcDisplayRow[]>(
+    () =>
+      records.map((record) => ({
+        ...record,
+        summaryProc: 0,
+        casesDisposed: Number(record.totalDisposed ?? 0),
+        pdlCICL: 0,
+        pdlInC: Number(record.pdlI ?? 0),
+        pdlProbation: Number(record.pdlOthers ?? 0),
+        ciclM: 0,
+        ciclF: 0,
+        ciclV: 0,
+        ciclInC: 0,
+        fine: 0,
+      })),
+    [records],
+  );
+
   async function loadRecords() {
     const res = await getMunicipalJudgements();
     if (res.success) setRecords(res.result);
@@ -41,17 +72,18 @@ const JudgementMTC = ({
   }, []);
 
   useEffect(() => {
-    if (onDataReady)
-      onDataReady(records as unknown as Record<string, unknown>[]);
-  }, [records, onDataReady]);
+    if (onDataReady) {
+      onDataReady(tableRecords as unknown as Record<string, unknown>[]);
+    }
+  }, [tableRecords, onDataReady]);
 
   return (
-    <JudgementTable<MTCJudgementLog & Record<string, unknown>>
-      title="MTC Judgment Week"
-      subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
-      data={records as (MTCJudgementLog & Record<string, unknown>)[]}
-      columns={mtcColumns}
-      fields={mtcJudgementFields}
+    <JudgementTable<MtcDisplayRow & Record<string, unknown>>
+      // title="MTC Judgment Week"
+      // subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
+      data={tableRecords as (MtcDisplayRow & Record<string, unknown>)[]}
+      columns={rtcColumns}
+      fields={rtcJudgementFields}
       dateKey="dateRecorded"
       sortDefaultKey="dateRecorded"
       selectedYear={selectedYear}

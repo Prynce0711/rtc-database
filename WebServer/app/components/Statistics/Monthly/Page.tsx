@@ -5,9 +5,9 @@ import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import RadioButton from "../../Filter/RadioButton";
 import {
-    deleteMonthlyStatistic,
-    getMonthlyStatistics,
-    upsertMonthlyStatistics,
+  deleteMonthlyStatistic,
+  getMonthlyStatistics,
+  upsertMonthlyStatistics,
 } from "./MonthlyActions";
 import type { MonthlyRow } from "./Schema";
 
@@ -196,8 +196,12 @@ export default function MonthlyPage() {
         onSave={async (newRows) => {
           const res = await upsertMonthlyStatistics(newRows);
           if (res.success) {
-            const fresh = await getMonthlyStatistics(selectedMonth);
-            if (fresh.success) setImportedData(fresh.result);
+            const savedMonth = newRows[0]?.month ?? selectedMonth;
+            const fresh = await getMonthlyStatistics(savedMonth);
+            if (fresh.success) {
+              setImportedData(fresh.result);
+              setSelectedMonth(savedMonth);
+            }
           } else {
             console.error("Save failed:", res.error);
           }

@@ -15,9 +15,13 @@ export async function getMonthlyStatistics(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
+    const orderBy = month
+      ? [{ id: "asc" as const }]
+      : [{ month: "desc" as const }, { id: "asc" as const }];
+
     const rows = await prisma.monthlyStatistics.findMany({
       where: month ? { month } : undefined,
-      orderBy: [{ month: "desc" }, { category: "asc" }, { branch: "asc" }],
+      orderBy,
     });
 
     return {
@@ -135,28 +139,40 @@ export async function upsertMonthlyStatistics(
       return { success: false, error: prettifyError(validation.error) };
     }
 
-    const results = await Promise.all(
-      validation.data.map((r) =>
-        prisma.monthlyStatistics.upsert({
-          where: {
-            month_category_branch: {
-              month: r.month,
-              category: r.category,
-              branch: r.branch,
-            },
-          },
-          update: { criminal: r.criminal, civil: r.civil, total: r.total },
-          create: {
+    const results: MonthlyRow[] = [];
+
+    // Run upserts sequentially so new records keep the same order as the
+    // submitted rows from AddReport preview/import.
+    for (const r of validation.data) {
+      const saved = await prisma.monthlyStatistics.upsert({
+        where: {
+          month_category_branch: {
             month: r.month,
             category: r.category,
             branch: r.branch,
-            criminal: r.criminal,
-            civil: r.civil,
-            total: r.total,
           },
-        }),
-      ),
-    );
+        },
+        update: { criminal: r.criminal, civil: r.civil, total: r.total },
+        create: {
+          month: r.month,
+          category: r.category,
+          branch: r.branch,
+          criminal: r.criminal,
+          civil: r.civil,
+          total: r.total,
+        },
+      });
+
+      results.push({
+        id: saved.id,
+        month: saved.month,
+        category: saved.category,
+        branch: saved.branch,
+        criminal: saved.criminal,
+        civil: saved.civil,
+        total: saved.total,
+      });
+    }
 
     return { success: true, result: { upserted: results.length } };
   } catch (error) {

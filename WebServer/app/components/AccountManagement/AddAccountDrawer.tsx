@@ -410,6 +410,9 @@ const AddAccountDrawer = ({
                 >
                   <option value={Roles.USER}>Staff</option>
                   <option value={Roles.ATTY}>Attorney</option>
+                  <option value={Roles.STATISTICS}>Statistics</option>
+                  <option value={Roles.NOTARIAL}>Notarial</option>
+                  <option value={Roles.ARCHIVE}>Archive</option>
                 </select>
                 <label className="label">
                   <span className="label-text-alt text-base-content/60">

@@ -375,14 +375,13 @@ export const rtcColumns: AnyColumnDef[] = [
         align: "center",
         render: (r) => v(r, "ciclInC"),
       },
+      {
+        key: "fine",
+        label: "Fine",
+        align: "center",
+        render: (r) => v(r, "fine"),
+      },
     ],
-  },
-  {
-    key: "fine",
-    label: "Fine",
-    sortable: false,
-    align: "center",
-    render: (r) => v(r, "fine"),
   },
   {
     key: "total",
@@ -397,3 +396,4 @@ export const rtcColumns: AnyColumnDef[] = [
 export const rtcLeafColumns: LeafColumn[] = flattenColumns(rtcColumns);
 
 export type { MTCJudgementLog, RTCJudgementLog };
+
