@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-    createMunicipalJudgement,
-    deleteMunicipalJudgement,
-    getMunicipalJudgements,
-    updateMunicipalJudgement,
+  createMunicipalJudgement,
+  deleteMunicipalJudgement,
+  getMunicipalJudgements,
+  updateMunicipalJudgement,
 } from "./judgementActions";
 import { rtcColumns } from "./JudgementColumnDef";
 import { rtcJudgementFields } from "./JudgementFieldConfig";
@@ -84,8 +84,6 @@ const JudgementMTC = ({
 
   return (
     <JudgementTable<MtcDisplayRow & Record<string, unknown>>
-      title="MTC Judgment Week"
-      subtitle="Municipal Trial Court — Nationwide Judgment Week Summary Report"
       data={tableRecords as (MtcDisplayRow & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}
