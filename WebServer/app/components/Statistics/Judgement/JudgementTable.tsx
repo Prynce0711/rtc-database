@@ -17,7 +17,7 @@ import {
 import { FieldConfig } from "./JudgementFieldConfig";
 import JudgementViewPage from "./JudgementViewPage";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 type KPICard = {
   label: string;
