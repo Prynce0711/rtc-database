@@ -4,11 +4,10 @@ import { validateSession } from "@/app/lib/authActions";
 import {
   BACKUP_INTERVAL_OPTIONS,
   cancelRunningBackup,
+  clearBackupRemoteFiles,
   createBackupRemote,
   deleteBackupRemote,
   getBackupOverview,
-  importBackupFromLocalUpload,
-  importBackupFromRemote,
   reloginBackupRemote,
   runBackupNow,
   startBackupScheduler,
@@ -20,7 +19,15 @@ import {
   type BackupLogEntry,
   type BackupProviderOption,
   type BackupRemote,
-} from "@/app/lib/backupScheduler";
+} from "@/app/lib/backup/backupScheduler";
+import {
+  importBackupFromLocalUpload,
+  importBackupFromRemote,
+} from "@/app/lib/backup/importer";
+import {
+  listOneDriveRemoteDriveOptions,
+  type OneDriveDriveOption,
+} from "@/app/lib/backup/remotes/onedrive";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
 import ActionResult from "../ActionResult";
@@ -34,6 +41,8 @@ export interface BackupDashboardData {
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
 }
+
+export type BackupOneDriveDriveOption = OneDriveDriveOption;
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
@@ -64,6 +73,10 @@ const UpdateRemoteSchema = z.object({
 const ReLoginRemoteSchema = z.object({
   remoteName: z.string().min(1),
   forceRestart: z.boolean().optional().default(false),
+});
+
+const ListOneDriveDrivesSchema = z.object({
+  remoteName: z.string().min(1),
 });
 
 async function getDashboardData(): Promise<BackupDashboardData> {
@@ -372,6 +385,7 @@ export async function reloginBackupAccount(
 
 export async function deleteBackupAccount(
   remoteName: string,
+  deleteBackupFiles = false,
 ): Promise<ActionResult<BackupDashboardData>> {
   try {
     const sessionValidation = await validateSession([Roles.ADMIN]);
@@ -383,8 +397,12 @@ export async function deleteBackupAccount(
       return { success: false, error: "Remote name is required" };
     }
 
+    if (typeof deleteBackupFiles !== "boolean") {
+      return { success: false, error: "Invalid delete backup files option" };
+    }
+
     await startBackupScheduler();
-    await deleteBackupRemote(remoteName);
+    await deleteBackupRemote(remoteName, deleteBackupFiles);
 
     return {
       success: true,
@@ -398,6 +416,84 @@ export async function deleteBackupAccount(
         error instanceof Error
           ? error.message
           : "Failed to delete backup account",
+    };
+  }
+}
+
+export async function clearBackupAccountFiles(
+  remoteName: string,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    if (!remoteName.trim()) {
+      return { success: false, error: "Remote name is required" };
+    }
+
+    await startBackupScheduler();
+    await clearBackupRemoteFiles(remoteName);
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error clearing backup account files:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to clear backup account files",
+    };
+  }
+}
+
+export async function listOneDriveDriveOptionsAction(
+  data: Record<string, unknown>,
+): Promise<
+  ActionResult<{
+    remoteName: string;
+    drives: BackupOneDriveDriveOption[];
+  }>
+> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = ListOneDriveDrivesSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Invalid OneDrive drive list payload",
+      };
+    }
+
+    await startBackupScheduler();
+
+    const normalizedRemoteName = parsed.data.remoteName.trim();
+    const drives = await listOneDriveRemoteDriveOptions(normalizedRemoteName);
+
+    return {
+      success: true,
+      result: {
+        remoteName: normalizedRemoteName,
+        drives,
+      },
+    };
+  } catch (error) {
+    console.error("Error listing OneDrive drives:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to list OneDrive drives",
     };
   }
 }

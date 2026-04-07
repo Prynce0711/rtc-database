@@ -13,6 +13,15 @@ export default defineConfig({
       main: {
         // Shortcut of `build.lib.entry`.
         entry: "electron/main.ts",
+        vite: {
+          build: {
+            rollupOptions: {
+              // Keep rclone.js as a runtime dependency so its CommonJS internals
+              // execute in their native environment instead of being ESM-bundled.
+              external: ["rclone.js"],
+            },
+          },
+        },
       },
       preload: {
         // Shortcut of `build.rollupOptions.input`.
