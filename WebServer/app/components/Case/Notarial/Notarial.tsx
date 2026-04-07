@@ -86,7 +86,7 @@ const SortTh = ({
   onSort: (k: SortKey) => void;
 }) => (
   <th
-    className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
+    className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 cursor-pointer select-none hover:bg-base-200/50 transition-colors"
     onClick={() => onSort(colKey)}
   >
     {label}
@@ -474,7 +474,7 @@ const NotarialPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-base-100">
+    <div className="space-y-6 sm:space-y-8">
       <FileViewerModal
         open={previewState.open}
         loading={previewState.loading}
@@ -490,289 +490,263 @@ const NotarialPage: React.FC = () => {
             : undefined
         }
       />
-      <main className="w-full">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Notarial Records
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Manage notarial reports and filings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
-          </div>
-        </div>
-
-        {/* Search and Actions */}
-        <div className="relative mb-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-              <input
-                type="text"
-                placeholder="Search by title..."
-                className="input input-bordered input-lg w-full pl-12 text-base"
-                value={appliedFilters?.title || ""}
-                onChange={(e) =>
-                  setAppliedFilters((prev) => ({
-                    ...prev,
-                    title: e.target.value,
-                  }))
-                }
-              />
+      
+      {/* Header */}
+      <header className="card bg-base-100 shadow-xl">
+        <div className="card-body p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+                Notarial Records
+              </h1>
+              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
+                <FiFileText className="shrink-0" />
+                <span>Manage notarial reports and filings</span>
+              </p>
             </div>
 
-            <button
-              className={`btn btn-outline ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-              onClick={() => setFilterModalOpen((prev) => !prev)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Filter
-              {activeFilterCount > 0 && (
-                <span className="badge badge-sm badge-primary ml-1">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-
-            {isAdminOrAtty && (
-              <NotarialExcelUploader onUploadCompleted={refreshFromBackend} />
-            )}
-            {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${exporting ? "loading" : ""}`}
-                onClick={() => void handleExport()}
-                disabled={exporting}
-              >
-                {" "}
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
-              </button>
-            )}
-            {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  router.push("/user/cases/notarial/add");
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex items-center gap-2 flex-nowrap">
+                <NotarialExcelUploader onSuccess={async () => await fetchData()} />
+                <button
+                  className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
+                  onClick={handleExport}
+                  disabled={exporting}
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Record
-              </button>
-            )}
+                  <FiDownload className="h-5 w-5" />
+                  {exporting ? "Exporting..." : "Export"}
+                </button>
+                <button
+                  className="btn btn-success btn-md gap-2"
+                  onClick={() => {
+                    router.push("/user/cases/notarial/add");
+                  }}
+                >
+                  <FiFileText className="h-5 w-5" />
+                  Add Record
+                </button>
+              </div>
+            </div>
           </div>
+        </div>
+      </header>
 
-          <FilterDropdown
-            isOpen={filterModalOpen}
-            onClose={() => setFilterModalOpen(false)}
-            options={NOTARIAL_FILTER_OPTIONS}
-            onApply={handleApplyFilters}
-            searchValue={appliedFilters}
-            getSuggestions={getSuggestions}
+      {/* Search and Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+          <input
+            type="text"
+            placeholder="Search by title..."
+            className="input input-bordered w-full pl-11"
+            value={appliedFilters?.title || ""}
+            onChange={(e) =>
+              setAppliedFilters((prev) => ({
+                ...prev,
+                title: e.target.value,
+              }))
+            }
           />
         </div>
 
-        {isAdminOrAtty && (
-          <AnimatePresence>
-            {selectedRecordIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
-                    {selectedRecordIds.length} record
-                    {selectedRecordIds.length > 1 ? "s" : ""} selected
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/notarial/edit?ids=${selectedRecordIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedRecords}
-                      disabled={deletingSelected}
-                    >
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedRecordIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
+        <button
+          className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+          onClick={() => setFilterModalOpen((prev) => !prev)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Filter
+          {activeFilterCount > 0 && (
+            <span className="badge badge-sm badge-primary ml-1">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "Total Records",
-              value: (stats.total ?? 0).toLocaleString(),
-              subtitle: `${(stats.noDate ?? 0).toLocaleString()} missing dates`,
-              icon: FiBarChart2,
-              delay: 0,
-            },
-            {
-              label: "This Month",
-              value: (stats.thisMonth ?? 0).toLocaleString(),
-              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} entries this month`,
-              icon: FiFileText,
-              delay: 100,
-            },
-            {
-              label: "Unique Attorneys",
-              value: (stats.attorneys ?? 0).toLocaleString(),
-              subtitle: `${(stats.attorneys ?? 0).toLocaleString()} attorneys`,
-              icon: FiUsers,
-              delay: 200,
-            },
-            {
-              label: "No Date",
-              value: (stats.noDate ?? 0).toLocaleString(),
-              subtitle: `Records without date`,
-              icon: FiLock,
-              delay: 300,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className={`transform hover:scale-105 card surface-card-hover group`}
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
-              >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                    <Icon className="h-full w-full" />
-                  </div>
-                  <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
-                    </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
-                      {card.subtitle}
-                    </p>
-                  </div>
+        <FilterDropdown
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          options={NOTARIAL_FILTER_OPTIONS}
+          onApply={handleApplyFilters}
+          searchValue={appliedFilters}
+          getSuggestions={getSuggestions}
+        />
+
+        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {totalCount} record{totalCount !== 1 && "s"}
+        </span>
+      </div>
+
+      {isAdminOrAtty && (
+        <AnimatePresence>
+          {selectedRecordIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-primary">
+                  {selectedRecordIds.length} record
+                  {selectedRecordIds.length > 1 ? "s" : ""} selected
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      router.push(
+                        `/user/cases/notarial/edit?ids=${selectedRecordIds.join(",")}`,
+                      )
+                    }
+                  >
+                    Edit Selected
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                    onClick={handleDeleteSelectedRecords}
+                    disabled={deletingSelected}
+                  >
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedRecordIds([])}
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
-        {/* Table */}
-        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
-          <table className="table table-zebra w-full text-center">
-            <thead className="bg-base-300">
-              <tr className="text-center">
-                {isAdminOrAtty && <th>SELECT</th>}
-                {isAdminOrAtty && <th>ACTIONS</th>}
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Total Records",
+            value: (stats.total ?? 0).toLocaleString(),
+            subtitle: `${(stats.noDate ?? 0).toLocaleString()} missing dates`,
+            icon: FiBarChart2,
+          },
+          {
+            label: "This Month",
+            value: (stats.thisMonth ?? 0).toLocaleString(),
+            subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} entries this month`,
+            icon: FiFileText,
+          },
+          {
+            label: "Unique Attorneys",
+            value: (stats.attorneys ?? 0).toLocaleString(),
+            subtitle: `${(stats.attorneys ?? 0).toLocaleString()} attorneys`,
+            icon: FiUsers,
+          },
+          {
+            label: "No Date",
+            value: (stats.noDate ?? 0).toLocaleString(),
+            subtitle: `Records without date`,
+            icon: FiLock,
+          },
+        ].map((card, idx) => {
+          const Icon = card.icon as React.ComponentType<
+            React.SVGProps<SVGSVGElement>
+          >;
+          return (
+            <div
+              key={idx}
+              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <div className="card-body relative overflow-hidden p-4 sm:p-6">
+                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
+                  <Icon className="h-full w-full" />
+                </div>
+                <div className="relative text-center">
+                  <div className="mb-2">
+                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
+                      {card.label}
+                    </span>
+                  </div>
+                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
+                    {card.value}
+                  </p>
+                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
+                    {card.subtitle}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Table */}
+      <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
+        <div className="overflow-x-auto">
+          <table className="table table-sm w-full text-center">
+            <thead>
+              <tr className="bg-base-200/50 border-b border-base-200">
+                {isAdminOrAtty && (
+                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                    Select
+                  </th>
+                )}
+                {isAdminOrAtty && (
+                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                    Actions
+                  </th>
+                )}
                 <SortTh
-                  label="TITLE"
+                  label="Title"
                   colKey="title"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="NAME"
+                  label="Name"
                   colKey="name"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="ATTORNEY"
+                  label="Attorney"
                   colKey="atty"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="DATE"
+                  label="Date"
                   colKey="date"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
-                <th>LINK</th>
+                <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
+                  Link
+                </th>
               </tr>
             </thead>
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminOrAtty ? 7 : 6}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-                      <div className=" flex items-center justify-center mb-4">
-                        <FiFileText className="w-15 h-15 opacity-50" />
-                      </div>
-                      <p className="text-lg uppercase font-semibold text-base-content/50">
+                  <td colSpan={isAdminOrAtty ? 7 : 6} className="py-16">
+                    <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
+                      <FiFileText className="w-16 h-16 opacity-20 mb-4" />
+                      <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
                         No records found
                       </p>
-                      <p className="text-sm mt-1 uppercase text-base-content/35">
+                      <p className="text-sm mt-2 text-base-content/35">
                         No notarial records match your current filters.
                       </p>
                     </div>
@@ -807,19 +781,22 @@ const NotarialPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="mt-4 flex justify-end">
-          <Pagination
-            pageCount={pageCount}
-            currentPage={currentPage}
-            onPageChange={(page) => {
-              setCurrentPage(page);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
-        </div>
-      </main>
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-base-content/40">
+          Showing page {currentPage} of {pageCount}
+        </p>
+        <Pagination
+          pageCount={pageCount}
+          currentPage={currentPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </div>
     </div>
   );
 };
