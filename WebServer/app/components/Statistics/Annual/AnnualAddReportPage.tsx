@@ -252,7 +252,9 @@ const shouldIgnoreAnnualImportRow = ({
   }
 
   if (
-    normalizedRowValues.some((value) =>
+    !hasNumericNonZero &&
+    normalizedRowValues.length > 0 &&
+    normalizedRowValues.every((value) =>
       IMPORT_NON_DATA_IDENTIFIER_VALUES.has(value),
     )
   ) {
