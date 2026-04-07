@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  createMunicipalJudgement,
-  deleteMunicipalJudgement,
-  getMunicipalJudgements,
-  updateMunicipalJudgement,
+    createMunicipalJudgement,
+    deleteMunicipalJudgement,
+    getMunicipalJudgements,
+    updateMunicipalJudgement,
 } from "./judgementActions";
 import { rtcColumns } from "./JudgementColumnDef";
 import { rtcJudgementFields } from "./JudgementFieldConfig";
