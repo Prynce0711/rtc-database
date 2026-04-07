@@ -1,25 +1,25 @@
 "use client";
 
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiGrid,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiGrid,
+    FiPlus,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
@@ -140,6 +140,138 @@ const toPercentNumber = (value: string | number): number | undefined => {
   const percentValue =
     !hasPercentSign && parsed >= 0 && parsed <= 1 ? parsed * 100 : parsed;
   return Number(percentValue.toFixed(2));
+};
+
+const IMPORT_FOOTER_SECTION_MARKERS = new Set([
+  "preparedby",
+  "notedby",
+  "remarks",
+]);
+
+const IMPORT_TITLE_TOKENS = [
+  "monthlyreport",
+  "annualreport",
+  "judgmentday",
+  "judgementday",
+  "nationwidejudgmentweek",
+  "nationwidejudgementweek",
+  "regionaltrialcourt",
+  "municipaltrialcourt",
+];
+
+const IMPORT_FOOTER_TOKENS = [
+  "preparedby",
+  "notedby",
+  "statistician",
+  "clerkofcourt",
+  "attorney",
+  "atty",
+  "judge",
+];
+
+const IMPORT_BRANCH_HEADER_TOKENS = new Set([
+  "branch",
+  "branches",
+  "branchno",
+  "branchesno",
+  "no",
+  "branchnumber",
+]);
+
+const IMPORT_NON_DATA_IDENTIFIER_VALUES = new Set([
+  "branch",
+  "branches",
+  "no",
+  "branchno",
+  "branchesno",
+  "branchnumber",
+  "remarks",
+  "remark",
+  "total",
+  "grand",
+  "grandtotal",
+  "subtotal",
+]);
+
+const IMPORT_CASE_HEADER_TOKENS = [
+  "civil",
+  "criminal",
+  "total",
+  "heard",
+  "disposed",
+  "summaryproc",
+  "pdl",
+  "cicl",
+  "fine",
+];
+
+const hasImportToken = (
+  normalizedValues: string[],
+  tokens: string[],
+): boolean =>
+  normalizedValues.some((value) =>
+    tokens.some((token) => value.includes(token)),
+  );
+
+const isImportHeaderLikeRow = (normalizedValues: string[]): boolean => {
+  const hasBranchToken = normalizedValues.some((value) =>
+    IMPORT_BRANCH_HEADER_TOKENS.has(value),
+  );
+  const hasCaseToken = normalizedValues.some((value) =>
+    IMPORT_CASE_HEADER_TOKENS.some((token) => value.includes(token)),
+  );
+
+  return hasBranchToken && hasCaseToken;
+};
+
+const shouldIgnoreAnnualImportRow = ({
+  normalizedRowValues,
+  identifierValue,
+  hasTextContent,
+  hasNumericNonZero,
+}: {
+  normalizedRowValues: string[];
+  identifierValue: string;
+  hasTextContent: boolean;
+  hasNumericNonZero: boolean;
+}): boolean => {
+  if (normalizedRowValues.length === 0) return true;
+
+  if (
+    IMPORT_FOOTER_SECTION_MARKERS.has(identifierValue) ||
+    hasImportToken(normalizedRowValues, IMPORT_FOOTER_TOKENS)
+  ) {
+    return true;
+  }
+
+  if (
+    IMPORT_NON_DATA_IDENTIFIER_VALUES.has(identifierValue) ||
+    identifierValue.startsWith("egbranch")
+  ) {
+    return true;
+  }
+
+  if (
+    normalizedRowValues.some((value) =>
+      IMPORT_NON_DATA_IDENTIFIER_VALUES.has(value),
+    )
+  ) {
+    return true;
+  }
+
+  if (isImportHeaderLikeRow(normalizedRowValues)) return true;
+
+  if (
+    !hasNumericNonZero &&
+    hasImportToken(normalizedRowValues, IMPORT_TITLE_TOKENS)
+  ) {
+    return true;
+  }
+
+  // Prevent empty/zero-only rows from being imported as fake entries.
+  if (!hasTextContent && !hasNumericNonZero) return true;
+
+  return false;
 };
 
 const buildFieldAliases = (field: FieldConfig): string[] => {
@@ -594,7 +726,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     col: string;
   } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [dateFilter, setDateFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>(() =>
+    /^\d{4}$/.test(yearLabel) ? yearLabel : "",
+  );
   const [step, setStep] = useState<"edit" | "review">("edit");
   const tableRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -805,14 +939,36 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
       const imported: EditableRow[] = [];
       let skippedCount = 0;
+      let skipRemainingRowsAsFooter = false;
 
       for (const excelRow of rawRows) {
+        const normalizedRowValues = excelRow
+          .map((cell) => normalizeImportHeader(toCellText(cell)))
+          .filter((value) => value.length > 0);
+
+        if (skipRemainingRowsAsFooter) {
+          skippedCount += 1;
+          continue;
+        }
+
+        if (
+          normalizedRowValues.some((value) =>
+            IMPORT_FOOTER_SECTION_MARKERS.has(value),
+          )
+        ) {
+          skipRemainingRowsAsFooter = true;
+          skippedCount += 1;
+          continue;
+        }
+
         const row = buildEmptyRow(fields);
         if (dateFilterField && effectiveYearFilter !== "") {
           row[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
         }
         let matchedFieldCount = 0;
-        let hasMappedContent = false;
+        let hasTextContent = false;
+        let hasNumericNonZero = false;
+        let identifierValue = "";
 
         for (const f of editableFields) {
           const colIndex = fieldColumnIndex.get(f.name);
@@ -831,22 +987,50 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
             if (isPercentageFieldName(f.name)) {
               const percentage = toPercentNumber(textValue);
               row[f.name] = percentage ?? textValue;
-              hasMappedContent = true;
+              if (percentage !== undefined) {
+                if (percentage !== 0) {
+                  hasNumericNonZero = true;
+                }
+              } else if (textValue !== "") {
+                hasNumericNonZero = true;
+              }
               continue;
             }
 
             const parsed = Number(textValue.replace(/,/g, ""));
             row[f.name] = Number.isFinite(parsed) ? parsed : textValue;
-            hasMappedContent = true;
+            if (Number.isFinite(parsed)) {
+              if (parsed !== 0) {
+                hasNumericNonZero = true;
+              }
+            } else if (textValue !== "") {
+              hasNumericNonZero = true;
+            }
           } else {
             row[f.name] = textValue;
             if (textValue !== "") {
-              hasMappedContent = true;
+              hasTextContent = true;
+
+              const normalizedFieldName = normalizeImportHeader(f.name);
+              if (
+                normalizedFieldName === "branch" ||
+                normalizedFieldName === "branchno"
+              ) {
+                identifierValue = normalizeImportHeader(textValue);
+              }
             }
           }
         }
 
-        if (matchedFieldCount > 0 && hasMappedContent) {
+        if (
+          matchedFieldCount > 0 &&
+          !shouldIgnoreAnnualImportRow({
+            normalizedRowValues,
+            identifierValue,
+            hasTextContent,
+            hasNumericNonZero,
+          })
+        ) {
           imported.push(row);
         } else {
           skippedCount += 1;
@@ -1059,16 +1243,38 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       if (!text.includes("\t") && !text.includes("\n")) return;
 
       e.preventDefault();
+      let skipRemainingPastedRowsAsFooter = false;
 
       const pastedRows = text
         .split(/\r?\n/)
         .filter((line) => line.trim())
         .map((line) => {
           const cells = line.split("\t");
+          const normalizedRowValues = cells
+            .map((cell) => normalizeImportHeader(cell ?? ""))
+            .filter((value) => value.length > 0);
+
+          if (skipRemainingPastedRowsAsFooter) {
+            return null;
+          }
+
+          if (
+            normalizedRowValues.some((value) =>
+              IMPORT_FOOTER_SECTION_MARKERS.has(value),
+            )
+          ) {
+            skipRemainingPastedRowsAsFooter = true;
+            return null;
+          }
+
           const row = buildEmptyRow(fields);
           if (dateFilterField && effectiveYearFilter !== "") {
             row[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
           }
+          let hasTextContent = false;
+          let hasNumericNonZero = false;
+          let identifierValue = "";
+
           editableFields.forEach((f, i) => {
             if (i < cells.length) {
               const v = cells[i].trim();
@@ -1076,17 +1282,55 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                 if (isPercentageFieldName(f.name)) {
                   const percentage = toPercentNumber(v);
                   row[f.name] = percentage ?? v;
+                  if (percentage !== undefined) {
+                    if (percentage !== 0) {
+                      hasNumericNonZero = true;
+                    }
+                  } else if (v !== "") {
+                    hasNumericNonZero = true;
+                  }
                 } else {
                   const numVal = Number(v);
                   row[f.name] = !Number.isNaN(numVal) && v !== "" ? numVal : v;
+                  if (!Number.isNaN(numVal) && v !== "") {
+                    if (numVal !== 0) {
+                      hasNumericNonZero = true;
+                    }
+                  } else if (v !== "") {
+                    hasNumericNonZero = true;
+                  }
                 }
               } else {
                 row[f.name] = v;
+                if (v !== "") {
+                  hasTextContent = true;
+
+                  const normalizedFieldName = normalizeImportHeader(f.name);
+                  if (
+                    normalizedFieldName === "branch" ||
+                    normalizedFieldName === "branchno"
+                  ) {
+                    identifierValue = normalizeImportHeader(v);
+                  }
+                }
               }
             }
           });
+
+          if (
+            shouldIgnoreAnnualImportRow({
+              normalizedRowValues,
+              identifierValue,
+              hasTextContent,
+              hasNumericNonZero,
+            })
+          ) {
+            return null;
+          }
+
           return row;
-        });
+        })
+        .filter((row): row is EditableRow => row !== null);
 
       if (pastedRows.length > 0) {
         setRows((prev) => {

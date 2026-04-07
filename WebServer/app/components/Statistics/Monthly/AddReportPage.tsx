@@ -2,23 +2,23 @@
 
 import { getHeaderRowInfo } from "@/app/lib/excel";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    FiArrowLeft,
-    FiCheck,
-    FiChevronRight,
-    FiCopy,
-    FiEdit3,
-    FiEye,
-    FiPlus,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiArrowLeft,
+  FiCheck,
+  FiChevronRight,
+  FiCopy,
+  FiEdit3,
+  FiEye,
+  FiPlus,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
@@ -31,6 +31,7 @@ import type { MonthlyRow } from "./Schema";
 
 interface EditableRow {
   id: string;
+  reportMonth: string;
   branch: string;
   criminal: number;
   civil: number;
@@ -52,6 +53,39 @@ export interface AddReportPageProps {
 
 type SheetCell = string | number | null | undefined;
 
+const MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+] as const;
+
+const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
+const CURRENT_YEAR = CURRENT_MONTH.slice(0, 4);
+
+const isMonthValue = (value: string): boolean =>
+  /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+
+const normalizeMonthValue = (value?: string): string =>
+  value && isMonthValue(value) ? value : CURRENT_MONTH;
+
+const toMonthLabel = (value: string): string => {
+  if (!isMonthValue(value)) return value;
+  const [year, month] = value.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+};
+
 const normalizeImportHeader = (value: string): string =>
   value
     .toLowerCase()
@@ -69,6 +103,120 @@ const toNumber = (value: SheetCell): number => {
 
   const parsed = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const HEADER_ALIASES = new Set([
+  "category",
+  "casecategory",
+  "classification",
+  "casetype",
+  "branch",
+  "branchno",
+  "branchnumber",
+  "branchstation",
+  "station",
+  "criminal",
+  "criminalcases",
+  "crim",
+  "civil",
+  "civilcases",
+  "total",
+]);
+
+const BRANCH_HEADER_ALIASES = new Set([
+  "branch",
+  "branchno",
+  "branchnumber",
+  "branchstation",
+  "station",
+]);
+
+const CRIMINAL_HEADER_ALIASES = new Set([
+  "criminal",
+  "criminalcases",
+  "criminalcount",
+  "crim",
+]);
+
+const CIVIL_HEADER_ALIASES = new Set(["civil", "civilcases", "civilcount"]);
+
+const FOOTER_SECTION_MARKERS = new Set(["preparedby", "notedby"]);
+
+const TITLE_TOKENS = [
+  "monthlyreport",
+  "regionaltrialcourt",
+  "pendingcasesfor",
+  "newcasesfiledfor",
+  "casesdisposedfor",
+];
+
+const FOOTER_TOKENS = [
+  "preparedby",
+  "notedby",
+  "statistician",
+  "clerkofcourt",
+  "attorney",
+  "atty",
+  "judge",
+];
+
+const hasAnyToken = (value: string, tokens: string[]): boolean =>
+  tokens.some((token) => value.includes(token));
+
+const isTotalLabel = (normalizedValue: string): boolean =>
+  normalizedValue === "total" ||
+  normalizedValue === "grandtotal" ||
+  normalizedValue === "subtotal" ||
+  normalizedValue.startsWith("grandtotal") ||
+  normalizedValue.startsWith("subtotal");
+
+const shouldSkipRemainingAsFooter = (normalizedRowValues: string[]): boolean =>
+  normalizedRowValues.some((value) => FOOTER_SECTION_MARKERS.has(value));
+
+const shouldIgnoreImportedRow = ({
+  rawCategory,
+  branch,
+  rawCriminal,
+  rawCivil,
+  normalizedRowValues,
+}: {
+  rawCategory: string;
+  branch: string;
+  rawCriminal: string;
+  rawCivil: string;
+  normalizedRowValues: string[];
+}): boolean => {
+  const category = normalizeImportHeader(rawCategory);
+  const branchText = normalizeImportHeader(branch);
+  const criminalText = normalizeImportHeader(rawCriminal);
+  const civilText = normalizeImportHeader(rawCivil);
+  const hasCountCells = rawCriminal.trim() !== "" || rawCivil.trim() !== "";
+  const combined =
+    `${category} ${branchText} ${normalizedRowValues.join(" ")}`.trim();
+
+  const looksLikeColumnHeaderRow =
+    BRANCH_HEADER_ALIASES.has(branchText) &&
+    CRIMINAL_HEADER_ALIASES.has(criminalText) &&
+    CIVIL_HEADER_ALIASES.has(civilText);
+
+  if (looksLikeColumnHeaderRow) return true;
+
+  if (!branchText && !hasCountCells) return true;
+
+  if (isTotalLabel(branchText) || isTotalLabel(category)) return true;
+
+  if (
+    !hasCountCells &&
+    (HEADER_ALIASES.has(branchText) || HEADER_ALIASES.has(category))
+  ) {
+    return true;
+  }
+
+  if (hasAnyToken(combined, TITLE_TOKENS)) return true;
+
+  if (hasAnyToken(combined, FOOTER_TOKENS)) return true;
+
+  return false;
 };
 
 const resolveColumnIndex = (
@@ -110,8 +258,9 @@ const createRowId = (): string => {
   return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const emptyRow = (): EditableRow => ({
+const emptyRow = (reportMonth: string): EditableRow => ({
   id: createRowId(),
+  reportMonth,
   branch: "",
   criminal: 0,
   civil: 0,
@@ -128,6 +277,10 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   onBack,
   onSave,
 }) => {
+  const initialFilterMonth =
+    initialData && initialData.length > 0
+      ? normalizeMonthValue(initialData[0]?.month ?? month)
+      : CURRENT_MONTH;
   const resolvedInitialCategory = useMemo(() => {
     if (initialCategory && CATEGORY_OPTIONS.includes(initialCategory)) {
       return initialCategory;
@@ -143,17 +296,24 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(
     resolvedInitialCategory,
   );
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>(
+    initialFilterMonth.slice(5, 7),
+  );
+  const [selectedYearFilter, setSelectedYearFilter] = useState<string>(
+    initialFilterMonth.slice(0, 4),
+  );
 
   const [rows, setRows] = useState<EditableRow[]>(() => {
     if (initialData && initialData.length > 0) {
       return initialData.map((r) => ({
         id: createRowId(),
+        reportMonth: normalizeMonthValue(r.month),
         branch: r.branch,
         criminal: r.criminal,
         civil: r.civil,
       }));
     }
-    return [emptyRow()];
+    return [emptyRow(CURRENT_MONTH)];
   });
   const [activeCell, setActiveCell] = useState<{
     rowIdx: number;
@@ -166,6 +326,57 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const effectiveYearFilter = /^\d{4}$/.test(selectedYearFilter)
+    ? selectedYearFilter
+    : CURRENT_YEAR;
+  const activeMonthFilter = `${effectiveYearFilter}-${selectedMonthFilter}`;
+  const handleYearFilterChange = useCallback((value: string) => {
+    setSelectedYearFilter(value.replace(/\D/g, "").slice(0, 4));
+  }, []);
+  const yearFilterOptions = useMemo(() => {
+    const years = new Set<string>([CURRENT_YEAR]);
+    const baseMonth = normalizeMonthValue(month);
+    years.add(baseMonth.slice(0, 4));
+
+    if (/^\d{4}$/.test(selectedYearFilter)) {
+      years.add(selectedYearFilter);
+    }
+
+    rows.forEach((row) => {
+      const normalized = normalizeMonthValue(row.reportMonth);
+      years.add(normalized.slice(0, 4));
+    });
+
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [rows, month, selectedYearFilter]);
+
+  const indexedRows = useMemo(
+    () => rows.map((row, sourceIndex) => ({ row, sourceIndex })),
+    [rows],
+  );
+  const displayedRows = useMemo(
+    () =>
+      indexedRows.filter(
+        ({ row }) => normalizeMonthValue(row.reportMonth) === activeMonthFilter,
+      ),
+    [indexedRows, activeMonthFilter],
+  );
+  const displayedRowIds = useMemo(
+    () => displayedRows.map(({ row }) => row.id),
+    [displayedRows],
+  );
+  const visibleSourceIndexes = useMemo(
+    () => displayedRows.map(({ sourceIndex }) => sourceIndex),
+    [displayedRows],
+  );
+  const selectedVisibleCount = useMemo(
+    () =>
+      displayedRowIds.reduce(
+        (count, id) => (selectedRows.has(id) ? count + 1 : count),
+        0,
+      ),
+    [displayedRowIds, selectedRows],
+  );
   const categoryLookup = useMemo(() => {
     const lookup = new Map<string, string>();
     CATEGORY_OPTIONS.forEach((category) => {
@@ -183,6 +394,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     const t = setTimeout(() => setImportFeedback(null), 4000);
     return () => clearTimeout(t);
   }, [importFeedback]);
+
+  useEffect(() => {
+    setSelectedRows(new Set());
+    setActiveCell(null);
+  }, [activeMonthFilter]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -214,6 +430,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       for (const sheetName of wb.SheetNames) {
         const ws = wb.Sheets[sheetName];
         if (!ws) continue;
+        let skipRemainingRowsAsFooter = false;
 
         const headerInfo = getHeaderRowInfo(ws, expectedHeaders);
         const normalizedHeaderRow = headerInfo.headerRow.map((header) =>
@@ -261,6 +478,21 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
         }) as SheetCell[][];
 
         for (const excelRow of rawRows) {
+          const normalizedRowValues = excelRow
+            .map((cell) => normalizeImportHeader(toCellText(cell)))
+            .filter((value) => value.length > 0);
+
+          if (skipRemainingRowsAsFooter) {
+            skippedCount += 1;
+            continue;
+          }
+
+          if (shouldSkipRemainingAsFooter(normalizedRowValues)) {
+            skipRemainingRowsAsFooter = true;
+            skippedCount += 1;
+            continue;
+          }
+
           const rawCategory =
             categoryIndex >= 0 ? toCellText(excelRow[categoryIndex]) : "";
           const matchedCategory = categoryLookup.get(
@@ -273,9 +505,28 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
           const branch =
             branchIndex >= 0 ? toCellText(excelRow[branchIndex]) : "";
-          const criminal =
-            criminalIndex >= 0 ? toNumber(excelRow[criminalIndex]) : 0;
-          const civil = civilIndex >= 0 ? toNumber(excelRow[civilIndex]) : 0;
+          const rawCriminalCell =
+            criminalIndex >= 0 ? excelRow[criminalIndex] : undefined;
+          const rawCivilCell =
+            civilIndex >= 0 ? excelRow[civilIndex] : undefined;
+          const rawCriminalText = toCellText(rawCriminalCell);
+          const rawCivilText = toCellText(rawCivilCell);
+
+          if (
+            shouldIgnoreImportedRow({
+              rawCategory,
+              branch,
+              rawCriminal: rawCriminalText,
+              rawCivil: rawCivilText,
+              normalizedRowValues,
+            })
+          ) {
+            skippedCount += 1;
+            continue;
+          }
+
+          const criminal = criminalIndex >= 0 ? toNumber(rawCriminalCell) : 0;
+          const civil = civilIndex >= 0 ? toNumber(rawCivilCell) : 0;
 
           if (!branch && criminal === 0 && civil === 0) {
             skippedCount += 1;
@@ -284,6 +535,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
           importedRows.push({
             id: createRowId(),
+            reportMonth: activeMonthFilter,
             branch,
             criminal,
             civil,
@@ -324,18 +576,21 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     }
   };
 
-  const monthLabel = new Date(month + "-01").toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = toMonthLabel(activeMonthFilter);
 
   /* ---------------------------------------------------------------- */
   /*  Row helpers                                                      */
   /* ---------------------------------------------------------------- */
 
-  const addRows = (count: number = 1) => {
-    setRows((prev) => [...prev, ...Array.from({ length: count }, emptyRow)]);
-  };
+  const addRows = useCallback(
+    (count: number = 1) => {
+      setRows((prev) => [
+        ...prev,
+        ...Array.from({ length: count }, () => emptyRow(activeMonthFilter)),
+      ]);
+    },
+    [activeMonthFilter],
+  );
 
   const deleteSelectedRows = () => {
     if (selectedRows.size === 0) return;
@@ -368,11 +623,20 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   };
 
   const toggleSelectAll = () => {
-    if (selectedRows.size === rows.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(rows.map((r) => r.id)));
-    }
+    if (displayedRowIds.length === 0) return;
+
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      const allVisibleSelected = displayedRowIds.every((id) => next.has(id));
+
+      if (allVisibleSelected) {
+        displayedRowIds.forEach((id) => next.delete(id));
+      } else {
+        displayedRowIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
   };
 
   /* ---------------------------------------------------------------- */
@@ -405,6 +669,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
       let nextRow = rowIdx;
       let nextCol = colIdx;
+      let rowStep = 0;
 
       switch (e.key) {
         case "Tab":
@@ -414,33 +679,52 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             if (nextCol < 0) {
               nextCol = COLS.length - 1;
               nextRow--;
+              rowStep = -1;
             }
           } else {
             nextCol++;
             if (nextCol >= COLS.length) {
               nextCol = 0;
               nextRow++;
+              rowStep = 1;
             }
           }
           break;
         case "Enter":
           e.preventDefault();
           nextRow++;
+          rowStep = 1;
           break;
         case "ArrowDown":
           if (col === "criminal" || col === "civil") {
             e.preventDefault();
             nextRow++;
+            rowStep = 1;
           }
           break;
         case "ArrowUp":
           if (col === "criminal" || col === "civil") {
             e.preventDefault();
             nextRow--;
+            rowStep = -1;
           }
           break;
         default:
           return;
+      }
+
+      if (rowStep !== 0) {
+        const currentVisibleIndex = visibleSourceIndexes.indexOf(rowIdx);
+        if (currentVisibleIndex !== -1 && visibleSourceIndexes.length > 0) {
+          const targetVisibleIndex = Math.max(
+            0,
+            Math.min(
+              visibleSourceIndexes.length - 1,
+              currentVisibleIndex + rowStep,
+            ),
+          );
+          nextRow = visibleSourceIndexes[targetVisibleIndex];
+        }
       }
 
       if (nextRow < 0) nextRow = 0;
@@ -453,7 +737,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
       setActiveCell({ rowIdx: nextRow, col: COLS[nextCol] });
     },
-    [rows.length, COLS],
+    [rows.length, COLS, addRows, visibleSourceIndexes],
   );
 
   /* ---------------------------------------------------------------- */
@@ -468,12 +752,26 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       e.preventDefault();
 
       const pastedCategories = new Set<string>();
+      let skipRemainingPastedRowsAsFooter = false;
 
       const pastedRows = text
         .split(/\r?\n/)
         .filter((line) => line.trim())
         .map((line) => {
           const cells = line.split("\t");
+          const normalizedRowValues = cells
+            .map((cell) => normalizeImportHeader(cell ?? ""))
+            .filter((value) => value.length > 0);
+
+          if (skipRemainingPastedRowsAsFooter) {
+            return null;
+          }
+
+          if (shouldSkipRemainingAsFooter(normalizedRowValues)) {
+            skipRemainingPastedRowsAsFooter = true;
+            return null;
+          }
+
           const firstCell = normalizeImportHeader(cells[0] ?? "");
           const matchedCategory = categoryLookup.get(firstCell);
 
@@ -482,13 +780,31 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
           }
 
           const startIndex = matchedCategory ? 1 : 0;
+          const branch = (cells[startIndex] ?? "").trim();
+          const rawCriminalText = (cells[startIndex + 1] ?? "").trim();
+          const rawCivilText = (cells[startIndex + 2] ?? "").trim();
+
+          if (
+            shouldIgnoreImportedRow({
+              rawCategory: matchedCategory ? (cells[0] ?? "") : "",
+              branch,
+              rawCriminal: rawCriminalText,
+              rawCivil: rawCivilText,
+              normalizedRowValues,
+            })
+          ) {
+            return null;
+          }
+
           return {
             id: createRowId(),
-            branch: (cells[startIndex] ?? "").trim(),
-            criminal: toNumber(cells[startIndex + 1] ?? ""),
-            civil: toNumber(cells[startIndex + 2] ?? ""),
+            reportMonth: activeMonthFilter,
+            branch,
+            criminal: toNumber(rawCriminalText),
+            civil: toNumber(rawCivilText),
           } as EditableRow;
         })
+        .filter((row): row is EditableRow => row !== null)
         .filter((row) => row.branch || row.criminal || row.civil);
 
       if (pastedRows.length > 0) {
@@ -502,7 +818,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
         });
       }
     },
-    [categoryLookup],
+    [categoryLookup, activeMonthFilter],
   );
 
   /* ---------------------------------------------------------------- */
@@ -510,11 +826,13 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
   /* ---------------------------------------------------------------- */
 
   const handleSave = () => {
-    const validRows = rows.filter((r) => r.branch);
+    const validRows = displayedRows
+      .map(({ row }) => row)
+      .filter((r) => r.branch);
     if (validRows.length === 0) return;
 
     const mapped: MonthlyRow[] = validRows.map((r) => ({
-      month,
+      month: normalizeMonthValue(r.reportMonth),
       category: selectedCategory,
       branch: r.branch,
       criminal: r.criminal,
@@ -526,9 +844,12 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     onBack();
   };
 
-  const validCount = rows.filter((r) => r.branch).length;
+  const validRows = useMemo(
+    () => displayedRows.map(({ row }) => row).filter((r) => r.branch),
+    [displayedRows],
+  );
 
-  const validRows = useMemo(() => rows.filter((r) => r.branch), [rows]);
+  const validCount = validRows.length;
 
   const selectedCategoryBadge = useMemo(
     () =>
@@ -617,6 +938,14 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                   <span className="xls-pill-dot" />
                   {rows.length} {rows.length === 1 ? "row" : "rows"}
                 </span>
+                <span className="xls-pill xls-pill-neutral">
+                  <span className="xls-pill-dot" />
+                  {monthLabel}
+                </span>
+                <span className="xls-pill xls-pill-neutral">
+                  <span className="xls-pill-dot" />
+                  {displayedRows.length} shown
+                </span>
                 <span className="xls-pill xls-pill-neutral" style={{ gap: 6 }}>
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${selectedCategoryBadge.bg}`}
@@ -630,10 +959,10 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                   <span className="xls-pill-dot" />
                   {validCount} valid
                 </span>
-                {rows.length - validCount > 0 && (
+                {displayedRows.length - validCount > 0 && (
                   <span className="xls-pill xls-pill-err">
                     <span className="xls-pill-dot" />
-                    {rows.length - validCount} incomplete
+                    {displayedRows.length - validCount} incomplete
                   </span>
                 )}
               </div>
@@ -645,7 +974,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <div
               className="xls-progress-fill"
               style={{
-                width: `${rows.length ? (validCount / rows.length) * 100 : 0}%`,
+                width: `${displayedRows.length ? (validCount / displayedRows.length) * 100 : 0}%`,
               }}
             />
           </div>
@@ -733,7 +1062,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <button
               className="btn btn-info btn-outline gap-2"
               onClick={duplicateSelectedRows}
-              disabled={selectedRows.size === 0}
+              disabled={selectedVisibleCount === 0}
             >
               <FiCopy size={15} />
               Duplicate
@@ -741,10 +1070,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <button
               className="btn btn-error btn-outline gap-2"
               onClick={deleteSelectedRows}
-              disabled={selectedRows.size === 0}
+              disabled={selectedVisibleCount === 0}
             >
               <FiTrash2 size={15} />
-              Delete{selectedRows.size > 0 ? ` (${selectedRows.size})` : ""}
+              Delete
+              {selectedVisibleCount > 0 ? ` (${selectedVisibleCount})` : ""}
             </button>
 
             <div
@@ -759,6 +1089,57 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             <button className="btn btn-warning btn-outline" onClick={clearAll}>
               Clear All
             </button>
+
+            <div
+              style={{
+                width: 1,
+                height: 28,
+                background: "var(--surface-border)",
+                margin: "0 4px",
+              }}
+            />
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>
+                Date Filter
+              </span>
+              <select
+                className="xls-input"
+                value={selectedMonthFilter}
+                onChange={(e) => setSelectedMonthFilter(e.target.value)}
+                style={{ width: 150, height: 36 }}
+              >
+                {MONTH_OPTIONS.map((monthOption) => (
+                  <option key={monthOption.value} value={monthOption.value}>
+                    {monthOption.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                list="monthly-year-filter-options"
+                className="xls-input"
+                value={selectedYearFilter}
+                onChange={(e) => handleYearFilterChange(e.target.value)}
+                placeholder={CURRENT_YEAR}
+                style={{ width: 110, height: 36 }}
+              />
+              <datalist id="monthly-year-filter-options">
+                {yearFilterOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </datalist>
+            </div>
 
             <>
               <div
@@ -846,7 +1227,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                         type="checkbox"
                         className="xls-checkbox"
                         checked={
-                          rows.length > 0 && selectedRows.size === rows.length
+                          displayedRows.length > 0 &&
+                          selectedVisibleCount === displayedRows.length
                         }
                         onChange={toggleSelectAll}
                       />
@@ -860,11 +1242,12 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 </thead>
 
                 <tbody>
-                  {rows.map((row, idx) => {
+                  {displayedRows.map(({ row, sourceIndex }, idx) => {
                     const isSelected = selectedRows.has(row.id);
                     const total = row.criminal + row.civil;
                     const isActive = (col: string) =>
-                      activeCell?.rowIdx === idx && activeCell?.col === col;
+                      activeCell?.rowIdx === sourceIndex &&
+                      activeCell?.col === col;
 
                     return (
                       <tr
@@ -905,7 +1288,10 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               : undefined
                           }
                           onClick={() =>
-                            setActiveCell({ rowIdx: idx, col: "branch" })
+                            setActiveCell({
+                              rowIdx: sourceIndex,
+                              col: "branch",
+                            })
                           }
                         >
                           <input
@@ -917,9 +1303,14 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               updateCell(row.id, "branch", e.target.value)
                             }
                             onFocus={() =>
-                              setActiveCell({ rowIdx: idx, col: "branch" })
+                              setActiveCell({
+                                rowIdx: sourceIndex,
+                                col: "branch",
+                              })
                             }
-                            onKeyDown={(e) => handleKeyDown(e, idx, "branch")}
+                            onKeyDown={(e) =>
+                              handleKeyDown(e, sourceIndex, "branch")
+                            }
                           />
                         </td>
 
@@ -934,7 +1325,10 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               : undefined
                           }
                           onClick={() =>
-                            setActiveCell({ rowIdx: idx, col: "criminal" })
+                            setActiveCell({
+                              rowIdx: sourceIndex,
+                              col: "criminal",
+                            })
                           }
                         >
                           <input
@@ -952,10 +1346,15 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               )
                             }
                             onFocus={(e) => {
-                              setActiveCell({ rowIdx: idx, col: "criminal" });
+                              setActiveCell({
+                                rowIdx: sourceIndex,
+                                col: "criminal",
+                              });
                               e.target.select();
                             }}
-                            onKeyDown={(e) => handleKeyDown(e, idx, "criminal")}
+                            onKeyDown={(e) =>
+                              handleKeyDown(e, sourceIndex, "criminal")
+                            }
                           />
                         </td>
 
@@ -970,7 +1369,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               : undefined
                           }
                           onClick={() =>
-                            setActiveCell({ rowIdx: idx, col: "civil" })
+                            setActiveCell({ rowIdx: sourceIndex, col: "civil" })
                           }
                         >
                           <input
@@ -988,10 +1387,15 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                               )
                             }
                             onFocus={(e) => {
-                              setActiveCell({ rowIdx: idx, col: "civil" });
+                              setActiveCell({
+                                rowIdx: sourceIndex,
+                                col: "civil",
+                              });
                               e.target.select();
                             }}
-                            onKeyDown={(e) => handleKeyDown(e, idx, "civil")}
+                            onKeyDown={(e) =>
+                              handleKeyDown(e, sourceIndex, "civil")
+                            }
                           />
                         </td>
 
@@ -1033,8 +1437,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
           <div className="xls-footer">
             <div className="xls-footer-meta">
               <span>
-                <strong>{validCount}</strong> of <strong>{rows.length}</strong>{" "}
-                rows ready
+                <strong>{validCount}</strong> of{" "}
+                <strong>{displayedRows.length}</strong> rows ready
               </span>
               <span style={{ color: "var(--color-subtle)", fontSize: 13 }}>
                 Paste from Excel: Branch, Criminal, Civil columns (Category
@@ -1052,7 +1456,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 style={{ opacity: validCount === 0 ? 0.5 : 1 }}
               >
                 <FiEye size={15} />
-                Review{validCount > 0 ? ` (${validCount})` : ""}
+                Review
+                {displayedRows.length > 0 ? ` (${displayedRows.length})` : ""}
               </button>
             </div>
           </div>
@@ -1084,7 +1489,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
             </div>
           </div>
 
-          {/* ── Summary cards ── */}
+          {/*  
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card bg-base-200/50 shadow">
               <div className="card-body p-4 text-center">
@@ -1116,7 +1521,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* ── Review table ── */}
           <div className="xls-sheet-wrap">
