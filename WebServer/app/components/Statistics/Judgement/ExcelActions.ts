@@ -3,7 +3,6 @@
 import { validateSession } from "@/app/lib/authActions";
 import {
   ExportExcelData,
-  findColumnValue,
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
@@ -29,6 +28,30 @@ const toNumber = (value: unknown): number => {
 const toBranch = (value: unknown): string | null => {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
+};
+
+const normalizeHeaderKey = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const findColumnValue = (
+  row: Record<string, unknown>,
+  possibleNames: string[],
+): unknown => {
+  const normalizedTargets = new Set(
+    possibleNames
+      .map((name) => normalizeHeaderKey(String(name)))
+      .filter((name) => name.length > 0),
+  );
+
+  if (normalizedTargets.size === 0) return undefined;
+
+  for (const key of Object.keys(row)) {
+    if (normalizedTargets.has(normalizeHeaderKey(key))) {
+      return row[key];
+    }
+  }
+
+  return undefined;
 };
 
 const getMtcCells = (row: Record<string, unknown>) => {
