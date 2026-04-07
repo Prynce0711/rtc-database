@@ -274,6 +274,106 @@ const shouldIgnoreAnnualImportRow = ({
   return false;
 };
 
+const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
+  branchno: [
+    "Branches",
+    "Branches No.",
+    "Branch No",
+    "Branch Number",
+  ],
+  civilv: [
+    "Civil V",
+    "Civil Voluntary",
+    "Number of Cases Heard/Tried Civil V",
+    "Cases Heard Civil V",
+    "Cases Heard/Tried Civil V",
+  ],
+  civilinc: [
+    "Civil In-C",
+    "Civil Inc",
+    "Civil InC",
+    "Civil L",
+    "Number of Cases Heard/Tried Civil In-C",
+  ],
+  criminalv: [
+    "Criminal V",
+    "Criminal Voluntary",
+    "Crim V",
+    "Number of Cases Heard/Tried Criminal V",
+    "Cases Heard Criminal V",
+  ],
+  criminalinc: [
+    "Criminal In-C",
+    "Criminal Inc",
+    "Criminal InC",
+    "Crim In-C",
+    "Crim Inc",
+    "Criminal L",
+    "Number of Cases Heard/Tried Criminal In-C",
+  ],
+  totalheard: [
+    "Total Cases Heard",
+    "Total Heard",
+    "Cases Heard",
+    "Total Cases Heard/Tried",
+  ],
+  disposedcivil: [
+    "Disposed Civil",
+    "Cases Disposed Civil",
+    "Number of Cases Disposed Civil",
+  ],
+  disposedcrim: [
+    "Disposed Crim",
+    "Disposed Criminal",
+    "Cases Disposed Criminal",
+    "Number of Cases Disposed Criminal",
+  ],
+  summaryproc: ["Summary Proc", "Summary Procedure", "Cases Proc"],
+  casesdisposed: [
+    "Cases Disposed",
+    "Total Cases Disposed",
+    "TOTAL Cases Disposed",
+  ],
+  pdlm: ["PDL M", "PDL/CICL M", "PDL CICL M"],
+  pdlf: ["PDL F", "PDL/CICL F", "PDL CICL F"],
+  pdlcicl: ["PDL CICL", "PDL/CICL CICL"],
+  pdltotal: [
+    "PDL Total",
+    "PDL/CICL Total",
+    "Number of Detainees Ordered Released Total",
+    "Detainees Ordered Released Total",
+  ],
+  pdlv: ["PDL Released V", "Released V"],
+  pdlinc: ["PDL Released In-C", "PDL In-C", "PDL Inc", "Released In-C"],
+  pdlbail: ["PDL Bail", "Bail", "Released on Bail"],
+  pdlrecognizance: [
+    "PDL Recognizance",
+    "Recognizance",
+    "Released on Bail/Recognizance",
+  ],
+  pdlminror: ["PDL Min/Ror", "Min/Ror", "Min Ror", "Minror"],
+  pdlmaxsentence: [
+    "PDL Max Sentence",
+    "Max Sentence",
+    "Convicted",
+    "Convicted (Transferred to BOC)",
+  ],
+  pdldismissal: ["PDL Dismissal", "Dismissal", "Cases Dismissed"],
+  pdlacquittal: ["PDL Acquittal", "Acquittal", "Acquitted"],
+  pdlminsentence: ["PDL Min Sentence", "Min Sentence"],
+  pdlprobation: ["PDL Probation", "Probation", "Others"],
+  ciclm: ["CICL M"],
+  ciclf: ["CICL F"],
+  ciclv: ["CICL V"],
+  ciclinc: ["CICL In-C", "CICL Inc", "CICL InC", "CICL L"],
+  fine: [
+    "Fine",
+    "Full Service of Sentence,Fine,etc",
+    "Full Service of Sentence Fine etc",
+  ],
+  total: ["TOTAL", "Grand Total"],
+};
+
 const buildFieldAliases = (field: FieldConfig): string[] => {
   const normalizedName = normalizeImportHeader(field.name);
   const camelWords = field.name.replace(/([a-z])([A-Z])/g, "$1 $2");
@@ -294,6 +394,11 @@ const buildFieldAliases = (field: FieldConfig): string[] => {
 
   if (normalizedName === "percentageofdisposition") {
     aliases.push("% Disposition", "Disposition Percentage");
+  }
+
+  const extraAliases = IMPORT_FIELD_ALIASES[normalizedName];
+  if (extraAliases && extraAliases.length > 0) {
+    aliases.push(...extraAliases);
   }
 
   return Array.from(
@@ -370,6 +475,26 @@ const getInventoryMetricColumnIndexes = (
   return result;
 };
 
+const buildMergedAwareRow = (
+  row: SheetCell[] | undefined,
+  maxCols: number,
+): string[] => {
+  const mergedAware: string[] = [];
+  let carry = "";
+
+  for (let colIndex = 0; colIndex < maxCols; colIndex += 1) {
+    const value = toCellText(row?.[colIndex]);
+    if (value !== "") {
+      carry = value;
+      mergedAware.push(value);
+    } else {
+      mergedAware.push(carry);
+    }
+  }
+
+  return mergedAware;
+};
+
 const buildCompositeHeaderRow = (
   rows: SheetCell[][],
   headerRowIndex: number,
@@ -385,6 +510,12 @@ const buildCompositeHeaderRow = (
     (row) => row.filter((cell) => toCellText(cell) !== "").length,
   );
 
+  const mergedAwareRows: Record<number, string[]> = {
+    [headerRowIndex]: buildMergedAwareRow(rows[headerRowIndex], maxCols),
+    [headerRowIndex - 1]: buildMergedAwareRow(rows[headerRowIndex - 1], maxCols),
+    [headerRowIndex - 2]: buildMergedAwareRow(rows[headerRowIndex - 2], maxCols),
+  };
+
   return Array.from({ length: maxCols }).map((_, colIndex) => {
     const parts: string[] = [];
 
@@ -392,11 +523,11 @@ const buildCompositeHeaderRow = (
       const rowIndex = headerRowIndex - offset;
       if (rowIndex < 0) continue;
       if (nonEmptyCounts[rowIndex] < 2) continue;
-      const value = toCellText(rows[rowIndex]?.[colIndex]);
+      const value = mergedAwareRows[rowIndex]?.[colIndex] ?? "";
       if (value) parts.push(value);
     }
 
-    const headerValue = toCellText(rows[headerRowIndex]?.[colIndex]);
+    const headerValue = mergedAwareRows[headerRowIndex]?.[colIndex] ?? "";
     if (headerValue) parts.push(headerValue);
 
     return parts.join(" ").trim();
@@ -834,9 +965,14 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       }
 
       const { worksheet, headerInfo } = bestSheet;
+      const isJudgementRtcLayout =
+        editableFields.some((field) => field.name === "branchNo") &&
+        editableFields.some((field) => field.name === "casesDisposed") &&
+        editableFields.some((field) => field.name === "pdlProbation");
+
       const rawRows = XLSX.utils.sheet_to_json<SheetCell[]>(worksheet, {
         header: 1,
-        range: headerInfo.headerRowIndex + 1,
+        range: isJudgementRtcLayout ? 0 : headerInfo.headerRowIndex + 1,
         blankrows: false,
       });
 
@@ -915,6 +1051,317 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         }
       });
 
+      if (isJudgementRtcLayout) {
+        const findHeaderIndex = (
+          predicate: (header: string) => boolean,
+          fromEnd: boolean = false,
+        ): number => {
+          if (fromEnd) {
+            for (
+              let index = normalizedHeaderRow.length - 1;
+              index >= 0;
+              index -= 1
+            ) {
+              const header = normalizedHeaderRow[index];
+              if (header && predicate(header)) return index;
+            }
+            return -1;
+          }
+
+          return normalizedHeaderRow.findIndex(
+            (header) => header.length > 0 && predicate(header),
+          );
+        };
+
+        const setFallbackFieldIndex = (
+          fieldName: string,
+          predicate: (header: string) => boolean,
+          fromEnd: boolean = false,
+        ) => {
+          if (fieldColumnIndex.has(fieldName)) return;
+          const index = findHeaderIndex(predicate, fromEnd);
+          if (index >= 0) {
+            fieldColumnIndex.set(fieldName, index);
+          }
+        };
+
+        const setPreferredFieldIndex = (
+          fieldName: string,
+          predicate: (header: string) => boolean,
+          fromEnd: boolean = false,
+        ) => {
+          const index = findHeaderIndex(predicate, fromEnd);
+          if (index >= 0) {
+            fieldColumnIndex.set(fieldName, index);
+          }
+        };
+
+        const heardCivilIndexes = normalizedHeaderRow
+          .map((header, index) =>
+            header.includes("civil") &&
+            (header.includes("heard") || header.includes("tried")) &&
+            !header.includes("disposed")
+              ? index
+              : -1,
+          )
+          .filter((index) => index >= 0);
+
+        const heardCriminalIndexes = normalizedHeaderRow
+          .map((header, index) =>
+            (header.includes("criminal") || header.includes("crim")) &&
+            (header.includes("heard") || header.includes("tried")) &&
+            !header.includes("disposed")
+              ? index
+              : -1,
+          )
+          .filter((index) => index >= 0);
+
+        if (!fieldColumnIndex.has("civilV") && heardCivilIndexes.length > 0) {
+          fieldColumnIndex.set("civilV", heardCivilIndexes[0]);
+        }
+        if (!fieldColumnIndex.has("civilInC") && heardCivilIndexes.length > 1) {
+          fieldColumnIndex.set("civilInC", heardCivilIndexes[1]);
+        }
+        if (
+          !fieldColumnIndex.has("criminalV") &&
+          heardCriminalIndexes.length > 0
+        ) {
+          fieldColumnIndex.set("criminalV", heardCriminalIndexes[0]);
+        }
+        if (
+          !fieldColumnIndex.has("criminalInC") &&
+          heardCriminalIndexes.length > 1
+        ) {
+          fieldColumnIndex.set("criminalInC", heardCriminalIndexes[1]);
+        }
+
+        setFallbackFieldIndex(
+          "branchNo",
+          (header) =>
+            header.includes("branch") &&
+            (header.includes("no") || header === "branches" || header === "no"),
+        );
+        setFallbackFieldIndex(
+          "totalHeard",
+          (header) => header.includes("heard") && header.includes("total"),
+        );
+        setFallbackFieldIndex(
+          "disposedCivil",
+          (header) =>
+            header.includes("civil") &&
+            header.includes("disposed") &&
+            !header.includes("total"),
+        );
+        setFallbackFieldIndex(
+          "disposedCrim",
+          (header) =>
+            (header.includes("criminal") || header.includes("crim")) &&
+            header.includes("disposed") &&
+            !header.includes("total"),
+        );
+        setFallbackFieldIndex(
+          "summaryProc",
+          (header) =>
+            header.includes("summaryproc") ||
+            header.includes("casesproc") ||
+            (header.includes("summary") && header.includes("disposed")),
+        );
+        setFallbackFieldIndex(
+          "casesDisposed",
+          (header) =>
+            header.includes("casesdisposed") ||
+            (header.includes("disposed") && header.includes("total")),
+        );
+
+        setFallbackFieldIndex(
+          "pdlM",
+          (header) =>
+            (header.includes("pdlcicl") && header.endsWith("m")) ||
+            header.endsWith("pdlm"),
+        );
+        setFallbackFieldIndex(
+          "pdlF",
+          (header) =>
+            (header.includes("pdlcicl") && header.endsWith("f")) ||
+            header.endsWith("pdlf"),
+        );
+        setFallbackFieldIndex(
+          "pdlCICL",
+          (header) =>
+            header.includes("pdlciclcicl") ||
+            (header.includes("pdlcicl") && header.endsWith("cicl")),
+        );
+        setFallbackFieldIndex(
+          "pdlTotal",
+          (header) =>
+            (header.includes("pdlcicl") && header.includes("total")) ||
+            (header.includes("detaineesorderedreleased") &&
+              header.includes("total")),
+        );
+
+        setFallbackFieldIndex(
+          "pdlV",
+          (header) =>
+            header.includes("pdlreleasedv") ||
+            (header.includes("pdlreleased") && header.endsWith("v")),
+        );
+        setFallbackFieldIndex(
+          "pdlInC",
+          (header) =>
+            header.includes("pdlreleasedinc") ||
+            header.includes("pdlreleasedl") ||
+            header.includes("pdlinc"),
+        );
+        setFallbackFieldIndex("pdlBail", (header) => header.includes("bail"));
+        setFallbackFieldIndex(
+          "pdlRecognizance",
+          (header) =>
+            header.includes("recognizance") ||
+            header.includes("bailrecognizance"),
+        );
+        setFallbackFieldIndex("pdlMinRor", (header) =>
+          header.includes("minror"),
+        );
+        setFallbackFieldIndex(
+          "pdlMaxSentence",
+          (header) =>
+            header.includes("maxsentence") ||
+            header.includes("convicted") ||
+            header.includes("transferredtoboc"),
+        );
+        setFallbackFieldIndex(
+          "pdlDismissal",
+          (header) =>
+            header.includes("dismissal") ||
+            header.includes("casesdismissed") ||
+            header.endsWith("dismissed"),
+        );
+        setFallbackFieldIndex(
+          "pdlAcquittal",
+          (header) =>
+            header.includes("acquittal") || header.includes("acquitted"),
+        );
+        setFallbackFieldIndex("pdlMinSentence", (header) =>
+          header.includes("minsentence"),
+        );
+        setFallbackFieldIndex(
+          "pdlProbation",
+          (header) => header.includes("probation") || header.includes("others"),
+        );
+
+        setFallbackFieldIndex(
+          "ciclM",
+          (header) => header.includes("ciclm") && !header.includes("pdlcicl"),
+        );
+        setFallbackFieldIndex(
+          "ciclF",
+          (header) => header.includes("ciclf") && !header.includes("pdlcicl"),
+        );
+        setFallbackFieldIndex(
+          "ciclV",
+          (header) => header.includes("ciclv") && !header.includes("pdlcicl"),
+        );
+        setFallbackFieldIndex(
+          "ciclInC",
+          (header) =>
+            (header.includes("ciclinc") || header.includes("cicll")) &&
+            !header.includes("pdlcicl"),
+        );
+        setFallbackFieldIndex(
+          "fine",
+          (header) =>
+            header.includes("fine") || header.includes("fullserviceofsentence"),
+        );
+
+        setFallbackFieldIndex(
+          "total",
+          (header) =>
+            header === "total" ||
+            (header.includes("grand") && header.includes("total")),
+          true,
+        );
+
+        // Override ambiguous initial alias hits with deterministic choices.
+        setPreferredFieldIndex(
+          "totalHeard",
+          (header) =>
+            header.includes("totalcasesheard") ||
+            (header.includes("heard") && header.includes("total")),
+        );
+        setPreferredFieldIndex(
+          "casesDisposed",
+          (header) =>
+            header.includes("casesdisposed") ||
+            header.includes("totalcasesdisposed") ||
+            (header.includes("disposed") && header.includes("total")),
+        );
+        setPreferredFieldIndex(
+          "pdlTotal",
+          (header) =>
+            (header.includes("pdlcicl") && header.includes("total")) ||
+            (header.includes("detaineesorderedreleased") &&
+              header.includes("total")),
+        );
+        setPreferredFieldIndex(
+          "fine",
+          (header) =>
+            header.includes("fullserviceofsentence") || header.includes("fine"),
+        );
+        setPreferredFieldIndex(
+          "pdlMaxSentence",
+          (header) =>
+            header.includes("maxsentence") ||
+            header.includes("convicted") ||
+            header.includes("transferredtoboc"),
+        );
+        setPreferredFieldIndex(
+          "total",
+          (header) =>
+            header === "total" ||
+            (header.includes("grand") && header.includes("total")),
+          true,
+        );
+
+        const pdlBailIndex = fieldColumnIndex.get("pdlBail");
+        const pdlRecognizanceIndex = fieldColumnIndex.get("pdlRecognizance");
+        if (
+          pdlBailIndex !== undefined &&
+          pdlRecognizanceIndex !== undefined &&
+          pdlBailIndex === pdlRecognizanceIndex
+        ) {
+          const sharedHeader = normalizedHeaderRow[pdlBailIndex] ?? "";
+          if (sharedHeader.includes("bailrecognizance")) {
+            fieldColumnIndex.delete("pdlBail");
+          }
+        }
+
+        const pdlMaxSentenceIndex = fieldColumnIndex.get("pdlMaxSentence");
+        const fineIndex = fieldColumnIndex.get("fine");
+        if (
+          pdlMaxSentenceIndex !== undefined &&
+          fineIndex !== undefined &&
+          pdlMaxSentenceIndex === fineIndex
+        ) {
+          const sharedHeader = normalizedHeaderRow[fineIndex] ?? "";
+          if (
+            sharedHeader.includes("fullserviceofsentence") ||
+            sharedHeader.includes("fine")
+          ) {
+            fieldColumnIndex.delete("pdlMaxSentence");
+          }
+        }
+
+        const totalIndex = fieldColumnIndex.get("total");
+        const pdlTotalIndex = fieldColumnIndex.get("pdlTotal");
+        if (
+          totalIndex !== undefined &&
+          pdlTotalIndex !== undefined &&
+          totalIndex === pdlTotalIndex
+        ) {
+          fieldColumnIndex.delete("pdlTotal");
+        }
+      }
+
       const inventoryMetricFieldNames: InventoryMetricFieldName[] = [
         "civilSmallClaimsFiled",
         "criminalCasesFiled",
@@ -940,6 +1387,9 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       const imported: EditableRow[] = [];
       let skippedCount = 0;
       let skipRemainingRowsAsFooter = false;
+      const requiresBranchIdentifier = editableFields.some(
+        (field) => normalizeImportHeader(field.name) === "branchno",
+      );
 
       for (const excelRow of rawRows) {
         const normalizedRowValues = excelRow
@@ -1020,6 +1470,11 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
               }
             }
           }
+        }
+
+        if (requiresBranchIdentifier && identifierValue === "") {
+          skippedCount += 1;
+          continue;
         }
 
         if (
