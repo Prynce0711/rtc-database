@@ -1,25 +1,25 @@
 "use client";
 
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    FiArrowLeft,
-    FiCheck,
-    FiChevronRight,
-    FiCopy,
-    FiEdit3,
-    FiEye,
-    FiFileText,
-    FiGrid,
-    FiPlus,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiArrowLeft,
+  FiCheck,
+  FiChevronRight,
+  FiCopy,
+  FiEdit3,
+  FiEye,
+  FiFileText,
+  FiGrid,
+  FiPlus,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
@@ -275,12 +275,7 @@ const shouldIgnoreAnnualImportRow = ({
 };
 
 const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
-  branchno: [
-    "Branches",
-    "Branches No.",
-    "Branch No",
-    "Branch Number",
-  ],
+  branchno: ["Branches", "Branches No.", "Branch No", "Branch Number"],
   civilv: [
     "Civil V",
     "Civil Voluntary",
@@ -512,8 +507,14 @@ const buildCompositeHeaderRow = (
 
   const mergedAwareRows: Record<number, string[]> = {
     [headerRowIndex]: buildMergedAwareRow(rows[headerRowIndex], maxCols),
-    [headerRowIndex - 1]: buildMergedAwareRow(rows[headerRowIndex - 1], maxCols),
-    [headerRowIndex - 2]: buildMergedAwareRow(rows[headerRowIndex - 2], maxCols),
+    [headerRowIndex - 1]: buildMergedAwareRow(
+      rows[headerRowIndex - 1],
+      maxCols,
+    ),
+    [headerRowIndex - 2]: buildMergedAwareRow(
+      rows[headerRowIndex - 2],
+      maxCols,
+    ),
   };
 
   return Array.from({ length: maxCols }).map((_, colIndex) => {

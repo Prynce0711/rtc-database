@@ -56,6 +56,10 @@ const roleToText = (role: User["role"] | Roles) => {
       return "Staff";
     case Roles.STATISTICS:
       return "Statistics";
+    case Roles.NOTARIAL:
+      return "Notarial";
+    case Roles.ARCHIVE:
+      return "Archive";
     default:
       return String(role);
   }
@@ -351,6 +355,8 @@ const AccountDashboard = () => {
             <option value={Roles.USER}>Staff</option>
             <option value={Roles.ATTY}>Attorney</option>
             <option value={Roles.STATISTICS}>Statistics</option>
+            <option value={Roles.NOTARIAL}>Notarial</option>
+            <option value={Roles.ARCHIVE}>Archive</option>
           </select>
         </div>
         {/* ── TABLE ────────────────────────────────────────── */}
@@ -470,6 +476,8 @@ const AccountDashboard = () => {
                               <option value={Roles.STATISTICS}>
                                 Statistics
                               </option>
+                              <option value={Roles.NOTARIAL}>Notarial</option>
+                              <option value={Roles.ARCHIVE}>Archive</option>
                             </select>
                           )}
                         </td>
