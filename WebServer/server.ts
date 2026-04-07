@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import next from "next";
-import { startBackupScheduler } from "./app/lib/backupScheduler";
+import { startBackupScheduler } from "./app/lib/backup/backupScheduler";
 import { startUdpBroadcast } from "./app/lib/udpBroadcast";
 
 const port = parseInt(process.env.PORT || "3000", 10);
