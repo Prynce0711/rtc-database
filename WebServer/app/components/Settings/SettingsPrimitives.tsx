@@ -83,15 +83,18 @@ export const SelectField = ({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) => (
   <select
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="select select-bordered text-sm min-w-48 h-10 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg"
+    disabled={disabled}
+    className="select select-bordered text-sm min-w-48 h-10 bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg disabled:opacity-40"
   >
     {options.map((o) => (
       <option key={o.value} value={o.value}>

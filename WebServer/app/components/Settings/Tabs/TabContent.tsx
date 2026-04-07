@@ -1,6 +1,7 @@
 "use client";
 
 import AppearanceTab from "./AppearanceTab";
+import BackupTab from "./BackupTab";
 import CalendarTab from "./CalendarTab";
 import NotificationsTab from "./NotificationsTab";
 import ProfileTab from "./ProfileTab";
@@ -19,6 +20,8 @@ const TabContent = ({ tabId, role }: { tabId: string; role: string }) => {
       return <AppearanceTab />;
     case "system":
       return <SystemTab />;
+    case "backup":
+      return <BackupTab />;
     case "calendar":
       return <CalendarTab />;
     default:

@@ -4,10 +4,11 @@ packages:
   - NativeApp
 
 onlyBuiltDependencies:
-  - "@prisma/engines"
+  - '@prisma/engines'
   - better-sqlite3
   - electron
   - esbuild
   - prisma
+  - rclone.js
   - sharp
   - unrs-resolver

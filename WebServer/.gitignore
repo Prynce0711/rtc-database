@@ -44,3 +44,6 @@ app/generated/prisma
 dev.db
 
 certificates/
+
+# backup runtime files
+data/backup
