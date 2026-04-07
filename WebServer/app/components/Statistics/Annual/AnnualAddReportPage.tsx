@@ -1,25 +1,25 @@
 "use client";
 
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    FiArrowLeft,
-    FiCheck,
-    FiChevronRight,
-    FiCopy,
-    FiEdit3,
-    FiEye,
-    FiFileText,
-    FiGrid,
-    FiPlus,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiArrowLeft,
+  FiCheck,
+  FiChevronRight,
+  FiCopy,
+  FiEdit3,
+  FiEye,
+  FiFileText,
+  FiGrid,
+  FiPlus,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
@@ -39,6 +39,8 @@ export interface AnnualAddReportPageProps {
   fields: FieldConfig[];
   columns: AnyColumnDef[];
   selectedYear?: string;
+  onSelectedYearChange?: (year: string) => void;
+  yearFilterInputMode?: "text" | "select";
   initialData?: Record<string, unknown>[];
   activeView?: string;
   onSwitchView?: (view: string) => void;
@@ -646,6 +648,8 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   fields,
   columns,
   selectedYear,
+  onSelectedYearChange,
+  yearFilterInputMode = "text",
   initialData,
   activeView,
   onSwitchView,
@@ -887,15 +891,27 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const isYearSelectMode = yearFilterInputMode === "select";
   const effectiveYearFilter = useMemo(
     () => (/^\d{4}$/.test(dateFilter) ? dateFilter : ""),
     [dateFilter],
   );
 
-  const handleYearFilterChange = useCallback((value: string) => {
-    const sanitized = value.replace(/\D/g, "").slice(0, 4);
-    setDateFilter(sanitized);
-  }, []);
+  useEffect(() => {
+    if (!/^\d{4}$/.test(yearLabel)) return;
+    setDateFilter((prev) => (prev === yearLabel ? prev : yearLabel));
+  }, [yearLabel]);
+
+  const handleYearFilterChange = useCallback(
+    (value: string) => {
+      const sanitized = value.replace(/\D/g, "").slice(0, 4);
+      setDateFilter(sanitized);
+      if (/^\d{4}$/.test(sanitized)) {
+        onSelectedYearChange?.(sanitized);
+      }
+    },
+    [onSelectedYearChange],
+  );
 
   const indexedRows = useMemo(
     () => rows.map((row, sourceIndex) => ({ row, sourceIndex })),
@@ -904,8 +920,18 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
   const yearFilterOptions = useMemo(() => {
     const years = new Set<string>();
-    const currentYear = new Date().getFullYear().toString();
+    const currentYearNumber = new Date().getFullYear();
+    const currentYear = currentYearNumber.toString();
     years.add(currentYear);
+
+    if (isYearSelectMode) {
+      // Let users pick historical years (e.g. 2010) even when no rows exist yet.
+      const minYear = Math.min(1990, currentYearNumber - 40);
+      const maxYear = currentYearNumber + 5;
+      for (let year = minYear; year <= maxYear; year += 1) {
+        years.add(String(year));
+      }
+    }
 
     if (/^\d{4}$/.test(yearLabel)) {
       years.add(yearLabel);
@@ -925,7 +951,7 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
     }
 
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
-  }, [rows, dateFilterField, yearLabel, dateFilter]);
+  }, [rows, dateFilterField, yearLabel, dateFilter, isYearSelectMode]);
 
   const displayedRows = useMemo(() => {
     if (!dateFilterField || effectiveYearFilter === "") return indexedRows;
@@ -2294,32 +2320,50 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
                   <span style={{ fontSize: 12, color: "var(--color-subtle)" }}>
                     Year Filter
                   </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    list="annual-year-filter-options"
-                    className="xls-input"
-                    value={dateFilter}
-                    onChange={(e) => handleYearFilterChange(e.target.value)}
-                    placeholder="YYYY"
-                    style={{ width: 120, height: 36 }}
-                  />
-                  <datalist id="annual-year-filter-options">
-                    {yearFilterOptions.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </datalist>
-                  {dateFilter && (
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => setDateFilter("")}
-                      style={{ height: 36 }}
+                  {isYearSelectMode ? (
+                    <select
+                      className="xls-input"
+                      value={dateFilter}
+                      onChange={(e) => handleYearFilterChange(e.target.value)}
+                      style={{ width: 120, height: 36 }}
+                      aria-label="Year Filter"
                     >
-                      Clear
-                    </button>
+                      {yearFilterOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        list="annual-year-filter-options"
+                        className="xls-input"
+                        value={dateFilter}
+                        onChange={(e) => handleYearFilterChange(e.target.value)}
+                        placeholder="YYYY"
+                        style={{ width: 120, height: 36 }}
+                      />
+                      <datalist id="annual-year-filter-options">
+                        {yearFilterOptions.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </datalist>
+                      {dateFilter && (
+                        <button
+                          className="btn btn-outline"
+                          onClick={() => setDateFilter("")}
+                          style={{ height: 36 }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </>

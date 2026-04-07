@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  createRegionalJudgement,
-  deleteRegionalJudgement,
-  getRegionalJudgements,
-  updateRegionalJudgement,
+    createRegionalJudgement,
+    deleteRegionalJudgement,
+    getRegionalJudgements,
+    updateRegionalJudgement,
 } from "./judgementActions";
 import { rtcColumns } from "./JudgementColumnDef";
 import { rtcJudgementFields } from "./JudgementFieldConfig";
@@ -14,6 +14,7 @@ import JudgementTable from "./JudgementTable";
 
 interface JudgementRTCProps {
   selectedYear?: string;
+  onSelectedYearChange?: (year: string) => void;
   requestAdd?: number;
   onDataReady?: (data: Record<string, unknown>[]) => void;
   onActivePageChange?: (active: boolean) => void;
@@ -23,6 +24,7 @@ interface JudgementRTCProps {
 
 const JudgementRTC = ({
   selectedYear,
+  onSelectedYearChange,
   requestAdd,
   onDataReady,
   onActivePageChange,
@@ -37,7 +39,10 @@ const JudgementRTC = ({
   }
 
   useEffect(() => {
-    loadRecords();
+    const load = async () => {
+      await loadRecords();
+    };
+    void load();
   }, []);
 
   useEffect(() => {
@@ -47,8 +52,8 @@ const JudgementRTC = ({
 
   return (
     <JudgementTable<RTCJudgementLog & Record<string, unknown>>
-      // title="RTC Judgment Week"
-      // subtitle="Regional Trial Court — Nationwide Judgment Week Summary Report"
+      title="RTC Judgment Week"
+      subtitle="Regional Trial Court — Nationwide Judgment Week Summary Report"
       data={records as (RTCJudgementLog & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}
@@ -77,6 +82,7 @@ const JudgementRTC = ({
         if (!res.success) throw new Error(res.error || "Delete failed");
         await loadRecords();
       }}
+      onSelectedYearChange={onSelectedYearChange}
       onActivePageChange={onActivePageChange}
       activeView={activeView}
       onSwitchView={onSwitchView}

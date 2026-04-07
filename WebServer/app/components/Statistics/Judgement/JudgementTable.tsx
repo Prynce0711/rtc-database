@@ -38,6 +38,7 @@ export interface JudgementTableProps<T extends Record<string, unknown>> {
   onActivePageChange?: (active: boolean) => void;
   activeView?: string;
   onSwitchView?: (view: string) => void;
+  onSelectedYearChange?: (year: string) => void;
 }
 
 function JudgementTable<T extends Record<string, unknown>>({
@@ -58,6 +59,7 @@ function JudgementTable<T extends Record<string, unknown>>({
   onActivePageChange,
   activeView,
   onSwitchView,
+  onSelectedYearChange,
 }: JudgementTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{
@@ -166,12 +168,37 @@ function JudgementTable<T extends Record<string, unknown>>({
   // Filter by year if provided
   const yearFilteredData = useMemo(() => {
     if (!selectedYear) return data;
+
+    const extractYear = (value: unknown): string | null => {
+      if (value instanceof Date && Number.isFinite(value.getTime())) {
+        return String(value.getFullYear());
+      }
+
+      const asString = String(value ?? "").trim();
+      if (!asString) return null;
+
+      const exactYear = asString.match(/^(19|20)\d{2}$/);
+      if (exactYear) return exactYear[0];
+
+      const isoYear = asString.match(/^(19|20)\d{2}/);
+      if (isoYear) return isoYear[0];
+
+      const genericYear = asString.match(/(19|20)\d{2}/);
+      return genericYear ? genericYear[0] : null;
+    };
+
     return data.filter((row) => {
-      const d = row[dateKey];
-      if (d == null) return true;
-      return String(d).startsWith(selectedYear);
+      const year = extractYear(row[dateKey]);
+      if (!year) return false;
+      return year === selectedYear;
     });
   }, [data, selectedYear, dateKey]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (searchTerm.trim()) return "No rows match your search.";
+    if (selectedYear) return `No records found for ${selectedYear}.`;
+    return "No records found.";
+  }, [searchTerm, selectedYear]);
 
   // const kpiCards: KPICard[] = useMemo(() => {
   //   const rows = yearFilteredData as Record<string, unknown>[];
@@ -375,6 +402,7 @@ function JudgementTable<T extends Record<string, unknown>>({
         onUpdate={onUpdate}
         activeView={activeView}
         onSwitchView={onSwitchView}
+        onSelectedYearChange={onSelectedYearChange}
       />
     );
   }
@@ -444,7 +472,7 @@ function JudgementTable<T extends Record<string, unknown>>({
           setCurrentPage(1);
         }}
         rowCount={filteredAndSorted.length}
-        placeholder={searchPlaceholder ?? `Search ${title}…`}
+        placeholder={searchPlaceholder ?? "Search records..."}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
         onStartEdit={() => {
@@ -577,7 +605,7 @@ function JudgementTable<T extends Record<string, unknown>>({
                     colSpan={leafColumns.length + (isSelecting ? 1 : 0)}
                     className="py-16 text-center text-base-content/40 text-base italic"
                   >
-                    No rows match your search.
+                    {emptyStateMessage}
                   </td>
                 </tr>
               ) : (

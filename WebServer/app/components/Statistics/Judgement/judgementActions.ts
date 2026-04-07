@@ -18,6 +18,27 @@ const toNumber = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const toDate = (v: unknown): Date => {
+  if (v instanceof Date && Number.isFinite(v.getTime())) return v;
+
+  const text = String(v ?? "").trim();
+  if (!text) return new Date();
+
+  if (/^\d{4}$/.test(text)) {
+    return new Date(`${text}-01-01T00:00:00.000Z`);
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return new Date(`${text}T00:00:00.000Z`);
+  }
+
+  const parsed = new Date(text);
+  if (Number.isFinite(parsed.getTime())) return parsed;
+  return new Date();
+};
+
+const toISODate = (v: Date): string => v.toISOString().slice(0, 10);
+
 const prettifyError = (err: unknown) => {
   try {
     // ZodError has `format` and `issues`; try to produce a readable message
@@ -26,7 +47,7 @@ const prettifyError = (err: unknown) => {
     if (e?.issues) return JSON.stringify(e.issues, null, 2);
     if (e?.message) return String(e.message);
     return String(err);
-  } catch (e) {
+  } catch {
     return String(err);
   }
 };
@@ -45,6 +66,7 @@ export async function getMunicipalJudgements(): Promise<
       result: rows.map((r) => ({
         id: r.id,
         branchNo: r.branchNo ?? undefined,
+        dateRecorded: toISODate(r.dateRecorded),
         civilV: r.civilV,
         civilInC: r.civilInc,
         criminalV: r.criminalV,
@@ -90,6 +112,7 @@ export async function createMunicipalJudgement(
     const record = await prisma.judgementMunicipal.create({
       data: {
         branchNo: validation.data.branchNo ?? undefined,
+        dateRecorded: toDate(validation.data.dateRecorded),
         civilV: toNumber(validation.data.civilV),
         civilInc: toNumber(validation.data.civilInC),
         criminalV: toNumber(validation.data.criminalV),
@@ -120,6 +143,7 @@ export async function createMunicipalJudgement(
       result: {
         id: record.id,
         branchNo: record.branchNo ?? undefined,
+        dateRecorded: toISODate(record.dateRecorded),
         civilV: record.civilV,
         civilInC: record.civilInc,
         criminalV: record.criminalV,
@@ -167,6 +191,7 @@ export async function updateMunicipalJudgement(
       where: { id },
       data: {
         branchNo: validation.data.branchNo ?? undefined,
+        dateRecorded: toDate(validation.data.dateRecorded),
         civilV: toNumber(validation.data.civilV),
         civilInc: toNumber(validation.data.civilInC),
         criminalV: toNumber(validation.data.criminalV),
@@ -197,6 +222,7 @@ export async function updateMunicipalJudgement(
       result: {
         id: record.id,
         branchNo: record.branchNo ?? undefined,
+        dateRecorded: toISODate(record.dateRecorded),
         civilV: record.civilV,
         civilInC: record.civilInc,
         criminalV: record.criminalV,
@@ -256,6 +282,7 @@ export async function getRegionalJudgements(): Promise<
       result: rows.map((r) => ({
         id: r.id,
         branchNo: r.branchNo ?? undefined,
+        dateRecorded: toISODate(r.dateRecorded),
         civilV: r.civilV,
         civilInC: r.civilInc,
         criminalV: r.criminalV,
@@ -308,6 +335,7 @@ export async function createRegionalJudgement(
     const record = await prisma.judgementRegional.create({
       data: {
         branchNo: validation.data.branchNo ?? undefined,
+        dateRecorded: toDate(validation.data.dateRecorded),
         civilV: toNumber(validation.data.civilV),
         civilInc: toNumber(validation.data.civilInC),
         criminalV: toNumber(validation.data.criminalV),
@@ -345,6 +373,7 @@ export async function createRegionalJudgement(
       result: {
         id: record.id,
         branchNo: record.branchNo ?? undefined,
+        dateRecorded: toISODate(record.dateRecorded),
         civilV: record.civilV,
         civilInC: record.civilInc,
         criminalV: record.criminalV,
@@ -399,6 +428,7 @@ export async function updateRegionalJudgement(
       where: { id },
       data: {
         branchNo: validation.data.branchNo ?? undefined,
+        dateRecorded: toDate(validation.data.dateRecorded),
         civilV: toNumber(validation.data.civilV),
         civilInc: toNumber(validation.data.civilInC),
         criminalV: toNumber(validation.data.criminalV),
@@ -436,6 +466,7 @@ export async function updateRegionalJudgement(
       result: {
         id: record.id,
         branchNo: record.branchNo ?? undefined,
+        dateRecorded: toISODate(record.dateRecorded),
         civilV: record.civilV,
         civilInC: record.civilInc,
         criminalV: record.criminalV,
