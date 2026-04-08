@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   BACKUP_INTERVAL_LOOKUP,
   DEFAULT_SELECTED_INTERVALS,
+  REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE,
   type BackupIntervalKey,
 } from "./constants";
 import type { BackupConfig, BackupRunStatus } from "./types";
@@ -289,7 +290,7 @@ export async function getRemoteConfigMap(): Promise<
         continue;
       }
 
-      const kvField = line.match(/^\s*([^=]+?)\s*=\s*(.+)\s*$/);
+      const kvField = line.match(/^\s*([^=]+?)\s*=\s*(.*)\s*$/);
       if (!kvField) {
         continue;
       }
@@ -394,7 +395,7 @@ export async function updateRemoteConfigOptionsInFile(
     }
 
     const nextValue = pending.get(key) ?? "";
-    if (nextValue) {
+    if (nextValue || REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE.has(key)) {
       lines[index] = `${key} = ${nextValue}`;
     } else {
       removedLineIndexes.add(index);
@@ -405,7 +406,7 @@ export async function updateRemoteConfigOptionsInFile(
 
   const additionalLines: string[] = [];
   for (const [key, value] of pending.entries()) {
-    if (!value) {
+    if (!value && !REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE.has(key)) {
       continue;
     }
 

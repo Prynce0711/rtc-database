@@ -53,7 +53,6 @@ type ProviderFieldConfig = {
 const OAUTH_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
 const ELECTRON_REQUIRED_AUTH_MESSAGE =
   "This provider requires the Electron desktop app for account authorization. Open RTC Native App and try again.";
-const ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL = "__RTC_ONEDRIVE_NO_DRIVE_ID__";
 
 const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   onedrive: [],
@@ -146,6 +145,35 @@ const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
       placeholder: "22",
     },
   ],
+  smb: [
+    {
+      key: "host",
+      label: "Host",
+      placeholder: "fileserver.local",
+      required: true,
+    },
+    {
+      key: "user",
+      label: "Username",
+      placeholder: "smb-user",
+    },
+    {
+      key: "pass",
+      label: "Password",
+      placeholder: "SMB password",
+      type: "password",
+    },
+    {
+      key: "domain",
+      label: "Domain (optional)",
+      placeholder: "WORKGROUP",
+    },
+    {
+      key: "port",
+      label: "Port",
+      placeholder: "445",
+    },
+  ],
   local: [],
 };
 
@@ -226,6 +254,12 @@ const BackupTab = () => {
   const [providers, setProviders] = useState<
     Array<{ value: string; label: string; description: string }>
   >([]);
+  const [oneDriveClearDriveIdSentinel, setOneDriveClearDriveIdSentinel] =
+    useState("");
+  const [
+    oneDriveDriveSelectionSourceOptionKey,
+    setOneDriveDriveSelectionSourceOptionKey,
+  ] = useState("");
 
   const [newRemoteName, setNewRemoteName] = useState("");
   const [newProvider, setNewProvider] = useState("drive");
@@ -282,6 +316,10 @@ const BackupTab = () => {
       setIntervalOptions(data.intervalOptions);
       setImportSourceOptions(data.importSourceOptions);
       setAccountSetupInProgress(data.accountSetupInProgress);
+      setOneDriveClearDriveIdSentinel(data.oneDriveClearDriveIdSentinel);
+      setOneDriveDriveSelectionSourceOptionKey(
+        data.oneDriveDriveSelectionSourceOptionKey,
+      );
 
       if (
         editingRemoteName &&
@@ -577,12 +615,23 @@ const BackupTab = () => {
     flow: "create" | "edit",
     mode: "manual" | "auto-personal" = "manual",
   ): Promise<boolean> => {
+    const clearDriveIdSentinel = oneDriveClearDriveIdSentinel.trim();
+    const driveSelectionSourceOptionKey =
+      oneDriveDriveSelectionSourceOptionKey.trim();
+
+    if (!clearDriveIdSentinel || !driveSelectionSourceOptionKey) {
+      popup.showError(
+        "OneDrive settings metadata is unavailable. Refresh and try again.",
+      );
+      return false;
+    }
+
     const baseUpdateOptions: Record<string, string> = {
-      config_driveid: selectedDriveId || ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,
+      config_driveid: selectedDriveId || clearDriveIdSentinel,
     };
 
     if (mode === "auto-personal") {
-      baseUpdateOptions.__rtc_onedrive_drive_selection_source = "auto-personal";
+      baseUpdateOptions[driveSelectionSourceOptionKey] = "auto-personal";
     }
 
     popup.showLoading("Applying selected OneDrive drive...");
@@ -1302,7 +1351,11 @@ const BackupTab = () => {
     const providerKey = remote.provider.trim().toLowerCase();
     const options = remote.options ?? {};
 
-    if (providerKey === "ftp" || providerKey === "sftp") {
+    if (
+      providerKey === "ftp" ||
+      providerKey === "sftp" ||
+      providerKey === "smb"
+    ) {
       const host = (options.host ?? "").trim();
       return host ? `Host: ${truncateRemoteDetail(host)}` : null;
     }

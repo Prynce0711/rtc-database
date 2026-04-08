@@ -164,6 +164,11 @@ export const BACKUP_PROVIDER_OPTIONS: BackupProviderOption[] = [
     description: "SFTP/SSH remote",
   },
   {
+    value: "smb",
+    label: "SMB",
+    description: "SMB/CIFS network share",
+  },
+  {
     value: "local",
     label: "Local Folder",
     description: "Another local path as destination",
