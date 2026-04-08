@@ -139,7 +139,10 @@ export interface ListOneDriveRemoteDriveOptionsDeps {
 
 export interface OneDriveRemoteIdentityFallbackDeps {
   getRemoteConfigMap: () => Promise<Map<string, ParsedRemoteConfig>>;
-  readBackupConfigFile: () => Promise<{ remotePath: string }>;
+  readBackupConfigFile: () => Promise<{
+    remotePath: string;
+    remoteBasePaths?: Record<string, string>;
+  }>;
   runRcloneCommand: RunRcloneCommand;
 }
 
@@ -565,17 +568,31 @@ export async function getOneDriveAccountIdentityFromAccessToken(
 }
 
 function joinRemotePathSegments(...segments: string[]): string {
-  return segments
-    .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
-    .filter((segment) => !!segment)
-    .join("/");
+  const normalizedParts: string[] = [];
+
+  for (const rawSegment of segments) {
+    const parts = rawSegment
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter((part) => !!part);
+
+    normalizedParts.push(...parts);
+  }
+
+  return normalizedParts.join("/");
 }
 
 function buildRemoteDestination(
   remoteName: string,
   remotePath: string,
 ): string {
-  const cleanedPath = remotePath.trim().replace(/^\/+/, "");
+  const cleanedPath = remotePath
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/")
+    .replace(/^\/+/, "");
 
   return cleanedPath ? `${remoteName}:${cleanedPath}` : `${remoteName}:`;
 }
@@ -631,7 +648,11 @@ async function getOneDriveAccountIdentityFromMetadataProbe(
   deps: OneDriveRemoteIdentityFallbackDeps,
 ): Promise<string | null> {
   const backupConfig = await deps.readBackupConfigFile();
+  const remoteBasePath = (
+    backupConfig.remoteBasePaths?.[normalizedRemoteName] ?? ""
+  ).trim();
   const probeRelativePath = joinRemotePathSegments(
+    remoteBasePath,
     backupConfig.remotePath,
     ".rtc-account-identity-probe",
   );

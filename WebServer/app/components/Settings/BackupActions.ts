@@ -62,6 +62,7 @@ const CreateRemoteSchema = z.object({
   provider: z.string().min(2).max(64),
   options: z.record(z.string(), z.string()).optional().default({}),
   forceRestart: z.boolean().optional().default(false),
+  remoteBasePath: z.string().optional(),
 });
 
 const ImportRemoteSchema = z.object({
@@ -74,6 +75,7 @@ const UpdateRemoteSchema = z.object({
   nextRemoteName: z.string().min(1),
   provider: z.string().min(1),
   options: z.record(z.string(), z.string()).optional().default({}),
+  remoteBasePath: z.string().optional(),
 });
 
 const ReLoginRemoteSchema = z.object({
@@ -300,6 +302,7 @@ export async function createBackupAccount(
       parsed.data.provider,
       parsed.data.options,
       parsed.data.forceRestart,
+      parsed.data.remoteBasePath,
     );
 
     return {
@@ -338,6 +341,7 @@ export async function updateBackupAccount(
       parsed.data.nextRemoteName,
       parsed.data.provider,
       parsed.data.options,
+      parsed.data.remoteBasePath,
     );
 
     return {

@@ -172,6 +172,39 @@ export function normalizeRemoteAccountIdentities(
   return normalized;
 }
 
+export function normalizeRemoteBasePaths(
+  value: unknown,
+): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, string> = {};
+
+  for (const [rawName, rawBasePath] of Object.entries(value)) {
+    if (typeof rawBasePath !== "string") {
+      continue;
+    }
+
+    const normalizedName = normalizeRemoteName(rawName);
+    const trimmedBasePath = rawBasePath
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter((part) => !!part)
+      .join("/");
+
+    if (!normalizedName || !trimmedBasePath) {
+      continue;
+    }
+
+    normalized[normalizedName] = trimmedBasePath;
+  }
+
+  return normalized;
+}
+
 export async function ensureBackupArtifacts(): Promise<void> {
   await mkdir(BACKUP_DATA_DIR, { recursive: true });
 
@@ -188,6 +221,7 @@ async function getDefaultBackupConfig(): Promise<BackupConfig> {
     selectedIntervals: [...DEFAULT_SELECTED_INTERVALS],
     selectedRemoteNames: [],
     remoteAccountIdentities: {},
+    remoteBasePaths: {},
     remotePath: "rtc-backups",
     lastRunAt: null,
     lastRunStatus: "IDLE",
@@ -219,6 +253,7 @@ async function normalizeBackupConfig(
     remoteAccountIdentities: normalizeRemoteAccountIdentities(
       value.remoteAccountIdentities,
     ),
+    remoteBasePaths: normalizeRemoteBasePaths(value.remoteBasePaths),
     remotePath:
       typeof value.remotePath === "string"
         ? value.remotePath.trim()
