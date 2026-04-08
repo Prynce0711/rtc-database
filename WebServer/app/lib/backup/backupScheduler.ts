@@ -351,7 +351,9 @@ async function saveRemoteBasePath(
 
   const trimmedRemoteBasePath = joinRemotePath(remoteBasePath);
   const current = await readBackupConfigFile();
-  const existingRemoteBasePath = (current.remoteBasePaths[normalizedName] ?? "").trim();
+  const existingRemoteBasePath = (
+    current.remoteBasePaths[normalizedName] ?? ""
+  ).trim();
 
   if (existingRemoteBasePath === trimmedRemoteBasePath) {
     return;
@@ -1579,7 +1581,8 @@ export async function updateBackupRemote(
     };
 
     if (remoteNameChanged) {
-      const existingIdentity = updatedRemoteAccountIdentities[normalizedCurrent];
+      const existingIdentity =
+        updatedRemoteAccountIdentities[normalizedCurrent];
       if (existingIdentity) {
         updatedRemoteAccountIdentities[targetRemoteName] = existingIdentity;
       }
