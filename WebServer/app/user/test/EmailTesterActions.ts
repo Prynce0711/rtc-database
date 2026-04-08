@@ -51,6 +51,14 @@ const inferSecureByPort = (port: number | null): boolean => {
   return true;
 };
 
+const escapeHtml = (unsafe: string): string =>
+  unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export async function getGlobalSmtpSettings(): Promise<
   ActionResult<GlobalSmtpSettings>
 > {
@@ -126,7 +134,7 @@ export async function sendEmailWithSmtp(
       to: normalizeEmailCsv(payload.to),
       subject: payload.subject || "SMTP Test Email",
       text: payload.text || "This is a test email.",
-      html: `<p>${(payload.text || "This is a test email.").replace(/\n/g, "<br />")}</p>`,
+      html: `<p>${escapeHtml(payload.text || "This is a test email.").replace(/\n/g, "<br />")}</p>`,
     });
 
     return {
