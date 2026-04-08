@@ -54,6 +54,7 @@ export function formatRcloneArgsForLog(args: string[]): string {
 
 function normalizeRemoteOptions(
   options: Record<string, string>,
+  mode: "create" | "update",
 ): Record<string, string> {
   const normalized: Record<string, string> = {};
 
@@ -64,7 +65,11 @@ function normalizeRemoteOptions(
     }
 
     const value = rawValue.trim();
-    if (!value) {
+    if (
+      !value &&
+      mode !== "update" &&
+      !REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE.has(key)
+    ) {
       continue;
     }
 
@@ -80,7 +85,7 @@ export function buildProviderAwareRemoteOptions(
   mode: "create" | "update",
 ): Record<string, string> {
   const normalizedProvider = provider.trim().toLowerCase();
-  const normalizedOptions = normalizeRemoteOptions(options);
+  const normalizedOptions = normalizeRemoteOptions(options, mode);
 
   if (!normalizedOptions.token && normalizedOptions.config_token) {
     normalizedOptions.token = normalizedOptions.config_token;
@@ -140,6 +145,7 @@ export function buildProviderAwareRemoteOptions(
 
 export function buildRemoteOptionArgs(
   options: Record<string, string>,
+  mode: "create" | "update" = "create",
 ): string[] {
   const optionArgs: string[] = [];
 
@@ -150,7 +156,11 @@ export function buildRemoteOptionArgs(
     }
 
     const cleanValue = value.trim();
-    if (!cleanValue && !REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE.has(cleanKey)) {
+    if (
+      !cleanValue &&
+      mode !== "update" &&
+      !REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE.has(cleanKey)
+    ) {
       continue;
     }
 

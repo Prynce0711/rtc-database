@@ -269,6 +269,9 @@ const BackupTab = () => {
   const [providerOptionValues, setProviderOptionValues] = useState<
     Record<string, string>
   >({});
+  const [providerOptionTouched, setProviderOptionTouched] = useState<
+    Record<string, boolean>
+  >({});
   const [oneDriveDriveSelector, setOneDriveDriveSelector] =
     useState<OneDriveDriveSelectorState | null>(null);
   const [savingOneDriveDriveSelection, setSavingOneDriveDriveSelection] =
@@ -327,6 +330,7 @@ const BackupTab = () => {
       ) {
         setEditingRemoteName(null);
         setProviderOptionValues({});
+        setProviderOptionTouched({});
         setNewRemoteName("");
       }
 
@@ -474,12 +478,14 @@ const BackupTab = () => {
     setEditingRemoteName(null);
     setNewRemoteName("");
     setProviderOptionValues({});
+    setProviderOptionTouched({});
     setNewProvider(providers[0]?.value ?? "drive");
   };
 
   const handleProviderChange = (providerValue: string) => {
     setNewProvider(providerValue);
     setProviderOptionValues({});
+    setProviderOptionTouched({});
   };
 
   const setProviderOptionValue = (key: string, value: string) => {
@@ -487,22 +493,34 @@ const BackupTab = () => {
       ...previous,
       [key]: value,
     }));
+
+    setProviderOptionTouched((previous) => ({
+      ...previous,
+      [key]: true,
+    }));
   };
 
-  const buildAccountOptions = (providerValue: string) => {
+  const buildAccountOptions = (
+    providerValue: string,
+    mode: "create" | "update",
+  ) => {
     const fields = getProviderFields(providerValue);
     const options: Record<string, string> = {};
 
     for (const field of fields) {
       const rawValue = providerOptionValues[field.key] ?? "";
       const trimmedValue = rawValue.trim();
+      const includeClearedOptionalValue =
+        mode === "update" &&
+        !field.required &&
+        (providerOptionTouched[field.key] ?? false);
 
       if (field.required && !trimmedValue) {
         popup.showError(`${field.label} is required.`);
         return null;
       }
 
-      if (trimmedValue) {
+      if (trimmedValue || includeClearedOptionalValue) {
         options[field.key] = trimmedValue;
       }
     }
@@ -523,6 +541,7 @@ const BackupTab = () => {
     setProviderOptionValues(
       pickProviderOptionValues(remote.provider, remote.options ?? {}),
     );
+    setProviderOptionTouched({});
   };
 
   const handleCancelEditAccount = () => {
@@ -848,7 +867,7 @@ const BackupTab = () => {
       return;
     }
 
-    const options = buildAccountOptions(newProvider);
+    const options = buildAccountOptions(newProvider, "create");
     if (!options) {
       return;
     }
@@ -986,7 +1005,7 @@ const BackupTab = () => {
       return;
     }
 
-    const options = buildAccountOptions(newProvider);
+    const options = buildAccountOptions(newProvider, "update");
     if (!options) {
       return;
     }

@@ -1152,7 +1152,7 @@ export async function createBackupRemote(
     await ensureAccountSetupIsAvailable(forceRestart);
   }
 
-  const optionArgs = buildRemoteOptionArgs(providerOptions);
+  const optionArgs = buildRemoteOptionArgs(providerOptions, "create");
 
   const configCreateArgs: string[] = [
     "config",
@@ -1443,7 +1443,7 @@ export async function updateBackupRemote(
     optionsForUpdate,
     "update",
   );
-  const optionArgs = buildRemoteOptionArgs(providerOptions);
+  const optionArgs = buildRemoteOptionArgs(providerOptions, "update");
   const isOAuthProvider = OAUTH_ACCOUNT_PROVIDERS.has(existingProvider);
 
   if (optionArgs.length > 0) {
