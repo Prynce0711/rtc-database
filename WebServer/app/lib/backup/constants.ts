@@ -203,7 +203,10 @@ export const ONEDRIVE_DEFAULT_ACCESS_SCOPES =
   "Files.Read Files.ReadWrite Files.Read.All Files.ReadWrite.All Sites.Read.All offline_access User.Read openid profile email";
 
 // Option handling for sensitive and special-case values.
-export const REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE = new Set(["drive_id"]);
+export const REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE = new Set([
+  "drive_id",
+  "domain",
+]);
 export const SENSITIVE_RCLONE_OPTION_KEYS = new Set([
   "token",
   "config_token",

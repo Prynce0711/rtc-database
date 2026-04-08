@@ -13,10 +13,20 @@ import {
 } from "./constants";
 
 export function joinRemotePath(...segments: string[]): string {
-  return segments
-    .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
-    .filter((segment) => !!segment)
-    .join("/");
+  const normalizedParts: string[] = [];
+
+  for (const rawSegment of segments) {
+    const parts = rawSegment
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter((part) => !!part);
+
+    normalizedParts.push(...parts);
+  }
+
+  return normalizedParts.join("/");
 }
 
 export function redactSensitiveText(value: string): string {

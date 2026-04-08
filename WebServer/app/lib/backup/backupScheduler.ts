@@ -322,9 +322,55 @@ function buildRcloneDestination(
   remotePath: string,
 ): string {
   const cleanedRemote = normalizeRemoteName(remoteName);
-  const cleanedPath = remotePath.trim().replace(/^\/+/, "");
+  const cleanedPath = remotePath
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/{2,}/g, "/")
+    .replace(/^\/+/, "");
 
   return cleanedPath ? `${cleanedRemote}:${cleanedPath}` : `${cleanedRemote}:`;
+}
+
+function getRemoteBasePath(config: BackupConfig, remoteName: string): string {
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    return "";
+  }
+
+  return (config.remoteBasePaths[normalizedName] ?? "").trim();
+}
+
+async function saveRemoteBasePath(
+  remoteName: string,
+  remoteBasePath: string,
+): Promise<void> {
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    return;
+  }
+
+  const trimmedRemoteBasePath = joinRemotePath(remoteBasePath);
+  const current = await readBackupConfigFile();
+  const existingRemoteBasePath = (current.remoteBasePaths[normalizedName] ?? "").trim();
+
+  if (existingRemoteBasePath === trimmedRemoteBasePath) {
+    return;
+  }
+
+  const nextRemoteBasePaths = {
+    ...current.remoteBasePaths,
+  };
+
+  if (trimmedRemoteBasePath) {
+    nextRemoteBasePaths[normalizedName] = trimmedRemoteBasePath;
+  } else {
+    delete nextRemoteBasePaths[normalizedName];
+  }
+
+  await writeBackupConfigFile({
+    ...current,
+    remoteBasePaths: nextRemoteBasePaths,
+  });
 }
 
 async function runRcloneCommand(
@@ -530,12 +576,7 @@ async function runBackup(
     trigger === "manual" || !intervalDefinition
       ? MANUAL_BACKUP_FOLDER
       : intervalDefinition.folderName;
-
-  const destinationRelativePath = joinRemotePath(
-    current.remotePath,
-    targetFolder,
-    path.basename(sourcePath),
-  );
+  const backupFileName = path.basename(sourcePath);
 
   current = await writeBackupConfigFile({
     ...current,
@@ -552,6 +593,13 @@ async function runBackup(
     const remoteOutputs: string[] = [];
 
     for (const remoteName of selectedRemoteNames) {
+      const remoteBasePath = getRemoteBasePath(current, remoteName);
+      const destinationRelativePath = joinRemotePath(
+        remoteBasePath,
+        current.remotePath,
+        targetFolder,
+        backupFileName,
+      );
       const destination = buildRcloneDestination(
         remoteName,
         destinationRelativePath,
@@ -1040,6 +1088,7 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
     const configMap = await getRemoteConfigMap();
     const backupConfig = await readBackupConfigFile();
     const cachedIdentities = backupConfig.remoteAccountIdentities;
+    const remoteBasePaths = backupConfig.remoteBasePaths;
 
     const remoteNames = output
       .split(/\r?\n/)
@@ -1072,6 +1121,7 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
         provider,
         options: config?.options ?? {},
         accountIdentity,
+        basePath: remoteBasePaths[name] ?? "",
       };
     });
   } catch (error) {
@@ -1094,11 +1144,20 @@ export async function createBackupRemote(
   provider: string,
   options: Record<string, string> = {},
   forceRestart = false,
+  remoteBasePath = "",
 ): Promise<BackupRemote[]> {
   await ensureBackupArtifacts();
 
   const normalizedName = normalizeRemoteName(remoteName);
   const normalizedProvider = provider.trim();
+  const normalizedRemoteBasePath = joinRemotePath(remoteBasePath);
+
+  const listBackupRemotesWithConfiguredBasePath = async (): Promise<
+    BackupRemote[]
+  > => {
+    await saveRemoteBasePath(normalizedName, normalizedRemoteBasePath);
+    return listBackupRemotes();
+  };
 
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(normalizedName)) {
     throw new Error(
@@ -1145,7 +1204,7 @@ export async function createBackupRemote(
         force: true,
       },
     );
-    return listBackupRemotes();
+    return listBackupRemotesWithConfiguredBasePath();
   }
 
   if (!hasProvidedOAuthToken) {
@@ -1210,7 +1269,7 @@ export async function createBackupRemote(
           force: true,
         },
       );
-      return listBackupRemotes();
+      return listBackupRemotesWithConfiguredBasePath();
     }
 
     if (isAuthServerPortConflictError(message)) {
@@ -1245,7 +1304,7 @@ export async function createBackupRemote(
               force: true,
             },
           );
-          return listBackupRemotes();
+          return listBackupRemotesWithConfiguredBasePath();
         }
 
         throw new Error(
@@ -1268,7 +1327,7 @@ export async function createBackupRemote(
       force: true,
     },
   );
-  return listBackupRemotes();
+  return listBackupRemotesWithConfiguredBasePath();
 }
 
 export async function reloginBackupRemote(
@@ -1380,12 +1439,17 @@ export async function updateBackupRemote(
   nextRemoteName: string,
   provider: string,
   options: Record<string, string> = {},
+  remoteBasePath?: string,
 ): Promise<BackupRemote[]> {
   await ensureBackupArtifacts();
 
   const normalizedCurrent = normalizeRemoteName(currentRemoteName);
   const normalizedNext = normalizeRemoteName(nextRemoteName);
   const normalizedProvider = provider.trim().toLowerCase();
+  const hasExplicitRemoteBasePath = typeof remoteBasePath === "string";
+  const normalizedRemoteBasePath = hasExplicitRemoteBasePath
+    ? joinRemotePath(remoteBasePath)
+    : "";
 
   if (!normalizedCurrent) {
     throw new Error("Current remote name is required.");
@@ -1503,37 +1567,63 @@ export async function updateBackupRemote(
     }
   }
 
-  if (targetRemoteName !== normalizedCurrent) {
+  const remoteNameChanged = targetRemoteName !== normalizedCurrent;
+
+  if (remoteNameChanged || hasExplicitRemoteBasePath) {
     const currentConfig = await readBackupConfigFile();
     const updatedRemoteAccountIdentities = {
       ...currentConfig.remoteAccountIdentities,
     };
+    const updatedRemoteBasePaths = {
+      ...currentConfig.remoteBasePaths,
+    };
 
-    const existingIdentity = updatedRemoteAccountIdentities[normalizedCurrent];
-    if (existingIdentity) {
-      updatedRemoteAccountIdentities[targetRemoteName] = existingIdentity;
+    if (remoteNameChanged) {
+      const existingIdentity = updatedRemoteAccountIdentities[normalizedCurrent];
+      if (existingIdentity) {
+        updatedRemoteAccountIdentities[targetRemoteName] = existingIdentity;
+      }
+      delete updatedRemoteAccountIdentities[normalizedCurrent];
+
+      const existingBasePath = updatedRemoteBasePaths[normalizedCurrent];
+      if (existingBasePath) {
+        updatedRemoteBasePaths[targetRemoteName] = existingBasePath;
+      }
+      delete updatedRemoteBasePaths[normalizedCurrent];
     }
-    delete updatedRemoteAccountIdentities[normalizedCurrent];
 
-    const updatedSelectedRemoteNames = Array.from(
-      new Set(
-        currentConfig.selectedRemoteNames
-          .map((name) =>
-            normalizeRemoteName(name) === normalizedCurrent
-              ? targetRemoteName
-              : normalizeRemoteName(name),
-          )
-          .filter((name) => !!name),
-      ),
-    );
+    if (hasExplicitRemoteBasePath) {
+      if (normalizedRemoteBasePath) {
+        updatedRemoteBasePaths[targetRemoteName] = normalizedRemoteBasePath;
+      } else {
+        delete updatedRemoteBasePaths[targetRemoteName];
+      }
+    }
+
+    const updatedSelectedRemoteNames = remoteNameChanged
+      ? Array.from(
+          new Set(
+            currentConfig.selectedRemoteNames
+              .map((name) =>
+                normalizeRemoteName(name) === normalizedCurrent
+                  ? targetRemoteName
+                  : normalizeRemoteName(name),
+              )
+              .filter((name) => !!name),
+          ),
+        )
+      : currentConfig.selectedRemoteNames;
 
     const updatedConfig = await writeBackupConfigFile({
       ...currentConfig,
       selectedRemoteNames: updatedSelectedRemoteNames,
       remoteAccountIdentities: updatedRemoteAccountIdentities,
+      remoteBasePaths: updatedRemoteBasePaths,
     });
 
-    scheduleFromConfig(updatedConfig);
+    if (remoteNameChanged) {
+      scheduleFromConfig(updatedConfig);
+    }
   }
 
   return listBackupRemotes();
@@ -1596,7 +1686,11 @@ export async function clearBackupRemoteFiles(
   }
 
   const current = await readBackupConfigFile();
-  const backupRootRelativePath = joinRemotePath(current.remotePath);
+  const remoteBasePath = getRemoteBasePath(current, normalizedName);
+  const backupRootRelativePath = joinRemotePath(
+    remoteBasePath,
+    current.remotePath,
+  );
 
   if (!backupRootRelativePath) {
     throw new Error(
@@ -1624,7 +1718,11 @@ export async function deleteBackupRemote(
   const current = await readBackupConfigFile();
 
   if (deleteBackupFiles) {
-    const backupRootRelativePath = joinRemotePath(current.remotePath);
+    const remoteBasePath = getRemoteBasePath(current, normalizedName);
+    const backupRootRelativePath = joinRemotePath(
+      remoteBasePath,
+      current.remotePath,
+    );
 
     if (!backupRootRelativePath) {
       throw new Error(
@@ -1642,19 +1740,27 @@ export async function deleteBackupRemote(
   const updatedRemoteAccountIdentities = {
     ...current.remoteAccountIdentities,
   };
+  const updatedRemoteBasePaths = {
+    ...current.remoteBasePaths,
+  };
   const identityWasCached = normalizedName in updatedRemoteAccountIdentities;
+  const basePathWasConfigured = normalizedName in updatedRemoteBasePaths;
   if (identityWasCached) {
     delete updatedRemoteAccountIdentities[normalizedName];
+  }
+  if (basePathWasConfigured) {
+    delete updatedRemoteBasePaths[normalizedName];
   }
 
   const selectedRemotesChanged =
     updatedSelectedRemoteNames.length !== current.selectedRemoteNames.length;
 
-  if (selectedRemotesChanged || identityWasCached) {
+  if (selectedRemotesChanged || identityWasCached || basePathWasConfigured) {
     const updated = await writeBackupConfigFile({
       ...current,
       selectedRemoteNames: updatedSelectedRemoteNames,
       remoteAccountIdentities: updatedRemoteAccountIdentities,
+      remoteBasePaths: updatedRemoteBasePaths,
       enabled:
         selectedRemotesChanged && updatedSelectedRemoteNames.length === 0
           ? false

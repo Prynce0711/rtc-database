@@ -20,6 +20,7 @@ export interface BackupConfig {
   selectedIntervals: BackupIntervalKey[];
   selectedRemoteNames: string[];
   remoteAccountIdentities: Record<string, string>;
+  remoteBasePaths: Record<string, string>;
   remotePath: string;
   lastRunAt: string | null;
   lastRunStatus: BackupRunStatus;
@@ -32,6 +33,7 @@ export interface BackupRemote {
   provider: string;
   options: Record<string, string>;
   accountIdentity: string | null;
+  basePath: string;
 }
 
 export interface BackupConfigPatch {

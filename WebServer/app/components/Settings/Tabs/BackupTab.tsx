@@ -272,6 +272,7 @@ const BackupTab = () => {
   const [providerOptionTouched, setProviderOptionTouched] = useState<
     Record<string, boolean>
   >({});
+  const [accountBasePath, setAccountBasePath] = useState("");
   const [oneDriveDriveSelector, setOneDriveDriveSelector] =
     useState<OneDriveDriveSelectorState | null>(null);
   const [savingOneDriveDriveSelection, setSavingOneDriveDriveSelection] =
@@ -331,6 +332,7 @@ const BackupTab = () => {
         setEditingRemoteName(null);
         setProviderOptionValues({});
         setProviderOptionTouched({});
+        setAccountBasePath("");
         setNewRemoteName("");
       }
 
@@ -479,6 +481,7 @@ const BackupTab = () => {
     setNewRemoteName("");
     setProviderOptionValues({});
     setProviderOptionTouched({});
+    setAccountBasePath("");
     setNewProvider(providers[0]?.value ?? "drive");
   };
 
@@ -542,6 +545,7 @@ const BackupTab = () => {
       pickProviderOptionValues(remote.provider, remote.options ?? {}),
     );
     setProviderOptionTouched({});
+    setAccountBasePath((remote.basePath ?? "").trim());
   };
 
   const handleCancelEditAccount = () => {
@@ -906,6 +910,7 @@ const BackupTab = () => {
       provider: newProvider,
       options: accountOptions,
       forceRestart,
+      remoteBasePath: accountBasePath.trim(),
     });
 
     if (
@@ -924,6 +929,7 @@ const BackupTab = () => {
           provider: newProvider,
           options: accountOptions,
           forceRestart: true,
+          remoteBasePath: accountBasePath.trim(),
         });
       }
     }
@@ -1018,6 +1024,7 @@ const BackupTab = () => {
       nextRemoteName: newRemoteName.trim(),
       provider: newProvider,
       options,
+      remoteBasePath: accountBasePath.trim(),
     });
 
     setAccountSaving(false);
@@ -1092,6 +1099,23 @@ const BackupTab = () => {
     popup.showSuccess(`Backup account ${remoteName} re-logged successfully.`);
   };
 
+  const composeRemoteFolderPath = (...segments: string[]): string => {
+    const normalizedParts: string[] = [];
+
+    for (const rawSegment of segments) {
+      const parts = rawSegment
+        .trim()
+        .replace(/\\/g, "/")
+        .split("/")
+        .map((part) => part.trim())
+        .filter((part) => !!part);
+
+      normalizedParts.push(...parts);
+    }
+
+    return normalizedParts.join("/");
+  };
+
   const handleDeleteAccount = async (accountName: string) => {
     const confirmed = await popup.showWarning(
       `Delete backup account ${accountName}?`,
@@ -1101,7 +1125,12 @@ const BackupTab = () => {
     }
 
     let deleteBackupFiles = false;
-    const backupFolderPath = remotePath.trim();
+    const remote = remotes.find((entry) => entry.name === accountName);
+    const accountBaseFolderPath = (remote?.basePath ?? "").trim();
+    const backupFolderPath = composeRemoteFolderPath(
+      accountBaseFolderPath,
+      remotePath,
+    );
 
     if (backupFolderPath) {
       deleteBackupFiles = await popup.showWarning(
@@ -1188,7 +1217,12 @@ const BackupTab = () => {
   };
 
   const handleClearAccountFiles = async (accountName: string) => {
-    const backupFolderPath = remotePath.trim();
+    const remote = remotes.find((entry) => entry.name === accountName);
+    const accountBaseFolderPath = (remote?.basePath ?? "").trim();
+    const backupFolderPath = composeRemoteFolderPath(
+      accountBaseFolderPath,
+      remotePath,
+    );
 
     if (!backupFolderPath) {
       popup.showError(
@@ -1370,11 +1404,12 @@ const BackupTab = () => {
     const providerKey = remote.provider.trim().toLowerCase();
     const options = remote.options ?? {};
 
-    if (
-      providerKey === "ftp" ||
-      providerKey === "sftp" ||
-      providerKey === "smb"
-    ) {
+    if (providerKey === "smb") {
+      const host = (options.host ?? "").trim();
+      return host ? `Host: ${truncateRemoteDetail(host)}` : null;
+    }
+
+    if (providerKey === "ftp" || providerKey === "sftp") {
       const host = (options.host ?? "").trim();
       return host ? `Host: ${truncateRemoteDetail(host)}` : null;
     }
@@ -1516,7 +1551,7 @@ const BackupTab = () => {
         </SettingsRow>
         <SettingsRow
           label="Destination Folder"
-          description="Base folder path inside the selected remote. Automatic backups create one subfolder per interval; manual backups use a manual folder."
+          description="Global folder path appended after each account base folder. Automatic backups create one subfolder per interval; manual backups use a manual folder."
         >
           <InputField
             value={remotePath}
@@ -1549,6 +1584,11 @@ const BackupTab = () => {
                     <p className="text-xs text-base-content/40 tracking-wide mt-0.5 break-all">
                       {getRemoteProviderDetails(remote)}
                     </p>
+                    {!!remote.basePath.trim() && (
+                      <p className="text-[11px] text-base-content/35 mt-1 break-all">
+                        Base folder: {remote.basePath}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1693,6 +1733,23 @@ const BackupTab = () => {
               No extra fields are required for this provider.
             </p>
           )}
+
+          <div>
+            <p className="text-xs text-base-content/35 mb-1.5">
+              Account Base Folder (optional)
+            </p>
+            <input
+              type="text"
+              value={accountBasePath}
+              onChange={(event) => setAccountBasePath(event.target.value)}
+              placeholder="team-a or projects/rtc"
+              disabled={accountActionBusy}
+              className="input input-bordered h-10 w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
+            />
+            <p className="text-xs text-base-content/40 mt-1">
+              Prepended before Destination Folder for this account.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-2">
             {isEditingAccount && (
