@@ -304,7 +304,6 @@ async function fetchJsonWithBearerToken(
     }
 
     const rawText = (await response.text()).trim();
-    console.log(`Fetched from ${endpoint}: ${rawText}`);
     if (!rawText) {
       return null;
     }

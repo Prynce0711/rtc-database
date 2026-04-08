@@ -3,6 +3,15 @@
 import nodemailer from "nodemailer";
 import { getSystemSettings } from "../components/Settings/SettingsActions";
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendEmail(
   to: string,
   subject: string,
@@ -44,7 +53,7 @@ export async function sendEmail(
       to: to,
       subject: subject,
       text: text,
-      html: `<p>${text}</p>`,
+      html: `<p>${escapeHtml(text)}</p>`,
     });
 
     if (info.accepted.length > 0) {

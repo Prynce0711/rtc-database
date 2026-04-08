@@ -21,6 +21,10 @@ import {
   type BackupRemote,
 } from "@/app/lib/backup/backupScheduler";
 import {
+  ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,
+  ONEDRIVE_DRIVE_SELECTION_SOURCE_OPTION_KEY,
+} from "@/app/lib/backup/constants";
+import {
   importBackupFromLocalUpload,
   importBackupFromRemote,
 } from "@/app/lib/backup/importer";
@@ -40,6 +44,8 @@ export interface BackupDashboardData {
   importSourceOptions: BackupImportSourceOption[];
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
+  oneDriveClearDriveIdSentinel: string;
+  oneDriveDriveSelectionSourceOptionKey: string;
 }
 
 export type BackupOneDriveDriveOption = OneDriveDriveOption;
@@ -85,6 +91,9 @@ async function getDashboardData(): Promise<BackupDashboardData> {
   return {
     ...overview,
     intervalOptions: [...BACKUP_INTERVAL_OPTIONS],
+    oneDriveClearDriveIdSentinel: ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,
+    oneDriveDriveSelectionSourceOptionKey:
+      ONEDRIVE_DRIVE_SELECTION_SOURCE_OPTION_KEY,
   };
 }
 
