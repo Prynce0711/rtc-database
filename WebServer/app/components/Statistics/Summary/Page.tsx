@@ -239,10 +239,11 @@ export default function SummaryPage() {
         onSave={async (rows) => {
           const result = await upsertSummaryStatistics(rows);
           if (!result.success) {
-            console.error("Failed to save summary statistics:", result.error);
+            throw new Error(
+              result.error ?? "Failed to save summary statistics",
+            );
           }
           await reloadData();
-          setShowAddPage(false);
         }}
       />
     );

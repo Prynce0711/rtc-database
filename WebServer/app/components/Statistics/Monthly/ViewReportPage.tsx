@@ -95,14 +95,14 @@ const ViewReportPage: React.FC<ViewReportPageProps> = ({
             <span>Report Details</span>
           </button>
           <span className="text-base-content/20 select-none">›</span>
-          <span className="text-base-content/70 font-semibold truncate max-w-[240px]">
+          <span className="text-base-content/70 font-semibold truncate max-w-60">
             {selectedRow.branch}
           </span>
         </nav>
 
         {/* Identity card */}
         <div className="card bg-base-100 border border-base-200 overflow-hidden">
-          <div className="h-[3px] bg-gradient-to-r from-primary via-primary/50 to-transparent" />
+          <div className="bg-linear-to-r from-primary via-primary/50 to-transparent" />
           <div className="p-6 sm:p-8">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-base-content/30 mb-3">
               Monthly Report · {monthLabel}

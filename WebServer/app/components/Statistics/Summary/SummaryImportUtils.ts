@@ -1,9 +1,9 @@
 import * as XLSX from "xlsx";
 import type { SummaryRow } from "./Schema";
 import {
-    SUMMARY_NUMERIC_FIELDS,
-    TITLE_ALIAS_LOOKUP,
-    type SummaryCourtType,
+  SUMMARY_NUMERIC_FIELDS,
+  TITLE_ALIAS_LOOKUP,
+  type SummaryCourtType,
 } from "./SummaryConstants";
 
 type SheetCell = string | number | boolean | Date | null | undefined;
@@ -52,9 +52,13 @@ const hasContent = (value: SheetCell): boolean => {
 
 const toNumber = (value: SheetCell): number => {
   if (value === null || value === undefined || value === "") return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.trunc(value));
+  }
   const parsed = Number(String(value).replace(/,/g, "").trim());
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.trunc(parsed));
 };
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
@@ -63,6 +67,60 @@ const toIsoDate = (year: number, month: number, day: number): string => {
   const safeMonth = Math.max(1, Math.min(12, month));
   const safeDay = Math.max(1, Math.min(31, day));
   return `${year}-${pad2(safeMonth)}-${pad2(safeDay)}`;
+};
+
+const toIsoDateStrict = (
+  year: number,
+  month: number,
+  day: number,
+): string | null => {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return null;
+  }
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  const isExactMatch =
+    candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() + 1 === month &&
+    candidate.getUTCDate() === day;
+
+  if (!isExactMatch) return null;
+  return toIsoDate(year, month, day);
+};
+
+const resolveAmbiguousMonthDayYear = (
+  first: number,
+  second: number,
+  year: number,
+  fallbackMonth: string,
+): string | null => {
+  const fallbackMonthNumber = Number(fallbackMonth);
+  const asMonthDay = toIsoDateStrict(year, first, second);
+  const asDayMonth = toIsoDateStrict(year, second, first);
+
+  if (asMonthDay && !asDayMonth) return asMonthDay;
+  if (!asMonthDay && asDayMonth) return asDayMonth;
+  if (!asMonthDay && !asDayMonth) return null;
+
+  // If both parses are valid (for values <= 12), prefer the one that matches the selected month filter.
+  if (first === fallbackMonthNumber && second !== fallbackMonthNumber) {
+    return asMonthDay;
+  }
+
+  if (second === fallbackMonthNumber && first !== fallbackMonthNumber) {
+    return asDayMonth;
+  }
+
+  // Default to month/day for ambiguous values to preserve existing behavior.
+  return asMonthDay;
 };
 
 const excelDateToIso = (serial: number): string | null => {
@@ -102,16 +160,31 @@ export const parseRaffleDateToIso = (
 
   const monthDayYear = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
   if (monthDayYear) {
-    const month = Number(monthDayYear[1]);
-    const day = Number(monthDayYear[2]);
+    const first = Number(monthDayYear[1]);
+    const second = Number(monthDayYear[2]);
     let year = Number(monthDayYear[3]);
     if (year < 100) year += 2000;
-    return toIsoDate(year, month, day);
+
+    const resolved = resolveAmbiguousMonthDayYear(
+      first,
+      second,
+      year,
+      fallbackMonth,
+    );
+
+    return resolved ?? fallback;
   }
 
   const monthDay = text.match(/^(\d{1,2})[\/-](\d{1,2})$/);
   if (monthDay) {
-    return toIsoDate(fallbackYear, Number(monthDay[1]), Number(monthDay[2]));
+    const resolved = resolveAmbiguousMonthDayYear(
+      Number(monthDay[1]),
+      Number(monthDay[2]),
+      fallbackYear,
+      fallbackMonth,
+    );
+
+    return resolved ?? fallback;
   }
 
   const isoDay = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -140,7 +213,7 @@ const detectCourtTypeFromRow = (
   normalizedValues: string[],
 ): SummaryCourtType | null => {
   if (normalizedValues.length === 0) return null;
-  const joined = normalizedValues.join("");
+  const joined = normalizedValues.join("").toUpperCase();
 
   const matched = TITLE_ALIAS_LOOKUP.find((alias) =>
     joined.includes(alias.key),
@@ -307,15 +380,27 @@ const mapSummaryDataRow = (
   fallbackYear: number,
   fallbackMonth: string,
   normalizedValues: string[],
+  fallbackBranch: string | null,
 ): SummaryRow | null => {
   const branchRaw = mapping.branch >= 0 ? row[mapping.branch] : "";
-  const branch = toCellText(branchRaw);
-  const branchToken = normalizeToken(branch);
+  const branchText = toCellText(branchRaw);
+  const branchToken = normalizeToken(branchText);
 
   if (branchToken === "total" || branchToken === "grandtotal") return null;
 
   const isHeaderLikeBranch =
     branchToken === "branch" || branchToken === "branchno";
+
+  const raffleDateCell =
+    mapping.raffleDate >= 0 ? row[mapping.raffleDate] : undefined;
+  const hasRaffleDate = hasContent(raffleDateCell);
+  const hasBranchInRow = branchText.length > 0;
+
+  // Import all data rows under each title block, while still skipping blank spacer lines.
+  if (!hasBranchInRow && !hasRaffleDate) return null;
+
+  const branch = branchText || fallbackBranch || "";
+  if (!branch) return null;
 
   const numericCells = {
     civilFamily: readMappedNumber(row, mapping.civilFamily),
@@ -345,7 +430,6 @@ const mapSummaryDataRow = (
   const computedTotal = computeSummaryTotal(numericCells);
 
   if (isHeaderLikeBranch) return null;
-  if (!branch && computedTotal === 0) return null;
 
   const hasOnlyHeaderTokens = normalizedValues.every(
     (value) =>
@@ -364,7 +448,7 @@ const mapSummaryDataRow = (
   if (hasOnlyHeaderTokens && computedTotal === 0) return null;
 
   const raffleDate = parseRaffleDateToIso(
-    mapping.raffleDate >= 0 ? row[mapping.raffleDate] : undefined,
+    raffleDateCell,
     fallbackYear,
     fallbackMonth,
   );
@@ -435,6 +519,7 @@ export const parseSummaryWorkbook = (
       }
 
       let j = i + 1;
+      let currentBranch: string | null = null;
       for (; j < rows.length; j += 1) {
         const dataRow = rows[j] ?? [];
         const normalizedDataValues = dataRow
@@ -469,6 +554,7 @@ export const parseSummaryWorkbook = (
           fallbackYear,
           fallbackMonth,
           normalizedDataValues,
+          currentBranch,
         );
 
         if (!mapped) {
@@ -476,6 +562,7 @@ export const parseSummaryWorkbook = (
           continue;
         }
 
+        currentBranch = mapped.branch;
         importedRows.push(mapped);
       }
 

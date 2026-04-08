@@ -7,6 +7,32 @@ import ActionResult from "../../ActionResult";
 import { SummaryRow, SummaryRowArraySchema } from "./Schema";
 import { computeSummaryTotal } from "./SummaryImportUtils";
 
+const toNonNegativeInt = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.trunc(value));
+};
+
+const sanitizeSummaryRow = (row: SummaryRow): SummaryRow => ({
+  ...row,
+  branch: row.branch.trim(),
+  civilFamily: toNonNegativeInt(row.civilFamily),
+  civilOrdinary: toNonNegativeInt(row.civilOrdinary),
+  civilReceivedViaReraffled: toNonNegativeInt(row.civilReceivedViaReraffled),
+  civilUnloaded: toNonNegativeInt(row.civilUnloaded),
+  lrcPetition: toNonNegativeInt(row.lrcPetition),
+  lrcSpProc: toNonNegativeInt(row.lrcSpProc),
+  lrcReceivedViaReraffled: toNonNegativeInt(row.lrcReceivedViaReraffled),
+  lrcUnloaded: toNonNegativeInt(row.lrcUnloaded),
+  criminalFamily: toNonNegativeInt(row.criminalFamily),
+  criminalDrugs: toNonNegativeInt(row.criminalDrugs),
+  criminalOrdinary: toNonNegativeInt(row.criminalOrdinary),
+  criminalReceivedViaReraffled: toNonNegativeInt(
+    row.criminalReceivedViaReraffled,
+  ),
+  criminalUnloaded: toNonNegativeInt(row.criminalUnloaded),
+  total: toNonNegativeInt(row.total),
+});
+
 const toDate = (value: string): Date => {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return new Date(`${value}T00:00:00.000Z`);
@@ -100,7 +126,8 @@ export async function upsertSummaryStatistics(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const validation = SummaryRowArraySchema.safeParse(rows);
+    const sanitizedRows = rows.map(sanitizeSummaryRow);
+    const validation = SummaryRowArraySchema.safeParse(sanitizedRows);
     if (!validation.success) {
       return { success: false, error: prettifyError(validation.error) };
     }

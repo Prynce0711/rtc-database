@@ -8,7 +8,7 @@ import {
     FiPlus,
     FiSave,
     FiTrash2,
-    FiUpload
+    FiUpload,
 } from "react-icons/fi";
 import type { SummaryRow } from "./Schema";
 import {
@@ -53,6 +53,24 @@ const toMonthLabel = (year: string, month: string): string =>
     month: "long",
     year: "numeric",
   });
+
+const getDaysInMonth = (year: number, month: string): number => {
+  const monthNumber = Number(month);
+  if (!Number.isInteger(year) || !Number.isInteger(monthNumber)) return 31;
+  return new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+};
+
+const alignIsoDateToPeriod = (
+  isoDate: string,
+  targetYear: string,
+  targetMonth: string,
+): string => {
+  const dayMatch = isoDate.match(/^\d{4}-\d{2}-(\d{2})$/);
+  const parsedDay = dayMatch ? Number(dayMatch[1]) : 1;
+  const maxDay = getDaysInMonth(Number(targetYear), targetMonth);
+  const safeDay = Math.max(1, Math.min(maxDay, parsedDay));
+  return `${targetYear}-${targetMonth}-${String(safeDay).padStart(2, "0")}`;
+};
 
 const createRowId = (): string => {
   if (typeof globalThis !== "undefined") {
@@ -130,6 +148,12 @@ const NUMERIC_FIELDS: Array<{
 const toRowTotal = (row: EditableSummaryRow): number =>
   computeSummaryTotal(row);
 
+const toNonNegativeInt = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.trunc(parsed));
+};
+
 const SumAddReport: React.FC<SumAddReportProps> = ({
   month,
   year,
@@ -197,6 +221,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -367,7 +392,29 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
         return;
       }
 
-      const importedRows = parsed.rows.map((row) => ({
+      let normalizedRows = parsed.rows;
+      let alignedToActivePeriod = false;
+
+      const hasRowsInActivePeriod = normalizedRows.some(
+        (row) => toMonthKey(row.raffleDate) === activeMonthKey,
+      );
+
+      // Some templates carry raffle dates that do not match the selected period.
+      // If nothing lands in the active month, align imported dates to the selected filter.
+      if (!hasRowsInActivePeriod) {
+        normalizedRows = normalizedRows.map((row) => ({
+          ...row,
+          reportYear: Number(effectiveYearFilter),
+          raffleDate: alignIsoDateToPeriod(
+            row.raffleDate,
+            effectiveYearFilter,
+            selectedMonthFilter,
+          ),
+        }));
+        alignedToActivePeriod = true;
+      }
+
+      const importedRows = normalizedRows.map((row) => ({
         ...row,
         id: createRowId(),
       }));
@@ -393,6 +440,32 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
 
       if (parsed.detectedCourtTypes.length === 1) {
         setSelectedCourtType(parsed.detectedCourtTypes[0]);
+      } else {
+        const rowsForActivePeriod = normalizedRows.filter(
+          (row) => toMonthKey(row.raffleDate) === activeMonthKey,
+        );
+
+        const hasVisibleRowsInSelectedCourt = rowsForActivePeriod.some(
+          (row) => row.courtType === selectedCourtType,
+        );
+
+        if (!hasVisibleRowsInSelectedCourt) {
+          const courtCounts = new Map<SummaryCourtType, number>();
+          rowsForActivePeriod.forEach((row) => {
+            courtCounts.set(
+              row.courtType,
+              (courtCounts.get(row.courtType) ?? 0) + 1,
+            );
+          });
+
+          const preferredCourtType = Array.from(courtCounts.entries()).sort(
+            (left, right) => right[1] - left[1],
+          )[0]?.[0];
+
+          if (preferredCourtType) {
+            setSelectedCourtType(preferredCourtType);
+          }
+        }
       }
 
       const skippedLabel =
@@ -400,8 +473,12 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
           ? ` (${parsed.skippedRows} row${parsed.skippedRows !== 1 ? "s" : ""} skipped)`
           : "";
 
+      const alignmentLabel = alignedToActivePeriod
+        ? ` Aligned raffle dates to ${periodLabel} to match the selected period.`
+        : "";
+
       setImportFeedback(
-        `✓ Imported ${parsed.rows.length} row${parsed.rows.length !== 1 ? "s" : ""}${skippedLabel}`,
+        `✓ Imported ${normalizedRows.length} row${normalizedRows.length !== 1 ? "s" : ""}${skippedLabel}${alignmentLabel}`,
       );
     } catch (error) {
       console.error("Summary import failed:", error);
@@ -422,29 +499,41 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
         reportYear,
         raffleDate: row.raffleDate,
         branch: row.branch.trim(),
-        civilFamily: row.civilFamily,
-        civilOrdinary: row.civilOrdinary,
-        civilReceivedViaReraffled: row.civilReceivedViaReraffled,
-        civilUnloaded: row.civilUnloaded,
-        lrcPetition: row.lrcPetition,
-        lrcSpProc: row.lrcSpProc,
-        lrcReceivedViaReraffled: row.lrcReceivedViaReraffled,
-        lrcUnloaded: row.lrcUnloaded,
-        criminalFamily: row.criminalFamily,
-        criminalDrugs: row.criminalDrugs,
-        criminalOrdinary: row.criminalOrdinary,
-        criminalReceivedViaReraffled: row.criminalReceivedViaReraffled,
-        criminalUnloaded: row.criminalUnloaded,
-        total: row.total || toRowTotal(row),
+        civilFamily: toNonNegativeInt(row.civilFamily),
+        civilOrdinary: toNonNegativeInt(row.civilOrdinary),
+        civilReceivedViaReraffled: toNonNegativeInt(
+          row.civilReceivedViaReraffled,
+        ),
+        civilUnloaded: toNonNegativeInt(row.civilUnloaded),
+        lrcPetition: toNonNegativeInt(row.lrcPetition),
+        lrcSpProc: toNonNegativeInt(row.lrcSpProc),
+        lrcReceivedViaReraffled: toNonNegativeInt(row.lrcReceivedViaReraffled),
+        lrcUnloaded: toNonNegativeInt(row.lrcUnloaded),
+        criminalFamily: toNonNegativeInt(row.criminalFamily),
+        criminalDrugs: toNonNegativeInt(row.criminalDrugs),
+        criminalOrdinary: toNonNegativeInt(row.criminalOrdinary),
+        criminalReceivedViaReraffled: toNonNegativeInt(
+          row.criminalReceivedViaReraffled,
+        ),
+        criminalUnloaded: toNonNegativeInt(row.criminalUnloaded),
+        total: toNonNegativeInt(row.total || toRowTotal(row)),
       };
     });
 
     if (payload.length === 0) return;
 
+    setSaveError(null);
     setSaving(true);
     try {
       await onSave(payload);
       onBack();
+    } catch (error) {
+      console.error("Summary save failed:", error);
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save summary statistics.",
+      );
     } finally {
       setSaving(false);
     }
@@ -747,7 +836,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                                 updateRow(
                                   row.id,
                                   field.key,
-                                  Number(event.target.value) || 0,
+                                  toNonNegativeInt(event.target.value),
                                 )
                               }
                             />
@@ -788,6 +877,12 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
+          {saveError && (
+            <div className="alert alert-error py-2">
+              <span>{saveError}</span>
+            </div>
+          )}
+
           <div className="card bg-base-100 border border-base-200">
             <div className="card-body p-4 sm:p-5">
               <h3 className="text-2xl sm:text-3xl font-black text-base-content">
