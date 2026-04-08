@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-    createRegionalJudgement,
-    deleteRegionalJudgement,
-    getRegionalJudgements,
-    updateRegionalJudgement,
+  createRegionalJudgement,
+  deleteRegionalJudgement,
+  getRegionalJudgements,
+  updateRegionalJudgement,
 } from "./judgementActions";
 import { rtcColumns } from "./JudgementColumnDef";
 import { rtcJudgementFields } from "./JudgementFieldConfig";
@@ -52,8 +52,6 @@ const JudgementRTC = ({
 
   return (
     <JudgementTable<RTCJudgementLog & Record<string, unknown>>
-      title="RTC Judgment Week"
-      subtitle="Regional Trial Court — Nationwide Judgment Week Summary Report"
       data={records as (RTCJudgementLog & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}
