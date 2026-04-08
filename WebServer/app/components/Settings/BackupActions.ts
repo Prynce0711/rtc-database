@@ -8,6 +8,7 @@ import {
   createBackupRemote,
   deleteBackupRemote,
   getBackupOverview,
+  getBackupRemoteStorageUsage,
   reloginBackupRemote,
   runBackupNow,
   startBackupScheduler,
@@ -19,6 +20,7 @@ import {
   type BackupLogEntry,
   type BackupProviderOption,
   type BackupRemote,
+  type BackupRemoteStorageUsage,
 } from "@/app/lib/backup/backupScheduler";
 import {
   ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,
@@ -49,6 +51,7 @@ export interface BackupDashboardData {
 }
 
 export type BackupOneDriveDriveOption = OneDriveDriveOption;
+export type BackupRemoteUsage = BackupRemoteStorageUsage;
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
@@ -84,6 +87,10 @@ const ReLoginRemoteSchema = z.object({
 });
 
 const ListOneDriveDrivesSchema = z.object({
+  remoteName: z.string().min(1),
+});
+
+const GetBackupRemoteStorageUsageSchema = z.object({
   remoteName: z.string().min(1),
 });
 
@@ -507,6 +514,41 @@ export async function listOneDriveDriveOptionsAction(
         error instanceof Error
           ? error.message
           : "Failed to list OneDrive drives",
+    };
+  }
+}
+
+export async function getBackupRemoteUsageAction(
+  data: Record<string, unknown>,
+): Promise<ActionResult<BackupRemoteUsage>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = GetBackupRemoteStorageUsageSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Invalid backup remote usage payload",
+      };
+    }
+
+    await startBackupScheduler();
+
+    return {
+      success: true,
+      result: await getBackupRemoteStorageUsage(parsed.data.remoteName),
+    };
+  } catch (error) {
+    console.error("Error loading backup remote usage:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load backup remote usage",
     };
   }
 }

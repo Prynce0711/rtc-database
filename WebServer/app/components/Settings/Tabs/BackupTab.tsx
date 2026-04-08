@@ -12,9 +12,11 @@ import {
   FiEdit2,
   FiPlus,
   FiRefreshCw,
+  FiSettings,
   FiTrash2,
   FiXCircle,
 } from "react-icons/fi";
+import Collapse from "../../Collapse/Collapse";
 import ModalBase from "../../Popup/ModalBase";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
@@ -23,6 +25,7 @@ import {
   createBackupAccount,
   deleteBackupAccount,
   getBackupDashboard,
+  getBackupRemoteUsageAction,
   importBackupFromLocalFileAction,
   importBackupFromRemoteAction,
   listOneDriveDriveOptionsAction,
@@ -31,6 +34,7 @@ import {
   updateBackupAccount,
   type BackupDashboardData,
   type BackupOneDriveDriveOption,
+  type BackupRemoteUsage,
 } from "../BackupActions";
 import MultiSelectPopoverDropdown from "../MultiSelectPopoverDropdown";
 import {
@@ -57,6 +61,18 @@ const ELECTRON_REQUIRED_AUTH_MESSAGE =
 const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   onedrive: [],
   s3: [
+    {
+      key: "provider",
+      label: "S3 Provider",
+      placeholder: "Other",
+      required: true,
+    },
+    {
+      key: "bucket",
+      label: "Bucket",
+      placeholder: "my-backup-bucket",
+      required: true,
+    },
     {
       key: "access_key_id",
       label: "Access Key ID",
@@ -147,6 +163,12 @@ const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   ],
   smb: [
     {
+      key: "share",
+      label: "Share",
+      placeholder: "backup-share",
+      required: true,
+    },
+    {
       key: "host",
       label: "Host",
       placeholder: "fileserver.local",
@@ -196,6 +218,12 @@ type ElectronAuthorizeProviderResult = {
   error?: string;
 };
 
+type RemoteUsageState = {
+  status: "idle" | "loading" | "success" | "error";
+  data?: BackupRemoteUsage;
+  error?: string;
+};
+
 const pickProviderOptionValues = (
   provider: string,
   options: Record<string, string>,
@@ -214,6 +242,47 @@ const pickProviderOptionValues = (
   return values;
 };
 
+const splitPrefixedBasePath = (
+  rawBasePath: string,
+): { prefix: string; accountBasePath: string } => {
+  const parts = rawBasePath
+    .trim()
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => !!part);
+
+  if (parts.length === 0) {
+    return {
+      prefix: "",
+      accountBasePath: "",
+    };
+  }
+
+  return {
+    prefix: parts[0] ?? "",
+    accountBasePath: parts.slice(1).join("/"),
+  };
+};
+
+const buildPrefixedBasePath = (
+  prefix: string,
+  accountBasePath: string,
+): string => {
+  const normalizedPrefix = prefix.trim();
+  const normalizedAccountBasePath = accountBasePath.trim();
+
+  if (!normalizedPrefix) {
+    return normalizedAccountBasePath;
+  }
+
+  if (!normalizedAccountBasePath) {
+    return normalizedPrefix;
+  }
+
+  return `${normalizedPrefix}/${normalizedAccountBasePath}`;
+};
+
 const BackupTab = () => {
   const popup = usePopup();
   const ipc = typeof window !== "undefined" ? window.ipcRenderer : undefined;
@@ -230,6 +299,9 @@ const BackupTab = () => {
   const [accountSetupInProgress, setAccountSetupInProgress] = useState(false);
   const [importingRemote, setImportingRemote] = useState(false);
   const [importingLocal, setImportingLocal] = useState(false);
+  const [remoteUsageByName, setRemoteUsageByName] = useState<
+    Record<string, RemoteUsageState>
+  >({});
 
   const [enabled, setEnabled] = useState(false);
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
@@ -487,7 +559,9 @@ const BackupTab = () => {
 
   const handleProviderChange = (providerValue: string) => {
     setNewProvider(providerValue);
-    setProviderOptionValues({});
+    setProviderOptionValues(
+      providerValue.toLowerCase() === "s3" ? { provider: "Other" } : {},
+    );
     setProviderOptionTouched({});
   };
 
@@ -541,11 +615,26 @@ const BackupTab = () => {
     setEditingRemoteName(remote.name);
     setNewRemoteName(remote.name);
     setNewProvider(remote.provider);
-    setProviderOptionValues(
-      pickProviderOptionValues(remote.provider, remote.options ?? {}),
+    const providerOptionValues = pickProviderOptionValues(
+      remote.provider,
+      remote.options ?? {},
     );
+
+    const providerKey = remote.provider.trim().toLowerCase();
+    if (providerKey === "s3" || providerKey === "smb") {
+      const prefixedBasePath = splitPrefixedBasePath(remote.basePath ?? "");
+      if (providerKey === "s3") {
+        providerOptionValues.bucket = prefixedBasePath.prefix;
+      } else {
+        providerOptionValues.share = prefixedBasePath.prefix;
+      }
+      setAccountBasePath(prefixedBasePath.accountBasePath);
+    } else {
+      setAccountBasePath((remote.basePath ?? "").trim());
+    }
+
+    setProviderOptionValues(providerOptionValues);
     setProviderOptionTouched({});
-    setAccountBasePath((remote.basePath ?? "").trim());
   };
 
   const handleCancelEditAccount = () => {
@@ -878,6 +967,27 @@ const BackupTab = () => {
 
     let accountOptions = options;
 
+    const normalizedBasePath = accountBasePath.trim();
+    let remoteBasePathToSave = normalizedBasePath;
+
+    if (newProvider.toLowerCase() === "s3") {
+      const s3Bucket = (accountOptions.bucket ?? "").trim();
+      delete accountOptions.bucket;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        s3Bucket,
+        normalizedBasePath,
+      );
+    }
+
+    if (newProvider.toLowerCase() === "smb") {
+      const smbShare = (accountOptions.share ?? "").trim();
+      delete accountOptions.share;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        smbShare,
+        normalizedBasePath,
+      );
+    }
+
     if (requiresAuthFlow) {
       setAccountSaving(true);
       popup.showLoading(
@@ -910,7 +1020,7 @@ const BackupTab = () => {
       provider: newProvider,
       options: accountOptions,
       forceRestart,
-      remoteBasePath: accountBasePath.trim(),
+      remoteBasePath: remoteBasePathToSave,
     });
 
     if (
@@ -929,7 +1039,7 @@ const BackupTab = () => {
           provider: newProvider,
           options: accountOptions,
           forceRestart: true,
-          remoteBasePath: accountBasePath.trim(),
+          remoteBasePath: remoteBasePathToSave,
         });
       }
     }
@@ -1016,6 +1126,28 @@ const BackupTab = () => {
       return;
     }
 
+    const normalizedBasePath = accountBasePath.trim();
+    let remoteBasePathToSave = normalizedBasePath;
+    let accountOptions = options;
+
+    if (newProvider.toLowerCase() === "s3") {
+      const s3Bucket = (accountOptions.bucket ?? "").trim();
+      delete accountOptions.bucket;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        s3Bucket,
+        normalizedBasePath,
+      );
+    }
+
+    if (newProvider.toLowerCase() === "smb") {
+      const smbShare = (accountOptions.share ?? "").trim();
+      delete accountOptions.share;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        smbShare,
+        normalizedBasePath,
+      );
+    }
+
     setAccountSaving(true);
     popup.showLoading("Updating backup account...");
 
@@ -1023,8 +1155,8 @@ const BackupTab = () => {
       currentRemoteName: editingRemoteName,
       nextRemoteName: newRemoteName.trim(),
       provider: newProvider,
-      options,
-      remoteBasePath: accountBasePath.trim(),
+      options: accountOptions,
+      remoteBasePath: remoteBasePathToSave,
     });
 
     setAccountSaving(false);
@@ -1485,6 +1617,94 @@ const BackupTab = () => {
     description: getRemoteProviderDetails(remote),
   }));
 
+  const formatBytes = (bytes: number | null): string => {
+    if (bytes === null || !Number.isFinite(bytes) || bytes < 0) {
+      return "Not available";
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let value = bytes;
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+
+    const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+    return `${value.toFixed(decimals)} ${units[unitIndex]}`;
+  };
+
+  const loadRemoteUsage = async (
+    remoteName: string,
+    force = false,
+  ): Promise<void> => {
+    const normalizedName = remoteName.trim();
+    if (!normalizedName) {
+      return;
+    }
+
+    let shouldRequest = true;
+
+    setRemoteUsageByName((previous) => {
+      const current = previous[normalizedName];
+
+      if (
+        !force &&
+        (current?.status === "loading" || current?.status === "success")
+      ) {
+        shouldRequest = false;
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [normalizedName]: {
+          status: "loading",
+        },
+      };
+    });
+
+    if (!shouldRequest) {
+      return;
+    }
+
+    const result = await getBackupRemoteUsageAction({
+      remoteName: normalizedName,
+    });
+
+    setRemoteUsageByName((previous) => ({
+      ...previous,
+      [normalizedName]: result.success
+        ? {
+            status: "success",
+            data: result.result,
+          }
+        : {
+            status: "error",
+            error: result.error || "Could not load storage usage.",
+          },
+    }));
+  };
+
+  const handleAccountCollapseToggle = (remoteName: string, isOpen: boolean) => {
+    if (!isOpen) {
+      return;
+    }
+
+    void loadRemoteUsage(remoteName);
+  };
+
+  const buildRemoteActionsPopoverId = (remoteName: string): string =>
+    `backup-account-actions-${remoteName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}`;
+
+  const buildRemoteActionsAnchorName = (remoteName: string): string =>
+    `--${buildRemoteActionsPopoverId(remoteName)}-anchor`;
+
   const isEditingAccount = editingRemoteName !== null;
   const accountActionBusy = accountSaving || reloggingRemoteName !== null;
   const accountProviderFields = getProviderFields(newProvider);
@@ -1573,65 +1793,228 @@ const BackupTab = () => {
           ) : (
             <div className="space-y-2">
               {remotes.map((remote) => (
-                <div
+                <Collapse
                   key={remote.name}
-                  className="flex items-center justify-between rounded-xl border border-base-300/60 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-base-content truncate">
-                      {remote.name}
-                    </p>
-                    <p className="text-xs text-base-content/40 tracking-wide mt-0.5 break-all">
-                      {getRemoteProviderDetails(remote)}
-                    </p>
-                    {!!remote.basePath.trim() && (
-                      <p className="text-[11px] text-base-content/35 mt-1 break-all">
-                        Base folder: {remote.basePath}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleClearAccountFiles(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm text-warning rounded-lg"
-                    >
-                      <FiDatabase size={14} /> Clear Files
-                    </button>
-                    {OAUTH_PROVIDERS.has(remote.provider.toLowerCase()) && (
+                  id={`backup-account-collapse-${remote.name}`}
+                  title={remote.name}
+                  subtitle={
+                    <>
+                      <p>{getRemoteProviderDetails(remote)}</p>
+                      {!!remote.basePath.trim() && (
+                        <p className="text-[11px] text-base-content/35 mt-1 break-all">
+                          Base folder: {remote.basePath}
+                        </p>
+                      )}
+                    </>
+                  }
+                  onToggle={(isOpen) =>
+                    handleAccountCollapseToggle(remote.name, isOpen)
+                  }
+                  headerActions={
+                    <>
                       <button
                         type="button"
-                        onClick={() =>
-                          void handleReloginAccount(
-                            remote.name,
-                            remote.provider,
-                          )
+                        popoverTarget={buildRemoteActionsPopoverId(remote.name)}
+                        style={
+                          {
+                            anchorName: buildRemoteActionsAnchorName(
+                              remote.name,
+                            ),
+                          } as React.CSSProperties
                         }
                         disabled={accountActionBusy}
-                        className="btn btn-ghost btn-sm text-info rounded-lg"
+                        className="btn btn-ghost btn-sm btn-circle"
+                        aria-label={`Open actions for ${remote.name}`}
                       >
-                        <FiRefreshCw size={14} /> Re-login
+                        <FiSettings size={15} />
                       </button>
+                      <ul
+                        popover="auto"
+                        id={buildRemoteActionsPopoverId(remote.name)}
+                        className="dropdown menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
+                        style={
+                          {
+                            positionAnchor: buildRemoteActionsAnchorName(
+                              remote.name,
+                            ),
+                            inset: "auto",
+                            top: "anchor(bottom)",
+                            left: "anchor(end)",
+                            marginTop: "0.35rem",
+                            zIndex: 9999,
+                          } as React.CSSProperties
+                        }
+                      >
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleClearAccountFiles(remote.name)
+                            }
+                            disabled={accountActionBusy}
+                            className="text-warning"
+                          >
+                            <FiDatabase size={14} /> Clear Files
+                          </button>
+                        </li>
+                        {OAUTH_PROVIDERS.has(remote.provider.toLowerCase()) && (
+                          <li>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleReloginAccount(
+                                  remote.name,
+                                  remote.provider,
+                                )
+                              }
+                              disabled={accountActionBusy}
+                              className="text-info"
+                            >
+                              <FiRefreshCw size={14} /> Re-login
+                            </button>
+                          </li>
+                        )}
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditAccount(remote.name)}
+                            disabled={accountActionBusy}
+                          >
+                            <FiEdit2 size={14} /> Edit
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleDeleteAccount(remote.name)
+                            }
+                            disabled={accountActionBusy}
+                            className="text-error"
+                          >
+                            <FiTrash2 size={14} /> Remove
+                          </button>
+                        </li>
+                      </ul>
+                    </>
+                  }
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.12em] text-base-content/45">
+                        Account Usage
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void loadRemoteUsage(remote.name, true)}
+                        disabled={
+                          remoteUsageByName[remote.name]?.status === "loading"
+                        }
+                        className="btn btn-ghost btn-xs"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {remoteUsageByName[remote.name]?.status === "loading" && (
+                      <p className="text-xs text-base-content/55">
+                        Loading storage usage...
+                      </p>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => handleStartEditAccount(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm rounded-lg"
-                    >
-                      <FiEdit2 size={14} /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteAccount(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm text-error/80 hover:text-error rounded-lg"
-                    >
-                      <FiTrash2 size={14} /> Remove
-                    </button>
+
+                    {remoteUsageByName[remote.name]?.status === "error" && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-error/85">
+                          {remoteUsageByName[remote.name]?.error ||
+                            "Could not load storage usage."}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Remaining
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Used
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Total
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {remoteUsageByName[remote.name]?.status === "success" &&
+                      (() => {
+                        const usage = remoteUsageByName[remote.name]?.data;
+                        const used = usage?.usedBytes ?? null;
+                        const total = usage?.totalBytes ?? null;
+                        const free = usage?.freeBytes ?? null;
+
+                        const usedPercent =
+                          used !== null && total !== null && total > 0
+                            ? Math.max(0, Math.min(100, (used / total) * 100))
+                            : null;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Remaining
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(free)}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Used
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(used)}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Total
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(total)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {usedPercent !== null && (
+                              <div>
+                                <progress
+                                  className="progress progress-primary w-full h-2"
+                                  value={usedPercent}
+                                  max={100}
+                                />
+                                <p className="text-[11px] text-base-content/50 mt-1">
+                                  {usedPercent.toFixed(1)}% used
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
-                </div>
+                </Collapse>
               ))}
             </div>
           )}
@@ -1747,7 +2130,11 @@ const BackupTab = () => {
               className="input input-bordered h-10 w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
             />
             <p className="text-xs text-base-content/40 mt-1">
-              Prepended before Destination Folder for this account.
+              {newProvider.toLowerCase() === "s3"
+                ? "For S3, this is the folder inside the bucket and is prepended before Destination Folder."
+                : newProvider.toLowerCase() === "smb"
+                  ? "For SMB, this is the folder inside the share and is prepended before Destination Folder."
+                  : "Prepended before Destination Folder for this account."}
             </p>
           </div>
 

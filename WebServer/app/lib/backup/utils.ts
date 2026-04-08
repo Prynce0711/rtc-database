@@ -97,6 +97,11 @@ export function buildProviderAwareRemoteOptions(
   const normalizedProvider = provider.trim().toLowerCase();
   const normalizedOptions = normalizeRemoteOptions(options, mode);
 
+  if (normalizedProvider === "s3" && !normalizedOptions.provider) {
+    // Use rclone's generic provider default for S3-compatible backends.
+    normalizedOptions.provider = "Other";
+  }
+
   if (!normalizedOptions.token && normalizedOptions.config_token) {
     normalizedOptions.token = normalizedOptions.config_token;
   }

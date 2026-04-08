@@ -49,6 +49,7 @@ import {
   retryOnedriveCreateWithDriveSelection as retryOnedriveCreateWithDriveSelectionForRemote,
   type OneDriveDriveOption,
 } from "./remotes/onedrive";
+import { getS3StorageUsage } from "./remotes/s3";
 import {
   clearAllScheduleTimers,
   clearIntervalScheduleState,
@@ -98,6 +99,16 @@ export type {
 };
 
 export type { OneDriveDriveOption };
+
+export interface BackupRemoteStorageUsage {
+  remoteName: string;
+  totalBytes: number | null;
+  usedBytes: number | null;
+  freeBytes: number | null;
+  trashedBytes: number | null;
+  otherBytes: number | null;
+  objects: number | null;
+}
 
 let schedulerStarted = false;
 const scheduleTimers: Partial<
@@ -382,6 +393,7 @@ async function runRcloneCommand(
     trackAsActiveBackup?: boolean;
     trackAsActiveAccountSetup?: boolean;
     silent?: boolean;
+    timeoutMs?: number;
   } = {},
 ): Promise<string> {
   try {
@@ -417,6 +429,49 @@ async function runRcloneCommand(
     return await new Promise<string>((resolve, reject) => {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
+      let settled = false;
+      const timeoutMs =
+        typeof options.timeoutMs === "number" && options.timeoutMs > 0
+          ? options.timeoutMs
+          : 0;
+      const timeoutHandle =
+        timeoutMs > 0
+          ? setTimeout(() => {
+              if (settled) {
+                return;
+              }
+
+              settled = true;
+
+              try {
+                subprocess.kill();
+              } catch {
+                // Ignore kill failures and reject with timeout.
+              }
+
+              reject(
+                new Error(
+                  `rclone command timed out after ${String(Math.floor(timeoutMs / 1000))} seconds`,
+                ),
+              );
+            }, timeoutMs)
+          : null;
+
+      const clearTimeoutHandle = () => {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
+      };
+
+      const finalize = (callback: () => void) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearTimeoutHandle();
+        callback();
+      };
 
       subprocess.stdout?.on("data", (chunk) => {
         const bufferChunk = Buffer.from(chunk);
@@ -437,6 +492,8 @@ async function runRcloneCommand(
       });
 
       subprocess.on("error", (error) => {
+        clearTimeoutHandle();
+
         if (options.trackAsActiveBackup && activeBackupProcess === subprocess) {
           activeBackupProcess = null;
         }
@@ -454,10 +511,12 @@ async function runRcloneCommand(
           appendBackupLog("error", formatBackupError(error));
         }
 
-        reject(error);
+        finalize(() => reject(error));
       });
 
       subprocess.on("close", (code) => {
+        clearTimeoutHandle();
+
         if (options.trackAsActiveBackup && activeBackupProcess === subprocess) {
           activeBackupProcess = null;
         }
@@ -479,7 +538,7 @@ async function runRcloneCommand(
             appendBackupLog("info", "rclone command completed successfully.");
           }
 
-          resolve(stdoutText);
+          finalize(() => resolve(stdoutText));
           return;
         }
 
@@ -492,11 +551,13 @@ async function runRcloneCommand(
           );
         }
 
-        reject(
-          new Error(
-            stderrText ||
-              stdoutText ||
-              `rclone command failed with exit code ${String(code)}`,
+        finalize(() =>
+          reject(
+            new Error(
+              stderrText ||
+                stdoutText ||
+                `rclone command failed with exit code ${String(code)}`,
+            ),
           ),
         );
       });
@@ -1139,6 +1200,94 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
 
     throw new Error(formatBackupError(error));
   }
+}
+
+function toNullableNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+export async function getBackupRemoteStorageUsage(
+  remoteName: string,
+): Promise<BackupRemoteStorageUsage> {
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    throw new Error("Remote name is required.");
+  }
+
+  await ensureBackupArtifacts();
+
+  const [configMap, currentConfig] = await Promise.all([
+    getRemoteConfigMap(),
+    readBackupConfigFile(),
+  ]);
+  const remoteConfig = configMap.get(normalizedName);
+  const remoteProvider = (remoteConfig?.provider ?? "").trim().toLowerCase();
+
+  // S3 requires special handling: use getS3StorageUsage with fallback from about to size
+  if (remoteProvider === "s3") {
+    const configuredBasePath = getRemoteBasePath(currentConfig, normalizedName);
+    const basePathSegments = configuredBasePath
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter((segment) => !!segment);
+    const bucket = basePathSegments[0] ?? "";
+
+    if (!bucket) {
+      throw new Error(
+        "S3 storage usage requires a bucket. Set S3 Bucket in account settings.",
+      );
+    }
+
+    return getS3StorageUsage(normalizedName, bucket, runRcloneCommand);
+  }
+
+  let aboutTarget = `${normalizedName}:`;
+
+  if (remoteProvider === "smb") {
+    const configuredBasePath = getRemoteBasePath(currentConfig, normalizedName);
+    const basePathSegments = configuredBasePath
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter((segment) => !!segment);
+    const share = basePathSegments[0] ?? "";
+
+    if (!share) {
+      throw new Error(
+        "SMB storage usage requires a share. Set SMB Share in account settings.",
+      );
+    }
+
+    aboutTarget = `${normalizedName}:${share}`;
+  }
+
+  const output = await runRcloneCommand(
+    ["about", aboutTarget, "--json"],
+    {},
+    { silent: true, timeoutMs: 10_000 },
+  );
+
+  const parsed = JSON.parse(output) as Record<string, unknown>;
+
+  return {
+    remoteName: normalizedName,
+    totalBytes: toNullableNumber(parsed.total),
+    usedBytes: toNullableNumber(parsed.used),
+    freeBytes: toNullableNumber(parsed.free),
+    trashedBytes: toNullableNumber(parsed.trashed),
+    otherBytes: toNullableNumber(parsed.other),
+    objects: toNullableNumber(parsed.objects),
+  };
 }
 
 export async function createBackupRemote(
