@@ -2,24 +2,24 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    FiArrowLeft,
-    FiChevronRight,
-    FiEye,
-    FiPlus,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiArrowLeft,
+  FiChevronRight,
+  FiEye,
+  FiPlus,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import type { SummaryRow } from "./Schema";
 import {
-    SUMMARY_COURT_TYPES,
-    SUMMARY_MONTH_OPTIONS,
-    type SummaryCourtType,
+  SUMMARY_COURT_TYPES,
+  SUMMARY_MONTH_OPTIONS,
+  type SummaryCourtType,
 } from "./SummaryConstants";
 import {
-    computeSummaryTotal,
-    parseSummaryWorkbook,
-    toMonthKey,
+  computeSummaryTotal,
+  parseSummaryWorkbook,
+  toMonthKey,
 } from "./SummaryImportUtils";
 
 type EditableSummaryRow = Omit<SummaryRow, "id"> & {
@@ -77,6 +77,36 @@ const alignIsoDateToPeriod = (
   const maxDay = getDaysInMonth(Number(targetYear), targetMonth);
   const safeDay = Math.max(1, Math.min(maxDay, parsedDay));
   return `${targetYear}-${targetMonth}-${String(safeDay).padStart(2, "0")}`;
+};
+
+const trySwapMonthDayToSelectedPeriod = (
+  isoDate: string,
+  targetYear: string,
+  targetMonth: string,
+): string => {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return isoDate;
+
+  const parsedYear = Number(match[1]);
+  const parsedMonth = Number(match[2]);
+  const parsedDay = Number(match[3]);
+  const selectedYear = Number(targetYear);
+  const selectedMonth = Number(targetMonth);
+
+  if (!Number.isInteger(selectedYear) || !Number.isInteger(selectedMonth)) {
+    return isoDate;
+  }
+
+  if (parsedYear !== selectedYear) return isoDate;
+  if (parsedMonth === selectedMonth) return isoDate;
+
+  // Recover dates that were parsed as month/day but authored as day/month.
+  // Example with selected month 12: 2025-01-12 should become 2025-12-01.
+  if (parsedDay !== selectedMonth) return isoDate;
+
+  const maxDay = getDaysInMonth(selectedYear, targetMonth);
+  const swappedDay = Math.max(1, Math.min(maxDay, parsedMonth));
+  return `${targetYear}-${targetMonth}-${String(swappedDay).padStart(2, "0")}`;
 };
 
 const createRowId = (): string => {
@@ -401,6 +431,24 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
 
       let normalizedRows = parsed.rows;
       let alignedToActivePeriod = false;
+      let swappedMonthDayCount = 0;
+
+      normalizedRows = normalizedRows.map((row) => {
+        const correctedRaffleDate = trySwapMonthDayToSelectedPeriod(
+          row.raffleDate,
+          effectiveYearFilter,
+          selectedMonthFilter,
+        );
+
+        if (correctedRaffleDate === row.raffleDate) return row;
+
+        swappedMonthDayCount += 1;
+        return {
+          ...row,
+          reportYear: Number(effectiveYearFilter),
+          raffleDate: correctedRaffleDate,
+        };
+      });
 
       const hasRowsInActivePeriod = normalizedRows.some(
         (row) => toMonthKey(row.raffleDate) === activeMonthKey,
@@ -457,7 +505,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
         );
 
         if (!hasVisibleRowsInSelectedCourt) {
-          const courtCounts = new Map<SummaryCourtType, number>();
+          const courtCounts = new Map<string, number>();
           rowsForActivePeriod.forEach((row) => {
             courtCounts.set(
               row.courtType,
@@ -469,8 +517,12 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
             (left, right) => right[1] - left[1],
           )[0]?.[0];
 
-          if (preferredCourtType) {
-            setSelectedCourtType(preferredCourtType);
+          const isSupportedCourtType = SUMMARY_COURT_TYPES.some(
+            (court) => court.value === preferredCourtType,
+          );
+
+          if (preferredCourtType && isSupportedCourtType) {
+            setSelectedCourtType(preferredCourtType as SummaryCourtType);
           }
         }
       }
@@ -484,8 +536,13 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
         ? ` Aligned raffle dates to ${periodLabel} to match the selected period.`
         : "";
 
+      const swapLabel =
+        swappedMonthDayCount > 0
+          ? ` Corrected ${swappedMonthDayCount} raffle date${swappedMonthDayCount !== 1 ? "s" : ""} with day/month format into ${periodLabel}.`
+          : "";
+
       setImportFeedback(
-        `✓ Imported ${normalizedRows.length} row${normalizedRows.length !== 1 ? "s" : ""}${skippedLabel}${alignmentLabel}`,
+        `✓ Imported ${normalizedRows.length} row${normalizedRows.length !== 1 ? "s" : ""}${skippedLabel}${alignmentLabel}${swapLabel}`,
       );
     } catch (error) {
       console.error("Summary import failed:", error);
