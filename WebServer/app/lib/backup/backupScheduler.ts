@@ -2,8 +2,8 @@ import "server-only";
 
 import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
 import type { ChildProcess } from "node:child_process";
-import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { access, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import rclone from "rclone.js";
 import {
@@ -65,6 +65,7 @@ import type {
   BackupLogEntry,
   BackupRemote,
   BackupRunStatus,
+  NotarialSnapshot,
 } from "./types";
 import {
   addIntervalToDate,
@@ -99,6 +100,7 @@ export type {
   BackupProviderOption,
   BackupRemote,
   BackupRunStatus,
+  NotarialSnapshot,
 };
 
 export type { OneDriveDriveOption };
@@ -127,6 +129,30 @@ let activeAccountSetupProcess: ChildProcess | null = null;
 let accountSetupStartedAt = 0;
 const pendingIdentityRefreshRemotes = new Set<string>();
 const lastIdentityRefreshAttemptAt = new Map<string, number>();
+const NOTARIAL_RESTIC_SOURCE_CACHE_PATH = path.join(
+  process.cwd(),
+  "data",
+  "backup",
+  "notarial-restic-source-cache",
+);
+const NOTARIAL_RESTIC_CACHE_PATH = path.join(
+  process.cwd(),
+  "data",
+  "backup",
+  "restic-cache",
+);
+const RCLONE_EXECUTABLE_FOR_RESTIC = path.join(
+  process.cwd(),
+  "node_modules",
+  "rclone.js",
+  "bin",
+  process.platform === "win32" ? "rclone.exe" : "rclone",
+);
+const RCLONE_EXECUTABLE_NAME_FOR_RESTIC =
+  process.platform === "win32" ? "rclone.exe" : "rclone";
+const RCLONE_EXECUTABLE_DIR_FOR_RESTIC = path.dirname(
+  RCLONE_EXECUTABLE_FOR_RESTIC,
+);
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -345,10 +371,179 @@ function buildRcloneDestination(
   return cleanedPath ? `${cleanedRemote}:${cleanedPath}` : `${cleanedRemote}:`;
 }
 
-function buildRetentionDaysArg(days: number): string {
-  const normalizedDays =
-    Number.isFinite(days) && days > 0 ? Math.floor(days) : 30;
-  return `${String(normalizedDays)}d`;
+function buildRetentionWithinArg(intervalKey: BackupIntervalKey): string {
+  switch (intervalKey) {
+    case "5m":
+      return "5m";
+    case "15m":
+      return "15m";
+    case "1h":
+      return "1h";
+    case "1d":
+      return "1d";
+    case "1w":
+      return "7d";
+    case "1mo":
+      return "30d";
+    case "1y":
+      return "365d";
+  }
+}
+
+function isResticRepositoryMissingError(message: string): boolean {
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("is there a repository") ||
+    lowered.includes("unable to open config file") ||
+    lowered.includes("config file does not exist") ||
+    lowered.includes("repository does not exist") ||
+    lowered.includes("no such file")
+  );
+}
+
+function normalizePathSegmentsForComparison(value: string): string[] {
+  return value
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim().toLowerCase().replace(/:$/, ""))
+    .filter((part) => !!part);
+}
+
+function hasPathSuffix(candidate: string[], suffix: string[]): boolean {
+  if (suffix.length === 0 || suffix.length > candidate.length) {
+    return false;
+  }
+
+  const startIndex = candidate.length - suffix.length;
+
+  for (let index = 0; index < suffix.length; index += 1) {
+    if (candidate[startIndex + index] !== suffix[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findDirectoryWithSuffix(
+  rootPath: string,
+  suffixSegments: string[],
+  maxDepth = 10,
+): Promise<string | null> {
+  const queue: Array<{ directory: string; depth: number }> = [
+    { directory: rootPath, depth: 0 },
+  ];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    const relative = path.relative(rootPath, current.directory);
+    const relativeSegments = normalizePathSegmentsForComparison(relative);
+
+    if (hasPathSuffix(relativeSegments, suffixSegments)) {
+      return current.directory;
+    }
+
+    if (current.depth >= maxDepth) {
+      continue;
+    }
+
+    let entries;
+    try {
+      entries = await readdir(current.directory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      queue.push({
+        directory: path.join(current.directory, entry.name),
+        depth: current.depth + 1,
+      });
+    }
+  }
+
+  return null;
+}
+
+async function resolveRestoredNotarialSourcePath(
+  restoreTargetPath: string,
+): Promise<string> {
+  const sourcePath = path.resolve(NOTARIAL_RESTIC_SOURCE_CACHE_PATH);
+  const parsedSource = path.parse(sourcePath);
+  const sourcePathWithoutRoot = sourcePath
+    .slice(parsedSource.root.length)
+    .replace(/^[\\/]+/, "");
+  const normalizedDriveSegment = parsedSource.root
+    .replace(/[\\/:]/g, "")
+    .trim()
+    .toLowerCase();
+
+  const candidatePaths = [
+    path.join(restoreTargetPath, sourcePathWithoutRoot),
+    path.join(restoreTargetPath, normalizedDriveSegment, sourcePathWithoutRoot),
+    path.join(restoreTargetPath, path.basename(sourcePath)),
+  ];
+
+  for (const candidatePath of candidatePaths) {
+    if (!candidatePath || !(await pathExists(candidatePath))) {
+      continue;
+    }
+
+    return candidatePath;
+  }
+
+  const expectedPathSuffix = normalizePathSegmentsForComparison(
+    sourcePathWithoutRoot,
+  );
+  const candidateSuffixes: string[][] = [];
+
+  if (expectedPathSuffix.length > 0) {
+    candidateSuffixes.push(expectedPathSuffix);
+  }
+
+  if (normalizedDriveSegment && expectedPathSuffix.length > 0) {
+    candidateSuffixes.push([normalizedDriveSegment, ...expectedPathSuffix]);
+  }
+
+  candidateSuffixes.push([
+    path.basename(sourcePath).trim().toLowerCase().replace(/:$/, ""),
+  ]);
+
+  for (const suffixSegments of candidateSuffixes) {
+    if (suffixSegments.length === 0) {
+      continue;
+    }
+
+    const matchedDirectory = await findDirectoryWithSuffix(
+      restoreTargetPath,
+      suffixSegments,
+    );
+
+    if (matchedDirectory) {
+      return matchedDirectory;
+    }
+  }
+
+  throw new Error(
+    "Could not determine restored notarial snapshot folder from restic output.",
+  );
 }
 
 function normalizeEndpointForComparison(value: string | undefined): string {
@@ -364,6 +559,210 @@ function extractS3BucketFromBasePath(basePath: string): string {
     .filter((part) => !!part);
 
   return parts[0] ?? "";
+}
+
+function buildResticRepositoryDestination(
+  remoteName: string,
+  repositoryPath: string,
+): string {
+  const rcloneDestination = buildRcloneDestination(remoteName, repositoryPath);
+  return `rclone:${rcloneDestination}`;
+}
+
+function buildResticCommandEnv(): NodeJS.ProcessEnv {
+  const hasResticPassword =
+    !!process.env.RESTIC_PASSWORD?.trim() ||
+    !!process.env.RESTIC_PASSWORD_FILE?.trim();
+
+  if (!hasResticPassword) {
+    throw new Error(
+      "RESTIC_PASSWORD or RESTIC_PASSWORD_FILE is required to run notarial restic backups.",
+    );
+  }
+
+  const configuredExecutable = process.env.RCLONE_EXECUTABLE?.trim() ?? "";
+  const preferredExecutableDirs = new Set<string>();
+
+  if (configuredExecutable && path.isAbsolute(configuredExecutable)) {
+    preferredExecutableDirs.add(path.dirname(configuredExecutable));
+  }
+
+  preferredExecutableDirs.add(RCLONE_EXECUTABLE_DIR_FOR_RESTIC);
+
+  const existingPath = process.env.PATH ?? "";
+  const prependedPath = Array.from(preferredExecutableDirs)
+    .filter((entry) => !!entry)
+    .join(path.delimiter);
+  const mergedPath = prependedPath
+    ? `${prependedPath}${existingPath ? path.delimiter : ""}${existingPath}`
+    : existingPath;
+
+  return {
+    ...process.env,
+    RCLONE_CONFIG: RCLONE_CONFIG_PATH,
+    RESTIC_CACHE_DIR: NOTARIAL_RESTIC_CACHE_PATH,
+    PATH: mergedPath,
+  };
+}
+
+function getResticRcloneProgramOptionArgs(): string[] {
+  const configuredExecutable = process.env.RCLONE_EXECUTABLE?.trim() ?? "";
+
+  if (configuredExecutable) {
+    const program =
+      process.platform === "win32" && path.isAbsolute(configuredExecutable)
+        ? path.basename(configuredExecutable)
+        : configuredExecutable;
+    return ["-o", `rclone.program=${program}`];
+  }
+
+  return ["-o", `rclone.program=${RCLONE_EXECUTABLE_NAME_FOR_RESTIC}`];
+}
+
+async function runResticCommand(
+  args: string[],
+  options: {
+    trackAsActiveBackup?: boolean;
+    silent?: boolean;
+    env?: NodeJS.ProcessEnv;
+  } = {},
+): Promise<string> {
+  const rcloneProgramOptionArgs = getResticRcloneProgramOptionArgs();
+  const finalArgs = [...rcloneProgramOptionArgs, ...args];
+
+  if (!options.silent) {
+    appendBackupLog("info", `Executing restic ${finalArgs.join(" ")}`);
+  }
+
+  return await new Promise<string>((resolve, reject) => {
+    const subprocess = spawn("restic", finalArgs, {
+      windowsHide: true,
+      env: options.env,
+    });
+
+    if (options.trackAsActiveBackup) {
+      activeBackupProcess = subprocess;
+      if (cancelBackupRequested) {
+        try {
+          subprocess.kill();
+        } catch {
+          // Ignore and let close/error handlers update state.
+        }
+      }
+    }
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let settled = false;
+
+    const finalize = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      callback();
+    };
+
+    subprocess.stdout?.on("data", (chunk) => {
+      const bufferChunk = Buffer.from(chunk);
+      stdoutChunks.push(bufferChunk);
+
+      if (!options.silent) {
+        appendBackupChunk("info", bufferChunk);
+      }
+    });
+
+    subprocess.stderr?.on("data", (chunk) => {
+      const bufferChunk = Buffer.from(chunk);
+      stderrChunks.push(bufferChunk);
+
+      if (!options.silent) {
+        appendBackupChunk("warn", bufferChunk);
+      }
+    });
+
+    subprocess.on("error", (error) => {
+      if (options.trackAsActiveBackup && activeBackupProcess === subprocess) {
+        activeBackupProcess = null;
+      }
+
+      const message = formatBackupError(error);
+      const lowered = message.toLowerCase();
+      const formattedError =
+        lowered.includes("enoent") && lowered.includes("restic")
+          ? new Error(
+              "restic executable was not found. Install restic and restart the server.",
+            )
+          : error instanceof Error
+            ? error
+            : new Error(message);
+
+      if (!options.silent) {
+        appendBackupLog("error", formatBackupError(formattedError));
+      }
+
+      finalize(() => reject(formattedError));
+    });
+
+    subprocess.on("close", (code) => {
+      if (options.trackAsActiveBackup && activeBackupProcess === subprocess) {
+        activeBackupProcess = null;
+      }
+
+      const stdoutText = Buffer.concat(stdoutChunks).toString("utf8").trim();
+      const stderrText = Buffer.concat(stderrChunks).toString("utf8").trim();
+
+      if ((code ?? 0) === 0) {
+        if (!options.silent) {
+          appendBackupLog("info", "restic command completed successfully.");
+        }
+
+        finalize(() => resolve(stdoutText));
+        return;
+      }
+
+      const errorMessage =
+        stderrText ||
+        stdoutText ||
+        `restic command failed with exit code ${String(code ?? 0)}`;
+
+      if (!options.silent) {
+        appendBackupLog("error", errorMessage);
+      }
+
+      finalize(() => reject(new Error(errorMessage)));
+    });
+  });
+}
+
+async function ensureResticRepositoryInitialized(
+  repositoryDestination: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  try {
+    await runResticCommand(["-r", repositoryDestination, "snapshots"], {
+      silent: true,
+      env,
+    });
+    return;
+  } catch (error) {
+    const message = formatBackupError(error);
+    const repositoryMissing = isResticRepositoryMissingError(message);
+
+    if (!repositoryMissing) {
+      throw error;
+    }
+  }
+
+  appendBackupLog(
+    "info",
+    `Initializing restic repository at ${repositoryDestination}.`,
+  );
+  await runResticCommand(["-r", repositoryDestination, "init"], {
+    trackAsActiveBackup: true,
+    env,
+  });
 }
 
 function getRemoteBasePath(config: BackupConfig, remoteName: string): string {
@@ -750,15 +1149,20 @@ async function runBackup(
         NOTARIAL_REMOTE_NAME,
         garageBucket,
       );
-      const retentionDaysArg = buildRetentionDaysArg(
-        current.notarialDeletedFilesMaxAgeDays,
+      const retentionWithinArg = buildRetentionWithinArg(
+        current.notarialSnapshotRetentionInterval,
       );
-      const retentionStamp = new Date().toISOString().slice(0, 10);
       const remoteConfigMap = await getRemoteConfigMap();
       const notarialRemoteConfig = remoteConfigMap.get(NOTARIAL_REMOTE_NAME);
       const notarialEndpoint = normalizeEndpointForComparison(
         notarialRemoteConfig?.options.endpoint,
       );
+      const resticEnv = buildResticCommandEnv();
+
+      await mkdir(NOTARIAL_RESTIC_SOURCE_CACHE_PATH, { recursive: true });
+      await mkdir(NOTARIAL_RESTIC_CACHE_PATH, { recursive: true });
+
+      const repositoryDestinationByRemote = new Map<string, string>();
 
       for (const remoteName of activeNotarialSelectedRemoteNames) {
         const remoteBasePath = getRemoteBasePath(current, remoteName);
@@ -781,87 +1185,85 @@ async function runBackup(
           );
         }
 
-        const notarialDestinationRelativePath = joinRemotePath(
+        const resticRepositoryRelativePath = joinRemotePath(
           remoteBasePath,
           current.remotePath,
-          "notarial",
+          "notarial-restic",
         );
-        const notarialDestination = buildRcloneDestination(
+        repositoryDestinationByRemote.set(
           remoteName,
-          notarialDestinationRelativePath,
+          buildResticRepositoryDestination(
+            remoteName,
+            resticRepositoryRelativePath,
+          ),
         );
-        const notarialDeletedRootRelativePath = joinRemotePath(
-          remoteBasePath,
-          current.remotePath,
-          "notarial-deleted",
-        );
-        const notarialDeletedRunRelativePath = joinRemotePath(
-          notarialDeletedRootRelativePath,
-          retentionStamp,
-        );
-        const notarialBackupDir = buildRcloneDestination(
-          remoteName,
-          notarialDeletedRunRelativePath,
-        );
-        const notarialDeletedRootDestination = buildRcloneDestination(
-          remoteName,
-          notarialDeletedRootRelativePath,
-        );
+      }
 
-        appendBackupLog(
-          "info",
-          `Syncing notarial files from ${notarialSource} to ${notarialDestination} with backup-dir ${notarialBackupDir}.`,
-        );
+      appendBackupLog(
+        "info",
+        `Syncing notarial source ${notarialSource} to local restic cache ${NOTARIAL_RESTIC_SOURCE_CACHE_PATH}.`,
+      );
+      await runRcloneCommand(
+        ["sync", notarialSource, NOTARIAL_RESTIC_SOURCE_CACHE_PATH],
+        {
+          "check-first": true,
+        },
+        {
+          trackAsActiveBackup: true,
+        },
+      );
 
-        await runRcloneCommand(
-          [
-            "sync",
-            notarialSource,
-            notarialDestination,
-            "--backup-dir",
-            notarialBackupDir,
-          ],
-          {
-            "check-first": true,
-          },
-          {
-            trackAsActiveBackup: true,
-          },
-        );
-
-        appendBackupLog(
-          "info",
-          `Pruning notarial backup-dir files older than ${retentionDaysArg} at ${notarialDeletedRootDestination}.`,
-        );
-
-        try {
-          await runRcloneCommand(
-            [
-              "delete",
-              notarialDeletedRootDestination,
-              "--min-age",
-              retentionDaysArg,
-            ],
-            {},
-            {
-              trackAsActiveBackup: true,
-            },
-          );
-        } catch (error) {
-          const message = formatBackupError(error);
-          if (!isRemotePathNotFoundError(message)) {
-            throw error;
-          }
-
-          appendBackupLog(
-            "warn",
-            `No notarial backup-dir path found at ${notarialDeletedRootDestination}; skipping retention prune.`,
-          );
+      for (const remoteName of activeNotarialSelectedRemoteNames) {
+        const repositoryDestination =
+          repositoryDestinationByRemote.get(remoteName);
+        if (!repositoryDestination) {
+          continue;
         }
 
+        await ensureResticRepositoryInitialized(
+          repositoryDestination,
+          resticEnv,
+        );
+
         appendBackupLog(
           "info",
-          `Completed notarial sync to remote ${remoteName}.`,
+          `Creating restic snapshot for notarial files on ${repositoryDestination}.`,
+        );
+        await runResticCommand(
+          [
+            "-r",
+            repositoryDestination,
+            "backup",
+            NOTARIAL_RESTIC_SOURCE_CACHE_PATH,
+          ],
+          {
+            trackAsActiveBackup: true,
+            env: resticEnv,
+          },
+        );
+
+        appendBackupLog(
+          "info",
+          `Applying restic retention (${retentionWithinArg}) on ${repositoryDestination}.`,
+        );
+        await runResticCommand(
+          [
+            "-r",
+            repositoryDestination,
+            "forget",
+            "--keep-within",
+            retentionWithinArg,
+            "--prune",
+          ],
+          {
+            trackAsActiveBackup: true,
+            env: resticEnv,
+          },
+        );
+
+        appendBackupLog(
+          "info",
+          `Completed notarial restic backup to remote ${remoteName}.`,
         );
       }
     }
@@ -1120,14 +1522,13 @@ export async function updateBackupConfig(
     );
   }
 
-  if (patch.notarialDeletedFilesMaxAgeDays !== undefined) {
-    const nextRetentionDays = Math.floor(patch.notarialDeletedFilesMaxAgeDays);
-    if (!Number.isFinite(nextRetentionDays) || nextRetentionDays < 1) {
-      throw new Error(
-        "Notarial deleted files max age must be a positive whole number of days.",
-      );
+  if (patch.notarialSnapshotRetentionInterval !== undefined) {
+    if (!isBackupIntervalKey(patch.notarialSnapshotRetentionInterval)) {
+      throw new Error("Select a valid notarial snapshot retention interval.");
     }
-    next.notarialDeletedFilesMaxAgeDays = nextRetentionDays;
+
+    next.notarialSnapshotRetentionInterval =
+      patch.notarialSnapshotRetentionInterval;
   }
 
   // Destination folder is fixed and not user-editable.
@@ -1582,6 +1983,293 @@ export async function getBackupRemoteStorageUsage(
     otherBytes: toNullableNumber(parsed.other),
     objects: toNullableNumber(parsed.objects),
   };
+}
+
+function parseNotarialSnapshotsOutput(output: string): NotarialSnapshot[] {
+  let parsed: unknown;
+
+  try {
+    parsed = output.trim() ? (JSON.parse(output) as unknown) : [];
+  } catch {
+    throw new Error("Failed to parse restic snapshots output.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const seenSnapshotIds = new Set<string>();
+  const snapshots: NotarialSnapshot[] = [];
+
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const typedEntry = entry as {
+      id?: unknown;
+      short_id?: unknown;
+      time?: unknown;
+    };
+    const snapshotId =
+      typeof typedEntry.id === "string" ? typedEntry.id.trim() : "";
+    const snapshotTime =
+      typeof typedEntry.time === "string" ? typedEntry.time.trim() : "";
+
+    if (!snapshotId || !snapshotTime || seenSnapshotIds.has(snapshotId)) {
+      continue;
+    }
+
+    seenSnapshotIds.add(snapshotId);
+    snapshots.push({
+      id: snapshotId,
+      shortId:
+        typeof typedEntry.short_id === "string" && typedEntry.short_id.trim()
+          ? typedEntry.short_id.trim()
+          : snapshotId.slice(0, 8),
+      time: snapshotTime,
+    });
+  }
+
+  snapshots.sort((left, right) => {
+    const leftTime = new Date(left.time).getTime();
+    const rightTime = new Date(right.time).getTime();
+
+    if (!Number.isFinite(leftTime) && !Number.isFinite(rightTime)) {
+      return 0;
+    }
+    if (!Number.isFinite(leftTime)) {
+      return 1;
+    }
+    if (!Number.isFinite(rightTime)) {
+      return -1;
+    }
+
+    return rightTime - leftTime;
+  });
+
+  return snapshots;
+}
+
+export async function listNotarialSnapshots(
+  remoteName: string,
+): Promise<NotarialSnapshot[]> {
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    throw new Error("Remote name is required.");
+  }
+
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and cannot be selected for notarial snapshots.`,
+    );
+  }
+
+  await ensureBackupArtifacts();
+
+  const [current, configMap] = await Promise.all([
+    readBackupConfigFile(),
+    getRemoteConfigMap(),
+  ]);
+
+  if (!configMap.has(normalizedName)) {
+    throw new Error(`Remote ${normalizedName} was not found.`);
+  }
+
+  const remoteBasePath = getRemoteBasePath(current, normalizedName);
+  const repositoryRelativePath = joinRemotePath(
+    remoteBasePath,
+    current.remotePath,
+    "notarial-restic",
+  );
+  const repositoryDestination = buildResticRepositoryDestination(
+    normalizedName,
+    repositoryRelativePath,
+  );
+  const resticEnv = buildResticCommandEnv();
+
+  try {
+    const output = await runResticCommand(
+      ["-r", repositoryDestination, "snapshots", "--json"],
+      {
+        silent: true,
+        env: resticEnv,
+      },
+    );
+
+    return parseNotarialSnapshotsOutput(output);
+  } catch (error) {
+    if (isResticRepositoryMissingError(formatBackupError(error))) {
+      return [];
+    }
+
+    throw error instanceof Error ? error : new Error(formatBackupError(error));
+  }
+}
+
+export async function restoreNotarialSnapshot(
+  remoteName: string,
+  snapshotId: string,
+): Promise<void> {
+  const normalizedName = normalizeRemoteName(remoteName);
+  if (!normalizedName) {
+    throw new Error("Remote name is required.");
+  }
+
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and cannot be selected for notarial restore.`,
+    );
+  }
+
+  const normalizedSnapshotId = snapshotId.trim();
+  if (!normalizedSnapshotId) {
+    throw new Error("Snapshot ID is required.");
+  }
+
+  if (backupRunning) {
+    throw new Error("A backup operation is already running.");
+  }
+
+  await ensureBackupArtifacts();
+
+  const [current, configMap, settingsResult, availableSnapshots] =
+    await Promise.all([
+      readBackupConfigFile(),
+      getRemoteConfigMap(),
+      getSystemSettings(),
+      listNotarialSnapshots(normalizedName),
+    ]);
+
+  if (!configMap.has(normalizedName)) {
+    throw new Error(`Remote ${normalizedName} was not found.`);
+  }
+
+  if (!configMap.has(NOTARIAL_REMOTE_NAME)) {
+    throw new Error(
+      "Notarial source remote is not configured. Save Garage settings first.",
+    );
+  }
+
+  if (!settingsResult.success) {
+    throw new Error(
+      `Failed to load system settings for notarial restore: ${settingsResult.error}`,
+    );
+  }
+
+  const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+  if (!garageBucket) {
+    throw new Error(
+      "Garage bucket is not configured. Set Garage bucket in System Settings before restoring notarial snapshots.",
+    );
+  }
+
+  const selectedSnapshot = availableSnapshots.find(
+    (snapshot) =>
+      snapshot.id === normalizedSnapshotId ||
+      snapshot.shortId === normalizedSnapshotId,
+  );
+
+  if (!selectedSnapshot) {
+    throw new Error(
+      "Selected notarial snapshot was not found for this destination account.",
+    );
+  }
+
+  const remoteBasePath = getRemoteBasePath(current, normalizedName);
+  const repositoryRelativePath = joinRemotePath(
+    remoteBasePath,
+    current.remotePath,
+    "notarial-restic",
+  );
+  const repositoryDestination = buildResticRepositoryDestination(
+    normalizedName,
+    repositoryRelativePath,
+  );
+  const notarialSource = buildRcloneDestination(
+    NOTARIAL_REMOTE_NAME,
+    garageBucket,
+  );
+  const resticEnv = buildResticCommandEnv();
+  const restoreTargetPath = path.join(
+    process.cwd(),
+    "data",
+    "backup",
+    "notarial-restore",
+    `${Date.now()}-${normalizedName.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
+  );
+
+  backupRunning = true;
+  cancelBackupRequested = false;
+
+  try {
+    await mkdir(restoreTargetPath, { recursive: true });
+
+    appendBackupLog(
+      "info",
+      `Restoring notarial snapshot ${selectedSnapshot.shortId} from ${normalizedName}.`,
+    );
+    await runResticCommand(
+      [
+        "-r",
+        repositoryDestination,
+        "restore",
+        selectedSnapshot.id,
+        "--target",
+        restoreTargetPath,
+      ],
+      {
+        trackAsActiveBackup: true,
+        env: resticEnv,
+      },
+    );
+
+    if (cancelBackupRequested) {
+      throw new Error("Restore cancelled by user.");
+    }
+
+    const restoredSourcePath =
+      await resolveRestoredNotarialSourcePath(restoreTargetPath);
+
+    appendBackupLog(
+      "info",
+      `Syncing restored notarial files from ${restoredSourcePath} to ${notarialSource}.`,
+    );
+    await runRcloneCommand(
+      ["sync", restoredSourcePath, notarialSource],
+      {
+        "check-first": true,
+      },
+      {
+        trackAsActiveBackup: true,
+      },
+    );
+
+    appendBackupLog(
+      "info",
+      `Notarial snapshot restore completed from ${normalizedName}.`,
+    );
+  } catch (error) {
+    const formattedError = formatBackupError(error);
+    appendBackupLog(
+      "error",
+      `Notarial snapshot restore failed: ${formattedError}`,
+    );
+    throw new Error(formattedError);
+  } finally {
+    try {
+      await rm(restoreTargetPath, { recursive: true, force: true });
+    } catch (cleanupError) {
+      appendBackupLog(
+        "warn",
+        `Could not clean temporary notarial restore folder: ${formatBackupError(cleanupError)}`,
+      );
+    }
+
+    activeBackupProcess = null;
+    cancelBackupRequested = false;
+    backupRunning = false;
+  }
 }
 
 export async function createBackupRemote(

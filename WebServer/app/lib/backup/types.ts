@@ -22,7 +22,7 @@ export interface BackupConfig {
   selectedIntervals: BackupIntervalKey[];
   selectedRemoteNames: string[];
   notarialSelectedRemoteNames: string[];
-  notarialDeletedFilesMaxAgeDays: number;
+  notarialSnapshotRetentionInterval: BackupIntervalKey;
   remoteAccountIdentities: Record<string, string>;
   remoteBasePaths: Record<string, string>;
   remotePath: string;
@@ -47,6 +47,12 @@ export interface BackupConfigPatch {
   selectedIntervals?: string[];
   selectedRemoteNames?: string[];
   notarialSelectedRemoteNames?: string[];
-  notarialDeletedFilesMaxAgeDays?: number;
+  notarialSnapshotRetentionInterval?: string;
   remotePath?: string;
+}
+
+export interface NotarialSnapshot {
+  id: string;
+  shortId: string;
+  time: string;
 }

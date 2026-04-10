@@ -28,11 +28,14 @@ import {
   getBackupRemoteUsageAction,
   importBackupFromLocalFileAction,
   importBackupFromRemoteAction,
+  listNotarialSnapshotsAction,
   listOneDriveDriveOptionsAction,
+  restoreNotarialSnapshotAction,
   runBackupNowAction,
   saveBackupConfiguration,
   updateBackupAccount,
   type BackupDashboardData,
+  type BackupNotarialSnapshot,
   type BackupOneDriveDriveOption,
   type BackupRemoteUsage,
 } from "../BackupActions";
@@ -311,8 +314,24 @@ const BackupTab = () => {
   const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
   const [notarialSelectedRemoteNames, setNotarialSelectedRemoteNames] =
     useState<string[]>([]);
-  const [notarialDeletedFilesMaxAgeDays, setNotarialDeletedFilesMaxAgeDays] =
-    useState("30");
+  const [
+    notarialSnapshotRetentionInterval,
+    setNotarialSnapshotRetentionInterval,
+  ] = useState("1mo");
+  const [notarialRestoreRemoteName, setNotarialRestoreRemoteName] =
+    useState("");
+  const [notarialSnapshots, setNotarialSnapshots] = useState<
+    BackupNotarialSnapshot[]
+  >([]);
+  const [selectedNotarialSnapshotId, setSelectedNotarialSnapshotId] =
+    useState("");
+  const [notarialSnapshotsError, setNotarialSnapshotsError] = useState<
+    string | null
+  >(null);
+  const [loadingNotarialSnapshots, setLoadingNotarialSnapshots] =
+    useState(false);
+  const [restoringNotarialSnapshot, setRestoringNotarialSnapshot] =
+    useState(false);
   const [importRemoteName, setImportRemoteName] = useState("");
   const [importSource, setImportSource] = useState("manual");
   const [localImportFile, setLocalImportFile] = useState<File | null>(null);
@@ -391,8 +410,8 @@ const BackupTab = () => {
       setSelectedIntervals(data.config.selectedIntervals);
       setSelectedRemoteNames(data.config.selectedRemoteNames);
       setNotarialSelectedRemoteNames(data.config.notarialSelectedRemoteNames);
-      setNotarialDeletedFilesMaxAgeDays(
-        String(data.config.notarialDeletedFilesMaxAgeDays),
+      setNotarialSnapshotRetentionInterval(
+        data.config.notarialSnapshotRetentionInterval,
       );
       setLastRunAt(data.config.lastRunAt);
       setLastRunStatus(data.config.lastRunStatus);
@@ -431,6 +450,11 @@ const BackupTab = () => {
       });
 
       const availableRemoteNames = data.remotes.map((remote) => remote.name);
+      const availableNotarialRemoteNames =
+        data.config.notarialSelectedRemoteNames.filter((remoteName) =>
+          availableRemoteNames.includes(remoteName),
+        );
+
       setNotarialSelectedRemoteNames((previous) => {
         const currentSelection = data.config.notarialSelectedRemoteNames;
         if (currentSelection.length > 0) {
@@ -443,6 +467,15 @@ const BackupTab = () => {
           availableRemoteNames.includes(remoteName),
         );
       });
+
+      setNotarialRestoreRemoteName((previous) => {
+        if (previous && availableNotarialRemoteNames.includes(previous)) {
+          return previous;
+        }
+
+        return availableNotarialRemoteNames[0] ?? "";
+      });
+
       setImportRemoteName((previous) => {
         if (previous && availableRemoteNames.includes(previous)) {
           return previous;
@@ -523,16 +556,11 @@ const BackupTab = () => {
       return;
     }
 
-    const parsedNotarialDeletedFilesMaxAgeDays = Number(
-      notarialDeletedFilesMaxAgeDays,
+    const validIntervalValues = new Set(
+      intervalOptions.map((interval) => interval.value),
     );
-    if (
-      !Number.isInteger(parsedNotarialDeletedFilesMaxAgeDays) ||
-      parsedNotarialDeletedFilesMaxAgeDays < 1
-    ) {
-      popup.showError(
-        "Notarial Deleted Files Max Age must be a positive whole number of days.",
-      );
+    if (!validIntervalValues.has(notarialSnapshotRetentionInterval)) {
+      popup.showError("Select a valid notarial snapshot retention interval.");
       return;
     }
 
@@ -546,7 +574,7 @@ const BackupTab = () => {
       selectedIntervals,
       selectedRemoteNames,
       notarialSelectedRemoteNames,
-      notarialDeletedFilesMaxAgeDays: parsedNotarialDeletedFilesMaxAgeDays,
+      notarialSnapshotRetentionInterval,
       remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     });
 
@@ -1433,19 +1461,19 @@ const BackupTab = () => {
 
   const handleImportFromRemote = async () => {
     if (!importRemoteName.trim()) {
-      popup.showError("Select a remote account to import from.");
+      popup.showError("Select a remote account to restore from.");
       return;
     }
 
     const confirmed = await popup.showWarning(
-      "This will update database (dev.db) from the selected remote backup. This might log out the current user. Continue?",
+      "This will restore database (dev.db) from the selected remote backup. This might log out the current user. Continue?",
     );
     if (!confirmed) {
       return;
     }
 
     setImportingRemote(true);
-    popup.showLoading("Updating database from remote backup...");
+    popup.showLoading("Restoring database from remote backup...");
 
     const result = await importBackupFromRemoteAction({
       remoteName: importRemoteName.trim(),
@@ -1454,12 +1482,12 @@ const BackupTab = () => {
 
     setImportingRemote(false);
     if (!result.success) {
-      popup.showError(result.error || "Failed to import backup from remote");
+      popup.showError(result.error || "Failed to restore backup from remote");
       return;
     }
 
     applyDashboardData(result.result);
-    popup.showSuccess("Database updated from remote backup.");
+    popup.showSuccess("Database restored from remote backup.");
   };
 
   const handleOpenLocalFilePicker = () => {
@@ -1475,19 +1503,19 @@ const BackupTab = () => {
 
   const handleImportFromLocalFile = async () => {
     if (!localImportFile) {
-      popup.showError("Choose a local backup file to import.");
+      popup.showError("Choose a local backup file to restore.");
       return;
     }
 
     const confirmed = await popup.showWarning(
-      `This will update database (dev.db) from \"${localImportFile.name}\". This might log out the current user. Continue?`,
+      `This will restore database (dev.db) from "${localImportFile.name}". This might log out the current user. Continue?`,
     );
     if (!confirmed) {
       return;
     }
 
     setImportingLocal(true);
-    popup.showLoading("Updating database from local backup file...");
+    popup.showLoading("Restoring database from local backup file...");
 
     const formData = new FormData();
     formData.set("file", localImportFile);
@@ -1497,7 +1525,7 @@ const BackupTab = () => {
     setImportingLocal(false);
     if (!result.success) {
       popup.showError(
-        result.error || "Failed to import backup from local file",
+        result.error || "Failed to restore backup from local file",
       );
       return;
     }
@@ -1507,8 +1535,126 @@ const BackupTab = () => {
     if (localImportInputRef.current) {
       localImportInputRef.current.value = "";
     }
-    popup.showSuccess("Database updated from local backup file.");
+    popup.showSuccess("Database restored from local backup file.");
   };
+
+  const loadNotarialSnapshots = useCallback(
+    async (
+      remoteName: string,
+      options: {
+        notifyOnSuccess?: boolean;
+        notifyOnError?: boolean;
+      } = {},
+    ) => {
+      const normalizedRemoteName = remoteName.trim();
+      if (!normalizedRemoteName) {
+        setNotarialSnapshots([]);
+        setSelectedNotarialSnapshotId("");
+        setNotarialSnapshotsError(null);
+        return;
+      }
+
+      setLoadingNotarialSnapshots(true);
+      setNotarialSnapshotsError(null);
+
+      const result = await listNotarialSnapshotsAction({
+        remoteName: normalizedRemoteName,
+      });
+
+      setLoadingNotarialSnapshots(false);
+
+      if (!result.success) {
+        const errorMessage =
+          result.error || "Failed to load notarial snapshots.";
+        setNotarialSnapshots([]);
+        setSelectedNotarialSnapshotId("");
+        setNotarialSnapshotsError(errorMessage);
+
+        if (options.notifyOnError) {
+          popup.showError(errorMessage);
+        }
+        return;
+      }
+
+      setNotarialSnapshots(result.result.snapshots);
+      setSelectedNotarialSnapshotId((previous) => {
+        if (
+          previous &&
+          result.result.snapshots.some((snapshot) => snapshot.id === previous)
+        ) {
+          return previous;
+        }
+
+        return result.result.snapshots[0]?.id ?? "";
+      });
+
+      if (result.result.snapshots.length === 0) {
+        setNotarialSnapshotsError(
+          "No snapshots found for the selected destination account.",
+        );
+      }
+
+      if (options.notifyOnSuccess) {
+        popup.showSuccess("Notarial snapshots refreshed.");
+      }
+    },
+    [popup],
+  );
+
+  const handleRestoreNotarialSnapshot = async () => {
+    const normalizedRemoteName = notarialRestoreRemoteName.trim();
+    if (!normalizedRemoteName) {
+      popup.showError("Select a notarial destination account first.");
+      return;
+    }
+
+    const normalizedSnapshotId = selectedNotarialSnapshotId.trim();
+    if (!normalizedSnapshotId) {
+      popup.showError("Select a notarial snapshot to restore.");
+      return;
+    }
+
+    const selectedSnapshot = notarialSnapshots.find(
+      (snapshot) => snapshot.id === normalizedSnapshotId,
+    );
+
+    const confirmed = await popup.showWarning(
+      `This will restore Garage notarial files from snapshot ${selectedSnapshot?.shortId ?? normalizedSnapshotId}. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setRestoringNotarialSnapshot(true);
+    popup.showLoading("Restoring notarial snapshot...");
+
+    const result = await restoreNotarialSnapshotAction({
+      remoteName: normalizedRemoteName,
+      snapshotId: normalizedSnapshotId,
+    });
+
+    setRestoringNotarialSnapshot(false);
+
+    if (!result.success) {
+      popup.showError(result.error || "Failed to restore notarial snapshot.");
+      return;
+    }
+
+    applyDashboardData(result.result);
+    await loadNotarialSnapshots(normalizedRemoteName);
+    popup.showSuccess("Notarial snapshot restored successfully.");
+  };
+
+  useEffect(() => {
+    if (!notarialRestoreRemoteName.trim()) {
+      setNotarialSnapshots([]);
+      setSelectedNotarialSnapshotId("");
+      setNotarialSnapshotsError(null);
+      return;
+    }
+
+    void loadNotarialSnapshots(notarialRestoreRemoteName);
+  }, [loadNotarialSnapshots, notarialRestoreRemoteName]);
 
   const toggleIntervalSelection = (intervalValue: string) => {
     setSelectedIntervals((previous) => {
@@ -1556,12 +1702,16 @@ const BackupTab = () => {
   }
 
   const isBackupRunning = lastRunStatus === "RUNNING";
+  const hasManualRunDestinations =
+    (caseEnabled && selectedRemoteNames.length > 0) ||
+    (notarialEnabled && notarialSelectedRemoteNames.length > 0);
   const canRunNow =
-    selectedRemoteNames.length > 0 &&
+    hasManualRunDestinations &&
     !runningBackup &&
     !cancellingBackup &&
     !importingRemote &&
     !importingLocal &&
+    !restoringNotarialSnapshot &&
     !isBackupRunning;
 
   const selectedIntervalLabels = intervalOptions
@@ -1676,10 +1826,36 @@ const BackupTab = () => {
     description: `Folder: ${interval.folderName}`,
   }));
 
+  const notarialRetentionDropdownOptions = intervalOptions.map((interval) => ({
+    value: interval.value,
+    label: interval.label.replace(/^Every\s+/i, ""),
+  }));
+
   const remoteDropdownOptions = remotes.map((remote) => ({
     value: remote.name,
     label: remote.name,
     description: getRemoteProviderDetails(remote),
+  }));
+
+  const notarialRestoreRemoteOptions = remotes
+    .filter((remote) => notarialSelectedRemoteNames.includes(remote.name))
+    .map((remote) => ({
+      value: remote.name,
+      label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
+    }));
+
+  const formatSnapshotTime = (value: string): string => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString();
+  };
+
+  const notarialSnapshotDropdownOptions = notarialSnapshots.map((snapshot) => ({
+    value: snapshot.id,
+    label: `${snapshot.shortId} (${formatSnapshotTime(snapshot.time)})`,
   }));
 
   const formatBytes = (bytes: number | null): string => {
@@ -1847,8 +2023,8 @@ const BackupTab = () => {
           )}
         </SettingsRow>
         <SettingsRow
-          label="Import from Remote"
-          description="Choose an account and backup source folder, then update database."
+          label="Restore from Remote"
+          description="Choose an account and backup source folder, then restore database."
         >
           <div className="w-full space-y-2">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
@@ -1886,14 +2062,14 @@ const BackupTab = () => {
                 }
                 className="btn btn-warning btn-sm"
               >
-                Import from Remote
+                Restore from Remote
               </button>
             </div>
           </div>
         </SettingsRow>
         <SettingsRow
-          label="Import from Local File"
-          description="Choose a backup file from this PC, then update database."
+          label="Restore from Local File"
+          description="Choose a backup file from this PC, then restore database."
         >
           <div className="w-full space-y-2">
             <input
@@ -1925,14 +2101,14 @@ const BackupTab = () => {
                 disabled={importingLocal || importingRemote || !localImportFile}
                 className="btn btn-warning btn-sm"
               >
-                Import Selected File
+                Restore Selected File
               </button>
             </div>
           </div>
         </SettingsRow>
         <div className="px-7 pb-5">
           <p className="text-xs text-warning">
-            Importing backup means updating database (dev.db) and might log out
+            Restoring backup means updating database (dev.db) and might log out
             the current user. Make sure the selected backup file is correct.
           </p>
         </div>
@@ -1940,7 +2116,7 @@ const BackupTab = () => {
 
       <SettingsCard
         title="Notarial Backups"
-        description="Sync Garage notarial files to selected destination accounts separately from database backups."
+        description="Create encrypted restic snapshots of Garage notarial files on selected destination accounts."
       >
         <SettingsRow
           label="Enable Notarial Backups"
@@ -1969,21 +2145,107 @@ const BackupTab = () => {
           )}
         </SettingsRow>
         <SettingsRow
-          label="Deleted Files Max Age (days)"
-          description="Retention window for deleted/replaced notarial files moved to backup archive folders."
+          label="Snapshot Retention"
+          description="Keep notarial snapshot history within this interval and prune older snapshots."
         >
-          <InputField
-            value={notarialDeletedFilesMaxAgeDays}
-            onChange={setNotarialDeletedFilesMaxAgeDays}
-            type="number"
-            placeholder="30"
+          <SelectField
+            value={notarialSnapshotRetentionInterval}
+            onChange={setNotarialSnapshotRetentionInterval}
+            options={
+              notarialRetentionDropdownOptions.length > 0
+                ? notarialRetentionDropdownOptions
+                : [{ value: "1mo", label: "1 month" }]
+            }
           />
+        </SettingsRow>
+        <SettingsRow
+          label="Restore Snapshot"
+          description="Select a notarial destination and snapshot to restore Garage notarial files."
+        >
+          {notarialRestoreRemoteOptions.length === 0 ? (
+            <p className="text-sm text-base-content/45">
+              Select at least one Notarial destination account first.
+            </p>
+          ) : (
+            <div className="w-full space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                <SelectField
+                  value={notarialRestoreRemoteName}
+                  onChange={setNotarialRestoreRemoteName}
+                  options={[
+                    {
+                      value: "",
+                      label: "Select notarial destination",
+                    },
+                    ...notarialRestoreRemoteOptions,
+                  ]}
+                />
+                <SelectField
+                  value={selectedNotarialSnapshotId}
+                  onChange={setSelectedNotarialSnapshotId}
+                  options={[
+                    {
+                      value: "",
+                      label: loadingNotarialSnapshots
+                        ? "Loading snapshots..."
+                        : notarialSnapshotDropdownOptions.length > 0
+                          ? "Select snapshot"
+                          : "No snapshots available",
+                    },
+                    ...notarialSnapshotDropdownOptions,
+                  ]}
+                  disabled={
+                    !notarialRestoreRemoteName || loadingNotarialSnapshots
+                  }
+                />
+              </div>
+
+              {notarialSnapshotsError && (
+                <p className="text-xs text-warning">{notarialSnapshotsError}</p>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadNotarialSnapshots(notarialRestoreRemoteName, {
+                      notifyOnSuccess: true,
+                      notifyOnError: true,
+                    })
+                  }
+                  disabled={
+                    !notarialRestoreRemoteName || loadingNotarialSnapshots
+                  }
+                  className="btn btn-ghost btn-sm"
+                >
+                  Refresh Snapshots
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRestoreNotarialSnapshot()}
+                  disabled={
+                    !notarialRestoreRemoteName ||
+                    !selectedNotarialSnapshotId ||
+                    loadingNotarialSnapshots ||
+                    restoringNotarialSnapshot ||
+                    importingRemote ||
+                    importingLocal ||
+                    runningBackup ||
+                    cancellingBackup
+                  }
+                  className="btn btn-warning btn-sm"
+                >
+                  Restore Notarial Snapshot
+                </button>
+              </div>
+            </div>
+          )}
         </SettingsRow>
         <div className="px-7 pb-5">
           <p className="text-xs text-base-content/45">
-            Notarial sync writes to each destination account using the backup
-            path plus /notarial, and keeps deleted/replaced files in
-            /notarial-deleted with retention cleanup.
+            Notarial backups use restic repositories at each destination account
+            under rtc-backups/notarial-restic. Restore any prior snapshot within
+            the configured retention interval.
           </p>
         </div>
       </SettingsCard>
@@ -2436,10 +2698,10 @@ const BackupTab = () => {
               <FiDatabase size={15} /> Backup Now
             </button>
           )}
-          {selectedRemoteNames.length === 0 && (
+          {!hasManualRunDestinations && (
             <p className="text-xs text-base-content/35 mt-2">
-              Select or create at least one destination account to enable manual
-              backup.
+              Select at least one active destination account (Cases or Notarial)
+              to enable manual backup.
             </p>
           )}
         </div>

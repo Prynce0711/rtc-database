@@ -224,7 +224,7 @@ async function getDefaultBackupConfig(): Promise<BackupConfig> {
     selectedIntervals: [...DEFAULT_SELECTED_INTERVALS],
     selectedRemoteNames: [],
     notarialSelectedRemoteNames: [],
-    notarialDeletedFilesMaxAgeDays: 30,
+    notarialSnapshotRetentionInterval: "1mo",
     remoteAccountIdentities: {},
     remoteBasePaths: {},
     remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
@@ -242,6 +242,35 @@ async function normalizeBackupConfig(
   const legacy = value as Partial<BackupConfig> & {
     intervalMinutes?: unknown;
     remoteName?: unknown;
+    notarialDeletedFilesMaxAgeDays?: unknown;
+    notarialSnapshotRetentionInterval?: unknown;
+  };
+
+  const normalizeNotarialSnapshotRetention = (): BackupIntervalKey => {
+    if (isBackupIntervalKey(legacy.notarialSnapshotRetentionInterval)) {
+      return legacy.notarialSnapshotRetentionInterval;
+    }
+
+    const legacyDays =
+      typeof legacy.notarialDeletedFilesMaxAgeDays === "number" &&
+      Number.isFinite(legacy.notarialDeletedFilesMaxAgeDays)
+        ? legacy.notarialDeletedFilesMaxAgeDays
+        : Number(legacy.notarialDeletedFilesMaxAgeDays);
+
+    if (Number.isFinite(legacyDays) && legacyDays > 0) {
+      if (legacyDays >= 365) {
+        return "1y";
+      }
+      if (legacyDays >= 30) {
+        return "1mo";
+      }
+      if (legacyDays >= 7) {
+        return "1w";
+      }
+      return "1d";
+    }
+
+    return defaults.notarialSnapshotRetentionInterval;
   };
 
   return {
@@ -268,12 +297,7 @@ async function normalizeBackupConfig(
       undefined,
       false,
     ),
-    notarialDeletedFilesMaxAgeDays:
-      typeof legacy.notarialDeletedFilesMaxAgeDays === "number" &&
-      Number.isFinite(legacy.notarialDeletedFilesMaxAgeDays) &&
-      legacy.notarialDeletedFilesMaxAgeDays > 0
-        ? Math.floor(legacy.notarialDeletedFilesMaxAgeDays)
-        : defaults.notarialDeletedFilesMaxAgeDays,
+    notarialSnapshotRetentionInterval: normalizeNotarialSnapshotRetention(),
     remoteAccountIdentities: normalizeRemoteAccountIdentities(
       value.remoteAccountIdentities,
     ),

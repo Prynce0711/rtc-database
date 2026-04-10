@@ -9,7 +9,9 @@ import {
   deleteBackupRemote,
   getBackupOverview,
   getBackupRemoteStorageUsage,
+  listNotarialSnapshots,
   reloginBackupRemote,
+  restoreNotarialSnapshot,
   runBackupNow,
   startBackupScheduler,
   updateBackupConfig,
@@ -21,6 +23,7 @@ import {
   type BackupProviderOption,
   type BackupRemote,
   type BackupRemoteStorageUsage,
+  type NotarialSnapshot,
 } from "@/app/lib/backup/backupScheduler";
 import {
   ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,
@@ -52,6 +55,11 @@ export interface BackupDashboardData {
 
 export type BackupOneDriveDriveOption = OneDriveDriveOption;
 export type BackupRemoteUsage = BackupRemoteStorageUsage;
+export type BackupNotarialSnapshot = NotarialSnapshot;
+
+const BACKUP_INTERVAL_VALUE_SET = new Set(
+  BACKUP_INTERVAL_OPTIONS.map((option) => option.value),
+);
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
@@ -60,7 +68,11 @@ const SaveBackupSchema = z.object({
   selectedIntervals: z.array(z.string()).default([]),
   selectedRemoteNames: z.array(z.string()).default([]),
   notarialSelectedRemoteNames: z.array(z.string()).default([]),
-  notarialDeletedFilesMaxAgeDays: z.number().int().min(1).max(3650),
+  notarialSnapshotRetentionInterval: z
+    .string()
+    .refine((value) => BACKUP_INTERVAL_VALUE_SET.has(value), {
+      message: "Invalid notarial snapshot retention interval",
+    }),
   remotePath: z.string(),
 });
 
@@ -96,6 +108,15 @@ const ListOneDriveDrivesSchema = z.object({
 
 const GetBackupRemoteStorageUsageSchema = z.object({
   remoteName: z.string().min(1),
+});
+
+const ListNotarialSnapshotsSchema = z.object({
+  remoteName: z.string().min(1),
+});
+
+const RestoreNotarialSnapshotSchema = z.object({
+  remoteName: z.string().min(1),
+  snapshotId: z.string().min(1),
 });
 
 async function getDashboardData(): Promise<BackupDashboardData> {
@@ -154,8 +175,8 @@ export async function saveBackupConfiguration(
       selectedIntervals: parsed.data.selectedIntervals,
       selectedRemoteNames: parsed.data.selectedRemoteNames,
       notarialSelectedRemoteNames: parsed.data.notarialSelectedRemoteNames,
-      notarialDeletedFilesMaxAgeDays:
-        parsed.data.notarialDeletedFilesMaxAgeDays,
+      notarialSnapshotRetentionInterval:
+        parsed.data.notarialSnapshotRetentionInterval,
       remotePath: parsed.data.remotePath,
     });
 
@@ -223,13 +244,13 @@ export async function importBackupFromRemoteAction(
       result: await getDashboardData(),
     };
   } catch (error) {
-    console.error("Error importing backup from remote:", error);
+    console.error("Error restoring backup from remote:", error);
     return {
       success: false,
       error:
         error instanceof Error
           ? error.message
-          : "Failed to import backup from remote",
+          : "Failed to restore backup from remote",
     };
   }
 }
@@ -262,13 +283,13 @@ export async function importBackupFromLocalFileAction(
       result: await getDashboardData(),
     };
   } catch (error) {
-    console.error("Error importing backup from local file:", error);
+    console.error("Error restoring backup from local file:", error);
     return {
       success: false,
       error:
         error instanceof Error
           ? error.message
-          : "Failed to import backup from local file",
+          : "Failed to restore backup from local file",
     };
   }
 }
@@ -558,6 +579,91 @@ export async function getBackupRemoteUsageAction(
         error instanceof Error
           ? error.message
           : "Failed to load backup remote usage",
+    };
+  }
+}
+
+export async function listNotarialSnapshotsAction(
+  data: Record<string, unknown>,
+): Promise<
+  ActionResult<{
+    remoteName: string;
+    snapshots: BackupNotarialSnapshot[];
+  }>
+> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = ListNotarialSnapshotsSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Invalid notarial snapshots payload",
+      };
+    }
+
+    await startBackupScheduler();
+
+    const normalizedRemoteName = parsed.data.remoteName.trim();
+    const snapshots = await listNotarialSnapshots(normalizedRemoteName);
+
+    return {
+      success: true,
+      result: {
+        remoteName: normalizedRemoteName,
+        snapshots,
+      },
+    };
+  } catch (error) {
+    console.error("Error listing notarial snapshots:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to list notarial snapshots",
+    };
+  }
+}
+
+export async function restoreNotarialSnapshotAction(
+  data: Record<string, unknown>,
+): Promise<ActionResult<BackupDashboardData>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const parsed = RestoreNotarialSnapshotSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Invalid notarial snapshot restore payload",
+      };
+    }
+
+    await startBackupScheduler();
+    await restoreNotarialSnapshot(
+      parsed.data.remoteName.trim(),
+      parsed.data.snapshotId.trim(),
+    );
+
+    return {
+      success: true,
+      result: await getDashboardData(),
+    };
+  } catch (error) {
+    console.error("Error restoring notarial snapshot:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to restore notarial snapshot",
     };
   }
 }
