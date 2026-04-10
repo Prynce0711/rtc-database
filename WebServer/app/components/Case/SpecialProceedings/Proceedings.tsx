@@ -571,8 +571,15 @@ const Proceedings: React.FC = () => {
             </div>
 
             <button
+              type="button"
               className={`btn btn-outline ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-              onClick={() => setFilterModalOpen((prev) => !prev)}
+              onClick={() => {
+                console.log(
+                  "SpecialProceedings Filter button clicked, current state:",
+                  filterModalOpen,
+                );
+                setFilterModalOpen((prev) => !prev);
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

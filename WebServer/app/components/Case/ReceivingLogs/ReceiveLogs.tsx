@@ -548,8 +548,15 @@ const ReceiveLogsPage: React.FC = () => {
               onChange={handleImportExcel}
             />
             <button
+              type="button"
               className="btn btn-outline flex items-center gap-2"
-              onClick={() => setFilterModalOpen((prev) => !prev)}
+              onClick={() => {
+                console.log(
+                  "ReceivingLogs Filter button clicked, current state:",
+                  filterModalOpen,
+                );
+                setFilterModalOpen((prev) => !prev);
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

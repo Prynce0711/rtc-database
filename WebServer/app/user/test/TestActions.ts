@@ -63,10 +63,19 @@ export async function deleteAllNotarial(): Promise<ActionResult<void>> {
     }
 
     for (const [fileId, key] of uniqueFiles) {
-      const [notarialCount, chatMessageCount] = await Promise.all([
+      const [notarialCountRaw, chatMessageCountRaw] = await Promise.all([
         prisma.notarial.count({ where: { fileId } }),
         prisma.chatMessage.count({ where: { fileId } }),
       ]);
+
+      const notarialCount =
+        typeof notarialCountRaw === "bigint"
+          ? Number(notarialCountRaw)
+          : notarialCountRaw;
+      const chatMessageCount =
+        typeof chatMessageCountRaw === "bigint"
+          ? Number(chatMessageCountRaw)
+          : chatMessageCountRaw;
 
       if (notarialCount === 0 && chatMessageCount === 0) {
         await deleteGarageFile(key);

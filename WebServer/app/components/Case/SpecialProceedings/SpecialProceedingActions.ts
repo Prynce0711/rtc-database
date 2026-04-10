@@ -56,7 +56,7 @@ export async function getSpecialProceedings(
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
-    const [cases, total] = await prisma.$transaction([
+    const [cases, totalRaw] = await prisma.$transaction([
       prisma.case.findMany({
         where: find.where,
         orderBy: find.orderBy,
@@ -84,6 +84,8 @@ export async function getSpecialProceedings(
         ...c.specialProceeding,
         ...c,
       }));
+
+    const total = typeof totalRaw === "bigint" ? Number(totalRaw) : totalRaw;
 
     return {
       success: true,
@@ -113,7 +115,7 @@ export async function getSpecialProceedingStats(
       options,
     );
 
-    const [totalCases, thisMonth, distinctNatures, distinctBranches] =
+    const [totalCasesRaw, thisMonthRaw, distinctNatures, distinctBranches] =
       await prisma.$transaction([
         prisma.case.count({ where: find.where }),
         prisma.case.count({
@@ -155,6 +157,11 @@ export async function getSpecialProceedingStats(
           distinct: ["raffledTo"],
         }),
       ]);
+
+    const totalCases =
+      typeof totalCasesRaw === "bigint" ? Number(totalCasesRaw) : totalCasesRaw;
+    const thisMonth =
+      typeof thisMonthRaw === "bigint" ? Number(thisMonthRaw) : thisMonthRaw;
 
     return {
       success: true,
