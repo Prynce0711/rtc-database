@@ -77,9 +77,9 @@ function Table<T extends Record<string, unknown>>({
   return (
     <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
       <div className="overflow-x-auto overflow-y-visible">
-        <table className="table table-compact uppercase table-zebra w-full text-center">
-          <thead className="text-sm bg-base-300 rounded-t-lg">
-            <tr>
+        <table className="table table-compact table-sm uppercase w-full text-center">
+          <thead className="text-sm">
+            <tr className="bg-base-200/50 border-b border-base-200">
               {headers.map((h) => {
                 const alignClass =
                   h.align === "center"
@@ -94,7 +94,7 @@ function Table<T extends Record<string, unknown>>({
                 return (
                   <th
                     key={h.key}
-                    className={`${h.className ?? ""} ${alignClass} ${h.sortable ? "cursor-pointer select-none hover:bg-base-200 transition-colors" : ""}`}
+                    className={`py-4 px-4 ${h.className ?? ""} ${alignClass} text-sm font-bold uppercase tracking-wider text-base-content/50 ${h.sortable ? "cursor-pointer select-none hover:bg-base-200/50 transition-colors" : ""}`}
                     onClick={() => {
                       if (!h.sortable || !onSort) return;
                       const key = h.sortKey ?? (h.key as keyof T);
@@ -124,15 +124,13 @@ function Table<T extends Record<string, unknown>>({
           <tbody className="text-sm [&_td]:py-2 [&_td]:text-sm">
             {data.length === 0 ? (
               <tr>
-                <td colSpan={headers.length}>
-                  <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-                    <div className="flex items-center justify-center mb-4">
-                      <FiInbox className="w-15 h-15 opacity-50" />
-                    </div>
-                    <p className="text-lg font-semibold text-base-content/50">
+                <td colSpan={headers.length} className="py-16">
+                  <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
+                    <FiInbox className="w-16 h-16 opacity-20 mb-4" />
+                    <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
                       No records found
                     </p>
-                    <p className="text-sm mt-1 text-base-content/35">
+                    <p className="text-sm mt-2 text-base-content/35">
                       There are no entries to display yet.
                     </p>
                   </div>

@@ -49,11 +49,14 @@ const NotarialRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm"
       onClick={() => onRowClick(record)}
     >
       {onToggleSelect && (
-        <td className="text-center" onClick={(e) => e.stopPropagation()}>
+        <td
+          className="text-center px-4 py-3.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input
             type="checkbox"
             className="checkbox checkbox-sm"
@@ -63,7 +66,10 @@ const NotarialRow = ({
           />
         </td>
       )}
-      <td onClick={(e) => e.stopPropagation()} className="text-center">
+      <td
+        onClick={(e) => e.stopPropagation()}
+        className="text-center px-4 py-3.5"
+      >
         <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
           <li>
             <button

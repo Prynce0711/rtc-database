@@ -58,6 +58,11 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Debug log
+  useEffect(() => {
+    console.log("FilterDropdown isOpen changed:", isOpen);
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       const { filters: initialFilters, exactMatchMap: initialExactMatchMap } =

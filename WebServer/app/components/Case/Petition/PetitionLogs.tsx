@@ -373,45 +373,119 @@ const ReceiveLogsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-base-100">
-      <main className="w-full">
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Petition Tables
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Track all petition entries and case filings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
+    <div className="space-y-6 sm:space-y-8">
+      {/* Header Card - Statistics Style */}
+      <header className="card bg-base-100 shadow-xl">
+        <div className="card-body p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Left Section */}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                <span>Case Management</span>
+                <span className="text-base-content/30">/</span>
+                <span className="text-base-content/70 font-medium">
+                  Petition Cases
+                </span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
+                Petition Cases
+              </h2>
+              <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
+                <FiFileText className="shrink-0 w-4 h-4" />
+                <span>Track all petition entries and case filings</span>
+              </p>
+            </div>
+
+            {/* Right Section - Quick Actions */}
+            {isAdminOrAtty && (
+              <div className="flex flex-col items-end gap-3">
+                <div className="flex items-center gap-2 flex-nowrap">
+                  {/* Import button */}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    id="petition-import-input"
+                    onChange={handleImportExcel}
+                  />
+                  <button
+                    className="btn btn-outline btn-md gap-2"
+                    onClick={() => {
+                      const el = document.getElementById(
+                        "petition-import-input",
+                      ) as HTMLInputElement | null;
+                      el?.click();
+                    }}
+                  >
+                    <FiUpload className="h-5 w-5" />
+                    Import
+                  </button>
+
+                  <button
+                    className="btn btn-outline btn-info btn-md gap-2"
+                    onClick={async () => {
+                      try {
+                        const { exportPetitionsExcel } =
+                          await import("./ExcelActions");
+                        const result = await exportPetitionsExcel();
+                        if (!result.success) {
+                          statusPopup.showError(
+                            result.error || "Export failed",
+                          );
+                          return;
+                        }
+                        const link = document.createElement("a");
+                        link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
+                        link.download = result.result.fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        statusPopup.showSuccess("Exported successfully");
+                      } catch (err) {
+                        statusPopup.showError(
+                          err instanceof Error ? err.message : "Export failed",
+                        );
+                      }
+                    }}
+                  >
+                    <FiDownload className="h-5 w-5" />
+                    Export
+                  </button>
+
+                  <button
+                    className="btn btn-success btn-md gap-2"
+                    onClick={() => router.push("/user/cases/petition/add")}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Add Entry
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </header>
 
-        {/* Search + Filter + Add */}
-        <div className="relative mb-6">
-          <div className="flex gap-4">
+      {/* Toolbar - Search & Filter */}
+      <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
               placeholder="Search case number..."
-              className="input input-bordered input-lg w-full pl-12 text-base"
+              className="input input-bordered w-full pl-11"
               value={appliedFilters?.caseNumber || ""}
               onChange={(e) =>
                 setAppliedFilters((prev) => ({
@@ -420,289 +494,244 @@ const ReceiveLogsPage: React.FC = () => {
                 }))
               }
             />
-            <button
-              className="btn btn-outline flex items-center gap-2"
-              onClick={() => setFilterModalOpen((prev) => !prev)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Filter
-            </button>
-            {isAdminOrAtty && (
-              <>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  id="petition-import-input"
-                  onChange={handleImportExcel}
-                />
-
-                <button
-                  className="btn btn-outline"
-                  onClick={() => {
-                    const el = document.getElementById(
-                      "petition-import-input",
-                    ) as HTMLInputElement | null;
-                    el?.click();
-                  }}
-                >
-                  {" "}
-                  <FiUpload className="h-5 w-5" />
-                  Import Excel
-                </button>
-
-                <button
-                  className="btn btn-outline"
-                  onClick={async () => {
-                    try {
-                      const { exportPetitionsExcel } =
-                        await import("./ExcelActions");
-                      const result = await exportPetitionsExcel();
-                      if (!result.success) {
-                        statusPopup.showError(result.error || "Export failed");
-                        return;
-                      }
-                      const link = document.createElement("a");
-                      link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
-                      link.download = result.result.fileName;
-                      document.body.appendChild(link);
-                      link.click();
-                      link.remove();
-                      statusPopup.showSuccess("Exported successfully");
-                    } catch (err) {
-                      statusPopup.showError(
-                        err instanceof Error ? err.message : "Export failed",
-                      );
-                    }
-                  }}
-                >
-                  {" "}
-                  <FiDownload className="h-5 w-5" />
-                  Export Excel
-                </button>
-
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    router.push("/user/cases/petition/add");
-                  }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Add Entry
-                </button>
-              </>
-            )}
           </div>
 
-          <FilterDropdown
-            isOpen={filterModalOpen}
-            onClose={() => setFilterModalOpen(false)}
-            options={petitionFilterOptions}
-            onApply={handleApplyFilters}
-            searchValue={appliedFilters}
-            getSuggestions={getSuggestions}
-          />
+          <button
+            type="button"
+            className="btn btn-md btn-outline gap-2 whitespace-nowrap"
+            onClick={() => {
+              console.log(
+                "Filter button clicked, current state:",
+                filterModalOpen,
+              );
+              setFilterModalOpen((prev) => !prev);
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Filter
+          </button>
+
+          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+            {filteredAndSorted.length} record
+            {filteredAndSorted.length !== 1 && "s"}
+          </span>
         </div>
 
-        {isAdminOrAtty && (
-          <AnimatePresence>
-            {selectedLogIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
-                    {selectedLogIds.length} petition
-                    {selectedLogIds.length > 1 ? "s" : ""} selected
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/petition/edit?ids=${selectedLogIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedLogs}
-                      disabled={deletingSelected}
-                    >
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedLogIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
+        <FilterDropdown
+          isOpen={filterModalOpen}
+          onClose={() => setFilterModalOpen(false)}
+          options={petitionFilterOptions}
+          onApply={handleApplyFilters}
+          searchValue={appliedFilters}
+          getSuggestions={getSuggestions}
+        />
+      </div>
 
-        {/* Stats (KPI cards) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "Total Entries",
-              value: (stats.total ?? 0).toLocaleString(),
-              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
-              icon: FiBarChart2,
-              delay: 0,
-            },
-            {
-              label: "Today",
-              value: (stats.today ?? 0).toLocaleString(),
-              subtitle: `Today`,
-              icon: FiFileText,
-              delay: 100,
-            },
-            {
-              label: "This Month",
-              value: (stats.thisMonth ?? 0).toLocaleString(),
-              subtitle: `Last 30 days`,
-              icon: FiLock,
-              delay: 200,
-            },
-            {
-              label: "Branches",
-              value: (stats.branches ?? 0).toLocaleString(),
-              subtitle: `Distinct branches`,
-              icon: FiUsers,
-              delay: 300,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className={`transform hover:scale-105 card surface-card-hover group`}
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
-              >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                    <Icon className="h-full w-full" />
-                  </div>
-                  <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
-                    </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
-                      {card.subtitle}
-                    </p>
-                  </div>
+      {isAdminOrAtty && (
+        <AnimatePresence>
+          {selectedLogIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="mb-4 overflow-hidden"
+            >
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-primary">
+                  {selectedLogIds.length} petition
+                  {selectedLogIds.length > 1 ? "s" : ""} selected
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() =>
+                      router.push(
+                        `/user/cases/petition/edit?ids=${selectedLogIds.join(",")}`,
+                      )
+                    }
+                  >
+                    Edit Selected
+                  </button>
+                  <button
+                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
+                    onClick={handleDeleteSelectedLogs}
+                    disabled={deletingSelected}
+                  >
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedLogIds([])}
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
-        {/* Table */}
-        <div className="bg-base-100 rounded-lg shadow">
-          <Table<PetitionCaseData>
-            headers={[
-              ...(isAdminOrAtty
-                ? [
-                    {
-                      key: "select",
-                      label: "Select",
-                      align: "center" as const,
-                    },
-                    {
-                      key: "actions",
-                      label: "Actions",
-                      align: "center" as const,
-                    },
-                  ]
-                : []),
-              { key: "caseNumber", label: "Case Number", sortable: true },
-              { key: "raffledTo", label: "Raffled to Branch", sortable: true },
-              { key: "date", label: "Date Filed", sortable: true },
-              { key: "petitioner", label: "Petitioners", sortable: true },
-              { key: "nature", label: "Nature", sortable: true },
-            ]}
-            data={paginatedLogs}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-            showPagination={false}
-            renderRow={(log) => (
-              <ReceiveRow
-                key={log.id}
-                log={log}
-                onEdit={(l) =>
-                  router.push(`/user/cases/petition/edit?id=${l.id}`)
-                }
-                onDelete={(l) => handleDeleteLog(l.id)}
-                isSelected={selectedLogIds.includes(log.id)}
-                onToggleSelect={(id) =>
-                  setSelectedLogIds((prev) =>
-                    prev.includes(id)
-                      ? prev.filter((entryId) => entryId !== id)
-                      : [...prev, id],
-                  )
-                }
-              />
-            )}
-          />
-        </div>
+      {/* Stats (KPI cards) - Statistics Style */}
+      <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {
+            label: "Total Entries",
+            value: stats.total ?? 0,
+            subtitle: `All time records`,
+            icon: FiBarChart2,
+            delay: 0,
+            color: "primary",
+          },
+          {
+            label: "Today",
+            value: stats.today ?? 0,
+            subtitle: `Filed today`,
+            icon: FiFileText,
+            delay: 100,
+            color: "info",
+          },
+          {
+            label: "This Month",
+            value: stats.thisMonth ?? 0,
+            subtitle: `Last 30 days`,
+            icon: FiLock,
+            delay: 200,
+            color: "success",
+          },
+          {
+            label: "Branches",
+            value: stats.branches ?? 0,
+            subtitle: `Distinct branches`,
+            icon: FiUsers,
+            delay: 300,
+            color: "warning",
+          },
+        ].map((card, idx) => {
+          const Icon = card.icon as React.ComponentType<
+            React.SVGProps<SVGSVGElement>
+          >;
+          const isGrandTotal = idx === 0;
+          return (
+            <div
+              key={idx}
+              className={`transform hover:scale-105 card shadow-lg hover:shadow-xl transition-all group ${
+                isGrandTotal
+                  ? "bg-primary/10 ring-1 ring-primary/20"
+                  : "bg-base-100 hover:ring-2 hover:ring-base-300"
+              }`}
+              style={{
+                transitionDelay: `${card.delay}ms`,
+                transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
+              }}
+            >
+              <div
+                className="card-body relative overflow-hidden"
+                style={{ padding: "1.5rem" }}
+              >
+                {/* Watermark icon */}
+                <div
+                  className={`absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110 ${
+                    isGrandTotal ? "text-primary" : ""
+                  }`}
+                >
+                  <Icon className="h-full w-full" />
+                </div>
 
-        {/* Pagination */}
-        <div className="mt-4 flex justify-end">
-          <Pagination
-            pageCount={pageCount}
-            currentPage={currentPage}
-            onPageChange={(page) => {
-              setCurrentPage(page);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-          />
-        </div>
-      </main>
+                {/* Content */}
+                <div className="relative text-center">
+                  <p className="font-extrabold uppercase text-sm tracking-wide text-base-content mb-3">
+                    {card.label}
+                  </p>
+                  <p
+                    className={`text-4xl sm:text-5xl font-black mb-2 ${
+                      isGrandTotal ? "text-primary" : "text-base-content"
+                    }`}
+                  >
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="text-sm sm:text-base font-semibold text-base-content/60">
+                    {card.subtitle}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* Table */}
+      <div className="bg-base-100 rounded-lg shadow">
+        <Table<PetitionCaseData>
+          headers={[
+            ...(isAdminOrAtty
+              ? [
+                  {
+                    key: "select",
+                    label: "Select",
+                    align: "center" as const,
+                  },
+                  {
+                    key: "actions",
+                    label: "Actions",
+                    align: "center" as const,
+                  },
+                ]
+              : []),
+            { key: "caseNumber", label: "Case Number", sortable: true },
+            { key: "raffledTo", label: "Raffled to Branch", sortable: true },
+            { key: "date", label: "Date Filed", sortable: true },
+            { key: "petitioner", label: "Petitioners", sortable: true },
+            { key: "nature", label: "Nature", sortable: true },
+          ]}
+          data={paginatedLogs}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          showPagination={false}
+          renderRow={(log) => (
+            <ReceiveRow
+              key={log.id}
+              log={log}
+              onEdit={(l) =>
+                router.push(`/user/cases/petition/edit?id=${l.id}`)
+              }
+              onDelete={(l) => handleDeleteLog(l.id)}
+              isSelected={selectedLogIds.includes(log.id)}
+              onToggleSelect={(id) =>
+                setSelectedLogIds((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((entryId) => entryId !== id)
+                    : [...prev, id],
+                )
+              }
+            />
+          )}
+        />
+      </div>
+
+      {/* Pagination */}
+      <div className="mt-4 flex justify-end">
+        <Pagination
+          pageCount={pageCount}
+          currentPage={currentPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      </div>
     </div>
   );
 };
