@@ -32,7 +32,14 @@ export interface SumAddReportProps {
   initialCourtType?: SummaryCourtType;
   initialData?: SummaryRow[];
   onBack: () => void;
-  onSave: (rows: SummaryRow[]) => void | Promise<void>;
+  onSave: (
+    rows: SummaryRow[],
+    context: {
+      month: string;
+      year: string;
+      courtType: SummaryCourtType;
+    },
+  ) => void | Promise<void>;
 }
 
 const CURRENT_DATE = new Date();
@@ -525,7 +532,11 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
     setSaveError(null);
     setSaving(true);
     try {
-      await onSave(payload);
+      await onSave(payload, {
+        month: selectedMonthFilter,
+        year: effectiveYearFilter,
+        courtType: selectedCourtType,
+      });
       onBack();
     } catch (error) {
       console.error("Summary save failed:", error);

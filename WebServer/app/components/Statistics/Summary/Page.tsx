@@ -2,25 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-    FiCalendar,
-    FiDownload,
-    FiPlus,
-    FiSearch,
-    FiTrash2,
-    FiX,
+  FiCalendar,
+  FiDownload,
+  FiPlus,
+  FiSearch,
+  FiTrash2,
+  FiX,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import type { SummaryRow } from "./Schema";
 import SumAddReport from "./SumAddReport";
 import {
-    deleteSummaryStatistic,
-    getSummaryStatistics,
-    upsertSummaryStatistics,
+  deleteSummaryStatistic,
+  getSummaryStatistics,
+  upsertSummaryStatistics,
 } from "./SummaryActions";
 import {
-    SUMMARY_COURT_TYPES,
-    SUMMARY_MONTH_OPTIONS,
-    type SummaryCourtType,
+  SUMMARY_COURT_TYPES,
+  SUMMARY_MONTH_OPTIONS,
+  type SummaryCourtType,
 } from "./SummaryConstants";
 
 type SelectionMode = "delete" | null;
@@ -91,13 +91,13 @@ export default function SummaryPage() {
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [summaryData, effectiveYear]);
 
-  const reloadData = async () => {
+  const reloadData = async (
+    month: string = selectedMonth,
+    year: string = effectiveYear,
+  ) => {
     setLoading(true);
     setErrorMessage(null);
-    const result = await getSummaryStatistics(
-      selectedMonth,
-      Number(effectiveYear),
-    );
+    const result = await getSummaryStatistics(month, Number(year));
     if (result.success) {
       setSummaryData(result.result);
     } else {
@@ -236,14 +236,21 @@ export default function SummaryPage() {
         onBack={() => {
           setShowAddPage(false);
         }}
-        onSave={async (rows) => {
+        onSave={async (rows, context) => {
           const result = await upsertSummaryStatistics(rows);
           if (!result.success) {
             throw new Error(
               result.error ?? "Failed to save summary statistics",
             );
           }
-          await reloadData();
+
+          setSelectedMonth(context.month);
+          setSelectedYear(context.year);
+          setActiveCourtType(context.courtType);
+          setSelectionMode(null);
+          setSelectedIds(new Set());
+
+          await reloadData(context.month, context.year);
         }}
       />
     );
