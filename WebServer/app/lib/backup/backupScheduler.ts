@@ -153,6 +153,11 @@ const RCLONE_EXECUTABLE_NAME_FOR_RESTIC =
 const RCLONE_EXECUTABLE_DIR_FOR_RESTIC = path.dirname(
   RCLONE_EXECUTABLE_FOR_RESTIC,
 );
+const NOTARIAL_PRIMARY_REPOSITORY_BUCKET =
+  process.env.NOTARIAL_RESTIC_PRIMARY_BUCKET?.trim() || "backups";
+const NOTARIAL_PRIMARY_REPOSITORY_FOLDER =
+  process.env.NOTARIAL_RESTIC_PRIMARY_FOLDER?.trim() || "notarial";
+const NOTARIAL_RCLONE_MOUNT_READY_TIMEOUT_MS = 30_000;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -765,6 +770,204 @@ async function ensureResticRepositoryInitialized(
   });
 }
 
+function parseRcloneLsfEntries(output: string): string[] {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/[\\/]+$/, ""))
+    .filter((line) => !!line);
+}
+
+function normalizeDirectoryEntryForComparison(entry: string): string {
+  return entry
+    .trim()
+    .replace(/[\\/]+$/, "")
+    .toLowerCase();
+}
+
+async function waitForNotarialSourceMountReady(
+  notarialSource: string,
+  mountPath: string,
+  mountProcess: ChildProcess,
+  getStderrTail: () => string,
+): Promise<void> {
+  const sourceListingOutput = await runRcloneCommand(
+    ["lsf", notarialSource, "--max-depth", "1"],
+    {},
+    { silent: true, timeoutMs: 20_000 },
+  );
+
+  const expectedEntries = parseRcloneLsfEntries(sourceListingOutput);
+  const expectedEntrySet = new Set(
+    expectedEntries.map((entry) => normalizeDirectoryEntryForComparison(entry)),
+  );
+
+  const emptyRemoteReadyAt = Date.now() + 1_200;
+  const deadline = Date.now() + NOTARIAL_RCLONE_MOUNT_READY_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    if (cancelBackupRequested) {
+      throw new Error("Backup cancelled by user.");
+    }
+
+    if (mountProcess.exitCode !== null) {
+      const stderrTail = getStderrTail();
+      throw new Error(
+        `rclone mount exited before becoming ready (exit code ${String(mountProcess.exitCode)}).${stderrTail ? ` ${stderrTail}` : ""}`,
+      );
+    }
+
+    try {
+      const mountedEntries = await readdir(mountPath);
+
+      if (expectedEntrySet.size === 0) {
+        if (Date.now() >= emptyRemoteReadyAt) {
+          return;
+        }
+      } else {
+        const mountedEntrySet = new Set(
+          mountedEntries.map((entry) =>
+            normalizeDirectoryEntryForComparison(entry),
+          ),
+        );
+
+        const hasExpectedEntry = Array.from(expectedEntrySet).some((entry) =>
+          mountedEntrySet.has(entry),
+        );
+
+        if (hasExpectedEntry) {
+          return;
+        }
+      }
+    } catch {
+      // Keep waiting while mount initializes.
+    }
+
+    await sleep(300);
+  }
+
+  throw new Error(`Timed out waiting for rclone mount at ${mountPath}.`);
+}
+
+async function startNotarialSourceMount(
+  notarialSource: string,
+  mountPath: string,
+): Promise<{
+  mountProcess: ChildProcess;
+  getStderrTail: () => string;
+}> {
+  await rm(mountPath, { recursive: true, force: true });
+  await mkdir(mountPath, { recursive: true });
+
+  const mountArgs = [
+    "mount",
+    notarialSource,
+    mountPath,
+    "--config",
+    RCLONE_CONFIG_PATH,
+    "--read-only",
+    "--vfs-cache-mode",
+    "off",
+    "--dir-cache-time",
+    "1m",
+    "--poll-interval",
+    "30s",
+    "--attr-timeout",
+    "1s",
+  ];
+
+  appendBackupLog(
+    "info",
+    `Mounting notarial source ${notarialSource} at ${mountPath} for restic snapshot.`,
+  );
+
+  const mountProcess = spawn(RCLONE_EXECUTABLE_FOR_RESTIC, mountArgs, {
+    windowsHide: true,
+    env: {
+      ...process.env,
+      RCLONE_CONFIG: RCLONE_CONFIG_PATH,
+    },
+  });
+
+  activeBackupProcess = mountProcess;
+
+  let stderrTail = "";
+
+  mountProcess.stderr?.on("data", (chunk) => {
+    const text = Buffer.from(chunk).toString("utf8");
+    stderrTail = `${stderrTail}${text}`.slice(-4_000);
+  });
+
+  mountProcess.on("error", (error) => {
+    stderrTail = `${stderrTail}\n${formatBackupError(error)}`.slice(-4_000);
+  });
+
+  await waitForNotarialSourceMountReady(
+    notarialSource,
+    mountPath,
+    mountProcess,
+    () => stderrTail.trim(),
+  );
+
+  appendBackupLog("info", `Notarial source mount is ready at ${mountPath}.`);
+
+  return {
+    mountProcess,
+    getStderrTail: () => stderrTail.trim(),
+  };
+}
+
+async function stopNotarialSourceMount(
+  mountProcess: ChildProcess,
+  mountPath: string,
+): Promise<void> {
+  if (mountProcess.exitCode === null) {
+    await new Promise<void>((resolve) => {
+      let settled = false;
+
+      const finalize = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve();
+      };
+
+      const timeoutHandle = setTimeout(() => {
+        try {
+          mountProcess.kill();
+        } catch {
+          // Ignore and resolve below.
+        }
+
+        finalize();
+      }, 5_000);
+
+      mountProcess.once("close", () => {
+        clearTimeout(timeoutHandle);
+        finalize();
+      });
+
+      try {
+        mountProcess.kill();
+      } catch {
+        clearTimeout(timeoutHandle);
+        finalize();
+      }
+    });
+  }
+
+  if (activeBackupProcess === mountProcess) {
+    activeBackupProcess = null;
+  }
+
+  try {
+    await rm(mountPath, { recursive: true, force: true });
+  } catch {
+    // Ignore cleanup issues for mount path.
+  }
+}
+
 function getRemoteBasePath(config: BackupConfig, remoteName: string): string {
   const normalizedName = normalizeRemoteName(remoteName);
   if (!normalizedName) {
@@ -1158,11 +1361,81 @@ async function runBackup(
         notarialRemoteConfig?.options.endpoint,
       );
       const resticEnv = buildResticCommandEnv();
+      const primaryRepositoryRelativePath = joinRemotePath(
+        NOTARIAL_PRIMARY_REPOSITORY_BUCKET,
+        NOTARIAL_PRIMARY_REPOSITORY_FOLDER,
+      );
 
-      await mkdir(NOTARIAL_RESTIC_SOURCE_CACHE_PATH, { recursive: true });
+      if (!primaryRepositoryRelativePath) {
+        throw new Error(
+          "Primary notarial restic repository path is empty. Configure NOTARIAL_RESTIC_PRIMARY_BUCKET and NOTARIAL_RESTIC_PRIMARY_FOLDER.",
+        );
+      }
+
+      const primaryRepositoryResticDestination =
+        buildResticRepositoryDestination(
+          NOTARIAL_REMOTE_NAME,
+          primaryRepositoryRelativePath,
+        );
+      const primaryRepositoryRcloneSource = buildRcloneDestination(
+        NOTARIAL_REMOTE_NAME,
+        primaryRepositoryRelativePath,
+      );
+
       await mkdir(NOTARIAL_RESTIC_CACHE_PATH, { recursive: true });
 
-      const repositoryDestinationByRemote = new Map<string, string>();
+      const mountedNotarialSource = await startNotarialSourceMount(
+        notarialSource,
+        NOTARIAL_RESTIC_SOURCE_CACHE_PATH,
+      );
+
+      try {
+        await ensureResticRepositoryInitialized(
+          primaryRepositoryResticDestination,
+          resticEnv,
+        );
+
+        appendBackupLog(
+          "info",
+          `Creating notarial restic snapshot on primary repository ${primaryRepositoryResticDestination}.`,
+        );
+        await runResticCommand(
+          [
+            "-r",
+            primaryRepositoryResticDestination,
+            "backup",
+            NOTARIAL_RESTIC_SOURCE_CACHE_PATH,
+          ],
+          {
+            trackAsActiveBackup: true,
+            env: resticEnv,
+          },
+        );
+
+        appendBackupLog(
+          "info",
+          `Applying restic retention (${retentionWithinArg}) on primary repository ${primaryRepositoryResticDestination}.`,
+        );
+        await runResticCommand(
+          [
+            "-r",
+            primaryRepositoryResticDestination,
+            "forget",
+            "--keep-within",
+            retentionWithinArg,
+            "--prune",
+          ],
+          {
+            trackAsActiveBackup: true,
+            env: resticEnv,
+          },
+        );
+      } finally {
+        await stopNotarialSourceMount(
+          mountedNotarialSource.mountProcess,
+          NOTARIAL_RESTIC_SOURCE_CACHE_PATH,
+        );
+      }
 
       for (const remoteName of activeNotarialSelectedRemoteNames) {
         const remoteBasePath = getRemoteBasePath(current, remoteName);
@@ -1181,89 +1454,52 @@ async function runBackup(
           targetBucket === garageBucket
         ) {
           throw new Error(
-            `Notarial destination "${remoteName}" points to the same Garage endpoint and bucket as the notarial source (${garageBucket}), which would cause a sync loop. Choose a different destination account or bucket for notarial backups.`,
+            `Notarial destination "${remoteName}" points to the same Garage endpoint and source bucket (${garageBucket}), which can cause recursive backup content. Use a different destination bucket/account for notarial repository replication.`,
           );
         }
 
-        const resticRepositoryRelativePath = joinRemotePath(
+        const destinationRepositoryRelativePath = joinRemotePath(
           remoteBasePath,
           current.remotePath,
           "notarial-restic",
         );
-        repositoryDestinationByRemote.set(
+        const destinationRepository = buildRcloneDestination(
           remoteName,
-          buildResticRepositoryDestination(
-            remoteName,
-            resticRepositoryRelativePath,
-          ),
+          destinationRepositoryRelativePath,
         );
-      }
 
-      appendBackupLog(
-        "info",
-        `Syncing notarial source ${notarialSource} to local restic cache ${NOTARIAL_RESTIC_SOURCE_CACHE_PATH}.`,
-      );
-      await runRcloneCommand(
-        ["sync", notarialSource, NOTARIAL_RESTIC_SOURCE_CACHE_PATH],
-        {
-          "check-first": true,
-        },
-        {
-          trackAsActiveBackup: true,
-        },
-      );
+        const sameAsPrimaryRepository =
+          isS3Target &&
+          !!notarialEndpoint &&
+          notarialEndpoint === targetEndpoint &&
+          joinRemotePath(destinationRepositoryRelativePath) ===
+            joinRemotePath(primaryRepositoryRelativePath);
 
-      for (const remoteName of activeNotarialSelectedRemoteNames) {
-        const repositoryDestination =
-          repositoryDestinationByRemote.get(remoteName);
-        if (!repositoryDestination) {
+        if (sameAsPrimaryRepository) {
+          appendBackupLog(
+            "warn",
+            `Skipping repository replication for ${remoteName} because it points to the primary notarial repository path (${destinationRepository}).`,
+          );
           continue;
         }
 
-        await ensureResticRepositoryInitialized(
-          repositoryDestination,
-          resticEnv,
-        );
-
         appendBackupLog(
           "info",
-          `Creating restic snapshot for notarial files on ${repositoryDestination}.`,
+          `Replicating primary notarial repository ${primaryRepositoryRcloneSource} to ${destinationRepository}.`,
         );
-        await runResticCommand(
-          [
-            "-r",
-            repositoryDestination,
-            "backup",
-            NOTARIAL_RESTIC_SOURCE_CACHE_PATH,
-          ],
+        await runRcloneCommand(
+          ["sync", primaryRepositoryRcloneSource, destinationRepository],
+          {
+            "check-first": true,
+          },
           {
             trackAsActiveBackup: true,
-            env: resticEnv,
           },
         );
 
         appendBackupLog(
           "info",
-          `Applying restic retention (${retentionWithinArg}) on ${repositoryDestination}.`,
-        );
-        await runResticCommand(
-          [
-            "-r",
-            repositoryDestination,
-            "forget",
-            "--keep-within",
-            retentionWithinArg,
-            "--prune",
-          ],
-          {
-            trackAsActiveBackup: true,
-            env: resticEnv,
-          },
-        );
-
-        appendBackupLog(
-          "info",
-          `Completed notarial restic backup to remote ${remoteName}.`,
+          `Completed notarial repository replication to remote ${remoteName}.`,
         );
       }
     }
