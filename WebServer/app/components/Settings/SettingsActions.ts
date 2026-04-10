@@ -1,6 +1,8 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { syncNotarialRemote } from "@/app/lib/backup/backupScheduler";
+import { getInfo, type GarageInfo } from "@/app/lib/garage";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import ActionResult from "../ActionResult";
@@ -89,9 +91,41 @@ export async function updateSystemSettings(
     });
 
     const normalized = normalizeSettingsRecord(updated);
+
+    // Sync notarial remote with Garage settings (fire-and-forget)
+    syncNotarialRemote().catch((error) => {
+      console.error(
+        "Failed to sync notarial remote after settings update:",
+        error,
+      );
+    });
+
     return { success: true, result: normalized };
   } catch (error) {
     console.error("Error updating system settings:", error);
     return { success: false, error: "Failed to update system settings" };
+  }
+}
+
+export async function getGarageInfo(): Promise<ActionResult<GarageInfo>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    return {
+      success: true,
+      result: await getInfo(),
+    };
+  } catch (error) {
+    console.error("Error fetching Garage info:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch Garage metrics",
+    };
   }
 }

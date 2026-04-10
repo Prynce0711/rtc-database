@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
 import type { ChildProcess } from "node:child_process";
 import { execFile } from "node:child_process";
 import { access } from "node:fs/promises";
@@ -30,6 +31,7 @@ import {
   MANUAL_BACKUP_FOLDER,
   MAX_BACKUP_LOG_ENTRIES,
   MAX_TIMER_MS,
+  NOTARIAL_REMOTE_NAME,
   OAUTH_ACCOUNT_PROVIDERS,
   ONEDRIVE_DRIVE_SELECTION_SOURCE_OPTION_KEY,
   type BackupImportSourceKey,
@@ -1202,6 +1204,74 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
   }
 }
 
+/**
+ * Synchronize the notarial remote with Garage system settings.
+ * Creates or updates the notarial S3 remote based on current Garage configuration.
+ * Called automatically when system settings are loaded/updated.
+ */
+export async function syncNotarialRemote(): Promise<void> {
+  try {
+    await ensureBackupArtifacts();
+
+    const settingsResult = await getSystemSettings();
+    if (!settingsResult.success) {
+      // Silently skip if we can't load settings (settings not yet configured)
+      return;
+    }
+
+    const settings = settingsResult.result;
+
+    // Check if Garage is fully configured
+    if (
+      !settings.garageHost ||
+      !settings.garageAccessKey ||
+      !settings.garageSecretKey ||
+      !settings.garageBucket
+    ) {
+      // Garage not configured, optionally remove the remote if it exists
+      try {
+        await runRcloneCommand(["config", "delete", NOTARIAL_REMOTE_NAME]);
+      } catch {
+        // Remote might not exist, that's fine
+      }
+      return;
+    }
+
+    // Build the S3 remote configuration for Garage
+    const garagePort = settings.garagePort || 3900;
+    const protocol = settings.garageIsHttps ? "https" : "http";
+    const endpoint = `${protocol}://${settings.garageHost}:${garagePort}`;
+
+    // Configure the notarial remote as S3 pointing to Garage
+    const remoteOptions = {
+      type: "s3",
+      provider: "Other",
+      access_key_id: settings.garageAccessKey,
+      secret_access_key: settings.garageSecretKey,
+      endpoint: endpoint,
+      region: "garage",
+      acl: "private",
+      force_path_style: "true",
+    };
+
+    // Write config using rclone config command
+    for (const [key, value] of Object.entries(remoteOptions)) {
+      await runRcloneCommand([
+        "config",
+        "set",
+        NOTARIAL_REMOTE_NAME,
+        key,
+        String(value),
+      ]);
+    }
+  } catch (error) {
+    console.error(
+      `Failed to sync notarial remote: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    // Don't throw - this is a background sync operation
+  }
+}
+
 function toNullableNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -1300,6 +1370,14 @@ export async function createBackupRemote(
   await ensureBackupArtifacts();
 
   const normalizedName = normalizeRemoteName(remoteName);
+
+  // Prevent creation of reserved "notarial" remote
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote name "${NOTARIAL_REMOTE_NAME}" is reserved for notarial storage and cannot be created manually.`,
+    );
+  }
+
   const normalizedProvider = provider.trim();
   const normalizedRemoteBasePath = joinRemotePath(remoteBasePath);
 
@@ -1863,6 +1941,13 @@ export async function deleteBackupRemote(
     throw new Error("Remote name is required.");
   }
 
+  // Prevent deletion of reserved "notarial" remote
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is reserved for notarial storage and cannot be deleted.`,
+    );
+  }
+
   if (typeof deleteBackupFiles !== "boolean") {
     throw new Error("Invalid delete backup files option.");
   }
@@ -1935,10 +2020,15 @@ export async function getBackupOverview(): Promise<{
   logs: BackupLogEntry[];
   accountSetupInProgress: boolean;
 }> {
-  const [config, remotes] = await Promise.all([
+  const [config, allRemotes] = await Promise.all([
     readBackupConfigFile(),
     listBackupRemotes(),
   ]);
+
+  // Filter out the reserved notarial remote from user-facing list
+  const remotes = allRemotes.filter(
+    (remote) => remote.name !== NOTARIAL_REMOTE_NAME,
+  );
 
   return {
     config,

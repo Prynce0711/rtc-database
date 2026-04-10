@@ -4,7 +4,11 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { FiEye, FiEyeOff, FiInfo } from "react-icons/fi";
 import { usePopup } from "../../Popup/PopupProvider";
-import { getSystemSettings, updateSystemSettings } from "../SettingsActions";
+import {
+  getGarageInfo,
+  getSystemSettings,
+  updateSystemSettings,
+} from "../SettingsActions";
 import {
   InputField,
   SaveButton,
@@ -29,6 +33,58 @@ const SystemTab = () => {
   const [senderPassword, setSenderPassword] = useState("");
   const [showSenderPassword, setShowSenderPassword] = useState(false);
   const [announceText, setAnnounceText] = useState("");
+  const [garageHost, setGarageHost] = useState("localhost");
+  const [garagePort, setGaragePort] = useState("3900");
+  const [garageAdminPort, setGarageAdminPort] = useState("3903");
+  const [garageIsHttps, setGarageIsHttps] = useState(false);
+  const [garageAccessKey, setGarageAccessKey] = useState("");
+  const [garageSecretKey, setGarageSecretKey] = useState("");
+  const [showGarageSecretKey, setShowGarageSecretKey] = useState(false);
+  const [garageBucket, setGarageBucket] = useState("");
+  const [garageAdminToken, setGarageAdminToken] = useState("");
+  const [showGarageAdminToken, setShowGarageAdminToken] = useState(false);
+  const [garageMetricsToken, setGarageMetricsToken] = useState("");
+  const [showGarageMetricsToken, setShowGarageMetricsToken] = useState(false);
+  const [garageInfoLoading, setGarageInfoLoading] = useState(false);
+  const [garageInfoError, setGarageInfoError] = useState<string | null>(null);
+  const [garageInfo, setGarageInfo] = useState<{
+    totalBytes: number;
+    remainingBytes: number;
+    consumedBytes: number;
+    fetchedAt: string;
+  } | null>(null);
+
+  const formatBytes = (value: number): string => {
+    if (!Number.isFinite(value) || value < 0) {
+      return "0 B";
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let size = value;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+
+    return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+  };
+
+  const loadGarageInfo = async () => {
+    setGarageInfoLoading(true);
+    setGarageInfoError(null);
+
+    const result = await getGarageInfo();
+    if (!result.success) {
+      setGarageInfo(null);
+      setGarageInfoError(result.error || "Failed to load Garage metrics");
+      setGarageInfoLoading(false);
+      return;
+    }
+
+    setGarageInfo(result.result);
+    setGarageInfoLoading(false);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -51,6 +107,18 @@ const SystemTab = () => {
       setSenderEmail(settings.senderEmail ?? "");
       setSenderPassword(settings.senderPassword ?? "");
       setAnnounceText(settings.systemAnnouncement ?? "");
+      setGarageHost(settings.garageHost ?? "localhost");
+      setGaragePort(settings.garagePort ? String(settings.garagePort) : "3900");
+      setGarageAdminPort(
+        settings.garageAdminPort ? String(settings.garageAdminPort) : "3903",
+      );
+      setGarageIsHttps(settings.garageIsHttps);
+      setGarageAccessKey(settings.garageAccessKey ?? "");
+      setGarageSecretKey(settings.garageSecretKey ?? "");
+      setGarageBucket(settings.garageBucket ?? "");
+      setGarageAdminToken(settings.garageAdminToken ?? "");
+      setGarageMetricsToken(settings.garageMetricsToken ?? "");
+      void loadGarageInfo();
       setLoading(false);
     };
 
@@ -58,12 +126,32 @@ const SystemTab = () => {
   }, [popup]);
 
   const handleSave = async () => {
-    const parsedPort = smtpPort.trim() === "" ? null : Number(smtpPort);
+    const parsedSmtpPort = smtpPort.trim() === "" ? null : Number(smtpPort);
     if (
-      parsedPort !== null &&
-      (!Number.isInteger(parsedPort) || parsedPort < 1)
+      parsedSmtpPort !== null &&
+      (!Number.isInteger(parsedSmtpPort) || parsedSmtpPort < 1)
     ) {
       popup.showError("SMTP port must be a valid positive integer.");
+      return;
+    }
+
+    const parsedGaragePort =
+      garagePort.trim() === "" ? null : Number(garagePort);
+    if (
+      parsedGaragePort !== null &&
+      (!Number.isInteger(parsedGaragePort) || parsedGaragePort < 1)
+    ) {
+      popup.showError("Garage port must be a valid positive integer.");
+      return;
+    }
+
+    const parsedGarageAdminPort =
+      garageAdminPort.trim() === "" ? null : Number(garageAdminPort);
+    if (
+      parsedGarageAdminPort !== null &&
+      (!Number.isInteger(parsedGarageAdminPort) || parsedGarageAdminPort < 1)
+    ) {
+      popup.showError("Garage admin port must be a valid positive integer.");
       return;
     }
 
@@ -74,10 +162,19 @@ const SystemTab = () => {
       maintainanceMode: maintenanceMode,
       systemAnnouncement: announceText.trim() || null,
       smtpHost: smtpHost.trim() || null,
-      smtpPort: parsedPort,
+      smtpPort: parsedSmtpPort,
       senderName: senderName.trim() || null,
       senderEmail: senderEmail.trim() || null,
       senderPassword: senderPassword === "" ? null : senderPassword,
+      garageHost: garageHost.trim() || "localhost",
+      garagePort: parsedGaragePort,
+      garageAdminPort: parsedGarageAdminPort,
+      garageIsHttps: garageIsHttps,
+      garageAccessKey: garageAccessKey.trim() || null,
+      garageSecretKey: garageSecretKey === "" ? null : garageSecretKey,
+      garageBucket: garageBucket.trim() || null,
+      garageAdminToken: garageAdminToken === "" ? null : garageAdminToken,
+      garageMetricsToken: garageMetricsToken === "" ? null : garageMetricsToken,
       passwordExpiration,
       lockoutThreshold,
       sessionTimeout,
@@ -225,6 +322,210 @@ const SystemTab = () => {
                 <FiEye size={16} />
               )}
             </button>
+          </div>
+        </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Garage Storage (Notarial)"
+        description="Configure S3-compatible object storage for notarial documents."
+      >
+        <SettingsRow
+          label="Garage Host"
+          description="Hostname or IP address of your Garage server."
+        >
+          <InputField
+            value={garageHost}
+            onChange={setGarageHost}
+            placeholder="localhost"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Garage Port"
+          description="Network port for Garage API access (default: 3900)."
+        >
+          <InputField
+            value={garagePort}
+            onChange={setGaragePort}
+            placeholder="3900"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Garage Admin Port"
+          description="Network port for Garage admin API and metrics (default: 3903)."
+        >
+          <InputField
+            value={garageAdminPort}
+            onChange={setGarageAdminPort}
+            placeholder="3903"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Use HTTPS"
+          description="Enable secure connection to Garage server."
+        >
+          <Toggle checked={garageIsHttps} onChange={setGarageIsHttps} />
+        </SettingsRow>
+        <SettingsRow
+          label="Access Key"
+          description="API access key for authentication with Garage."
+        >
+          <InputField
+            value={garageAccessKey}
+            onChange={setGarageAccessKey}
+            placeholder="Enter Garage access key"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Secret Key"
+          description="API secret key for authentication with Garage."
+        >
+          <div className="relative">
+            <InputField
+              value={garageSecretKey}
+              onChange={setGarageSecretKey}
+              type={showGarageSecretKey ? "text" : "password"}
+              placeholder="Enter Garage secret key"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGarageSecretKey((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/25 hover:text-base-content/60 transition-colors"
+              aria-label={
+                showGarageSecretKey
+                  ? "Hide Garage secret key"
+                  : "Show Garage secret key"
+              }
+            >
+              {showGarageSecretKey ? (
+                <FiEyeOff size={16} />
+              ) : (
+                <FiEye size={16} />
+              )}
+            </button>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Bucket Name"
+          description="Default bucket for storing notarial documents."
+        >
+          <InputField
+            value={garageBucket}
+            onChange={setGarageBucket}
+            placeholder="notarial-documents"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Admin API Token"
+          description="Bearer token for Garage admin API calls (ListBuckets/GetBucketInfo)."
+        >
+          <div className="relative">
+            <InputField
+              value={garageAdminToken}
+              onChange={setGarageAdminToken}
+              type={showGarageAdminToken ? "text" : "password"}
+              placeholder="Enter Garage admin token"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGarageAdminToken((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/25 hover:text-base-content/60 transition-colors"
+              aria-label={
+                showGarageAdminToken
+                  ? "Hide Garage admin token"
+                  : "Show Garage admin token"
+              }
+            >
+              {showGarageAdminToken ? (
+                <FiEyeOff size={16} />
+              ) : (
+                <FiEye size={16} />
+              )}
+            </button>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Metrics Token"
+          description="Bearer token for Garage /metrics endpoint (optional if metrics are public)."
+        >
+          <div className="relative">
+            <InputField
+              value={garageMetricsToken}
+              onChange={setGarageMetricsToken}
+              type={showGarageMetricsToken ? "text" : "password"}
+              placeholder="Enter Garage metrics token"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGarageMetricsToken((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/25 hover:text-base-content/60 transition-colors"
+              aria-label={
+                showGarageMetricsToken
+                  ? "Hide Garage metrics token"
+                  : "Show Garage metrics token"
+              }
+            >
+              {showGarageMetricsToken ? (
+                <FiEyeOff size={16} />
+              ) : (
+                <FiEye size={16} />
+              )}
+            </button>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Storage Info"
+          description="Live capacity metrics from Garage monitoring endpoint."
+        >
+          <div className="w-full rounded-xl border border-base-300 bg-base-100 px-4 py-3">
+            {garageInfoLoading ? (
+              <p className="text-sm text-base-content/60">
+                Loading storage info...
+              </p>
+            ) : garageInfoError ? (
+              <p className="text-sm text-error">{garageInfoError}</p>
+            ) : garageInfo ? (
+              <div className="space-y-1 text-sm">
+                <p className="text-base-content/80">
+                  Remaining:{" "}
+                  <span className="font-semibold">
+                    {formatBytes(garageInfo.remainingBytes)}
+                  </span>
+                </p>
+                <p className="text-base-content/80">
+                  Consumed:{" "}
+                  <span className="font-semibold">
+                    {formatBytes(garageInfo.consumedBytes)}
+                  </span>
+                </p>
+                <p className="text-base-content/80">
+                  Total:{" "}
+                  <span className="font-semibold">
+                    {formatBytes(garageInfo.totalBytes)}
+                  </span>
+                </p>
+                <p className="text-xs text-base-content/40">
+                  Last updated:{" "}
+                  {new Date(garageInfo.fetchedAt).toLocaleString()}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-base-content/60">
+                No metrics available.
+              </p>
+            )}
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => {
+                  void loadGarageInfo();
+                }}
+                disabled={garageInfoLoading}
+              >
+                Refresh
+              </button>
+            </div>
           </div>
         </SettingsRow>
       </SettingsCard>

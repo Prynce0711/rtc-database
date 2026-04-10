@@ -178,6 +178,9 @@ export const BACKUP_PROVIDER_OPTIONS: BackupProviderOption[] = [
 // Local backup source path.
 export const FIXED_BACKUP_SOURCE_PATH = path.join(process.cwd(), "dev.db");
 
+// Reserved remote names.
+export const NOTARIAL_REMOTE_NAME = "notarial";
+
 // Scheduler/logging/runtime numeric limits.
 export const MAX_BACKUP_LOG_ENTRIES = 500;
 export const MAX_TIMER_MS = 2_147_000_000;
