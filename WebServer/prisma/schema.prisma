@@ -628,6 +628,17 @@ model SystemSettings {
   senderEmail    String? @default("noreply@rtc.com")
   senderPassword String?
 
+  garageHost     String? @default("localhost")
+  garagePort     Int?    @default(3900)
+  garageAdminPort Int?    @default(3903)
+  garageIsHttps  Boolean @default(false)
+  garageAccessKey String?
+  garageSecretKey String?
+  garageBucket    String?
+  garageRegion    String? @default("garage")
+  garageAdminToken String?
+  garageMetricsToken String?
+
   backupFrequency BackupFrequency @default(MANUAL)
   logRetention    LogRetention    @default(THREE_MONTHS)
 

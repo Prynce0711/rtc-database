@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   BACKUP_INTERVAL_LOOKUP,
   DEFAULT_SELECTED_INTERVALS,
+  FIXED_BACKUP_DESTINATION_FOLDER,
   REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE,
   type BackupIntervalKey,
 } from "./constants";
@@ -172,6 +173,39 @@ export function normalizeRemoteAccountIdentities(
   return normalized;
 }
 
+export function normalizeRemoteBasePaths(
+  value: unknown,
+): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const normalized: Record<string, string> = {};
+
+  for (const [rawName, rawBasePath] of Object.entries(value)) {
+    if (typeof rawBasePath !== "string") {
+      continue;
+    }
+
+    const normalizedName = normalizeRemoteName(rawName);
+    const trimmedBasePath = rawBasePath
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter((part) => !!part)
+      .join("/");
+
+    if (!normalizedName || !trimmedBasePath) {
+      continue;
+    }
+
+    normalized[normalizedName] = trimmedBasePath;
+  }
+
+  return normalized;
+}
+
 export async function ensureBackupArtifacts(): Promise<void> {
   await mkdir(BACKUP_DATA_DIR, { recursive: true });
 
@@ -184,11 +218,16 @@ export async function ensureBackupArtifacts(): Promise<void> {
 
 async function getDefaultBackupConfig(): Promise<BackupConfig> {
   return {
-    enabled: false,
+    enabled: true,
+    caseEnabled: true,
+    notarialEnabled: true,
     selectedIntervals: [...DEFAULT_SELECTED_INTERVALS],
     selectedRemoteNames: [],
+    notarialSelectedRemoteNames: [],
+    notarialSnapshotRetentionInterval: "1mo",
     remoteAccountIdentities: {},
-    remotePath: "rtc-backups",
+    remoteBasePaths: {},
+    remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     lastRunAt: null,
     lastRunStatus: "IDLE",
     lastRunMessage: null,
@@ -203,11 +242,48 @@ async function normalizeBackupConfig(
   const legacy = value as Partial<BackupConfig> & {
     intervalMinutes?: unknown;
     remoteName?: unknown;
+    notarialDeletedFilesMaxAgeDays?: unknown;
+    notarialSnapshotRetentionInterval?: unknown;
+  };
+
+  const normalizeNotarialSnapshotRetention = (): BackupIntervalKey => {
+    if (isBackupIntervalKey(legacy.notarialSnapshotRetentionInterval)) {
+      return legacy.notarialSnapshotRetentionInterval;
+    }
+
+    const legacyDays =
+      typeof legacy.notarialDeletedFilesMaxAgeDays === "number" &&
+      Number.isFinite(legacy.notarialDeletedFilesMaxAgeDays)
+        ? legacy.notarialDeletedFilesMaxAgeDays
+        : Number(legacy.notarialDeletedFilesMaxAgeDays);
+
+    if (Number.isFinite(legacyDays) && legacyDays > 0) {
+      if (legacyDays >= 365) {
+        return "1y";
+      }
+      if (legacyDays >= 30) {
+        return "1mo";
+      }
+      if (legacyDays >= 7) {
+        return "1w";
+      }
+      return "1d";
+    }
+
+    return defaults.notarialSnapshotRetentionInterval;
   };
 
   return {
     enabled:
       typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
+    caseEnabled:
+      typeof value.caseEnabled === "boolean"
+        ? value.caseEnabled
+        : defaults.caseEnabled,
+    notarialEnabled:
+      typeof value.notarialEnabled === "boolean"
+        ? value.notarialEnabled
+        : defaults.notarialEnabled,
     selectedIntervals: normalizeSelectedIntervals(
       legacy.selectedIntervals,
       legacy.intervalMinutes,
@@ -216,13 +292,17 @@ async function normalizeBackupConfig(
       legacy.selectedRemoteNames,
       legacy.remoteName,
     ),
+    notarialSelectedRemoteNames: normalizeSelectedRemoteNames(
+      legacy.notarialSelectedRemoteNames,
+      undefined,
+      false,
+    ),
+    notarialSnapshotRetentionInterval: normalizeNotarialSnapshotRetention(),
     remoteAccountIdentities: normalizeRemoteAccountIdentities(
       value.remoteAccountIdentities,
     ),
-    remotePath:
-      typeof value.remotePath === "string"
-        ? value.remotePath.trim()
-        : defaults.remotePath,
+    remoteBasePaths: normalizeRemoteBasePaths(value.remoteBasePaths),
+    remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     lastRunAt: normalizeIsoDate(value.lastRunAt),
     lastRunStatus: isBackupRunStatus(value.lastRunStatus)
       ? value.lastRunStatus

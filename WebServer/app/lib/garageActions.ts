@@ -14,10 +14,19 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "crypto";
 import ActionResult from "../components/ActionResult";
+import { getSystemSettings } from "../components/Settings/SettingsActions";
 import { FileData } from "../generated/prisma/browser";
-import { garage, GetFileOptions } from "../lib/garage";
+import { GetFileOptions, getGarageClient } from "../lib/garage";
 import { validateSession } from "./authActions";
 import { prisma } from "./prisma";
+
+async function getGarageBucket(): Promise<string> {
+  const settingsResult = await getSystemSettings();
+  if (!settingsResult.success) {
+    throw new Error("Failed to load garage bucket configuration");
+  }
+  return settingsResult.result.garageBucket || "uploads";
+}
 
 export async function getFileHash(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
@@ -124,14 +133,17 @@ async function uploadFileToGarageCore(
       };
     }
 
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
+
     const command = new PutObjectCommand({
-      Bucket: process.env.GARAGE_BUCKET || "uploads",
+      Bucket: bucket,
       Key: key,
       Body: new Uint8Array(buffer),
       ContentType: file.type,
     });
 
-    await garage.send(command);
+    await garageClient.send(command);
 
     const fileData = await prisma.fileData.create({
       data: {
@@ -172,11 +184,14 @@ export async function listGarageFiles(): Promise<
       return sessionValidation;
     }
 
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
+
     const command = new ListObjectsV2Command({
-      Bucket: process.env.GARAGE_BUCKET || "uploads",
+      Bucket: bucket,
     });
 
-    const response = await garage.send(command);
+    const response = await garageClient.send(command);
 
     // Filter out folder markers (keys ending with /)
     const files =
@@ -221,8 +236,11 @@ export async function getGarageFileUrl(
       .replace(/[\r\n"]/g, "")
       .trim();
 
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
+
     const command = new GetObjectCommand({
-      Bucket: process.env.GARAGE_BUCKET || "uploads",
+      Bucket: bucket,
       Key: key,
       ResponseContentDisposition: `${inline ? "inline" : "attachment"}; filename="${normalizedFileName}"`,
       ...(options?.contentType
@@ -231,7 +249,7 @@ export async function getGarageFileUrl(
     });
 
     // Generate a presigned URL valid for 1 hour
-    const url = await getSignedUrl(garage, command, { expiresIn: 3600 });
+    const url = await getSignedUrl(garageClient, command, { expiresIn: 3600 });
 
     return {
       success: true,
@@ -255,12 +273,15 @@ export async function deleteGarageFile(
       return sessionValidation;
     }
 
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
+
     const command = new DeleteObjectCommand({
-      Bucket: process.env.GARAGE_BUCKET || "uploads",
+      Bucket: bucket,
       Key: key,
     });
 
-    await garage.send(command);
+    await garageClient.send(command);
 
     await prisma.fileData.deleteMany({
       where: {
@@ -320,9 +341,10 @@ export async function moveGarageFile(
       newFolderPath = newKey.slice(0, lastSlash);
     }
 
-    const bucket = process.env.GARAGE_BUCKET || "uploads";
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
 
-    await garage.send(
+    await garageClient.send(
       new CopyObjectCommand({
         Bucket: bucket,
         CopySource: `${bucket}/${oldKey}`,
@@ -349,7 +371,7 @@ export async function moveGarageFile(
       };
     }
 
-    await garage.send(
+    await garageClient.send(
       new DeleteObjectCommand({
         Bucket: bucket,
         Key: oldKey,

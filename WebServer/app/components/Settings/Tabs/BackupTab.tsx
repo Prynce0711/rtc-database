@@ -12,9 +12,11 @@ import {
   FiEdit2,
   FiPlus,
   FiRefreshCw,
+  FiSettings,
   FiTrash2,
   FiXCircle,
 } from "react-icons/fi";
+import Collapse from "../../Collapse/Collapse";
 import ModalBase from "../../Popup/ModalBase";
 import { usePopup } from "../../Popup/PopupProvider";
 import {
@@ -23,14 +25,19 @@ import {
   createBackupAccount,
   deleteBackupAccount,
   getBackupDashboard,
+  getBackupRemoteUsageAction,
   importBackupFromLocalFileAction,
   importBackupFromRemoteAction,
+  listNotarialSnapshotsAction,
   listOneDriveDriveOptionsAction,
+  restoreNotarialSnapshotAction,
   runBackupNowAction,
   saveBackupConfiguration,
   updateBackupAccount,
   type BackupDashboardData,
+  type BackupNotarialSnapshot,
   type BackupOneDriveDriveOption,
+  type BackupRemoteUsage,
 } from "../BackupActions";
 import MultiSelectPopoverDropdown from "../MultiSelectPopoverDropdown";
 import {
@@ -53,10 +60,23 @@ type ProviderFieldConfig = {
 const OAUTH_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
 const ELECTRON_REQUIRED_AUTH_MESSAGE =
   "This provider requires the Electron desktop app for account authorization. Open RTC Native App and try again.";
+const FIXED_BACKUP_DESTINATION_FOLDER = "rtc-backups";
 
 const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   onedrive: [],
   s3: [
+    {
+      key: "provider",
+      label: "S3 Provider",
+      placeholder: "Other",
+      required: true,
+    },
+    {
+      key: "bucket",
+      label: "Bucket",
+      placeholder: "my-backup-bucket",
+      required: true,
+    },
     {
       key: "access_key_id",
       label: "Access Key ID",
@@ -147,6 +167,12 @@ const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   ],
   smb: [
     {
+      key: "share",
+      label: "Share",
+      placeholder: "backup-share",
+      required: true,
+    },
+    {
       key: "host",
       label: "Host",
       placeholder: "fileserver.local",
@@ -196,6 +222,12 @@ type ElectronAuthorizeProviderResult = {
   error?: string;
 };
 
+type RemoteUsageState = {
+  status: "idle" | "loading" | "success" | "error";
+  data?: BackupRemoteUsage;
+  error?: string;
+};
+
 const pickProviderOptionValues = (
   provider: string,
   options: Record<string, string>,
@@ -214,6 +246,47 @@ const pickProviderOptionValues = (
   return values;
 };
 
+const splitPrefixedBasePath = (
+  rawBasePath: string,
+): { prefix: string; accountBasePath: string } => {
+  const parts = rawBasePath
+    .trim()
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => !!part);
+
+  if (parts.length === 0) {
+    return {
+      prefix: "",
+      accountBasePath: "",
+    };
+  }
+
+  return {
+    prefix: parts[0] ?? "",
+    accountBasePath: parts.slice(1).join("/"),
+  };
+};
+
+const buildPrefixedBasePath = (
+  prefix: string,
+  accountBasePath: string,
+): string => {
+  const normalizedPrefix = prefix.trim();
+  const normalizedAccountBasePath = accountBasePath.trim();
+
+  if (!normalizedPrefix) {
+    return normalizedAccountBasePath;
+  }
+
+  if (!normalizedAccountBasePath) {
+    return normalizedPrefix;
+  }
+
+  return `${normalizedPrefix}/${normalizedAccountBasePath}`;
+};
+
 const BackupTab = () => {
   const popup = usePopup();
   const ipc = typeof window !== "undefined" ? window.ipcRenderer : undefined;
@@ -230,11 +303,35 @@ const BackupTab = () => {
   const [accountSetupInProgress, setAccountSetupInProgress] = useState(false);
   const [importingRemote, setImportingRemote] = useState(false);
   const [importingLocal, setImportingLocal] = useState(false);
+  const [remoteUsageByName, setRemoteUsageByName] = useState<
+    Record<string, RemoteUsageState>
+  >({});
 
   const [enabled, setEnabled] = useState(false);
+  const [caseEnabled, setCaseEnabled] = useState(false);
+  const [notarialEnabled, setNotarialEnabled] = useState(false);
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
-  const [remotePath, setRemotePath] = useState("rtc-backups");
+  const [notarialSelectedRemoteNames, setNotarialSelectedRemoteNames] =
+    useState<string[]>([]);
+  const [
+    notarialSnapshotRetentionInterval,
+    setNotarialSnapshotRetentionInterval,
+  ] = useState("1mo");
+  const [notarialRestoreRemoteName, setNotarialRestoreRemoteName] =
+    useState("");
+  const [notarialSnapshots, setNotarialSnapshots] = useState<
+    BackupNotarialSnapshot[]
+  >([]);
+  const [selectedNotarialSnapshotId, setSelectedNotarialSnapshotId] =
+    useState("");
+  const [notarialSnapshotsError, setNotarialSnapshotsError] = useState<
+    string | null
+  >(null);
+  const [loadingNotarialSnapshots, setLoadingNotarialSnapshots] =
+    useState(false);
+  const [restoringNotarialSnapshot, setRestoringNotarialSnapshot] =
+    useState(false);
   const [importRemoteName, setImportRemoteName] = useState("");
   const [importSource, setImportSource] = useState("manual");
   const [localImportFile, setLocalImportFile] = useState<File | null>(null);
@@ -272,6 +369,7 @@ const BackupTab = () => {
   const [providerOptionTouched, setProviderOptionTouched] = useState<
     Record<string, boolean>
   >({});
+  const [accountBasePath, setAccountBasePath] = useState("");
   const [oneDriveDriveSelector, setOneDriveDriveSelector] =
     useState<OneDriveDriveSelectorState | null>(null);
   const [savingOneDriveDriveSelection, setSavingOneDriveDriveSelection] =
@@ -307,9 +405,14 @@ const BackupTab = () => {
   const applyDashboardData = useCallback(
     (data: BackupDashboardData) => {
       setEnabled(data.config.enabled);
+      setCaseEnabled(data.config.caseEnabled);
+      setNotarialEnabled(data.config.notarialEnabled);
       setSelectedIntervals(data.config.selectedIntervals);
       setSelectedRemoteNames(data.config.selectedRemoteNames);
-      setRemotePath(data.config.remotePath);
+      setNotarialSelectedRemoteNames(data.config.notarialSelectedRemoteNames);
+      setNotarialSnapshotRetentionInterval(
+        data.config.notarialSnapshotRetentionInterval,
+      );
       setLastRunAt(data.config.lastRunAt);
       setLastRunStatus(data.config.lastRunStatus);
       setLastRunMessage(data.config.lastRunMessage);
@@ -331,6 +434,7 @@ const BackupTab = () => {
         setEditingRemoteName(null);
         setProviderOptionValues({});
         setProviderOptionTouched({});
+        setAccountBasePath("");
         setNewRemoteName("");
       }
 
@@ -346,6 +450,32 @@ const BackupTab = () => {
       });
 
       const availableRemoteNames = data.remotes.map((remote) => remote.name);
+      const availableNotarialRemoteNames =
+        data.config.notarialSelectedRemoteNames.filter((remoteName) =>
+          availableRemoteNames.includes(remoteName),
+        );
+
+      setNotarialSelectedRemoteNames((previous) => {
+        const currentSelection = data.config.notarialSelectedRemoteNames;
+        if (currentSelection.length > 0) {
+          return currentSelection.filter((remoteName) =>
+            availableRemoteNames.includes(remoteName),
+          );
+        }
+
+        return previous.filter((remoteName) =>
+          availableRemoteNames.includes(remoteName),
+        );
+      });
+
+      setNotarialRestoreRemoteName((previous) => {
+        if (previous && availableNotarialRemoteNames.includes(previous)) {
+          return previous;
+        }
+
+        return availableNotarialRemoteNames[0] ?? "";
+      });
+
       setImportRemoteName((previous) => {
         if (previous && availableRemoteNames.includes(previous)) {
           return previous;
@@ -408,9 +538,13 @@ const BackupTab = () => {
   }, [logs]);
 
   const handleSave = async () => {
-    if (enabled && selectedRemoteNames.length === 0) {
+    const hasCaseDestinations = caseEnabled && selectedRemoteNames.length > 0;
+    const hasNotarialDestinations =
+      notarialEnabled && notarialSelectedRemoteNames.length > 0;
+
+    if (enabled && !hasCaseDestinations && !hasNotarialDestinations) {
       popup.showError(
-        "Select at least one destination account before enabling auto backup.",
+        "Select at least one active destination account (Cases or Notarial) before enabling scheduling.",
       );
       return;
     }
@@ -422,14 +556,26 @@ const BackupTab = () => {
       return;
     }
 
+    const validIntervalValues = new Set(
+      intervalOptions.map((interval) => interval.value),
+    );
+    if (!validIntervalValues.has(notarialSnapshotRetentionInterval)) {
+      popup.showError("Select a valid notarial snapshot retention interval.");
+      return;
+    }
+
     setSaving(true);
     popup.showLoading("Saving backup settings...");
 
     const result = await saveBackupConfiguration({
       enabled,
+      caseEnabled,
+      notarialEnabled,
       selectedIntervals,
       selectedRemoteNames,
-      remotePath: remotePath.trim(),
+      notarialSelectedRemoteNames,
+      notarialSnapshotRetentionInterval,
+      remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     });
 
     setSaving(false);
@@ -479,12 +625,15 @@ const BackupTab = () => {
     setNewRemoteName("");
     setProviderOptionValues({});
     setProviderOptionTouched({});
+    setAccountBasePath("");
     setNewProvider(providers[0]?.value ?? "drive");
   };
 
   const handleProviderChange = (providerValue: string) => {
     setNewProvider(providerValue);
-    setProviderOptionValues({});
+    setProviderOptionValues(
+      providerValue.toLowerCase() === "s3" ? { provider: "Other" } : {},
+    );
     setProviderOptionTouched({});
   };
 
@@ -538,9 +687,25 @@ const BackupTab = () => {
     setEditingRemoteName(remote.name);
     setNewRemoteName(remote.name);
     setNewProvider(remote.provider);
-    setProviderOptionValues(
-      pickProviderOptionValues(remote.provider, remote.options ?? {}),
+    const providerOptionValues = pickProviderOptionValues(
+      remote.provider,
+      remote.options ?? {},
     );
+
+    const providerKey = remote.provider.trim().toLowerCase();
+    if (providerKey === "s3" || providerKey === "smb") {
+      const prefixedBasePath = splitPrefixedBasePath(remote.basePath ?? "");
+      if (providerKey === "s3") {
+        providerOptionValues.bucket = prefixedBasePath.prefix;
+      } else {
+        providerOptionValues.share = prefixedBasePath.prefix;
+      }
+      setAccountBasePath(prefixedBasePath.accountBasePath);
+    } else {
+      setAccountBasePath((remote.basePath ?? "").trim());
+    }
+
+    setProviderOptionValues(providerOptionValues);
     setProviderOptionTouched({});
   };
 
@@ -874,6 +1039,27 @@ const BackupTab = () => {
 
     let accountOptions = options;
 
+    const normalizedBasePath = accountBasePath.trim();
+    let remoteBasePathToSave = normalizedBasePath;
+
+    if (newProvider.toLowerCase() === "s3") {
+      const s3Bucket = (accountOptions.bucket ?? "").trim();
+      delete accountOptions.bucket;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        s3Bucket,
+        normalizedBasePath,
+      );
+    }
+
+    if (newProvider.toLowerCase() === "smb") {
+      const smbShare = (accountOptions.share ?? "").trim();
+      delete accountOptions.share;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        smbShare,
+        normalizedBasePath,
+      );
+    }
+
     if (requiresAuthFlow) {
       setAccountSaving(true);
       popup.showLoading(
@@ -906,6 +1092,7 @@ const BackupTab = () => {
       provider: newProvider,
       options: accountOptions,
       forceRestart,
+      remoteBasePath: remoteBasePathToSave,
     });
 
     if (
@@ -924,6 +1111,7 @@ const BackupTab = () => {
           provider: newProvider,
           options: accountOptions,
           forceRestart: true,
+          remoteBasePath: remoteBasePathToSave,
         });
       }
     }
@@ -1010,6 +1198,28 @@ const BackupTab = () => {
       return;
     }
 
+    const normalizedBasePath = accountBasePath.trim();
+    let remoteBasePathToSave = normalizedBasePath;
+    let accountOptions = options;
+
+    if (newProvider.toLowerCase() === "s3") {
+      const s3Bucket = (accountOptions.bucket ?? "").trim();
+      delete accountOptions.bucket;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        s3Bucket,
+        normalizedBasePath,
+      );
+    }
+
+    if (newProvider.toLowerCase() === "smb") {
+      const smbShare = (accountOptions.share ?? "").trim();
+      delete accountOptions.share;
+      remoteBasePathToSave = buildPrefixedBasePath(
+        smbShare,
+        normalizedBasePath,
+      );
+    }
+
     setAccountSaving(true);
     popup.showLoading("Updating backup account...");
 
@@ -1017,7 +1227,8 @@ const BackupTab = () => {
       currentRemoteName: editingRemoteName,
       nextRemoteName: newRemoteName.trim(),
       provider: newProvider,
-      options,
+      options: accountOptions,
+      remoteBasePath: remoteBasePathToSave,
     });
 
     setAccountSaving(false);
@@ -1092,6 +1303,23 @@ const BackupTab = () => {
     popup.showSuccess(`Backup account ${remoteName} re-logged successfully.`);
   };
 
+  const composeRemoteFolderPath = (...segments: string[]): string => {
+    const normalizedParts: string[] = [];
+
+    for (const rawSegment of segments) {
+      const parts = rawSegment
+        .trim()
+        .replace(/\\/g, "/")
+        .split("/")
+        .map((part) => part.trim())
+        .filter((part) => !!part);
+
+      normalizedParts.push(...parts);
+    }
+
+    return normalizedParts.join("/");
+  };
+
   const handleDeleteAccount = async (accountName: string) => {
     const confirmed = await popup.showWarning(
       `Delete backup account ${accountName}?`,
@@ -1101,7 +1329,12 @@ const BackupTab = () => {
     }
 
     let deleteBackupFiles = false;
-    const backupFolderPath = remotePath.trim();
+    const remote = remotes.find((entry) => entry.name === accountName);
+    const accountBaseFolderPath = (remote?.basePath ?? "").trim();
+    const backupFolderPath = composeRemoteFolderPath(
+      accountBaseFolderPath,
+      FIXED_BACKUP_DESTINATION_FOLDER,
+    );
 
     if (backupFolderPath) {
       deleteBackupFiles = await popup.showWarning(
@@ -1188,11 +1421,16 @@ const BackupTab = () => {
   };
 
   const handleClearAccountFiles = async (accountName: string) => {
-    const backupFolderPath = remotePath.trim();
+    const remote = remotes.find((entry) => entry.name === accountName);
+    const accountBaseFolderPath = (remote?.basePath ?? "").trim();
+    const backupFolderPath = composeRemoteFolderPath(
+      accountBaseFolderPath,
+      FIXED_BACKUP_DESTINATION_FOLDER,
+    );
 
     if (!backupFolderPath) {
       popup.showError(
-        "Destination Folder is empty. Set it first before clearing backup files.",
+        "Backup folder path is empty unexpectedly. Please try again.",
       );
       return;
     }
@@ -1223,19 +1461,19 @@ const BackupTab = () => {
 
   const handleImportFromRemote = async () => {
     if (!importRemoteName.trim()) {
-      popup.showError("Select a remote account to import from.");
+      popup.showError("Select a remote account to restore from.");
       return;
     }
 
     const confirmed = await popup.showWarning(
-      "This will update database (dev.db) from the selected remote backup. This might log out the current user. Continue?",
+      "This will restore database (dev.db) from the selected remote backup. This might log out the current user. Continue?",
     );
     if (!confirmed) {
       return;
     }
 
     setImportingRemote(true);
-    popup.showLoading("Updating database from remote backup...");
+    popup.showLoading("Restoring database from remote backup...");
 
     const result = await importBackupFromRemoteAction({
       remoteName: importRemoteName.trim(),
@@ -1244,12 +1482,12 @@ const BackupTab = () => {
 
     setImportingRemote(false);
     if (!result.success) {
-      popup.showError(result.error || "Failed to import backup from remote");
+      popup.showError(result.error || "Failed to restore backup from remote");
       return;
     }
 
     applyDashboardData(result.result);
-    popup.showSuccess("Database updated from remote backup.");
+    popup.showSuccess("Database restored from remote backup.");
   };
 
   const handleOpenLocalFilePicker = () => {
@@ -1265,19 +1503,19 @@ const BackupTab = () => {
 
   const handleImportFromLocalFile = async () => {
     if (!localImportFile) {
-      popup.showError("Choose a local backup file to import.");
+      popup.showError("Choose a local backup file to restore.");
       return;
     }
 
     const confirmed = await popup.showWarning(
-      `This will update database (dev.db) from \"${localImportFile.name}\". This might log out the current user. Continue?`,
+      `This will restore database (dev.db) from "${localImportFile.name}". This might log out the current user. Continue?`,
     );
     if (!confirmed) {
       return;
     }
 
     setImportingLocal(true);
-    popup.showLoading("Updating database from local backup file...");
+    popup.showLoading("Restoring database from local backup file...");
 
     const formData = new FormData();
     formData.set("file", localImportFile);
@@ -1287,7 +1525,7 @@ const BackupTab = () => {
     setImportingLocal(false);
     if (!result.success) {
       popup.showError(
-        result.error || "Failed to import backup from local file",
+        result.error || "Failed to restore backup from local file",
       );
       return;
     }
@@ -1297,8 +1535,126 @@ const BackupTab = () => {
     if (localImportInputRef.current) {
       localImportInputRef.current.value = "";
     }
-    popup.showSuccess("Database updated from local backup file.");
+    popup.showSuccess("Database restored from local backup file.");
   };
+
+  const loadNotarialSnapshots = useCallback(
+    async (
+      remoteName: string,
+      options: {
+        notifyOnSuccess?: boolean;
+        notifyOnError?: boolean;
+      } = {},
+    ) => {
+      const normalizedRemoteName = remoteName.trim();
+      if (!normalizedRemoteName) {
+        setNotarialSnapshots([]);
+        setSelectedNotarialSnapshotId("");
+        setNotarialSnapshotsError(null);
+        return;
+      }
+
+      setLoadingNotarialSnapshots(true);
+      setNotarialSnapshotsError(null);
+
+      const result = await listNotarialSnapshotsAction({
+        remoteName: normalizedRemoteName,
+      });
+
+      setLoadingNotarialSnapshots(false);
+
+      if (!result.success) {
+        const errorMessage =
+          result.error || "Failed to load notarial snapshots.";
+        setNotarialSnapshots([]);
+        setSelectedNotarialSnapshotId("");
+        setNotarialSnapshotsError(errorMessage);
+
+        if (options.notifyOnError) {
+          popup.showError(errorMessage);
+        }
+        return;
+      }
+
+      setNotarialSnapshots(result.result.snapshots);
+      setSelectedNotarialSnapshotId((previous) => {
+        if (
+          previous &&
+          result.result.snapshots.some((snapshot) => snapshot.id === previous)
+        ) {
+          return previous;
+        }
+
+        return result.result.snapshots[0]?.id ?? "";
+      });
+
+      if (result.result.snapshots.length === 0) {
+        setNotarialSnapshotsError(
+          "No snapshots found for the selected destination account.",
+        );
+      }
+
+      if (options.notifyOnSuccess) {
+        popup.showSuccess("Notarial snapshots refreshed.");
+      }
+    },
+    [popup],
+  );
+
+  const handleRestoreNotarialSnapshot = async () => {
+    const normalizedRemoteName = notarialRestoreRemoteName.trim();
+    if (!normalizedRemoteName) {
+      popup.showError("Select a notarial destination account first.");
+      return;
+    }
+
+    const normalizedSnapshotId = selectedNotarialSnapshotId.trim();
+    if (!normalizedSnapshotId) {
+      popup.showError("Select a notarial snapshot to restore.");
+      return;
+    }
+
+    const selectedSnapshot = notarialSnapshots.find(
+      (snapshot) => snapshot.id === normalizedSnapshotId,
+    );
+
+    const confirmed = await popup.showWarning(
+      `This will restore Garage notarial files from snapshot ${selectedSnapshot?.shortId ?? normalizedSnapshotId}. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setRestoringNotarialSnapshot(true);
+    popup.showLoading("Restoring notarial snapshot...");
+
+    const result = await restoreNotarialSnapshotAction({
+      remoteName: normalizedRemoteName,
+      snapshotId: normalizedSnapshotId,
+    });
+
+    setRestoringNotarialSnapshot(false);
+
+    if (!result.success) {
+      popup.showError(result.error || "Failed to restore notarial snapshot.");
+      return;
+    }
+
+    applyDashboardData(result.result);
+    await loadNotarialSnapshots(normalizedRemoteName);
+    popup.showSuccess("Notarial snapshot restored successfully.");
+  };
+
+  useEffect(() => {
+    if (!notarialRestoreRemoteName.trim()) {
+      setNotarialSnapshots([]);
+      setSelectedNotarialSnapshotId("");
+      setNotarialSnapshotsError(null);
+      return;
+    }
+
+    void loadNotarialSnapshots(notarialRestoreRemoteName);
+  }, [loadNotarialSnapshots, notarialRestoreRemoteName]);
 
   const toggleIntervalSelection = (intervalValue: string) => {
     setSelectedIntervals((previous) => {
@@ -1312,6 +1668,16 @@ const BackupTab = () => {
 
   const toggleRemoteSelection = (remoteValue: string) => {
     setSelectedRemoteNames((previous) => {
+      if (previous.includes(remoteValue)) {
+        return previous.filter((value) => value !== remoteValue);
+      }
+
+      return [...previous, remoteValue];
+    });
+  };
+
+  const toggleNotarialRemoteSelection = (remoteValue: string) => {
+    setNotarialSelectedRemoteNames((previous) => {
       if (previous.includes(remoteValue)) {
         return previous.filter((value) => value !== remoteValue);
       }
@@ -1336,12 +1702,16 @@ const BackupTab = () => {
   }
 
   const isBackupRunning = lastRunStatus === "RUNNING";
+  const hasManualRunDestinations =
+    (caseEnabled && selectedRemoteNames.length > 0) ||
+    (notarialEnabled && notarialSelectedRemoteNames.length > 0);
   const canRunNow =
-    selectedRemoteNames.length > 0 &&
+    hasManualRunDestinations &&
     !runningBackup &&
     !cancellingBackup &&
     !importingRemote &&
     !importingLocal &&
+    !restoringNotarialSnapshot &&
     !isBackupRunning;
 
   const selectedIntervalLabels = intervalOptions
@@ -1370,11 +1740,12 @@ const BackupTab = () => {
     const providerKey = remote.provider.trim().toLowerCase();
     const options = remote.options ?? {};
 
-    if (
-      providerKey === "ftp" ||
-      providerKey === "sftp" ||
-      providerKey === "smb"
-    ) {
+    if (providerKey === "smb") {
+      const host = (options.host ?? "").trim();
+      return host ? `Host: ${truncateRemoteDetail(host)}` : null;
+    }
+
+    if (providerKey === "ftp" || providerKey === "sftp") {
       const host = (options.host ?? "").trim();
       return host ? `Host: ${truncateRemoteDetail(host)}` : null;
     }
@@ -1438,10 +1809,26 @@ const BackupTab = () => {
         : "Choose destination accounts"
       : `${selectedRemoteLabels.length} account${selectedRemoteLabels.length > 1 ? "s" : ""} selected`;
 
+  const notarialSelectedRemoteLabels = remotes
+    .filter((remote) => notarialSelectedRemoteNames.includes(remote.name))
+    .map((remote) => `${remote.name} (${getRemoteProviderDetails(remote)})`);
+
+  const notarialRemoteSummary =
+    notarialSelectedRemoteLabels.length === 0
+      ? remotes.length === 0
+        ? "No accounts available"
+        : "Choose destination accounts"
+      : `${notarialSelectedRemoteLabels.length} account${notarialSelectedRemoteLabels.length > 1 ? "s" : ""} selected`;
+
   const intervalDropdownOptions = intervalOptions.map((interval) => ({
     value: interval.value,
     label: interval.label,
     description: `Folder: ${interval.folderName}`,
+  }));
+
+  const notarialRetentionDropdownOptions = intervalOptions.map((interval) => ({
+    value: interval.value,
+    label: interval.label.replace(/^Every\s+/i, ""),
   }));
 
   const remoteDropdownOptions = remotes.map((remote) => ({
@@ -1449,6 +1836,115 @@ const BackupTab = () => {
     label: remote.name,
     description: getRemoteProviderDetails(remote),
   }));
+
+  const notarialRestoreRemoteOptions = remotes
+    .filter((remote) => notarialSelectedRemoteNames.includes(remote.name))
+    .map((remote) => ({
+      value: remote.name,
+      label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
+    }));
+
+  const formatSnapshotTime = (value: string): string => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString();
+  };
+
+  const notarialSnapshotDropdownOptions = notarialSnapshots.map((snapshot) => ({
+    value: snapshot.id,
+    label: `${snapshot.shortId} (${formatSnapshotTime(snapshot.time)})`,
+  }));
+
+  const formatBytes = (bytes: number | null): string => {
+    if (bytes === null || !Number.isFinite(bytes) || bytes < 0) {
+      return "Not available";
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let value = bytes;
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+
+    const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+    return `${value.toFixed(decimals)} ${units[unitIndex]}`;
+  };
+
+  const loadRemoteUsage = async (
+    remoteName: string,
+    force = false,
+  ): Promise<void> => {
+    const normalizedName = remoteName.trim();
+    if (!normalizedName) {
+      return;
+    }
+
+    let shouldRequest = true;
+
+    setRemoteUsageByName((previous) => {
+      const current = previous[normalizedName];
+
+      if (
+        !force &&
+        (current?.status === "loading" || current?.status === "success")
+      ) {
+        shouldRequest = false;
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [normalizedName]: {
+          status: "loading",
+        },
+      };
+    });
+
+    if (!shouldRequest) {
+      return;
+    }
+
+    const result = await getBackupRemoteUsageAction({
+      remoteName: normalizedName,
+    });
+
+    setRemoteUsageByName((previous) => ({
+      ...previous,
+      [normalizedName]: result.success
+        ? {
+            status: "success",
+            data: result.result,
+          }
+        : {
+            status: "error",
+            error: result.error || "Could not load storage usage.",
+          },
+    }));
+  };
+
+  const handleAccountCollapseToggle = (remoteName: string, isOpen: boolean) => {
+    if (!isOpen) {
+      return;
+    }
+
+    void loadRemoteUsage(remoteName);
+  };
+
+  const buildRemoteActionsPopoverId = (remoteName: string): string =>
+    `backup-account-actions-${remoteName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}`;
+
+  const buildRemoteActionsAnchorName = (remoteName: string): string =>
+    `--${buildRemoteActionsPopoverId(remoteName)}-anchor`;
 
   const isEditingAccount = editingRemoteName !== null;
   const accountActionBusy = accountSaving || reloggingRemoteName !== null;
@@ -1473,8 +1969,8 @@ const BackupTab = () => {
         description="Configure automatic backups with rclone remotes. Source is fixed to dev.db."
       >
         <SettingsRow
-          label="Enable Automatic Backups"
-          description="When enabled, the server runs backups on your selected interval."
+          label="Enable Scheduling"
+          description="Master switch for scheduled backup runs using selected intervals."
         >
           <Toggle checked={enabled} onChange={setEnabled} />
         </SettingsRow>
@@ -1494,9 +1990,21 @@ const BackupTab = () => {
             />
           </div>
         </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Cases Backups"
+        description="Database-only backup destinations and import options."
+      >
+        <SettingsRow
+          label="Enable Cases Backups"
+          description="Turn on/off database backup syncing during backup runs."
+        >
+          <Toggle checked={caseEnabled} onChange={setCaseEnabled} />
+        </SettingsRow>
         <SettingsRow
           label="Destination Accounts"
-          description="Select one or more configured cloud accounts to receive each backup run."
+          description="Select one or more configured cloud accounts to receive database backups."
         >
           {remotes.length === 0 ? (
             <p className="text-sm text-base-content/45">No accounts yet.</p>
@@ -1515,15 +2023,231 @@ const BackupTab = () => {
           )}
         </SettingsRow>
         <SettingsRow
-          label="Destination Folder"
-          description="Base folder path inside the selected remote. Automatic backups create one subfolder per interval; manual backups use a manual folder."
+          label="Restore from Remote"
+          description="Choose an account and backup source folder, then restore database."
         >
-          <InputField
-            value={remotePath}
-            onChange={setRemotePath}
-            placeholder="rtc-backups"
+          <div className="w-full space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <SelectField
+                value={importRemoteName}
+                onChange={setImportRemoteName}
+                options={[
+                  {
+                    value: "",
+                    label: remotes.length
+                      ? "Select remote account"
+                      : "No accounts available",
+                  },
+                  ...remotes.map((remote) => ({
+                    value: remote.name,
+                    label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
+                  })),
+                ]}
+              />
+              <SelectField
+                value={importSource}
+                onChange={setImportSource}
+                options={importSourceOptions.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} (${option.folderName})`,
+                }))}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromRemote()}
+                disabled={
+                  importingRemote || importingLocal || !importRemoteName
+                }
+                className="btn btn-warning btn-sm"
+              >
+                Restore from Remote
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Restore from Local File"
+          description="Choose a backup file from this PC, then restore database."
+        >
+          <div className="w-full space-y-2">
+            <input
+              ref={localImportInputRef}
+              type="file"
+              onChange={handleLocalImportFileSelected}
+              className="hidden"
+              accept=".db,.sqlite,.sqlite3,.bak,.backup"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenLocalFilePicker}
+                disabled={importingLocal || importingRemote}
+                className="btn btn-outline btn-sm"
+              >
+                Choose Local Backup File
+              </button>
+              <p className="text-xs text-base-content/55 break-all">
+                {localImportFile
+                  ? `Selected: ${localImportFile.name}`
+                  : "No file selected."}
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromLocalFile()}
+                disabled={importingLocal || importingRemote || !localImportFile}
+                className="btn btn-warning btn-sm"
+              >
+                Restore Selected File
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <div className="px-7 pb-5">
+          <p className="text-xs text-warning">
+            Restoring backup means updating database (dev.db) and might log out
+            the current user. Make sure the selected backup file is correct.
+          </p>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Notarial Backups"
+        description="Create encrypted restic snapshots of Garage notarial files on selected destination accounts."
+      >
+        <SettingsRow
+          label="Enable Notarial Backups"
+          description="Turn on/off notarial file syncing for backup runs."
+        >
+          <Toggle checked={notarialEnabled} onChange={setNotarialEnabled} />
+        </SettingsRow>
+        <SettingsRow
+          label="Destination Accounts"
+          description="Select one or more configured accounts where notarial backups will be synced later."
+        >
+          {remotes.length === 0 ? (
+            <p className="text-sm text-base-content/45">No accounts yet.</p>
+          ) : (
+            <div className="w-full">
+              <MultiSelectPopoverDropdown
+                popoverId="notarial-backup-remotes-popover"
+                anchorName="--notarial-backup-remotes-anchor"
+                summary={notarialRemoteSummary}
+                options={remoteDropdownOptions}
+                selectedValues={notarialSelectedRemoteNames}
+                onToggle={toggleNotarialRemoteSelection}
+                emptyLabel="No accounts yet."
+              />
+            </div>
+          )}
+        </SettingsRow>
+        <SettingsRow
+          label="Snapshot Retention"
+          description="Keep notarial snapshot history within this interval and prune older snapshots."
+        >
+          <SelectField
+            value={notarialSnapshotRetentionInterval}
+            onChange={setNotarialSnapshotRetentionInterval}
+            options={
+              notarialRetentionDropdownOptions.length > 0
+                ? notarialRetentionDropdownOptions
+                : [{ value: "1mo", label: "1 month" }]
+            }
           />
         </SettingsRow>
+        <SettingsRow
+          label="Restore Snapshot"
+          description="Select a notarial destination and snapshot to restore Garage notarial files."
+        >
+          {notarialRestoreRemoteOptions.length === 0 ? (
+            <p className="text-sm text-base-content/45">
+              Select at least one Notarial destination account first.
+            </p>
+          ) : (
+            <div className="w-full space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                <SelectField
+                  value={notarialRestoreRemoteName}
+                  onChange={setNotarialRestoreRemoteName}
+                  options={[
+                    {
+                      value: "",
+                      label: "Select notarial destination",
+                    },
+                    ...notarialRestoreRemoteOptions,
+                  ]}
+                />
+                <SelectField
+                  value={selectedNotarialSnapshotId}
+                  onChange={setSelectedNotarialSnapshotId}
+                  options={[
+                    {
+                      value: "",
+                      label: loadingNotarialSnapshots
+                        ? "Loading snapshots..."
+                        : notarialSnapshotDropdownOptions.length > 0
+                          ? "Select snapshot"
+                          : "No snapshots available",
+                    },
+                    ...notarialSnapshotDropdownOptions,
+                  ]}
+                  disabled={
+                    !notarialRestoreRemoteName || loadingNotarialSnapshots
+                  }
+                />
+              </div>
+
+              {notarialSnapshotsError && (
+                <p className="text-xs text-warning">{notarialSnapshotsError}</p>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadNotarialSnapshots(notarialRestoreRemoteName, {
+                      notifyOnSuccess: true,
+                      notifyOnError: true,
+                    })
+                  }
+                  disabled={
+                    !notarialRestoreRemoteName || loadingNotarialSnapshots
+                  }
+                  className="btn btn-ghost btn-sm"
+                >
+                  Refresh Snapshots
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRestoreNotarialSnapshot()}
+                  disabled={
+                    !notarialRestoreRemoteName ||
+                    !selectedNotarialSnapshotId ||
+                    loadingNotarialSnapshots ||
+                    restoringNotarialSnapshot ||
+                    importingRemote ||
+                    importingLocal ||
+                    runningBackup ||
+                    cancellingBackup
+                  }
+                  className="btn btn-warning btn-sm"
+                >
+                  Restore Notarial Snapshot
+                </button>
+              </div>
+            </div>
+          )}
+        </SettingsRow>
+        <div className="px-7 pb-5">
+          <p className="text-xs text-base-content/45">
+            Notarial backups use restic repositories at each destination account
+            under rtc-backups/notarial-restic. Restore any prior snapshot within
+            the configured retention interval.
+          </p>
+        </div>
       </SettingsCard>
 
       <SettingsCard
@@ -1538,60 +2262,228 @@ const BackupTab = () => {
           ) : (
             <div className="space-y-2">
               {remotes.map((remote) => (
-                <div
+                <Collapse
                   key={remote.name}
-                  className="flex items-center justify-between rounded-xl border border-base-300/60 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-base-content truncate">
-                      {remote.name}
-                    </p>
-                    <p className="text-xs text-base-content/40 tracking-wide mt-0.5 break-all">
-                      {getRemoteProviderDetails(remote)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleClearAccountFiles(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm text-warning rounded-lg"
-                    >
-                      <FiDatabase size={14} /> Clear Files
-                    </button>
-                    {OAUTH_PROVIDERS.has(remote.provider.toLowerCase()) && (
+                  id={`backup-account-collapse-${remote.name}`}
+                  title={remote.name}
+                  subtitle={
+                    <>
+                      <p>{getRemoteProviderDetails(remote)}</p>
+                      {!!remote.basePath.trim() && (
+                        <p className="text-[11px] text-base-content/35 mt-1 break-all">
+                          Base folder: {remote.basePath}
+                        </p>
+                      )}
+                    </>
+                  }
+                  onToggle={(isOpen) =>
+                    handleAccountCollapseToggle(remote.name, isOpen)
+                  }
+                  headerActions={
+                    <>
                       <button
                         type="button"
-                        onClick={() =>
-                          void handleReloginAccount(
-                            remote.name,
-                            remote.provider,
-                          )
+                        popoverTarget={buildRemoteActionsPopoverId(remote.name)}
+                        style={
+                          {
+                            anchorName: buildRemoteActionsAnchorName(
+                              remote.name,
+                            ),
+                          } as React.CSSProperties
                         }
                         disabled={accountActionBusy}
-                        className="btn btn-ghost btn-sm text-info rounded-lg"
+                        className="btn btn-ghost btn-sm btn-circle"
+                        aria-label={`Open actions for ${remote.name}`}
                       >
-                        <FiRefreshCw size={14} /> Re-login
+                        <FiSettings size={15} />
                       </button>
+                      <ul
+                        popover="auto"
+                        id={buildRemoteActionsPopoverId(remote.name)}
+                        className="dropdown menu p-2 shadow-lg bg-base-100 rounded-box w-44 border border-base-200"
+                        style={
+                          {
+                            positionAnchor: buildRemoteActionsAnchorName(
+                              remote.name,
+                            ),
+                            inset: "auto",
+                            top: "anchor(bottom)",
+                            left: "anchor(end)",
+                            marginTop: "0.35rem",
+                            zIndex: 9999,
+                          } as React.CSSProperties
+                        }
+                      >
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleClearAccountFiles(remote.name)
+                            }
+                            disabled={accountActionBusy}
+                            className="text-warning"
+                          >
+                            <FiDatabase size={14} /> Clear Files
+                          </button>
+                        </li>
+                        {OAUTH_PROVIDERS.has(remote.provider.toLowerCase()) && (
+                          <li>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleReloginAccount(
+                                  remote.name,
+                                  remote.provider,
+                                )
+                              }
+                              disabled={accountActionBusy}
+                              className="text-info"
+                            >
+                              <FiRefreshCw size={14} /> Re-login
+                            </button>
+                          </li>
+                        )}
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditAccount(remote.name)}
+                            disabled={accountActionBusy}
+                          >
+                            <FiEdit2 size={14} /> Edit
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleDeleteAccount(remote.name)
+                            }
+                            disabled={accountActionBusy}
+                            className="text-error"
+                          >
+                            <FiTrash2 size={14} /> Remove
+                          </button>
+                        </li>
+                      </ul>
+                    </>
+                  }
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.12em] text-base-content/45">
+                        Account Usage
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void loadRemoteUsage(remote.name, true)}
+                        disabled={
+                          remoteUsageByName[remote.name]?.status === "loading"
+                        }
+                        className="btn btn-ghost btn-xs"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {remoteUsageByName[remote.name]?.status === "loading" && (
+                      <p className="text-xs text-base-content/55">
+                        Loading storage usage...
+                      </p>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => handleStartEditAccount(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm rounded-lg"
-                    >
-                      <FiEdit2 size={14} /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteAccount(remote.name)}
-                      disabled={accountActionBusy}
-                      className="btn btn-ghost btn-sm text-error/80 hover:text-error rounded-lg"
-                    >
-                      <FiTrash2 size={14} /> Remove
-                    </button>
+
+                    {remoteUsageByName[remote.name]?.status === "error" && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-error/85">
+                          {remoteUsageByName[remote.name]?.error ||
+                            "Could not load storage usage."}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Remaining
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Used
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                            <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                              Total
+                            </p>
+                            <p className="text-sm font-semibold text-base-content">
+                              Not available
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {remoteUsageByName[remote.name]?.status === "success" &&
+                      (() => {
+                        const usage = remoteUsageByName[remote.name]?.data;
+                        const used = usage?.usedBytes ?? null;
+                        const total = usage?.totalBytes ?? null;
+                        const free = usage?.freeBytes ?? null;
+
+                        const usedPercent =
+                          used !== null && total !== null && total > 0
+                            ? Math.max(0, Math.min(100, (used / total) * 100))
+                            : null;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Remaining
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(free)}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Used
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(used)}
+                                </p>
+                              </div>
+                              <div className="rounded-lg bg-base-200/50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-wide text-base-content/45">
+                                  Total
+                                </p>
+                                <p className="text-sm font-semibold text-base-content">
+                                  {formatBytes(total)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {usedPercent !== null && (
+                              <div>
+                                <progress
+                                  className="progress progress-primary w-full h-2"
+                                  value={usedPercent}
+                                  max={100}
+                                />
+                                <p className="text-[11px] text-base-content/50 mt-1">
+                                  {usedPercent.toFixed(1)}% used
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
-                </div>
+                </Collapse>
               ))}
             </div>
           )}
@@ -1685,14 +2577,35 @@ const BackupTab = () => {
           ) : newProvider === "local" ? (
             <p className="text-xs text-base-content/45">
               Local Folder does not require credentials. Set the target path in
-              <span className="font-semibold"> Destination Folder</span> under
-              Backup Schedule.
+              <span className="font-semibold"> rtc-backups</span> under each
+              account base folder.
             </p>
           ) : (
             <p className="text-xs text-base-content/45">
               No extra fields are required for this provider.
             </p>
           )}
+
+          <div>
+            <p className="text-xs text-base-content/35 mb-1.5">
+              Account Base Folder (optional)
+            </p>
+            <input
+              type="text"
+              value={accountBasePath}
+              onChange={(event) => setAccountBasePath(event.target.value)}
+              placeholder="team-a or projects/rtc"
+              disabled={accountActionBusy}
+              className="input input-bordered h-10 w-full text-sm bg-base-100 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 rounded-lg placeholder:text-base-content/25"
+            />
+            <p className="text-xs text-base-content/40 mt-1">
+              {newProvider.toLowerCase() === "s3"
+                ? "For S3, this is the folder inside the bucket and is prepended before rtc-backups."
+                : newProvider.toLowerCase() === "smb"
+                  ? "For SMB, this is the folder inside the share and is prepended before rtc-backups."
+                  : "Prepended before rtc-backups for this account."}
+            </p>
+          </div>
 
           <div className="flex justify-end gap-2">
             {isEditingAccount && (
@@ -1726,102 +2639,6 @@ const BackupTab = () => {
               override and cancel the current sign-in flow.
             </p>
           )}
-        </div>
-      </SettingsCard>
-
-      <SettingsCard
-        title="Import Backup"
-        description="Restore from a remote backup folder or a local backup file from this PC. This updates the database file (dev.db)."
-      >
-        <SettingsRow
-          label="Import from Remote"
-          description="Choose an account and backup source folder, then update database."
-        >
-          <div className="w-full space-y-2">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-              <SelectField
-                value={importRemoteName}
-                onChange={setImportRemoteName}
-                options={[
-                  {
-                    value: "",
-                    label: remotes.length
-                      ? "Select remote account"
-                      : "No accounts available",
-                  },
-                  ...remotes.map((remote) => ({
-                    value: remote.name,
-                    label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
-                  })),
-                ]}
-              />
-              <SelectField
-                value={importSource}
-                onChange={setImportSource}
-                options={importSourceOptions.map((option) => ({
-                  value: option.value,
-                  label: `${option.label} (${option.folderName})`,
-                }))}
-              />
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleImportFromRemote()}
-                disabled={
-                  importingRemote || importingLocal || !importRemoteName
-                }
-                className="btn btn-warning btn-sm"
-              >
-                Import from Remote
-              </button>
-            </div>
-          </div>
-        </SettingsRow>
-        <SettingsRow
-          label="Import from Local File"
-          description="Choose a backup file from this PC, then update database."
-        >
-          <div className="w-full space-y-2">
-            <input
-              ref={localImportInputRef}
-              type="file"
-              onChange={handleLocalImportFileSelected}
-              className="hidden"
-              accept=".db,.sqlite,.sqlite3,.bak,.backup"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleOpenLocalFilePicker}
-                disabled={importingLocal || importingRemote}
-                className="btn btn-outline btn-sm"
-              >
-                Choose Local Backup File
-              </button>
-              <p className="text-xs text-base-content/55 break-all">
-                {localImportFile
-                  ? `Selected: ${localImportFile.name}`
-                  : "No file selected."}
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleImportFromLocalFile()}
-                disabled={importingLocal || importingRemote || !localImportFile}
-                className="btn btn-warning btn-sm"
-              >
-                Import Selected File
-              </button>
-            </div>
-          </div>
-        </SettingsRow>
-        <div className="px-7 pb-5">
-          <p className="text-xs text-warning">
-            Importing backup means updating database (dev.db) and might log out
-            the current user. Make sure the selected backup file is correct.
-          </p>
         </div>
       </SettingsCard>
 
@@ -1881,10 +2698,10 @@ const BackupTab = () => {
               <FiDatabase size={15} /> Backup Now
             </button>
           )}
-          {selectedRemoteNames.length === 0 && (
+          {!hasManualRunDestinations && (
             <p className="text-xs text-base-content/35 mt-2">
-              Select or create at least one destination account to enable manual
-              backup.
+              Select at least one active destination account (Cases or Notarial)
+              to enable manual backup.
             </p>
           )}
         </div>

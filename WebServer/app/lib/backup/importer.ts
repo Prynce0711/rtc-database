@@ -386,7 +386,11 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
     const config = await deps.readBackupConfigFile();
     const sourceFolder = resolveImportSourceFolder(source);
     const backupFileName = path.basename(deps.fixedBackupSourcePath);
+    const remoteBasePath = (
+      config.remoteBasePaths[normalizedRemoteName] ?? ""
+    ).trim();
     const remoteSourceFolderRelativePath = deps.joinRemotePath(
+      remoteBasePath,
       config.remotePath,
       sourceFolder,
     );

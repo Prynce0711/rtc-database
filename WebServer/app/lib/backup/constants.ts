@@ -96,6 +96,7 @@ export const BACKUP_INTERVAL_LOOKUP = new Map<
 
 export const DEFAULT_SELECTED_INTERVALS: BackupIntervalKey[] = ["1h"];
 export const MANUAL_BACKUP_FOLDER = "manual";
+export const FIXED_BACKUP_DESTINATION_FOLDER = "rtc-backups";
 
 export type BackupImportSourceKey = "manual" | BackupIntervalKey;
 
@@ -178,6 +179,9 @@ export const BACKUP_PROVIDER_OPTIONS: BackupProviderOption[] = [
 // Local backup source path.
 export const FIXED_BACKUP_SOURCE_PATH = path.join(process.cwd(), "dev.db");
 
+// Reserved remote names.
+export const NOTARIAL_REMOTE_NAME = "notarial";
+
 // Scheduler/logging/runtime numeric limits.
 export const MAX_BACKUP_LOG_ENTRIES = 500;
 export const MAX_TIMER_MS = 2_147_000_000;
@@ -203,7 +207,10 @@ export const ONEDRIVE_DEFAULT_ACCESS_SCOPES =
   "Files.Read Files.ReadWrite Files.Read.All Files.ReadWrite.All Sites.Read.All offline_access User.Read openid profile email";
 
 // Option handling for sensitive and special-case values.
-export const REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE = new Set(["drive_id"]);
+export const REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE = new Set([
+  "drive_id",
+  "domain",
+]);
 export const SENSITIVE_RCLONE_OPTION_KEYS = new Set([
   "token",
   "config_token",

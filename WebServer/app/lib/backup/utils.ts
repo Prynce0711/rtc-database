@@ -13,10 +13,20 @@ import {
 } from "./constants";
 
 export function joinRemotePath(...segments: string[]): string {
-  return segments
-    .map((segment) => segment.trim().replace(/^\/+|\/+$/g, ""))
-    .filter((segment) => !!segment)
-    .join("/");
+  const normalizedParts: string[] = [];
+
+  for (const rawSegment of segments) {
+    const parts = rawSegment
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter((part) => !!part);
+
+    normalizedParts.push(...parts);
+  }
+
+  return normalizedParts.join("/");
 }
 
 export function redactSensitiveText(value: string): string {
@@ -86,6 +96,11 @@ export function buildProviderAwareRemoteOptions(
 ): Record<string, string> {
   const normalizedProvider = provider.trim().toLowerCase();
   const normalizedOptions = normalizeRemoteOptions(options, mode);
+
+  if (normalizedProvider === "s3" && !normalizedOptions.provider) {
+    // Use rclone's generic provider default for S3-compatible backends.
+    normalizedOptions.provider = "Other";
+  }
 
   if (!normalizedOptions.token && normalizedOptions.config_token) {
     normalizedOptions.token = normalizedOptions.config_token;
