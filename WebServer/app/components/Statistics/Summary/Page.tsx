@@ -43,6 +43,34 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const parseBranchNumber = (branch: string): number | null => {
+  const match = branch.match(/\d+/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const compareBranchLabel = (left: string, right: string): number => {
+  const leftNumber = parseBranchNumber(left);
+  const rightNumber = parseBranchNumber(right);
+
+  if (
+    leftNumber !== null &&
+    rightNumber !== null &&
+    leftNumber !== rightNumber
+  ) {
+    return leftNumber - rightNumber;
+  }
+
+  if (leftNumber !== null && rightNumber === null) return -1;
+  if (leftNumber === null && rightNumber !== null) return 1;
+
+  return left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+};
+
 const TOTAL_FIELDS: Array<
   Exclude<
     keyof SummaryRow,
@@ -114,20 +142,28 @@ export default function SummaryPage() {
   const filteredData = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return summaryData.filter((row) => {
-      if (row.courtType !== activeCourtType) return false;
-      if (!row.raffleDate.startsWith(activeMonthKey)) return false;
+    return summaryData
+      .filter((row) => {
+        if (row.courtType !== activeCourtType) return false;
+        if (!row.raffleDate.startsWith(activeMonthKey)) return false;
 
-      if (!q) return true;
+        if (!q) return true;
 
-      return (
-        row.branch.toLowerCase().includes(q) ||
-        row.raffleDate.toLowerCase().includes(q) ||
-        String(row.total).includes(q) ||
-        String(row.civilFamily).includes(q) ||
-        String(row.criminalFamily).includes(q)
+        return (
+          row.branch.toLowerCase().includes(q) ||
+          row.raffleDate.toLowerCase().includes(q) ||
+          String(row.total).includes(q) ||
+          String(row.civilFamily).includes(q) ||
+          String(row.criminalFamily).includes(q)
+        );
+      })
+      .sort(
+        (left, right) =>
+          compareBranchLabel(left.branch, right.branch) ||
+          left.raffleDate.localeCompare(right.raffleDate) ||
+          (left.id ?? Number.MAX_SAFE_INTEGER) -
+            (right.id ?? Number.MAX_SAFE_INTEGER),
       );
-    });
   }, [summaryData, activeCourtType, activeMonthKey, search]);
 
   const totals = useMemo(() => {
