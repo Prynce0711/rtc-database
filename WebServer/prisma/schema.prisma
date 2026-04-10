@@ -443,67 +443,94 @@ model monthlyStatistics {
   @@unique([month, category, branch])
 }
 
+model SummaryStatistic {
+  id                           Int       @id @default(autoincrement())
+  courtType                    String
+  reportYear                   Int
+  branch                       String
+  raffleDate                   DateTime
+  civilFamily                  Int       @default(0)
+  civilOrdinary                Int       @default(0)
+  civilReceivedViaReraffled    Int       @default(0)
+  civilUnloaded                Int       @default(0)
+  lrcPetition                  Int       @default(0)
+  lrcSpProc                    Int       @default(0)
+  lrcReceivedViaReraffled      Int       @default(0)
+  lrcUnloaded                  Int       @default(0)
+  criminalFamily               Int       @default(0)
+  criminalDrugs                Int       @default(0)
+  criminalOrdinary             Int       @default(0)
+  criminalReceivedViaReraffled Int       @default(0)
+  criminalUnloaded             Int       @default(0)
+  total                        Int       @default(0)
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime? @updatedAt
+
+  @@unique([courtType, branch, raffleDate])
+  @@index([reportYear, courtType])
+}
+
 model JudgementMunicipal {
-  id              Int     @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   branchNo        String?
   dateRecorded    DateTime @default(now())
   civilV          Int
   civilInc        Int
   criminalV       Int
   criminalInc     Int
-  totalHeard      Int     @default(0)
-  disposedCivil   Int     @default(0)
-  disposedCrim    Int     @default(0)
-  totalDisposed   Int     @default(0)
-  pdlM            Int     @default(0)
-  pdlF            Int     @default(0)
-  pdlTotal        Int     @default(0)
-  pdlV            Int     @default(0)
-  pdlI            Int     @default(0)
-  pdlBail         Int     @default(0)
-  pdlRecognizance Int     @default(0)
-  pdlMinRor       Int     @default(0)
-  pdlMaxSentence  Int     @default(0)
-  pdlDismissal    Int     @default(0)
-  pdlAcquittal    Int     @default(0)
-  pdlMinSentence  Int     @default(0)
-  pdlOthers       Int     @default(0)
-  total           Int     @default(0)
+  totalHeard      Int      @default(0)
+  disposedCivil   Int      @default(0)
+  disposedCrim    Int      @default(0)
+  totalDisposed   Int      @default(0)
+  pdlM            Int      @default(0)
+  pdlF            Int      @default(0)
+  pdlTotal        Int      @default(0)
+  pdlV            Int      @default(0)
+  pdlI            Int      @default(0)
+  pdlBail         Int      @default(0)
+  pdlRecognizance Int      @default(0)
+  pdlMinRor       Int      @default(0)
+  pdlMaxSentence  Int      @default(0)
+  pdlDismissal    Int      @default(0)
+  pdlAcquittal    Int      @default(0)
+  pdlMinSentence  Int      @default(0)
+  pdlOthers       Int      @default(0)
+  total           Int      @default(0)
 }
 
 model JudgementRegional {
-  id              Int     @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   branchNo        String?
   dateRecorded    DateTime @default(now())
   civilV          Int
   civilInc        Int
   criminalV       Int
   criminalInc     Int
-  totalHeard      Int     @default(0)
-  disposedCivil   Int     @default(0)
-  disposedCrim    Int     @default(0)
-  summaryProc     Int     @default(0)
-  casesDisposed   Int     @default(0)
-  pdlM            Int     @default(0)
-  pdlF            Int     @default(0)
-  pdlCICL         Int     @default(0)
-  pdlTotal        Int     @default(0)
-  pdlV            Int     @default(0)
-  pdlInc          Int     @default(0)
-  pdlBail         Int     @default(0)
-  pdlRecognizance Int     @default(0)
-  pdlMinRor       Int     @default(0)
-  pdlMaxSentence  Int     @default(0)
-  pdlDismissal    Int     @default(0)
-  pdlAcquittal    Int     @default(0)
-  pdlMinSentence  Int     @default(0)
-  pdlProbation    Int     @default(0)
-  ciclM           Int     @default(0)
-  ciclF           Int     @default(0)
-  ciclV           Int     @default(0)
-  ciclInc         Int     @default(0)
-  fine            Int     @default(0)
-  total           Int     @default(0)
+  totalHeard      Int      @default(0)
+  disposedCivil   Int      @default(0)
+  disposedCrim    Int      @default(0)
+  summaryProc     Int      @default(0)
+  casesDisposed   Int      @default(0)
+  pdlM            Int      @default(0)
+  pdlF            Int      @default(0)
+  pdlCICL         Int      @default(0)
+  pdlTotal        Int      @default(0)
+  pdlV            Int      @default(0)
+  pdlInc          Int      @default(0)
+  pdlBail         Int      @default(0)
+  pdlRecognizance Int      @default(0)
+  pdlMinRor       Int      @default(0)
+  pdlMaxSentence  Int      @default(0)
+  pdlDismissal    Int      @default(0)
+  pdlAcquittal    Int      @default(0)
+  pdlMinSentence  Int      @default(0)
+  pdlProbation    Int      @default(0)
+  ciclM           Int      @default(0)
+  ciclF           Int      @default(0)
+  ciclV           Int      @default(0)
+  ciclInc         Int      @default(0)
+  fine            Int      @default(0)
+  total           Int      @default(0)
 }
 
 model Chat {
@@ -553,7 +580,7 @@ enum BackupFrequency {
   MANUAL
   DAILY
   WEEKLY
-  MONTHLY
+  MONTHLYe
 }
 
 enum LogRetention {
