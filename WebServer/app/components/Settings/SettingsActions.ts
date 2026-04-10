@@ -92,18 +92,19 @@ export async function updateSystemSettings(
 
     const normalized = normalizeSettingsRecord(updated);
 
-    // Sync notarial remote with Garage settings (fire-and-forget)
-    syncNotarialRemote().catch((error) => {
-      console.error(
-        "Failed to sync notarial remote after settings update:",
-        error,
-      );
-    });
+    // Keep notarial remote in lockstep with Garage settings.
+    await syncNotarialRemote();
 
     return { success: true, result: normalized };
   } catch (error) {
     console.error("Error updating system settings:", error);
-    return { success: false, error: "Failed to update system settings" };
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update system settings",
+    };
   }
 }
 

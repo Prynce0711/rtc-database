@@ -96,6 +96,7 @@ export const BACKUP_INTERVAL_LOOKUP = new Map<
 
 export const DEFAULT_SELECTED_INTERVALS: BackupIntervalKey[] = ["1h"];
 export const MANUAL_BACKUP_FOLDER = "manual";
+export const FIXED_BACKUP_DESTINATION_FOLDER = "rtc-backups";
 
 export type BackupImportSourceKey = "manual" | BackupIntervalKey;
 

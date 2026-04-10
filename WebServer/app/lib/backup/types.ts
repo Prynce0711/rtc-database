@@ -17,8 +17,12 @@ export interface BackupLogEntry {
 
 export interface BackupConfig {
   enabled: boolean;
+  caseEnabled: boolean;
+  notarialEnabled: boolean;
   selectedIntervals: BackupIntervalKey[];
   selectedRemoteNames: string[];
+  notarialSelectedRemoteNames: string[];
+  notarialDeletedFilesMaxAgeDays: number;
   remoteAccountIdentities: Record<string, string>;
   remoteBasePaths: Record<string, string>;
   remotePath: string;
@@ -38,7 +42,11 @@ export interface BackupRemote {
 
 export interface BackupConfigPatch {
   enabled?: boolean;
+  caseEnabled?: boolean;
+  notarialEnabled?: boolean;
   selectedIntervals?: string[];
   selectedRemoteNames?: string[];
+  notarialSelectedRemoteNames?: string[];
+  notarialDeletedFilesMaxAgeDays?: number;
   remotePath?: string;
 }

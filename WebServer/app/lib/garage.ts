@@ -31,11 +31,13 @@ function hashSettings(settings: {
   garageIsHttps: boolean;
   garageAccessKey: string | null;
   garageSecretKey: string | null;
+  garageRegion: string | null;
 }): string {
   const settingsString = JSON.stringify({
     host: settings.garageHost,
     port: settings.garagePort,
     isHttps: settings.garageIsHttps,
+    region: settings.garageRegion,
     accessKeyId: settings.garageAccessKey,
     secretAccessKey: settings.garageSecretKey,
   });
@@ -71,9 +73,10 @@ export async function getGarageClient(): Promise<S3Client> {
   // Settings changed or client not cached, rebuild
   const protocol = settings.garageIsHttps ? "https" : "http";
   const endpoint = `${protocol}://${settings.garageHost}:${settings.garagePort}`;
+  const region = settings.garageRegion?.trim() || "garage";
 
   cachedGarageClient = new S3Client({
-    region: "garage",
+    region,
     endpoint,
     credentials: {
       accessKeyId: settings.garageAccessKey,

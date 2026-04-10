@@ -41,6 +41,7 @@ const SystemTab = () => {
   const [garageSecretKey, setGarageSecretKey] = useState("");
   const [showGarageSecretKey, setShowGarageSecretKey] = useState(false);
   const [garageBucket, setGarageBucket] = useState("");
+  const [garageRegion, setGarageRegion] = useState("garage");
   const [garageAdminToken, setGarageAdminToken] = useState("");
   const [showGarageAdminToken, setShowGarageAdminToken] = useState(false);
   const [garageMetricsToken, setGarageMetricsToken] = useState("");
@@ -116,6 +117,7 @@ const SystemTab = () => {
       setGarageAccessKey(settings.garageAccessKey ?? "");
       setGarageSecretKey(settings.garageSecretKey ?? "");
       setGarageBucket(settings.garageBucket ?? "");
+      setGarageRegion(settings.garageRegion ?? "garage");
       setGarageAdminToken(settings.garageAdminToken ?? "");
       setGarageMetricsToken(settings.garageMetricsToken ?? "");
       void loadGarageInfo();
@@ -173,6 +175,7 @@ const SystemTab = () => {
       garageAccessKey: garageAccessKey.trim() || null,
       garageSecretKey: garageSecretKey === "" ? null : garageSecretKey,
       garageBucket: garageBucket.trim() || null,
+      garageRegion: garageRegion.trim() || "garage",
       garageAdminToken: garageAdminToken === "" ? null : garageAdminToken,
       garageMetricsToken: garageMetricsToken === "" ? null : garageMetricsToken,
       passwordExpiration,
@@ -413,6 +416,16 @@ const SystemTab = () => {
             value={garageBucket}
             onChange={setGarageBucket}
             placeholder="notarial-documents"
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Region"
+          description="S3 region label used for Garage and rclone remote configuration (default: garage)."
+        >
+          <InputField
+            value={garageRegion}
+            onChange={setGarageRegion}
+            placeholder="garage"
           />
         </SettingsRow>
         <SettingsRow

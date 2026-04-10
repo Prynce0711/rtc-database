@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   BACKUP_INTERVAL_LOOKUP,
   DEFAULT_SELECTED_INTERVALS,
+  FIXED_BACKUP_DESTINATION_FOLDER,
   REMOTE_OPTION_KEYS_ALLOW_EMPTY_VALUE,
   type BackupIntervalKey,
 } from "./constants";
@@ -217,12 +218,16 @@ export async function ensureBackupArtifacts(): Promise<void> {
 
 async function getDefaultBackupConfig(): Promise<BackupConfig> {
   return {
-    enabled: false,
+    enabled: true,
+    caseEnabled: true,
+    notarialEnabled: true,
     selectedIntervals: [...DEFAULT_SELECTED_INTERVALS],
     selectedRemoteNames: [],
+    notarialSelectedRemoteNames: [],
+    notarialDeletedFilesMaxAgeDays: 30,
     remoteAccountIdentities: {},
     remoteBasePaths: {},
-    remotePath: "rtc-backups",
+    remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     lastRunAt: null,
     lastRunStatus: "IDLE",
     lastRunMessage: null,
@@ -242,6 +247,14 @@ async function normalizeBackupConfig(
   return {
     enabled:
       typeof value.enabled === "boolean" ? value.enabled : defaults.enabled,
+    caseEnabled:
+      typeof value.caseEnabled === "boolean"
+        ? value.caseEnabled
+        : defaults.caseEnabled,
+    notarialEnabled:
+      typeof value.notarialEnabled === "boolean"
+        ? value.notarialEnabled
+        : defaults.notarialEnabled,
     selectedIntervals: normalizeSelectedIntervals(
       legacy.selectedIntervals,
       legacy.intervalMinutes,
@@ -250,14 +263,22 @@ async function normalizeBackupConfig(
       legacy.selectedRemoteNames,
       legacy.remoteName,
     ),
+    notarialSelectedRemoteNames: normalizeSelectedRemoteNames(
+      legacy.notarialSelectedRemoteNames,
+      undefined,
+      false,
+    ),
+    notarialDeletedFilesMaxAgeDays:
+      typeof legacy.notarialDeletedFilesMaxAgeDays === "number" &&
+      Number.isFinite(legacy.notarialDeletedFilesMaxAgeDays) &&
+      legacy.notarialDeletedFilesMaxAgeDays > 0
+        ? Math.floor(legacy.notarialDeletedFilesMaxAgeDays)
+        : defaults.notarialDeletedFilesMaxAgeDays,
     remoteAccountIdentities: normalizeRemoteAccountIdentities(
       value.remoteAccountIdentities,
     ),
     remoteBasePaths: normalizeRemoteBasePaths(value.remoteBasePaths),
-    remotePath:
-      typeof value.remotePath === "string"
-        ? value.remotePath.trim()
-        : defaults.remotePath,
+    remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     lastRunAt: normalizeIsoDate(value.lastRunAt),
     lastRunStatus: isBackupRunStatus(value.lastRunStatus)
       ? value.lastRunStatus

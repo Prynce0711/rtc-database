@@ -55,8 +55,12 @@ export type BackupRemoteUsage = BackupRemoteStorageUsage;
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
+  caseEnabled: z.boolean().default(true),
+  notarialEnabled: z.boolean().default(false),
   selectedIntervals: z.array(z.string()).default([]),
   selectedRemoteNames: z.array(z.string()).default([]),
+  notarialSelectedRemoteNames: z.array(z.string()).default([]),
+  notarialDeletedFilesMaxAgeDays: z.number().int().min(1).max(3650),
   remotePath: z.string(),
 });
 
@@ -145,8 +149,13 @@ export async function saveBackupConfiguration(
 
     await updateBackupConfig({
       enabled: parsed.data.enabled,
+      caseEnabled: parsed.data.caseEnabled,
+      notarialEnabled: parsed.data.notarialEnabled,
       selectedIntervals: parsed.data.selectedIntervals,
       selectedRemoteNames: parsed.data.selectedRemoteNames,
+      notarialSelectedRemoteNames: parsed.data.notarialSelectedRemoteNames,
+      notarialDeletedFilesMaxAgeDays:
+        parsed.data.notarialDeletedFilesMaxAgeDays,
       remotePath: parsed.data.remotePath,
     });
 

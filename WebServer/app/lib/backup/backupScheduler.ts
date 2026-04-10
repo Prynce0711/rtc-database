@@ -26,6 +26,7 @@ import {
   BACKUP_INTERVAL_KEYS,
   BACKUP_INTERVAL_OPTIONS,
   BACKUP_PROVIDER_OPTIONS,
+  FIXED_BACKUP_DESTINATION_FOLDER,
   FIXED_BACKUP_SOURCE_PATH,
   IDENTITY_REFRESH_RETRY_MS,
   MANUAL_BACKUP_FOLDER,
@@ -344,6 +345,27 @@ function buildRcloneDestination(
   return cleanedPath ? `${cleanedRemote}:${cleanedPath}` : `${cleanedRemote}:`;
 }
 
+function buildRetentionDaysArg(days: number): string {
+  const normalizedDays =
+    Number.isFinite(days) && days > 0 ? Math.floor(days) : 30;
+  return `${String(normalizedDays)}d`;
+}
+
+function normalizeEndpointForComparison(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/\/+$/, "");
+}
+
+function extractS3BucketFromBasePath(basePath: string): string {
+  const parts = basePath
+    .trim()
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => !!part);
+
+  return parts[0] ?? "";
+}
+
 function getRemoteBasePath(config: BackupConfig, remoteName: string): string {
   const normalizedName = normalizeRemoteName(remoteName);
   if (!normalizedName) {
@@ -613,8 +635,25 @@ async function runBackup(
         .filter((remoteName) => !!remoteName),
     ),
   );
+  const activeCaseSelectedRemoteNames = current.caseEnabled
+    ? selectedRemoteNames
+    : [];
 
-  if (selectedRemoteNames.length === 0) {
+  const notarialSelectedRemoteNames = Array.from(
+    new Set(
+      current.notarialSelectedRemoteNames
+        .map((remoteName) => normalizeRemoteName(remoteName))
+        .filter((remoteName) => !!remoteName),
+    ),
+  );
+  const activeNotarialSelectedRemoteNames = current.notarialEnabled
+    ? notarialSelectedRemoteNames
+    : [];
+
+  if (
+    activeCaseSelectedRemoteNames.length === 0 &&
+    activeNotarialSelectedRemoteNames.length === 0
+  ) {
     throw new Error("No backup account selected.");
   }
 
@@ -651,13 +690,13 @@ async function runBackup(
 
   appendBackupLog(
     "info",
-    `${runLabel} started from ${sourcePath} to ${selectedRemoteNames.length} remote(s).`,
+    `${runLabel} started for ${activeCaseSelectedRemoteNames.length} database remote(s) and ${activeNotarialSelectedRemoteNames.length} notarial remote(s).`,
   );
 
   try {
     const remoteOutputs: string[] = [];
 
-    for (const remoteName of selectedRemoteNames) {
+    for (const remoteName of activeCaseSelectedRemoteNames) {
       const remoteBasePath = getRemoteBasePath(current, remoteName);
       const destinationRelativePath = joinRemotePath(
         remoteBasePath,
@@ -692,11 +731,146 @@ async function runBackup(
       appendBackupLog("info", `Completed sync to remote ${remoteName}.`);
     }
 
+    if (activeNotarialSelectedRemoteNames.length > 0) {
+      const settingsResult = await getSystemSettings();
+      if (!settingsResult.success) {
+        throw new Error(
+          `Failed to load system settings for notarial sync: ${settingsResult.error}`,
+        );
+      }
+
+      const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+      if (!garageBucket) {
+        throw new Error(
+          "Garage bucket is not configured. Set Garage bucket in System Settings to run notarial sync.",
+        );
+      }
+
+      const notarialSource = buildRcloneDestination(
+        NOTARIAL_REMOTE_NAME,
+        garageBucket,
+      );
+      const retentionDaysArg = buildRetentionDaysArg(
+        current.notarialDeletedFilesMaxAgeDays,
+      );
+      const retentionStamp = new Date().toISOString().slice(0, 10);
+      const remoteConfigMap = await getRemoteConfigMap();
+      const notarialRemoteConfig = remoteConfigMap.get(NOTARIAL_REMOTE_NAME);
+      const notarialEndpoint = normalizeEndpointForComparison(
+        notarialRemoteConfig?.options.endpoint,
+      );
+
+      for (const remoteName of activeNotarialSelectedRemoteNames) {
+        const remoteBasePath = getRemoteBasePath(current, remoteName);
+        const targetRemoteConfig = remoteConfigMap.get(remoteName);
+        const targetEndpoint = normalizeEndpointForComparison(
+          targetRemoteConfig?.options.endpoint,
+        );
+        const targetBucket = extractS3BucketFromBasePath(remoteBasePath);
+        const isS3Target =
+          (targetRemoteConfig?.provider ?? "").trim().toLowerCase() === "s3";
+
+        if (
+          isS3Target &&
+          !!notarialEndpoint &&
+          notarialEndpoint === targetEndpoint &&
+          targetBucket === garageBucket
+        ) {
+          throw new Error(
+            `Notarial destination "${remoteName}" points to the same Garage endpoint and bucket as the notarial source (${garageBucket}), which would cause a sync loop. Choose a different destination account or bucket for notarial backups.`,
+          );
+        }
+
+        const notarialDestinationRelativePath = joinRemotePath(
+          remoteBasePath,
+          current.remotePath,
+          "notarial",
+        );
+        const notarialDestination = buildRcloneDestination(
+          remoteName,
+          notarialDestinationRelativePath,
+        );
+        const notarialDeletedRootRelativePath = joinRemotePath(
+          remoteBasePath,
+          current.remotePath,
+          "notarial-deleted",
+        );
+        const notarialDeletedRunRelativePath = joinRemotePath(
+          notarialDeletedRootRelativePath,
+          retentionStamp,
+        );
+        const notarialBackupDir = buildRcloneDestination(
+          remoteName,
+          notarialDeletedRunRelativePath,
+        );
+        const notarialDeletedRootDestination = buildRcloneDestination(
+          remoteName,
+          notarialDeletedRootRelativePath,
+        );
+
+        appendBackupLog(
+          "info",
+          `Syncing notarial files from ${notarialSource} to ${notarialDestination} with backup-dir ${notarialBackupDir}.`,
+        );
+
+        await runRcloneCommand(
+          [
+            "sync",
+            notarialSource,
+            notarialDestination,
+            "--backup-dir",
+            notarialBackupDir,
+          ],
+          {
+            "check-first": true,
+          },
+          {
+            trackAsActiveBackup: true,
+          },
+        );
+
+        appendBackupLog(
+          "info",
+          `Pruning notarial backup-dir files older than ${retentionDaysArg} at ${notarialDeletedRootDestination}.`,
+        );
+
+        try {
+          await runRcloneCommand(
+            [
+              "delete",
+              notarialDeletedRootDestination,
+              "--min-age",
+              retentionDaysArg,
+            ],
+            {},
+            {
+              trackAsActiveBackup: true,
+            },
+          );
+        } catch (error) {
+          const message = formatBackupError(error);
+          if (!isRemotePathNotFoundError(message)) {
+            throw error;
+          }
+
+          appendBackupLog(
+            "warn",
+            `No notarial backup-dir path found at ${notarialDeletedRootDestination}; skipping retention prune.`,
+          );
+        }
+
+        appendBackupLog(
+          "info",
+          `Completed notarial sync to remote ${remoteName}.`,
+        );
+      }
+    }
+
     const nowIso = new Date().toISOString();
     const completionMessage =
       remoteOutputs.length > 0
         ? remoteOutputs.join("\n")
-        : `${runLabel} completed for ${selectedRemoteNames.length} remote(s).`;
+        : `${runLabel} completed for ${activeCaseSelectedRemoteNames.length} database remote(s) and ${activeNotarialSelectedRemoteNames.length} notarial remote(s).`;
 
     const updated = await writeBackupConfigFile({
       ...current,
@@ -706,7 +880,7 @@ async function runBackup(
     });
     appendBackupLog(
       "info",
-      `${runLabel} completed successfully for ${selectedRemoteNames.length} remote(s).`,
+      `${runLabel} completed successfully for ${activeCaseSelectedRemoteNames.length} database remote(s) and ${activeNotarialSelectedRemoteNames.length} notarial remote(s).`,
     );
 
     return updated;
@@ -837,7 +1011,12 @@ function scheduleFromConfig(config: BackupConfig): void {
     return;
   }
 
-  if (config.selectedRemoteNames.length === 0) {
+  const hasActiveCaseDestinations =
+    config.caseEnabled && config.selectedRemoteNames.length > 0;
+  const hasActiveNotarialDestinations =
+    config.notarialEnabled && config.notarialSelectedRemoteNames.length > 0;
+
+  if (!hasActiveCaseDestinations && !hasActiveNotarialDestinations) {
     clearAllScheduleTimers(scheduleTimers, BACKUP_INTERVAL_KEYS);
 
     for (const intervalKey of BACKUP_INTERVAL_KEYS) {
@@ -909,6 +1088,14 @@ export async function updateBackupConfig(
     next.enabled = patch.enabled;
   }
 
+  if (typeof patch.caseEnabled === "boolean") {
+    next.caseEnabled = patch.caseEnabled;
+  }
+
+  if (typeof patch.notarialEnabled === "boolean") {
+    next.notarialEnabled = patch.notarialEnabled;
+  }
+
   if (patch.selectedIntervals !== undefined) {
     next.selectedIntervals = normalizeSelectedIntervals(
       patch.selectedIntervals,
@@ -925,13 +1112,39 @@ export async function updateBackupConfig(
     );
   }
 
-  if (patch.remotePath !== undefined) {
-    next.remotePath = patch.remotePath.trim();
+  if (patch.notarialSelectedRemoteNames !== undefined) {
+    next.notarialSelectedRemoteNames = normalizeSelectedRemoteNames(
+      patch.notarialSelectedRemoteNames,
+      undefined,
+      false,
+    );
   }
 
-  if (next.enabled && next.selectedRemoteNames.length === 0) {
+  if (patch.notarialDeletedFilesMaxAgeDays !== undefined) {
+    const nextRetentionDays = Math.floor(patch.notarialDeletedFilesMaxAgeDays);
+    if (!Number.isFinite(nextRetentionDays) || nextRetentionDays < 1) {
+      throw new Error(
+        "Notarial deleted files max age must be a positive whole number of days.",
+      );
+    }
+    next.notarialDeletedFilesMaxAgeDays = nextRetentionDays;
+  }
+
+  // Destination folder is fixed and not user-editable.
+  next.remotePath = FIXED_BACKUP_DESTINATION_FOLDER;
+
+  const hasActiveCaseDestinations =
+    next.caseEnabled && next.selectedRemoteNames.length > 0;
+  const hasActiveNotarialDestinations =
+    next.notarialEnabled && next.notarialSelectedRemoteNames.length > 0;
+
+  if (
+    next.enabled &&
+    !hasActiveCaseDestinations &&
+    !hasActiveNotarialDestinations
+  ) {
     throw new Error(
-      "Select at least one destination account before enabling automatic backups.",
+      "Select at least one active destination account (Cases or Notarial) before enabling scheduling.",
     );
   }
 
@@ -1210,66 +1423,71 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
  * Called automatically when system settings are loaded/updated.
  */
 export async function syncNotarialRemote(): Promise<void> {
-  try {
-    await ensureBackupArtifacts();
+  await ensureBackupArtifacts();
 
-    const settingsResult = await getSystemSettings();
-    if (!settingsResult.success) {
-      // Silently skip if we can't load settings (settings not yet configured)
-      return;
-    }
-
-    const settings = settingsResult.result;
-
-    // Check if Garage is fully configured
-    if (
-      !settings.garageHost ||
-      !settings.garageAccessKey ||
-      !settings.garageSecretKey ||
-      !settings.garageBucket
-    ) {
-      // Garage not configured, optionally remove the remote if it exists
-      try {
-        await runRcloneCommand(["config", "delete", NOTARIAL_REMOTE_NAME]);
-      } catch {
-        // Remote might not exist, that's fine
-      }
-      return;
-    }
-
-    // Build the S3 remote configuration for Garage
-    const garagePort = settings.garagePort || 3900;
-    const protocol = settings.garageIsHttps ? "https" : "http";
-    const endpoint = `${protocol}://${settings.garageHost}:${garagePort}`;
-
-    // Configure the notarial remote as S3 pointing to Garage
-    const remoteOptions = {
-      type: "s3",
-      provider: "Other",
-      access_key_id: settings.garageAccessKey,
-      secret_access_key: settings.garageSecretKey,
-      endpoint: endpoint,
-      region: "garage",
-      acl: "private",
-      force_path_style: "true",
-    };
-
-    // Write config using rclone config command
-    for (const [key, value] of Object.entries(remoteOptions)) {
-      await runRcloneCommand([
-        "config",
-        "set",
-        NOTARIAL_REMOTE_NAME,
-        key,
-        String(value),
-      ]);
-    }
-  } catch (error) {
-    console.error(
-      `Failed to sync notarial remote: ${error instanceof Error ? error.message : String(error)}`,
+  const settingsResult = await getSystemSettings();
+  if (!settingsResult.success) {
+    throw new Error(
+      `Failed to load system settings for notarial sync: ${settingsResult.error}`,
     );
-    // Don't throw - this is a background sync operation
   }
+
+  const settings = settingsResult.result;
+
+  // Check if Garage is fully configured
+  if (
+    !settings.garageHost ||
+    !settings.garageAccessKey ||
+    !settings.garageSecretKey ||
+    !settings.garageBucket
+  ) {
+    // Garage not configured, optionally remove the remote if it exists
+    try {
+      await runRcloneCommand(["config", "delete", NOTARIAL_REMOTE_NAME]);
+    } catch {
+      // Remote might not exist, that's fine
+    }
+    return;
+  }
+
+  // Build the S3 remote configuration for Garage
+  const garagePort = settings.garagePort || 3900;
+  const protocol = settings.garageIsHttps ? "https" : "http";
+  const endpoint = `${protocol}://${settings.garageHost}:${garagePort}`;
+  const region = settings.garageRegion?.trim() || "garage";
+
+  // Configure the notarial remote as S3 pointing to Garage
+  const provider = "s3";
+  const remoteOptions = {
+    provider: "Other",
+    access_key_id: settings.garageAccessKey,
+    secret_access_key: settings.garageSecretKey,
+    endpoint: endpoint,
+    region,
+    acl: "private",
+    force_path_style: "true",
+  };
+
+  const configMap = await getRemoteConfigMap();
+  const remoteExists = configMap.has(NOTARIAL_REMOTE_NAME);
+
+  if (remoteExists) {
+    await runRcloneCommand([
+      "config",
+      "update",
+      NOTARIAL_REMOTE_NAME,
+      ...buildRemoteOptionArgs(remoteOptions, "update"),
+    ]);
+    return;
+  }
+
+  await runRcloneCommand([
+    "config",
+    "create",
+    NOTARIAL_REMOTE_NAME,
+    provider,
+    ...buildRemoteOptionArgs(remoteOptions, "create"),
+  ]);
 }
 
 function toNullableNumber(value: unknown): number | null {
@@ -1293,6 +1511,12 @@ export async function getBackupRemoteStorageUsage(
   const normalizedName = normalizeRemoteName(remoteName);
   if (!normalizedName) {
     throw new Error("Remote name is required.");
+  }
+
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and is not available in backup account operations.`,
+    );
   }
 
   await ensureBackupArtifacts();
@@ -1570,6 +1794,12 @@ export async function reloginBackupRemote(
     throw new Error("Remote name is required.");
   }
 
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and cannot be re-logged manually.`,
+    );
+  }
+
   const configMap = await getRemoteConfigMap();
   const existing = configMap.get(normalizedName);
 
@@ -1684,8 +1914,20 @@ export async function updateBackupRemote(
     throw new Error("Current remote name is required.");
   }
 
+  if (normalizedCurrent === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and cannot be edited manually.`,
+    );
+  }
+
   if (!normalizedNext) {
     throw new Error("Remote name is required.");
+  }
+
+  if (normalizedNext === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote name "${NOTARIAL_REMOTE_NAME}" is reserved for Garage-managed notarial storage.`,
+    );
   }
 
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(normalizedNext)) {
@@ -1844,9 +2086,24 @@ export async function updateBackupRemote(
         )
       : currentConfig.selectedRemoteNames;
 
+    const updatedNotarialSelectedRemoteNames = remoteNameChanged
+      ? Array.from(
+          new Set(
+            currentConfig.notarialSelectedRemoteNames
+              .map((name) =>
+                normalizeRemoteName(name) === normalizedCurrent
+                  ? targetRemoteName
+                  : normalizeRemoteName(name),
+              )
+              .filter((name) => !!name),
+          ),
+        )
+      : currentConfig.notarialSelectedRemoteNames;
+
     const updatedConfig = await writeBackupConfigFile({
       ...currentConfig,
       selectedRemoteNames: updatedSelectedRemoteNames,
+      notarialSelectedRemoteNames: updatedNotarialSelectedRemoteNames,
       remoteAccountIdentities: updatedRemoteAccountIdentities,
       remoteBasePaths: updatedRemoteBasePaths,
     });
@@ -1908,6 +2165,12 @@ export async function clearBackupRemoteFiles(
   const normalizedName = normalizeRemoteName(remoteName);
   if (!normalizedName) {
     throw new Error("Remote name is required.");
+  }
+
+  if (normalizedName === NOTARIAL_REMOTE_NAME) {
+    throw new Error(
+      `Remote "${NOTARIAL_REMOTE_NAME}" is managed by Garage settings and cannot be cleared manually.`,
+    );
   }
 
   const configMap = await getRemoteConfigMap();
@@ -1974,6 +2237,10 @@ export async function deleteBackupRemote(
   const updatedSelectedRemoteNames = current.selectedRemoteNames.filter(
     (remoteName) => normalizeRemoteName(remoteName) !== normalizedName,
   );
+  const updatedNotarialSelectedRemoteNames =
+    current.notarialSelectedRemoteNames.filter(
+      (remoteName) => normalizeRemoteName(remoteName) !== normalizedName,
+    );
   const updatedRemoteAccountIdentities = {
     ...current.remoteAccountIdentities,
   };
@@ -1991,20 +2258,31 @@ export async function deleteBackupRemote(
 
   const selectedRemotesChanged =
     updatedSelectedRemoteNames.length !== current.selectedRemoteNames.length;
+  const notarialSelectedRemotesChanged =
+    updatedNotarialSelectedRemoteNames.length !==
+    current.notarialSelectedRemoteNames.length;
 
-  if (selectedRemotesChanged || identityWasCached || basePathWasConfigured) {
+  if (
+    selectedRemotesChanged ||
+    notarialSelectedRemotesChanged ||
+    identityWasCached ||
+    basePathWasConfigured
+  ) {
     const updated = await writeBackupConfigFile({
       ...current,
       selectedRemoteNames: updatedSelectedRemoteNames,
+      notarialSelectedRemoteNames: updatedNotarialSelectedRemoteNames,
       remoteAccountIdentities: updatedRemoteAccountIdentities,
       remoteBasePaths: updatedRemoteBasePaths,
       enabled:
-        selectedRemotesChanged && updatedSelectedRemoteNames.length === 0
+        (selectedRemotesChanged || notarialSelectedRemotesChanged) &&
+        updatedSelectedRemoteNames.length === 0 &&
+        updatedNotarialSelectedRemoteNames.length === 0
           ? false
           : current.enabled,
     });
 
-    if (selectedRemotesChanged) {
+    if (selectedRemotesChanged || notarialSelectedRemotesChanged) {
       scheduleFromConfig(updated);
     }
   }

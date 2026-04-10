@@ -57,6 +57,7 @@ type ProviderFieldConfig = {
 const OAUTH_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
 const ELECTRON_REQUIRED_AUTH_MESSAGE =
   "This provider requires the Electron desktop app for account authorization. Open RTC Native App and try again.";
+const FIXED_BACKUP_DESTINATION_FOLDER = "rtc-backups";
 
 const PROVIDER_FIELD_MAP: Record<string, ProviderFieldConfig[]> = {
   onedrive: [],
@@ -304,9 +305,14 @@ const BackupTab = () => {
   >({});
 
   const [enabled, setEnabled] = useState(false);
+  const [caseEnabled, setCaseEnabled] = useState(false);
+  const [notarialEnabled, setNotarialEnabled] = useState(false);
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [selectedRemoteNames, setSelectedRemoteNames] = useState<string[]>([]);
-  const [remotePath, setRemotePath] = useState("rtc-backups");
+  const [notarialSelectedRemoteNames, setNotarialSelectedRemoteNames] =
+    useState<string[]>([]);
+  const [notarialDeletedFilesMaxAgeDays, setNotarialDeletedFilesMaxAgeDays] =
+    useState("30");
   const [importRemoteName, setImportRemoteName] = useState("");
   const [importSource, setImportSource] = useState("manual");
   const [localImportFile, setLocalImportFile] = useState<File | null>(null);
@@ -380,9 +386,14 @@ const BackupTab = () => {
   const applyDashboardData = useCallback(
     (data: BackupDashboardData) => {
       setEnabled(data.config.enabled);
+      setCaseEnabled(data.config.caseEnabled);
+      setNotarialEnabled(data.config.notarialEnabled);
       setSelectedIntervals(data.config.selectedIntervals);
       setSelectedRemoteNames(data.config.selectedRemoteNames);
-      setRemotePath(data.config.remotePath);
+      setNotarialSelectedRemoteNames(data.config.notarialSelectedRemoteNames);
+      setNotarialDeletedFilesMaxAgeDays(
+        String(data.config.notarialDeletedFilesMaxAgeDays),
+      );
       setLastRunAt(data.config.lastRunAt);
       setLastRunStatus(data.config.lastRunStatus);
       setLastRunMessage(data.config.lastRunMessage);
@@ -420,6 +431,18 @@ const BackupTab = () => {
       });
 
       const availableRemoteNames = data.remotes.map((remote) => remote.name);
+      setNotarialSelectedRemoteNames((previous) => {
+        const currentSelection = data.config.notarialSelectedRemoteNames;
+        if (currentSelection.length > 0) {
+          return currentSelection.filter((remoteName) =>
+            availableRemoteNames.includes(remoteName),
+          );
+        }
+
+        return previous.filter((remoteName) =>
+          availableRemoteNames.includes(remoteName),
+        );
+      });
       setImportRemoteName((previous) => {
         if (previous && availableRemoteNames.includes(previous)) {
           return previous;
@@ -482,9 +505,13 @@ const BackupTab = () => {
   }, [logs]);
 
   const handleSave = async () => {
-    if (enabled && selectedRemoteNames.length === 0) {
+    const hasCaseDestinations = caseEnabled && selectedRemoteNames.length > 0;
+    const hasNotarialDestinations =
+      notarialEnabled && notarialSelectedRemoteNames.length > 0;
+
+    if (enabled && !hasCaseDestinations && !hasNotarialDestinations) {
       popup.showError(
-        "Select at least one destination account before enabling auto backup.",
+        "Select at least one active destination account (Cases or Notarial) before enabling scheduling.",
       );
       return;
     }
@@ -496,14 +523,31 @@ const BackupTab = () => {
       return;
     }
 
+    const parsedNotarialDeletedFilesMaxAgeDays = Number(
+      notarialDeletedFilesMaxAgeDays,
+    );
+    if (
+      !Number.isInteger(parsedNotarialDeletedFilesMaxAgeDays) ||
+      parsedNotarialDeletedFilesMaxAgeDays < 1
+    ) {
+      popup.showError(
+        "Notarial Deleted Files Max Age must be a positive whole number of days.",
+      );
+      return;
+    }
+
     setSaving(true);
     popup.showLoading("Saving backup settings...");
 
     const result = await saveBackupConfiguration({
       enabled,
+      caseEnabled,
+      notarialEnabled,
       selectedIntervals,
       selectedRemoteNames,
-      remotePath: remotePath.trim(),
+      notarialSelectedRemoteNames,
+      notarialDeletedFilesMaxAgeDays: parsedNotarialDeletedFilesMaxAgeDays,
+      remotePath: FIXED_BACKUP_DESTINATION_FOLDER,
     });
 
     setSaving(false);
@@ -1261,7 +1305,7 @@ const BackupTab = () => {
     const accountBaseFolderPath = (remote?.basePath ?? "").trim();
     const backupFolderPath = composeRemoteFolderPath(
       accountBaseFolderPath,
-      remotePath,
+      FIXED_BACKUP_DESTINATION_FOLDER,
     );
 
     if (backupFolderPath) {
@@ -1353,12 +1397,12 @@ const BackupTab = () => {
     const accountBaseFolderPath = (remote?.basePath ?? "").trim();
     const backupFolderPath = composeRemoteFolderPath(
       accountBaseFolderPath,
-      remotePath,
+      FIXED_BACKUP_DESTINATION_FOLDER,
     );
 
     if (!backupFolderPath) {
       popup.showError(
-        "Destination Folder is empty. Set it first before clearing backup files.",
+        "Backup folder path is empty unexpectedly. Please try again.",
       );
       return;
     }
@@ -1486,6 +1530,16 @@ const BackupTab = () => {
     });
   };
 
+  const toggleNotarialRemoteSelection = (remoteValue: string) => {
+    setNotarialSelectedRemoteNames((previous) => {
+      if (previous.includes(remoteValue)) {
+        return previous.filter((value) => value !== remoteValue);
+      }
+
+      return [...previous, remoteValue];
+    });
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -1604,6 +1658,17 @@ const BackupTab = () => {
         ? "No accounts available"
         : "Choose destination accounts"
       : `${selectedRemoteLabels.length} account${selectedRemoteLabels.length > 1 ? "s" : ""} selected`;
+
+  const notarialSelectedRemoteLabels = remotes
+    .filter((remote) => notarialSelectedRemoteNames.includes(remote.name))
+    .map((remote) => `${remote.name} (${getRemoteProviderDetails(remote)})`);
+
+  const notarialRemoteSummary =
+    notarialSelectedRemoteLabels.length === 0
+      ? remotes.length === 0
+        ? "No accounts available"
+        : "Choose destination accounts"
+      : `${notarialSelectedRemoteLabels.length} account${notarialSelectedRemoteLabels.length > 1 ? "s" : ""} selected`;
 
   const intervalDropdownOptions = intervalOptions.map((interval) => ({
     value: interval.value,
@@ -1728,8 +1793,8 @@ const BackupTab = () => {
         description="Configure automatic backups with rclone remotes. Source is fixed to dev.db."
       >
         <SettingsRow
-          label="Enable Automatic Backups"
-          description="When enabled, the server runs backups on your selected interval."
+          label="Enable Scheduling"
+          description="Master switch for scheduled backup runs using selected intervals."
         >
           <Toggle checked={enabled} onChange={setEnabled} />
         </SettingsRow>
@@ -1749,9 +1814,21 @@ const BackupTab = () => {
             />
           </div>
         </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Cases Backups"
+        description="Database-only backup destinations and import options."
+      >
+        <SettingsRow
+          label="Enable Cases Backups"
+          description="Turn on/off database backup syncing during backup runs."
+        >
+          <Toggle checked={caseEnabled} onChange={setCaseEnabled} />
+        </SettingsRow>
         <SettingsRow
           label="Destination Accounts"
-          description="Select one or more configured cloud accounts to receive each backup run."
+          description="Select one or more configured cloud accounts to receive database backups."
         >
           {remotes.length === 0 ? (
             <p className="text-sm text-base-content/45">No accounts yet.</p>
@@ -1770,15 +1847,145 @@ const BackupTab = () => {
           )}
         </SettingsRow>
         <SettingsRow
-          label="Destination Folder"
-          description="Global folder path appended after each account base folder. Automatic backups create one subfolder per interval; manual backups use a manual folder."
+          label="Import from Remote"
+          description="Choose an account and backup source folder, then update database."
+        >
+          <div className="w-full space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <SelectField
+                value={importRemoteName}
+                onChange={setImportRemoteName}
+                options={[
+                  {
+                    value: "",
+                    label: remotes.length
+                      ? "Select remote account"
+                      : "No accounts available",
+                  },
+                  ...remotes.map((remote) => ({
+                    value: remote.name,
+                    label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
+                  })),
+                ]}
+              />
+              <SelectField
+                value={importSource}
+                onChange={setImportSource}
+                options={importSourceOptions.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} (${option.folderName})`,
+                }))}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromRemote()}
+                disabled={
+                  importingRemote || importingLocal || !importRemoteName
+                }
+                className="btn btn-warning btn-sm"
+              >
+                Import from Remote
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Import from Local File"
+          description="Choose a backup file from this PC, then update database."
+        >
+          <div className="w-full space-y-2">
+            <input
+              ref={localImportInputRef}
+              type="file"
+              onChange={handleLocalImportFileSelected}
+              className="hidden"
+              accept=".db,.sqlite,.sqlite3,.bak,.backup"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenLocalFilePicker}
+                disabled={importingLocal || importingRemote}
+                className="btn btn-outline btn-sm"
+              >
+                Choose Local Backup File
+              </button>
+              <p className="text-xs text-base-content/55 break-all">
+                {localImportFile
+                  ? `Selected: ${localImportFile.name}`
+                  : "No file selected."}
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleImportFromLocalFile()}
+                disabled={importingLocal || importingRemote || !localImportFile}
+                className="btn btn-warning btn-sm"
+              >
+                Import Selected File
+              </button>
+            </div>
+          </div>
+        </SettingsRow>
+        <div className="px-7 pb-5">
+          <p className="text-xs text-warning">
+            Importing backup means updating database (dev.db) and might log out
+            the current user. Make sure the selected backup file is correct.
+          </p>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Notarial Backups"
+        description="Sync Garage notarial files to selected destination accounts separately from database backups."
+      >
+        <SettingsRow
+          label="Enable Notarial Backups"
+          description="Turn on/off notarial file syncing for backup runs."
+        >
+          <Toggle checked={notarialEnabled} onChange={setNotarialEnabled} />
+        </SettingsRow>
+        <SettingsRow
+          label="Destination Accounts"
+          description="Select one or more configured accounts where notarial backups will be synced later."
+        >
+          {remotes.length === 0 ? (
+            <p className="text-sm text-base-content/45">No accounts yet.</p>
+          ) : (
+            <div className="w-full">
+              <MultiSelectPopoverDropdown
+                popoverId="notarial-backup-remotes-popover"
+                anchorName="--notarial-backup-remotes-anchor"
+                summary={notarialRemoteSummary}
+                options={remoteDropdownOptions}
+                selectedValues={notarialSelectedRemoteNames}
+                onToggle={toggleNotarialRemoteSelection}
+                emptyLabel="No accounts yet."
+              />
+            </div>
+          )}
+        </SettingsRow>
+        <SettingsRow
+          label="Deleted Files Max Age (days)"
+          description="Retention window for deleted/replaced notarial files moved to backup archive folders."
         >
           <InputField
-            value={remotePath}
-            onChange={setRemotePath}
-            placeholder="rtc-backups"
+            value={notarialDeletedFilesMaxAgeDays}
+            onChange={setNotarialDeletedFilesMaxAgeDays}
+            type="number"
+            placeholder="30"
           />
         </SettingsRow>
+        <div className="px-7 pb-5">
+          <p className="text-xs text-base-content/45">
+            Notarial sync writes to each destination account using the backup
+            path plus /notarial, and keeps deleted/replaced files in
+            /notarial-deleted with retention cleanup.
+          </p>
+        </div>
       </SettingsCard>
 
       <SettingsCard
@@ -2108,8 +2315,8 @@ const BackupTab = () => {
           ) : newProvider === "local" ? (
             <p className="text-xs text-base-content/45">
               Local Folder does not require credentials. Set the target path in
-              <span className="font-semibold"> Destination Folder</span> under
-              Backup Schedule.
+              <span className="font-semibold"> rtc-backups</span> under each
+              account base folder.
             </p>
           ) : (
             <p className="text-xs text-base-content/45">
@@ -2131,10 +2338,10 @@ const BackupTab = () => {
             />
             <p className="text-xs text-base-content/40 mt-1">
               {newProvider.toLowerCase() === "s3"
-                ? "For S3, this is the folder inside the bucket and is prepended before Destination Folder."
+                ? "For S3, this is the folder inside the bucket and is prepended before rtc-backups."
                 : newProvider.toLowerCase() === "smb"
-                  ? "For SMB, this is the folder inside the share and is prepended before Destination Folder."
-                  : "Prepended before Destination Folder for this account."}
+                  ? "For SMB, this is the folder inside the share and is prepended before rtc-backups."
+                  : "Prepended before rtc-backups for this account."}
             </p>
           </div>
 
@@ -2170,102 +2377,6 @@ const BackupTab = () => {
               override and cancel the current sign-in flow.
             </p>
           )}
-        </div>
-      </SettingsCard>
-
-      <SettingsCard
-        title="Import Backup"
-        description="Restore from a remote backup folder or a local backup file from this PC. This updates the database file (dev.db)."
-      >
-        <SettingsRow
-          label="Import from Remote"
-          description="Choose an account and backup source folder, then update database."
-        >
-          <div className="w-full space-y-2">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-              <SelectField
-                value={importRemoteName}
-                onChange={setImportRemoteName}
-                options={[
-                  {
-                    value: "",
-                    label: remotes.length
-                      ? "Select remote account"
-                      : "No accounts available",
-                  },
-                  ...remotes.map((remote) => ({
-                    value: remote.name,
-                    label: `${remote.name} (${getRemoteProviderDetails(remote)})`,
-                  })),
-                ]}
-              />
-              <SelectField
-                value={importSource}
-                onChange={setImportSource}
-                options={importSourceOptions.map((option) => ({
-                  value: option.value,
-                  label: `${option.label} (${option.folderName})`,
-                }))}
-              />
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleImportFromRemote()}
-                disabled={
-                  importingRemote || importingLocal || !importRemoteName
-                }
-                className="btn btn-warning btn-sm"
-              >
-                Import from Remote
-              </button>
-            </div>
-          </div>
-        </SettingsRow>
-        <SettingsRow
-          label="Import from Local File"
-          description="Choose a backup file from this PC, then update database."
-        >
-          <div className="w-full space-y-2">
-            <input
-              ref={localImportInputRef}
-              type="file"
-              onChange={handleLocalImportFileSelected}
-              className="hidden"
-              accept=".db,.sqlite,.sqlite3,.bak,.backup"
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleOpenLocalFilePicker}
-                disabled={importingLocal || importingRemote}
-                className="btn btn-outline btn-sm"
-              >
-                Choose Local Backup File
-              </button>
-              <p className="text-xs text-base-content/55 break-all">
-                {localImportFile
-                  ? `Selected: ${localImportFile.name}`
-                  : "No file selected."}
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleImportFromLocalFile()}
-                disabled={importingLocal || importingRemote || !localImportFile}
-                className="btn btn-warning btn-sm"
-              >
-                Import Selected File
-              </button>
-            </div>
-          </div>
-        </SettingsRow>
-        <div className="px-7 pb-5">
-          <p className="text-xs text-warning">
-            Importing backup means updating database (dev.db) and might log out
-            the current user. Make sure the selected backup file is correct.
-          </p>
         </div>
       </SettingsCard>
 
