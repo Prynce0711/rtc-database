@@ -1,5 +1,6 @@
 "use server";
 
+import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
@@ -123,7 +124,10 @@ export async function upsertSummaryStatistics(
   rows: SummaryRow[],
 ): Promise<ActionResult<{ upserted: number }>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const sanitizedRows = rows.map(sanitizeSummaryRow);
@@ -200,7 +204,10 @@ export async function deleteSummaryStatistic(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.summaryStatistic.delete({ where: { id } });

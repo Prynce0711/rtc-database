@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
 import { useEffect, useMemo, useState } from "react";
 import {
   FiCalendar,
@@ -94,6 +96,11 @@ const TOTAL_FIELDS: Array<
 ];
 
 export default function SummaryPage() {
+  const session = useSession();
+  const canManageStats =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.STATISTICS;
+
   const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH);
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [search, setSearch] = useState("");
@@ -357,13 +364,15 @@ export default function SummaryPage() {
                   <FiDownload className="h-5 w-5" />
                   Export
                 </button>
-                <button
-                  className="btn btn-success btn-md gap-2"
-                  onClick={() => setShowAddPage(true)}
-                >
-                  <FiPlus className="h-5 w-5" />
-                  Add Report
-                </button>
+                {canManageStats && (
+                  <button
+                    className="btn btn-success btn-md gap-2"
+                    onClick={() => setShowAddPage(true)}
+                  >
+                    <FiPlus className="h-5 w-5" />
+                    Add Report
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -407,36 +416,40 @@ export default function SummaryPage() {
           />
         </div>
 
-        {selectionMode === "delete" ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-base-content/40 tabular-nums">
-              {selectedIds.size} selected
-            </span>
+        {canManageStats &&
+          (selectionMode === "delete" ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-base-content/40 tabular-nums">
+                {selectedIds.size} selected
+              </span>
+              <button
+                className="btn btn-error btn-md gap-2"
+                disabled={selectedIds.size === 0}
+                onClick={confirmDelete}
+              >
+                <FiTrash2 className="h-4 w-4" />
+                Apply Delete
+              </button>
+              <button
+                className="btn btn-ghost btn-md"
+                onClick={cancelSelection}
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
             <button
-              className="btn btn-error btn-md gap-2"
-              disabled={selectedIds.size === 0}
-              onClick={confirmDelete}
+              className="btn btn-outline btn-md gap-2 text-error hover:bg-error/10"
+              onClick={() => {
+                setSelectionMode("delete");
+                setSelectedIds(new Set());
+              }}
+              disabled={filteredData.length === 0}
             >
               <FiTrash2 className="h-4 w-4" />
-              Apply Delete
+              Delete Rows
             </button>
-            <button className="btn btn-ghost btn-md" onClick={cancelSelection}>
-              <FiX className="h-4 w-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            className="btn btn-outline btn-md gap-2 text-error hover:bg-error/10"
-            onClick={() => {
-              setSelectionMode("delete");
-              setSelectedIds(new Set());
-            }}
-            disabled={filteredData.length === 0}
-          >
-            <FiTrash2 className="h-4 w-4" />
-            Delete Rows
-          </button>
-        )}
+          ))}
 
         <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
           {filteredData.length} row{filteredData.length !== 1 && "s"}

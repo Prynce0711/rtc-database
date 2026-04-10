@@ -1,5 +1,5 @@
 "use server";
-
+import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
@@ -48,7 +48,10 @@ export async function createMonthlyStatistic(
   data: MonthlyRow,
 ): Promise<ActionResult<MonthlyRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = MonthlyRowSchema.safeParse(data);
@@ -81,7 +84,10 @@ export async function updateMonthlyStatistic(
   data: MonthlyRow,
 ): Promise<ActionResult<MonthlyRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = MonthlyRowSchema.safeParse(data);
@@ -114,7 +120,10 @@ export async function deleteMonthlyStatistic(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.monthlyStatistics.delete({ where: { id } });
@@ -131,7 +140,10 @@ export async function upsertMonthlyStatistics(
   rows: MonthlyRow[],
 ): Promise<ActionResult<{ upserted: number }>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = z.array(MonthlyRowSchema).safeParse(rows);
@@ -187,7 +199,10 @@ export async function clearMonthlyStatistics(
   month?: string,
 ): Promise<ActionResult<{ deleted: number }>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const { count } = await prisma.monthlyStatistics.deleteMany({

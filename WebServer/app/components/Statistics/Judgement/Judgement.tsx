@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
 import { useMemo, useRef, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
@@ -48,6 +50,11 @@ const views: {
 ];
 
 export default function Judgement() {
+  const session = useSession();
+  const canManageStats =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.STATISTICS;
+
   const [activeView, setActiveView] = useState<JudgementView>("MTC");
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString(),
@@ -146,13 +153,15 @@ export default function Judgement() {
                     <FiDownload className="h-5 w-5" />
                     Export
                   </button>
-                  <button
-                    className="btn btn-success btn-md gap-2"
-                    onClick={() => setRequestAdd((c) => c + 1)}
-                  >
-                    <FiPlus className="h-5 w-5" />
-                    Add Report
-                  </button>
+                  {canManageStats && (
+                    <button
+                      className="btn btn-success btn-md gap-2"
+                      onClick={() => setRequestAdd((c) => c + 1)}
+                    >
+                      <FiPlus className="h-5 w-5" />
+                      Add Report
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

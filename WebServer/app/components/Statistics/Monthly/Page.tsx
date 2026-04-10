@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
 import { useEffect, useMemo, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
@@ -53,6 +55,11 @@ const categoryViews: {
 /* ------------------------------------------------------------------ */
 
 export default function MonthlyPage() {
+  const session = useSession();
+  const canManageStats =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.STATISTICS;
+
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7),
   );
@@ -90,6 +97,7 @@ export default function MonthlyPage() {
   };
 
   const confirmSelection = async () => {
+    if (!canManageStats) return;
     if (selectedIds.size === 0) return;
 
     if (selectionMode === "delete") {
@@ -132,22 +140,21 @@ export default function MonthlyPage() {
 
   /* ---------- derived ---------- */
 
-  const filteredData = useMemo(() => {
-    let rows = monthlyData;
-    rows = rows.filter((r) => r.category === activeCategoryView);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      rows = rows.filter(
-        (r) =>
+  const byCategory = monthlyData.filter(
+    (r) => r.category === activeCategoryView,
+  );
+  const filteredData = !search.trim()
+    ? byCategory
+    : byCategory.filter((r) => {
+        const q = search.toLowerCase();
+        return (
           r.category.toLowerCase().includes(q) ||
           r.branch.toLowerCase().includes(q) ||
           String(r.criminal).includes(q) ||
           String(r.civil).includes(q) ||
-          String(r.total).includes(q),
-      );
-    }
-    return rows;
-  }, [search, activeCategoryView, monthlyData]);
+          String(r.total).includes(q)
+        );
+      });
 
   const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString(
     "en-US",
@@ -257,13 +264,15 @@ export default function MonthlyPage() {
                     <FiDownload className="h-5 w-5" />
                     Export
                   </button>
-                  <button
-                    className="btn btn-success btn-md gap-2"
-                    onClick={() => setShowAddPage(true)}
-                  >
-                    <FiPlus className="h-5 w-5" />
-                    Add Report
-                  </button>
+                  {canManageStats && (
+                    <button
+                      className="btn btn-success btn-md gap-2"
+                      onClick={() => setShowAddPage(true)}
+                    >
+                      <FiPlus className="h-5 w-5" />
+                      Add Report
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -287,20 +296,28 @@ export default function MonthlyPage() {
         rowCount={filteredData.length}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
-        onStartEdit={() => {
-          if (filteredData.length > 0) {
-            setSelectionMode("edit");
-            setSelectedIds(new Set());
-          }
-        }}
-        onStartDelete={() => {
-          if (filteredData.length > 0) {
-            setSelectionMode("delete");
-            setSelectedIds(new Set());
-          }
-        }}
-        onConfirmSelection={confirmSelection}
-        onCancelSelection={cancelSelection}
+        onStartEdit={
+          canManageStats
+            ? () => {
+                if (filteredData.length > 0) {
+                  setSelectionMode("edit");
+                  setSelectedIds(new Set());
+                }
+              }
+            : undefined
+        }
+        onStartDelete={
+          canManageStats
+            ? () => {
+                if (filteredData.length > 0) {
+                  setSelectionMode("delete");
+                  setSelectedIds(new Set());
+                }
+              }
+            : undefined
+        }
+        onConfirmSelection={canManageStats ? confirmSelection : undefined}
+        onCancelSelection={canManageStats ? cancelSelection : undefined}
       />
 
       {/* ── TABLE ── */}

@@ -1,5 +1,5 @@
 "use server";
-
+import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 // zod doesn't export a `prettifyError` helper in all versions — provide a small local formatter
@@ -101,7 +101,10 @@ export async function createMunicipalJudgement(
   data: MTCJudgementRow,
 ): Promise<ActionResult<MTCJudgementRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = MTCJudgementRowSchema.safeParse(data);
@@ -179,7 +182,10 @@ export async function updateMunicipalJudgement(
   data: MTCJudgementRow,
 ): Promise<ActionResult<MTCJudgementRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = MTCJudgementRowSchema.safeParse(data);
@@ -257,7 +263,10 @@ export async function deleteMunicipalJudgement(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.judgementMunicipal.delete({ where: { id } });
@@ -324,7 +333,10 @@ export async function createRegionalJudgement(
   data: RTCJudgementRow,
 ): Promise<ActionResult<RTCJudgementRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = RTCJudgementRowSchema.safeParse(data);
@@ -416,7 +428,10 @@ export async function updateRegionalJudgement(
   data: RTCJudgementRow,
 ): Promise<ActionResult<RTCJudgementRow>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = RTCJudgementRowSchema.safeParse(data);
@@ -508,7 +523,10 @@ export async function deleteRegionalJudgement(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.judgementRegional.delete({ where: { id } });

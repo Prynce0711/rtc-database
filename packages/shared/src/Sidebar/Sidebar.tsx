@@ -351,7 +351,14 @@ const SectionLabel = ({
   );
 };
 
-// --- Nav config ---------------------------------------------------------------
+const resolveTheme = (): "winter" | "dim" => {
+  if (typeof document === "undefined") return "winter";
+  return document.documentElement.getAttribute("data-theme") === "dim"
+    ? "dim"
+    : "winter";
+};
+
+// ─── Nav config ───────────────────────────────────────────────────────────────
 const caseNavItems: NavItem[] = [
   {
     icon: <FiFileText />,
@@ -394,6 +401,17 @@ const caseNavItems: NavItem[] = [
 // Backwards-compatible aliases used across the file
 const caseManagementNavItem: NavItem = caseNavItems[0];
 const statisticsNavItem: NavItem = caseNavItems[1];
+const adminStatisticsNavItem: NavItem = caseNavItems[2];
+const archiveOnlyNavItem: NavItem = {
+  icon: <FiFileText />,
+  href: "cases/receiving",
+  label: "Archive",
+};
+const notarialOnlyNavItem: NavItem = {
+  icon: <FiFileText />,
+  href: "cases/notarial",
+  label: "Notarial",
+};
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
@@ -466,7 +484,7 @@ function adminSidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={caseNavItems[2]}
+          item={adminStatisticsNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -656,6 +674,7 @@ function statsSidebar({
   theme,
   onToggleTheme,
   onOpenMessages,
+  onOpenNotifications,
   onOpenSettings,
 }: SidebarMenuProps) {
   return (
@@ -686,7 +705,7 @@ function statsSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={caseNavItems[1]}
+          item={statisticsNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -706,6 +725,15 @@ function statsSidebar({
           badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
+        />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+        <ActionBtn
+          icon={<FiBell />}
+          label="Notifications"
+          badge={5}
+          isExpanded={isExpanded}
+          onClick={onOpenNotifications}
         />
       </div>
 
@@ -878,7 +906,7 @@ function archiveSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={archiveOnlyNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -974,7 +1002,7 @@ function notarialSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={notarialOnlyNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -1124,19 +1152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     providedSession ?? sessionState?.data ?? null;
   const activeView = pathname.split("/")[2] || "";
 
-  const [theme, setTheme] = useState<"winter" | "dim">("winter");
+  const [theme, setTheme] = useState<"winter" | "dim">(resolveTheme);
   const [collapsed, setCollapsed] = useState(false);
   const isExpanded = !collapsed;
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const current =
-      document.documentElement.getAttribute("data-theme") === "dim"
-        ? "dim"
-        : "winter";
-    setTheme(current);
-  }, []);
 
   async function updateTheme(newTheme: SidebarTheme) {
     if (updateDarkMode) {
@@ -1293,12 +1312,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               ? attySidebar(menuProps)
               : normalizedRole === "statistics" || normalizedRole === "stats"
                 ? statsSidebar(menuProps)
-                : normalizedRole === "user" || normalizedRole === "staff"
+                : normalizedRole === "archive" || normalizedRole === "archives"
                   ? archiveSidebar(menuProps)
-                  : normalizedRole === "archives"
+                  : normalizedRole === "notarial"
                     ? notarialSidebar(menuProps)
-                    : normalizedRole === "notarial"
-                      ? notarialSidebar(menuProps)
+                    : normalizedRole === "user" || normalizedRole === "staff"
+                      ? staffSidebar(menuProps)
                       : staffSidebar(menuProps)}
         </nav>
 

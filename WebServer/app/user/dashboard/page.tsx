@@ -1,5 +1,7 @@
 import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
+import ArchiveDashboard from "@/app/components/Dashboard/ArchiveDashboard";
 import AttorneyDashboard from "@/app/components/Dashboard/Attorney/AttorneyDashboard";
+import NotarialDashboard from "@/app/components/Dashboard/NotarialDashboard";
 import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
 import StatisticsDashboard from "@/app/components/Dashboard/StatisticsDashboard";
 import { auth } from "@/app/lib/auth";
@@ -53,6 +55,12 @@ const page = async () => {
     return <AttorneyDashboard />;
   } else if (session.user.role === Roles.STATISTICS) {
     return <StatisticsDashboard />;
+  } else if (session.user.role === Roles.NOTARIAL) {
+    return <NotarialDashboard />;
+  } else if (session.user.role === Roles.ARCHIVE) {
+    return <ArchiveDashboard />;
+  } else if (session.user.role === Roles.USER) {
+    return <StaffDashboard staffId={session.user.id} />;
   } else {
     return <StaffDashboard staffId={session.user.id} />;
   }

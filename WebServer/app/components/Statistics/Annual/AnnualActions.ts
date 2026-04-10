@@ -4,6 +4,7 @@ import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
 import { LogAction } from "@rtc-database/shared/prisma/client";
+import Roles from "@/app/lib/Roles";
 import { prettifyError } from "zod";
 import {
   BaseLogData,
@@ -111,7 +112,10 @@ export async function createLog(
       return { success: true, result: undefined };
     }
 
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) {
       return sessionValidation; // Return the error from session validation
     }
@@ -167,7 +171,10 @@ export async function createRegionalTrialCourt(
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = CaseSchema.safeParse(data);
@@ -210,7 +217,10 @@ export async function updateRegionalTrialCourt(
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = CaseSchema.safeParse(data);
@@ -253,7 +263,10 @@ export async function deleteRegionalTrialCourt(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.regionalTrialCourt.delete({ where: { id } });
@@ -296,7 +309,10 @@ export async function createMunicipalTrialCourt(
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = CaseSchema.safeParse(data);
@@ -339,7 +355,10 @@ export async function updateMunicipalTrialCourt(
   data: CaseSchema,
 ): Promise<ActionResult<CaseSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = CaseSchema.safeParse(data);
@@ -424,7 +443,10 @@ export async function createInventoryDocument(
   data: InventoryDocumentSchema,
 ): Promise<ActionResult<InventoryDocumentSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = InventoryDocumentSchema.safeParse(data);
@@ -473,7 +495,10 @@ export async function updateInventoryDocument(
   data: InventoryDocumentSchema,
 ): Promise<ActionResult<InventoryDocumentSchema>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const validation = InventoryDocumentSchema.safeParse(data);
@@ -522,7 +547,10 @@ export async function deleteInventoryDocument(
   id: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.inventoryDocument.delete({ where: { id } });

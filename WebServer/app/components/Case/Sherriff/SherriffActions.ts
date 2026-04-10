@@ -406,7 +406,7 @@ export async function deleteSheriffCase(
   caseId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.ARCHIVE, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }

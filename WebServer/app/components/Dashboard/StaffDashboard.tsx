@@ -14,9 +14,25 @@ import { RecentCasesCard } from "./StaffCard";
 
 interface Props {
   staffId?: string;
+  dashboardTitle?: string;
+  dashboardSubtitle?: string;
+  loadingTitle?: string;
+  loadingSubtitle?: string;
+  viewAllPath?: string;
+  showRecentCases?: boolean;
+  recentSection?: React.ReactNode;
 }
 
-const StaffDashboard: React.FC<Props> = ({ staffId }) => {
+const StaffDashboard: React.FC<Props> = ({
+  staffId,
+  dashboardTitle = "Staff Dashboard",
+  dashboardSubtitle = "Manage your assigned cases",
+  loadingTitle = "Loading Staff Dashboard",
+  loadingSubtitle = "Fetching your assigned cases...",
+  viewAllPath = "/user/cases/criminal",
+  showRecentCases = true,
+  recentSection,
+}) => {
   const [cases, setCases] = useState<UnifiedCaseData[]>([]);
   const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,11 +112,9 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
               </div>
             </div>
             <h2 className="text-3xl font-bold text-base-content mb-2">
-              Loading Staff Dashboard
+              {loadingTitle}
             </h2>
-            <p className="text-lg text-base-content/60">
-              Fetching your assigned cases...
-            </p>
+            <p className="text-lg text-base-content/60">{loadingSubtitle}</p>
             <div className="flex items-center justify-center gap-2 mt-4">
               {[0, 150, 300].map((delay) => (
                 <div
@@ -127,11 +141,11 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="flex-1">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                      Staff Dashboard
+                      {dashboardTitle}
                     </h1>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
                       <span className="flex items-center text-xl gap-2">
-                        <span>Manage your assigned cases</span>
+                        <span>{dashboardSubtitle}</span>
                       </span>
                     </p>
                   </div>
@@ -204,14 +218,20 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
 
             {/* Insights removed from Staff Dashboard */}
 
-            {/* RECENT CASES */}
-            <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
-              <RecentCasesCard
-                cases={stats.recent}
-                view="table"
-                onViewAll={() => router.push("/user/cases/criminal")}
-              />
-            </section>
+            {/* RECENT SECTION */}
+            {recentSection ? (
+              <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+                {recentSection}
+              </section>
+            ) : showRecentCases ? (
+              <section className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow">
+                <RecentCasesCard
+                  cases={stats.recent}
+                  view="table"
+                  onViewAll={() => router.push(viewAllPath)}
+                />
+              </section>
+            ) : null}
           </div>
         </div>
       </div>

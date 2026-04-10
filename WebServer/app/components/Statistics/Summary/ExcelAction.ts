@@ -1,5 +1,6 @@
 "use server";
 
+import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { ExportExcelData, UploadExcelResult } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
@@ -25,7 +26,10 @@ export async function uploadSummaryExcel(
   fallbackYear?: number,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
-    const sessionValidation = await validateSession();
+    const sessionValidation = await validateSession([
+      Roles.ADMIN,
+      Roles.STATISTICS,
+    ]);
     if (!sessionValidation.success) return sessionValidation;
 
     const now = new Date();

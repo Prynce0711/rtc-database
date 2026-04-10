@@ -1,12 +1,14 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
 import { useRef, useState } from "react";
 import {
-  FiCalendar,
-  FiDownload,
-  FiFileText,
-  FiGrid,
-  FiPlus,
+    FiCalendar,
+    FiDownload,
+    FiFileText,
+    FiGrid,
+    FiPlus,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import Inventory, { type InventoryCourtFilter } from "./Inventory";
@@ -62,6 +64,11 @@ const INVENTORY_EXPORT_HEADERS = [
 ];
 
 export default function AnnualPage() {
+  const session = useSession();
+  const canManageStats =
+    session?.data?.user?.role === Roles.ADMIN ||
+    session?.data?.user?.role === Roles.STATISTICS;
+
   const [activeView, setActiveView] = useState<AnnualView>("MTC");
   const [inventoryCourtFilter, setInventoryCourtFilter] =
     useState<InventoryCourtFilter>("RTC");
@@ -204,13 +211,15 @@ export default function AnnualPage() {
                     <FiDownload className="h-5 w-5" />
                     Export
                   </button>
-                  <button
-                    className="btn btn-success btn-md gap-2"
-                    onClick={() => setRequestAdd((c) => c + 1)}
-                  >
-                    <FiPlus className="h-5 w-5" />
-                    Add Report
-                  </button>
+                  {canManageStats && (
+                    <button
+                      className="btn btn-success btn-md gap-2"
+                      onClick={() => setRequestAdd((c) => c + 1)}
+                    >
+                      <FiPlus className="h-5 w-5" />
+                      Add Report
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

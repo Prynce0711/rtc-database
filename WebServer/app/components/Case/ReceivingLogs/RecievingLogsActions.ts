@@ -25,6 +25,16 @@ export type ReceivingLogStats = {
   docTypes: number;
 };
 
+export type ArchiveRecentFile = {
+  id: number;
+  fileName: string;
+  caseNumber: string | null;
+  caseType: CaseType;
+  branchNumber: string | null;
+  dateRecieved: Date | null;
+  uploadedAt: Date;
+};
+
 function buildReceivingLogWhere(
   options?: ReceivingLogFilterOptions,
 ): Prisma.RecievingLogWhereInput {
@@ -379,5 +389,57 @@ export async function deleteRecievingLog(
   } catch (error) {
     console.error("Error deleting receiving log:", error);
     return { success: false, error: "Error deleting receiving log" };
+  }
+}
+
+export async function getRecentArchiveFiles(
+  limit = 5,
+): Promise<ActionResult<ArchiveRecentFile[]>> {
+  try {
+    const sessionValidation = await validateSession([
+      Roles.ARCHIVE,
+      Roles.ADMIN,
+      Roles.ATTY,
+    ]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLimit = Math.min(Math.max(Math.trunc(limit || 5), 1), 20);
+
+    const logs = await prisma.recievingLog.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: normalizedLimit,
+      select: {
+        id: true,
+        content: true,
+        caseNumber: true,
+        caseType: true,
+        branchNumber: true,
+        dateRecieved: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      result: logs.map((log) => ({
+        id: log.id,
+        fileName:
+          log.content?.trim() ||
+          [log.caseType, log.caseNumber].filter(Boolean).join(" - ") ||
+          `Archive File #${log.id}`,
+        caseNumber: log.caseNumber,
+        caseType: log.caseType,
+        branchNumber: log.branchNumber,
+        dateRecieved: log.dateRecieved,
+        uploadedAt: log.createdAt,
+      })),
+    };
+  } catch (error) {
+    console.error("Error fetching recent archive files:", error);
+    return { success: false, error: "Failed to fetch recent archive files" };
   }
 }

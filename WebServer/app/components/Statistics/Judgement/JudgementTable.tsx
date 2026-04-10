@@ -8,10 +8,10 @@ import AnnualRow from "../Annual/AnnualRow";
 import AnnualToolbar from "../Annual/AnnualToolbar";
 import JudgementAddReportPage from "./JudgementAddReportPage";
 import {
-  AnyColumnDef,
-  ColumnDef,
-  flattenColumns,
-  isGroupColumn,
+    AnyColumnDef,
+    ColumnDef,
+    flattenColumns,
+    isGroupColumn,
 } from "./JudgementColumnDef";
 import { FieldConfig } from "./JudgementFieldConfig";
 import JudgementViewPage from "./JudgementViewPage";
@@ -474,20 +474,28 @@ function JudgementTable<T extends Record<string, unknown>>({
         placeholder={searchPlaceholder ?? "Search records..."}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
-        onStartEdit={() => {
-          if (filteredAndSorted.length > 0) {
-            setSelectionMode("edit");
-            setSelectedIds(new Set());
-          }
-        }}
-        onStartDelete={() => {
-          if (filteredAndSorted.length > 0) {
-            setSelectionMode("delete");
-            setSelectedIds(new Set());
-          }
-        }}
-        onConfirmSelection={confirmSelection}
-        onCancelSelection={cancelSelection}
+        onStartEdit={
+          isAdminOrAtty
+            ? () => {
+                if (filteredAndSorted.length > 0) {
+                  setSelectionMode("edit");
+                  setSelectedIds(new Set());
+                }
+              }
+            : undefined
+        }
+        onStartDelete={
+          isAdminOrAtty
+            ? () => {
+                if (filteredAndSorted.length > 0) {
+                  setSelectionMode("delete");
+                  setSelectedIds(new Set());
+                }
+              }
+            : undefined
+        }
+        onConfirmSelection={isAdminOrAtty ? confirmSelection : undefined}
+        onCancelSelection={isAdminOrAtty ? cancelSelection : undefined}
       />
       {/* ── TABLE ── */}
       <div

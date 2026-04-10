@@ -38,6 +38,16 @@ export type NotarialStats = {
   noDate: number;
 };
 
+export type NotarialRecentFile = {
+  id: number;
+  fileName: string;
+  title: string | null;
+  name: string | null;
+  attorney: string | null;
+  mimeType: string | null;
+  uploadedAt: Date;
+};
+
 function buildNotarialWhere(
   options?: NotarialFilterOptions,
 ): Prisma.NotarialWhereInput {
@@ -87,7 +97,7 @@ async function deleteFileIfUnreferenced(fileId: number, key: string) {
 
 export async function getNotarial(): Promise<ActionResult<NotarialData[]>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([Roles.ADMIN, Roles.NOTARIAL]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -109,7 +119,7 @@ export async function getNotarialById(
   id: number,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([Roles.ADMIN, Roles.NOTARIAL]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -547,5 +557,58 @@ export async function getNotarialFileUrl(
   } catch (error) {
     console.error("Error getting notarial file URL:", error);
     return { success: false, error: "Error getting notarial file URL" };
+  }
+}
+
+export async function getRecentNotarialFiles(
+  limit = 5,
+): Promise<ActionResult<NotarialRecentFile[]>> {
+  try {
+    const sessionResult = await validateSession([
+      Roles.NOTARIAL,
+      Roles.ADMIN,
+      Roles.ATTY,
+    ]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedLimit = Math.min(Math.max(Math.trunc(limit || 5), 1), 20);
+
+    const items = await prisma.notarial.findMany({
+      where: {
+        fileId: {
+          not: null,
+        },
+      },
+      include: {
+        file: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: normalizedLimit,
+    });
+
+    return {
+      success: true,
+      result: items
+        .filter((item) => !!item.file)
+        .map((item) => ({
+          id: item.id,
+          fileName:
+            item.file?.fileName?.trim() ||
+            item.title?.trim() ||
+            "Untitled File",
+          title: item.title,
+          name: item.name,
+          attorney: item.attorney,
+          mimeType: item.file?.mimeType ?? null,
+          uploadedAt: item.file?.createdAt ?? item.createdAt,
+        })),
+    };
+  } catch (error) {
+    console.error("Error fetching recent notarial files:", error);
+    return { success: false, error: "Failed to fetch recent notarial files" };
   }
 }
