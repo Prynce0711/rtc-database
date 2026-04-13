@@ -1,15 +1,14 @@
 "use client";
 
+import {
+  UnifiedCaseData,
+  UnifiedCaseStats,
+  usePopup,
+} from "@rtc-database/shared";
 import { Calendar, FileText, Lock, Scale, Server } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  getCaseStats,
-  getCases,
-  type UnifiedCaseData,
-  type UnifiedCaseStats,
-} from "../Case/CaseActions";
-import { usePopup } from "@rtc-database/shared";
+import { getCaseStats, getCases } from "../Case/BaseCaseActions";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
 
@@ -221,4 +220,3 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
 };
 
 export default StaffDashboard;
-

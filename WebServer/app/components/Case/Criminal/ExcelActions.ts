@@ -1,10 +1,6 @@
 "use server";
 
 import {
-  CriminalCaseData,
-  CriminalCaseSchema,
-} from "@/app/components/Case/Criminal/CriminalCaseSchema";
-import {
   Case,
   CaseType,
   CriminalCase,
@@ -30,12 +26,17 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@/app/lib/utils";
-import { ActionResult } from "@rtc-database/shared";
+
+import {
+  ActionResult,
+  BaseCaseSchema,
+  CriminalCaseData,
+  CriminalCaseSchema,
+  getSchemaFieldKeys,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export async function uploadExcel(
   file: File,
@@ -46,7 +47,7 @@ export async function uploadExcel(
       return sessionResult;
     }
 
-    console.log(`✓ Excel file received: ${file.name} (${file.size} bytes)`);
+    console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
     const candidateCaseNumbers = new Set<string>();
 
@@ -55,7 +56,7 @@ export async function uploadExcel(
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
-        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+        `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
 
       for (const sheetName of workbook.SheetNames) {
@@ -74,7 +75,7 @@ export async function uploadExcel(
         }
       }
     } catch (peekError) {
-      console.warn("⚠ Unable to preview workbook for logging:", peekError);
+      console.warn("WARN Unable to preview workbook for logging:", peekError);
     }
 
     const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
@@ -283,7 +284,7 @@ export async function uploadExcel(
       const sheets = meta.sheetSummary;
 
       console.log(
-        `✓ Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach(
@@ -294,7 +295,7 @@ export async function uploadExcel(
             failed: number;
           }) => {
             console.log(
-              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+              `  SHEET "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
             );
           },
         );
@@ -302,7 +303,7 @@ export async function uploadExcel(
 
       if (result.result?.failedExcel) {
         console.log(
-          "⚠ Failed rows file generated:",
+          "WARN Failed rows file generated:",
           result.result.failedExcel.fileName,
         );
       }
@@ -314,7 +315,7 @@ export async function uploadExcel(
         },
       });
     } else {
-      console.error("✗ Import failed:", result.error);
+      console.error("FAILED Import failed:", result.error);
     }
 
     return result;

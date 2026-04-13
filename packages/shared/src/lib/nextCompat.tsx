@@ -218,11 +218,22 @@ type PatchedHistory = History & {
   __rtcAdaptivePatched?: boolean;
 };
 
+const runDeferred = (callback: () => void) => {
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(callback);
+    return;
+  }
+
+  Promise.resolve().then(callback);
+};
+
 const notifyNavigationChange = () => {
   if (typeof window === "undefined") {
     return;
   }
-  window.dispatchEvent(new Event(NAVIGATION_EVENT));
+  runDeferred(() => {
+    window.dispatchEvent(new Event(NAVIGATION_EVENT));
+  });
 };
 
 const ensureHistoryPatched = () => {
@@ -267,6 +278,7 @@ const readPathname = () => {
 export const useAdaptivePathname = (): string => {
   // Keep initial render deterministic between server and client to avoid hydration mismatches.
   const [pathname, setPathname] = React.useState<string>("");
+  const pathnameRef = React.useRef("");
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -276,7 +288,18 @@ export const useAdaptivePathname = (): string => {
     ensureHistoryPatched();
 
     const update = () => {
-      setPathname(readPathname());
+      const nextPathname = readPathname();
+      if (nextPathname === pathnameRef.current) {
+        return;
+      }
+
+      runDeferred(() => {
+        if (nextPathname === pathnameRef.current) {
+          return;
+        }
+        pathnameRef.current = nextPathname;
+        setPathname(nextPathname);
+      });
     };
 
     update();

@@ -6,7 +6,7 @@ import {
   formatDate,
   getAgeFromDate,
   isRetirementEligible,
-} from "@/app/lib/utils";
+} from "@rtc-database/shared";
 import { ActionDropdown, Pagination, TipCell } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";

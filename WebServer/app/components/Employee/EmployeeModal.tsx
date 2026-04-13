@@ -2,7 +2,7 @@
 
 import type { Employee } from "@/app/generated/prisma/browser";
 import { EmploymentType } from "@/app/generated/prisma/enums";
-import { enumToText } from "@/app/lib/utils";
+import { enumToText } from "@rtc-database/shared";
 import React from "react";
 
 interface Props {

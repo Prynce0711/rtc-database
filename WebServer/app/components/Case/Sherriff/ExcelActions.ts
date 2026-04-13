@@ -30,12 +30,12 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@/app/lib/utils";
+import { getSchemaFieldKeys } from "@rtc-database/shared";
 import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../BaseCaseSchema";
+import { BaseCaseSchema } from "@rtc-database/shared";
 
 export async function uploadSheriffExcel(
   file: File,
@@ -388,3 +388,4 @@ export async function exportSheriffExcel(): Promise<
     return { success: false, error: "Export failed" };
   }
 }
+

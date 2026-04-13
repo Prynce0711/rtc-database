@@ -2,7 +2,7 @@ import type { Case, Petition } from "@/app/generated/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "../BaseCaseSchema";
+import { BaseCaseSchema } from "@rtc-database/shared";
 
 export type PetitionCasesFilterOptions = FilterOptions<PetitionSchema>;
 
@@ -84,3 +84,4 @@ export const createEmptyEntry = (): PetitionEntry => ({
   collapsed: false,
   saved: false,
 });
+

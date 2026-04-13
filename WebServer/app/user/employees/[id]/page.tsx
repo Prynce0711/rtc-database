@@ -6,7 +6,7 @@ import {
   enumToText,
   getAgeFromDate,
   isRetirementEligible,
-} from "@/app/lib/utils";
+} from "@rtc-database/shared";
 import { PageDetailSkeleton } from "@rtc-database/shared";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

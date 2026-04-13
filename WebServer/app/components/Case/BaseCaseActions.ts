@@ -1,35 +1,16 @@
 "use server";
 
-import { CaseType, Prisma, type Case } from "@/app/generated/prisma/client";
+import { CaseType, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import type { PaginatedResult } from "@rtc-database/shared";
+import { DEFAULT_PAGE_SIZE } from "@/app/lib/PrismaHelper";
+import type {
+  PaginatedResult,
+  UnifiedCaseData,
+  UnifiedCasesOptions,
+  UnifiedCaseStats,
+} from "@rtc-database/shared";
 import { ActionResult } from "@rtc-database/shared";
-
-export type UnifiedCaseData = Case & {
-  displayParty: string;
-  displayDetail: string;
-  isDetained: boolean;
-  statusText: string;
-  raffleDate: Date | null;
-};
-
-export type UnifiedCaseStats = {
-  totalCases: number;
-  detainedCases: number;
-  pendingCases: number;
-  recentlyFiled: number;
-};
-
-export type UnifiedCasesOptions = {
-  page?: number;
-  pageSize?: number;
-  sortKey?: "id" | "caseNumber" | "dateFiled" | "caseType" | "branch";
-  sortOrder?: "asc" | "desc";
-  caseType?: CaseType;
-};
-
-const DEFAULT_PAGE_SIZE = 25;
 
 const toUnifiedCase = (
   c: Prisma.CaseGetPayload<{

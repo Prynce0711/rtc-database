@@ -1,6 +1,7 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
+import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -24,8 +25,7 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
-import { doesCaseExist } from "../CaseActions";
+import { doesCaseExist } from "../BaseCaseActions";
 import {
   createCivilCase,
   deleteCivilCase,
@@ -1752,4 +1752,3 @@ export const NotarialUpdatePage = ({
     </div>
   );
 };
-

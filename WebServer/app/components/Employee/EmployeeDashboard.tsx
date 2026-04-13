@@ -26,7 +26,7 @@ import {
 } from "react-icons/fi";
 
 import type { Employee } from "@/app/generated/prisma/browser";
-import { isRetirementEligible } from "@/app/lib/utils";
+import { isRetirementEligible } from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterDropdown,

@@ -1,5 +1,5 @@
 import z from "zod";
-import { CaseType } from "../generated/prisma/browser";
+import { Case, CaseType } from "../generated/prisma/browser";
 import { excelHeaders } from "../lib/excel";
 
 export const BaseCaseSchema = z.object({
@@ -34,3 +34,26 @@ export const BaseCaseSchema = z.object({
   caseType: z.enum(CaseType),
 });
 export type BaseCaseSchema = z.infer<typeof BaseCaseSchema>;
+
+export type UnifiedCaseData = Case & {
+  displayParty: string;
+  displayDetail: string;
+  isDetained: boolean;
+  statusText: string;
+  raffleDate: Date | null;
+};
+
+export type UnifiedCaseStats = {
+  totalCases: number;
+  detainedCases: number;
+  pendingCases: number;
+  recentlyFiled: number;
+};
+
+export type UnifiedCasesOptions = {
+  page?: number;
+  pageSize?: number;
+  sortKey?: "id" | "caseNumber" | "dateFiled" | "caseType" | "branch";
+  sortOrder?: "asc" | "desc";
+  caseType?: CaseType;
+};

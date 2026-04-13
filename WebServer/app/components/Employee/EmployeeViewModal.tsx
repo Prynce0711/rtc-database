@@ -5,7 +5,7 @@ import {
   enumToText,
   getAgeFromDate,
   isRetirementEligible,
-} from "@/app/lib/utils";
+} from "@rtc-database/shared";
 import React from "react";
 
 interface Props {

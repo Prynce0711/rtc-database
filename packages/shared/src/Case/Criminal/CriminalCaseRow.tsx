@@ -1,12 +1,11 @@
 "use client";
 
-import Roles from "@/app/lib/Roles";
+import type { CriminalCaseData } from "@rtc-database/shared";
 import { ActionDropdown, Table, TipCell } from "@rtc-database/shared";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import type { CriminalCaseData } from "./CriminalCaseSchema";
-import { useSession } from "@/app/lib/authClient";
+import Roles from "../../lib/Roles";
+import { useAdaptiveNavigation } from "../../lib/nextCompat";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,18 +33,17 @@ const CriminalCaseRow = ({
   onEdit,
   selected = false,
   onToggleSelect,
+  role,
 }: {
   caseItem: CriminalCaseData;
   handleDeleteCase: (caseId: number) => void;
   onEdit: (caseItem: CriminalCaseData) => void;
   selected?: boolean;
   onToggleSelect?: (caseId: number, checked: boolean) => void;
+  role: Roles;
 }) => {
-  const session = useSession();
-  const router = useRouter();
-  const isAdminOrAtty =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
+  const router = useAdaptiveNavigation();
+  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
   const popoverId = `criminal-actions-popover-${caseItem.id}`;
   const anchorName = `--criminal-actions-anchor-${caseItem.id}`;
 
@@ -223,15 +221,14 @@ export const CaseTable = ({
   data,
   handleDeleteCase,
   onEdit,
+  role,
 }: {
   data: CriminalCaseData[];
   handleDeleteCase: (caseId: number) => void;
   onEdit: (caseItem: CriminalCaseData) => void;
+  role: Roles;
 }) => {
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
+  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
 
   const [sortConfig, setSortConfig] = useState<CaseSortConfig>({
     key: "dateFiled",
@@ -414,6 +411,7 @@ export const CaseTable = ({
           caseItem={item}
           handleDeleteCase={handleDeleteCase}
           onEdit={onEdit}
+          role={role}
         />
       )}
       rowsPerPage={25}

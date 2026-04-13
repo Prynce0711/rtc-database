@@ -1,11 +1,11 @@
 "use client";
 
+import { criminalCaseAdapter } from "@/app/components/Case/Criminal/CriminalCaseAdapter";
 import {
   getCriminalCaseById,
   getCriminalCasesByIds,
 } from "@/app/components/Case/Criminal/CriminalCasesActions";
-import type { CriminalCaseData } from "@/app/components/Case/Criminal/CriminalCaseSchema";
-import CriminalCaseUpdatePage from "@/app/components/Case/Criminal/CriminalCaseUpdatePage";
+import { CriminalCaseData, CriminalCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -118,6 +118,7 @@ const CriminalEditPage = () => {
       onClose={goBackToList}
       onCreate={goBackToList}
       onUpdate={goBackToList}
+      adapter={criminalCaseAdapter}
     />
   );
 };

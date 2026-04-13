@@ -1,6 +1,7 @@
 "use client";
 
-import CriminalCaseUpdatePage from "@/app/components/Case/Criminal/CriminalCaseUpdatePage";
+import criminalCaseAdapter from "@/app/components/Case/Criminal/CriminalCaseAdapter";
+import { CriminalCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 
 const CriminalAddPage = () => {
@@ -15,6 +16,7 @@ const CriminalAddPage = () => {
       onClose={goBackToList}
       onCreate={goBackToList}
       onUpdate={goBackToList}
+      adapter={criminalCaseAdapter}
     />
   );
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { authClient, useSession } from "@/app/lib/authClient";
-import { isDarkMode } from "@/app/lib/utils";
+import { isDarkMode } from "@rtc-database/shared";
 import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import Image from "next/image";

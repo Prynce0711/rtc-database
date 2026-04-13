@@ -4,7 +4,7 @@ import {
   exportSpecialProceedingsExcel,
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
-import { isTextFieldKey } from "@/app/lib/utils";
+import { isTextFieldKey } from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterDropdown,

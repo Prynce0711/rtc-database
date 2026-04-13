@@ -1,5 +1,5 @@
+import { UnifiedCaseData } from "@rtc-database/shared";
 import React from "react";
-import type { UnifiedCaseData } from "../Case/CaseActions";
 
 interface RecentCasesProps {
   cases: UnifiedCaseData[];

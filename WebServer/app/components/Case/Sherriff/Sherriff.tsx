@@ -1,6 +1,6 @@
 "use client";
 
-import { isTextFieldKey } from "@/app/lib/utils";
+import { isTextFieldKey } from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterDropdown,

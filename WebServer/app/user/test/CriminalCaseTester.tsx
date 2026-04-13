@@ -7,16 +7,16 @@ import {
   updateCriminalCase,
 } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
-  CaseEntry,
-  CriminalCaseData,
-  caseToEntry,
-  createEmptyEntry,
-} from "@/app/components/Case/Criminal/CriminalCaseSchema";
-import {
   exportCasesExcel,
   uploadExcel,
 } from "@/app/components/Case/Criminal/ExcelActions";
 import { CaseType } from "@/app/generated/prisma/client";
+import {
+  CaseEntry,
+  CriminalCaseData,
+  caseToEntry,
+  createEmptyEntry,
+} from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 

@@ -1,19 +1,25 @@
 "use client";
 
-import { isTextFieldKey } from "@/app/lib/utils";
 import {
+  calculateCriminalCaseStats,
+  CriminalCaseAdapter,
+  CriminalCaseStats,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
   getFilterStateFromSearchParams,
+  isTextFieldKey,
   PageListSkeleton,
   Pagination,
+  Roles,
   Table,
   usePopup,
+  type CriminalCaseData,
+  type CriminalCaseFilters,
+  type CriminalCasesFilterOptions,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
 import React, {
   useCallback,
   useEffect,
@@ -31,21 +37,11 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
+import {
+  useAdaptiveNavigation,
+  useAdaptivePathname,
+} from "../../lib/nextCompat";
 import CriminalCaseRow from "./CriminalCaseRow";
-import {
-  deleteCriminalCase,
-  getCriminalCases,
-  getCriminalCaseStats,
-} from "./CriminalCasesActions";
-import {
-  calculateCriminalCaseStats,
-  CriminalCaseStats,
-  type CriminalCaseData,
-  type CriminalCaseFilters,
-  type CriminalCasesFilterOptions,
-} from "./CriminalCaseSchema";
-import { exportCasesExcel, uploadExcel } from "./ExcelActions";
-import { useSession } from "@/app/lib/authClient";
 
 // TODO: Move import excel here instead of server action and just call createCase
 // TODO: Maybe add a reusable CasePage component that you put schema and it will make the filter and table?
@@ -54,13 +50,19 @@ type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
 type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
 
-const CriminalCasePage: React.FC = () => {
+const CriminalCasePage: React.FC<{
+  role: Roles;
+  adapter: CriminalCaseAdapter;
+}> = ({ role, adapter }) => {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const pathname = useAdaptivePathname();
+  const router = useAdaptiveNavigation();
+  const [searchParams, setSearchParams] = useState<URLSearchParams>(
+    () => new URLSearchParams(),
+  );
   const [stats, setStats] = useState<CriminalCaseStats>({
     totalCases: 0,
     detainedCases: 0,
@@ -68,10 +70,7 @@ const CriminalCasePage: React.FC = () => {
     recentlyFiled: 0,
   });
 
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === "admin" ||
-    session?.data?.user?.role === "atty";
+  const isAdminOrAtty = role === "admin" || role === "atty";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -91,6 +90,23 @@ const CriminalCasePage: React.FC = () => {
     () => getFilterStateFromSearchParams(searchParams),
     [searchParams],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateSearchParams = () => {
+      setSearchParams(new URLSearchParams(window.location.search));
+    };
+
+    updateSearchParams();
+    window.addEventListener("popstate", updateSearchParams);
+    window.addEventListener("hashchange", updateSearchParams);
+
+    return () => {
+      window.removeEventListener("popstate", updateSearchParams);
+      window.removeEventListener("hashchange", updateSearchParams);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const nextFilters = urlFilterState.filters as CaseFilterValues;
@@ -165,7 +181,7 @@ const CriminalCasePage: React.FC = () => {
     async (page = currentPage) => {
       try {
         const [casesRes, statsRes] = await Promise.all([
-          getCriminalCases({
+          adapter.getCriminalCases({
             page,
             pageSize,
             filters: appliedFilters,
@@ -173,7 +189,7 @@ const CriminalCasePage: React.FC = () => {
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
-          getCriminalCaseStats({
+          adapter.getCriminalCaseStats({
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -244,7 +260,7 @@ const CriminalCasePage: React.FC = () => {
 
     if (!isTextField) return [];
 
-    const res = await getCriminalCases({
+    const res = await adapter.getCriminalCases({
       page: 1,
       pageSize: 10,
       filters: { [key]: inputValue } as CaseFilters,
@@ -285,7 +301,7 @@ const CriminalCasePage: React.FC = () => {
     )
       return;
 
-    const result = await deleteCriminalCase(caseId);
+    const result = await adapter.deleteCriminalCase(caseId);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete case");
       return;
@@ -311,7 +327,7 @@ const CriminalCasePage: React.FC = () => {
 
     try {
       const results = await Promise.allSettled(
-        selectedCaseIds.map((caseId) => deleteCriminalCase(caseId)),
+        selectedCaseIds.map((caseId) => adapter.deleteCriminalCase(caseId)),
       );
 
       const failedIds: number[] = [];
@@ -351,7 +367,7 @@ const CriminalCasePage: React.FC = () => {
 
     setUploading(true);
     try {
-      const result = await uploadExcel(file);
+      const result = await adapter.uploadExcel(file);
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {
@@ -404,7 +420,7 @@ const CriminalCasePage: React.FC = () => {
   const handleExportExcel = async () => {
     setExporting(true);
     try {
-      const result = await exportCasesExcel();
+      const result = await adapter.exportCasesExcel();
       if (!result.success) {
         statusPopup.showError(result.error || "Failed to export cases");
         return;
@@ -756,6 +772,7 @@ const CriminalCasePage: React.FC = () => {
               }}
               selected={selectedCaseIds.includes(caseItem.id)}
               onToggleSelect={handleToggleCaseSelection}
+              role={role}
             />
           )}
         />

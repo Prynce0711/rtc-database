@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate } from "@/app/lib/utils";
+import { formatDate } from "@rtc-database/shared";
 import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { FiDownload, FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 

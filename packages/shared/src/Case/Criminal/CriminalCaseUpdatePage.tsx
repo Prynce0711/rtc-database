@@ -1,9 +1,18 @@
 "use client";
 
-import { CaseType } from "@/app/generated/prisma/enums";
-import { usePopup, useToast } from "@rtc-database/shared";
+import {
+  CaseEntry,
+  CaseType,
+  CriminalCaseAdapter,
+  CriminalCaseData,
+  CriminalCaseSchema,
+  caseToEntry,
+  createEmptyEntry,
+  createTempId,
+  usePopup,
+  useToast,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import React, {
   useCallback,
   useEffect,
@@ -28,21 +37,7 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { doesCaseExist } from "../CaseActions";
-import {
-  createCriminalCase,
-  deleteCriminalCase,
-  getCriminalCaseNumberPreview,
-  updateCriminalCase,
-} from "./CriminalCasesActions";
-import {
-  CaseEntry,
-  CriminalCaseData,
-  CriminalCaseSchema,
-  caseToEntry,
-  createEmptyEntry,
-  createTempId,
-} from "./CriminalCaseSchema";
+import { useAdaptiveNavigation } from "../../lib/nextCompat";
 
 export enum CriminalCaseUpdateType {
   ADD = "ADD",
@@ -796,12 +791,14 @@ const CriminalCaseUpdatePage = ({
   selectedCases,
   onCreate,
   onUpdate,
+  adapter,
 }: {
   onClose?: () => void;
   selectedCase?: CriminalCaseData | null;
   selectedCases?: CriminalCaseData[];
   onCreate?: () => void;
   onUpdate?: () => void;
+  adapter: CriminalCaseAdapter;
 }) => {
   const editCases =
     selectedCases && selectedCases.length > 0
@@ -823,7 +820,7 @@ const CriminalCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const router = useAdaptiveNavigation();
 
   const makeFromCase = (sc: CriminalCaseData): CaseEntry =>
     caseToEntry({ ...sc, id: sc.id ?? createTempId() });
@@ -915,7 +912,7 @@ const CriminalCaseUpdatePage = ({
       for (const bucket of uniqueBuckets) {
         const [area, yearRaw] = bucket.split("|");
         const year = Number.parseInt(yearRaw, 10);
-        const preview = await getCriminalCaseNumberPreview(area, year);
+        const preview = await adapter.getCriminalCaseNumberPreview(area, year);
         nextPerBucket.set(
           bucket,
           preview.success ? preview.result!.nextNumber : 1,
@@ -1171,7 +1168,7 @@ const CriminalCaseUpdatePage = ({
       return [];
     }
 
-    const result = await doesCaseExist(caseNumbers, CaseType.CRIMINAL);
+    const result = await adapter.doesCaseExist(caseNumbers, CaseType.CRIMINAL);
     if (!result.success || !result.result) {
       setExistingCaseNumbers([]);
       return [];
@@ -1273,7 +1270,7 @@ const CriminalCaseUpdatePage = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteCriminalCase(id)),
+        createdIds.map((id) => adapter.deleteCriminalCase(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -1315,7 +1312,7 @@ const CriminalCaseUpdatePage = ({
           }
 
           const payload = parsed.data;
-          const response = await updateCriminalCase(original.id, {
+          const response = await adapter.updateCriminalCase(original.id, {
             ...payload,
             dateFiled: payload.dateFiled
               ? new Date(payload.dateFiled).toISOString()
@@ -1363,7 +1360,7 @@ const CriminalCaseUpdatePage = ({
             return;
           }
           const payload = parsed.data;
-          const response = await createCriminalCase({
+          const response = await adapter.createCriminalCase({
             ...payload,
             isManual: entry.isManual,
             dateFiled: payload.dateFiled

@@ -1,6 +1,7 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
+import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -24,8 +25,7 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
-import { doesCaseExist } from "../CaseActions";
+import { doesCaseExist } from "../BaseCaseActions";
 import {
   createSpecialProceeding,
   deleteSpecialProceeding,
@@ -1739,4 +1739,3 @@ const SpecialProceedingDrawer = ({
 };
 
 export default SpecialProceedingDrawer;
-

@@ -2,7 +2,7 @@ import type { Case, SpecialProceeding } from "@/app/generated/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "../BaseCaseSchema";
+import { BaseCaseSchema } from "@rtc-database/shared";
 
 export type SpecialProceedingsFilterOptions =
   FilterOptions<SpecialProceedingSchema>;
@@ -165,3 +165,4 @@ export const calculateSpecialProceedingStats = (
     branches: new Set(cases.map((c) => c.raffledTo)).size,
   };
 };
+

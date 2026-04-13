@@ -29,7 +29,11 @@
     "**/*.d.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "../packages/shared/src/Case/Criminal/CriminalCasePage.tsx",
+    "../packages/shared/src/Case/Criminal/CriminalCaseRow.tsx",
+    "../packages/shared/src/Case/Criminal/CriminalCaseUpdatePage.tsx",
+    "../packages/shared/src/utils.ts"
   ],
   "exclude": ["node_modules"]
 }

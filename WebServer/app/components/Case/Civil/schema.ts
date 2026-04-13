@@ -2,7 +2,7 @@ import type { Case, CivilCase } from "@/app/generated/prisma/client";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "../BaseCaseSchema";
+import { BaseCaseSchema } from "@rtc-database/shared";
 
 export type CivilCasesFilterOptions = FilterOptions<CivilCaseSchema>;
 
@@ -202,3 +202,4 @@ export const sortCivilCases = (
     return 0;
   });
 };
+
