@@ -1,7 +1,19 @@
-"use client";
+import recievingLogsAdapter from "@/app/components/Case/ReceivingLogs/RecievingLogsAdapter";
+import { auth } from "@/app/lib/auth";
+import { ReceivingLogsPage, Roles } from "@rtc-database/shared";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-import ReceiveLogsPage from "@/app/components/Case/ReceivingLogs/ReceiveLogs";
+export default async function Page() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || !session.user || !session.user.role) {
+    redirect("/");
+  }
 
-export default function Page() {
-  return <ReceiveLogsPage />;
+  return (
+    <ReceivingLogsPage
+      adapter={recievingLogsAdapter}
+      role={session.user.role as Roles}
+    />
+  );
 }

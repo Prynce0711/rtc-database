@@ -1,8 +1,10 @@
-import { RecievingLog } from "@/app/generated/prisma/client";
-import { CaseType } from "@/app/generated/prisma/enums";
-import { excelHeaders } from "@/app/lib/excel";
+import {
+  CaseType,
+  excelHeaders,
+  FilterOptions,
+  RecievingLog,
+} from "@rtc-database/shared";
 import { z } from "zod";
-import { FilterOptions } from "@rtc-database/shared";
 
 const ReceivingLogObjectSchema = z.object({
   bookAndPage: z
@@ -122,7 +124,7 @@ export const initialReceivingLogFormData: Omit<
 };
 
 /** Create an empty entry based on schema defaults. */
-export const createEmptyEntry = (): ReceivingLogEntry => ({
+export const createEmptyRecievingLogEntry = (): ReceivingLogEntry => ({
   ...initialReceivingLogFormData,
   id: 0,
   createdAt: new Date(),

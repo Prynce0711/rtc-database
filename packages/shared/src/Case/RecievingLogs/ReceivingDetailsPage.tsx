@@ -1,20 +1,31 @@
 "use client";
 
-import { getRecievingLogById } from "@/app/components/Case/ReceivingLogs/RecievingLogsActions";
-import type { RecievingLog } from "@/app/generated/prisma/browser";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
   NavButton,
   PageDetailSkeleton,
+  RecievingLog,
+  RecievingLogsAdapter,
 } from "@rtc-database/shared";
-import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAdaptivePathname, useAdaptiveRouter } from "../../lib/nextCompat";
 
-export default function ReceivingDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+const getReceivingIdFromPathname = (pathname: string): number | null => {
+  const segments = pathname.split("/").filter(Boolean);
+  const rawId = segments[segments.length - 1];
+  const numId = Number(rawId);
+  return Number.isInteger(numId) && numId > 0 ? numId : null;
+};
+
+export default function ReceivingDetailsPage({
+  adapter,
+}: {
+  adapter: RecievingLogsAdapter;
+}) {
+  const router = useAdaptiveRouter();
+  const pathname = useAdaptivePathname();
 
   const [logData, setLogData] = useState<RecievingLog | null>(null);
   const [prevLog, setPrevLog] = useState<RecievingLog | null>(null);
@@ -25,13 +36,18 @@ export default function ReceivingDetailsPage() {
     const fetchLog = async () => {
       try {
         setLoading(true);
-        const id = Array.isArray(params.id) ? params.id[0] : params.id;
-        const numId = Number(id);
+        const numId = getReceivingIdFromPathname(pathname);
+        if (numId === null) {
+          setLogData(null);
+          setPrevLog(null);
+          setNextLog(null);
+          return;
+        }
 
         const [current, prev, next] = await Promise.allSettled([
-          getRecievingLogById(numId),
-          getRecievingLogById(numId - 1),
-          getRecievingLogById(numId + 1),
+          adapter.getRecievingLogById(numId),
+          adapter.getRecievingLogById(numId - 1),
+          adapter.getRecievingLogById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
@@ -58,8 +74,8 @@ export default function ReceivingDetailsPage() {
       }
     };
 
-    if (params.id) fetchLog();
-  }, [params.id]);
+    if (pathname) fetchLog();
+  }, [pathname, adapter]);
 
   if (loading) return <PageDetailSkeleton />;
 
@@ -81,7 +97,7 @@ export default function ReceivingDetailsPage() {
     );
   }
 
-  const currentId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const currentId = getReceivingIdFromPathname(pathname);
 
   return (
     <div className="min-h-screen bg-base-100 animate-fade-in">
@@ -103,7 +119,7 @@ export default function ReceivingDetailsPage() {
           </div>
 
           <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
-            #{currentId}
+            #{currentId ?? "-"}
           </span>
         </div>
       </header>

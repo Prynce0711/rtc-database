@@ -6,8 +6,11 @@ import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult, PaginatedResult } from "@rtc-database/shared";
+import {
+  ReceivingLogFilterOptions,
+  ReceivingLogSchema,
+} from "@rtc-database/shared/src/Case/RecievingLogs/RecievingLogsSchema.js";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { ReceivingLogFilterOptions, ReceivingLogSchema } from "./schema";
 
 const CASE_TYPE_VALUES = new Set(Object.values(CaseType));
 

@@ -1,12 +1,14 @@
 "use client";
 
-import { useSession } from "@/app/lib/authClient";
-import Roles from "@/app/lib/Roles";
-import { ActionDropdown, TipCell } from "@rtc-database/shared";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import {
+  ActionDropdown,
+  RecievingLog,
+  Roles,
+  TipCell,
+} from "@rtc-database/shared";
+import { useState, type SyntheticEvent } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import { ReceiveLog } from "./ReceiveRecord";
+import { useAdaptiveRouter } from "../../lib/nextCompat";
 
 function ExpandableContent({
   text,
@@ -44,41 +46,43 @@ const ReceiveRow = ({
   onEdit,
   onDelete,
   onRowClick,
+  role,
 }: {
-  log: ReceiveLog;
-  onEdit: (log: ReceiveLog) => void;
-  onDelete: (log: ReceiveLog) => void;
-  onRowClick?: (log: ReceiveLog) => void;
+  log: RecievingLog;
+  onEdit: (log: RecievingLog) => void;
+  onDelete: (log: RecievingLog) => void;
+  onRowClick?: (log: RecievingLog) => void;
+  role: Roles;
 }) => {
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
+  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
 
   const dateStr =
-    log.dateReceived instanceof Date
-      ? log.dateReceived.toLocaleDateString("en-PH", {
+    log.dateRecieved instanceof Date
+      ? log.dateRecieved.toLocaleDateString("en-PH", {
           year: "numeric",
           month: "short",
           day: "numeric",
         })
-      : new Date(log.dateReceived).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
+      : "—";
 
-  const bookAndPages =
-    (log as any).BookAndPages ?? (log as any).receiptNo ?? "—";
-  const caseType = (log as any).caseType ?? (log as any).Abbreviation ?? "—";
-  const timeVal = (log as any).Time ?? log.timeReceived ?? "—";
-  const caseNo = (log as any)["Case No"] ?? log.caseNumber ?? "—";
-  const content = (log as any).Content ?? log.documentType ?? "—";
-  const branchNo = (log as any)["Branch No"] ?? log.branch ?? "—";
-  const notes = (log as any).Notes ?? log.remarks ?? "—";
+  const timeVal =
+    log.dateRecieved instanceof Date
+      ? log.dateRecieved.toLocaleTimeString("en-PH", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      : "—";
+
+  const bookAndPages = log.bookAndPage ?? "—";
+  const caseType = log.caseType ?? "—";
+  const caseNo = log.caseNumber ?? "—";
+  const content = log.content ?? "—";
+  const branchNo = log.branchNumber ?? "—";
+  const notes = log.notes ?? "—";
 
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter();
+  const router = useAdaptiveRouter();
   const popoverId = `receive-actions-popover-${log.id}`;
   const anchorName = `--receive-actions-anchor-${log.id}`;
 
@@ -89,7 +93,7 @@ const ReceiveRow = ({
     popoverEl?.hidePopover?.();
   };
 
-  const openModal = (e?: React.SyntheticEvent) => {
+  const openModal = (e?: SyntheticEvent) => {
     e?.stopPropagation();
     setIsOpen(true);
     onRowClick?.(log);

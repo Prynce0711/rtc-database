@@ -1,14 +1,19 @@
-"use client";
-
 import { civilCaseAdapter } from "@/app/components/Case/Civil/CivilCaseAdapter";
-import { useSession } from "@/app/lib/authClient";
+import { auth } from "@/app/lib/auth";
 import { CivilCasePage, Roles } from "@rtc-database/shared";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-const page = () => {
-  const session = useSession();
-  const role = (session?.data?.user?.role as Roles | undefined) ?? Roles.ATTY;
+export default async function Page() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session || !session.user || !session.user.role) {
+    redirect("/");
+  }
 
-  return <CivilCasePage role={role} adapter={civilCaseAdapter} />;
-};
-
-export default page;
+  return (
+    <CivilCasePage
+      role={session.user.role as Roles}
+      adapter={civilCaseAdapter}
+    />
+  );
+}

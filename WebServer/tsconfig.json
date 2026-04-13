@@ -38,7 +38,12 @@
     "../packages/shared/src/Case/Petition/PetitionCasePage.tsx",
     "../packages/shared/src/Case/Petition/PetitionCaseRow.tsx",
     "../packages/shared/src/Case/Petition/PetitionCaseDetailsPage.tsx",
-    "../packages/shared/src/Case/Petition/PetitionCaseUpdatePage.tsx"
+    "../packages/shared/src/Case/Petition/PetitionCaseUpdatePage.tsx",
+    "../packages/shared/src/Case/RecievingLogs/ReceivingDrawer.tsx",
+    "../packages/shared/src/Case/RecievingLogs/ReceivingLogs.tsx",
+    "../packages/shared/src/Case/RecievingLogs/ReceivingRow.tsx",
+    "../packages/shared/src/Case/RecievingLogs/RecievingLogsSchema.ts",
+    "../packages/shared/src/Case/RecievingLogs/ReceivingDetailsPage.tsx"
   ],
   "exclude": ["node_modules"]
 }

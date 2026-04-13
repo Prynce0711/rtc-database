@@ -5,9 +5,9 @@ import {
   CriminalCaseSchema,
   PetitionCaseSchema,
 } from "@rtc-database/shared";
+import { ReceivingLogSchema } from "@rtc-database/shared/src/Case/RecievingLogs/RecievingLogsSchema.js";
 import { z } from "zod";
 import { NotarialSchema } from "../Case/Notarial/schema";
-import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
 import { SheriffCaseSchema } from "../Case/Sherriff/schema";
 import { SpecialProceedingSchema } from "../Case/SpecialProceedings/schema";
 import { EmployeeSchema } from "../Employee/schema";

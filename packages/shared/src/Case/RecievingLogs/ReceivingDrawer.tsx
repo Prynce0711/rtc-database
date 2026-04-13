@@ -1,7 +1,11 @@
 "use client";
 
-import { CaseType } from "@/app/generated/prisma/enums";
-import { usePopup } from "@rtc-database/shared";
+import {
+  CaseType,
+  RecievingLog,
+  RecievingLogsAdapter,
+  usePopup,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -19,13 +23,8 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { ReceiveLog } from "./ReceiveRecord";
-import {
-  createRecievingLog,
-  deleteRecievingLog,
-  updateRecievingLog,
-} from "./RecievingLogsActions";
-import { ReceivingLogEntry } from "./schema";
+
+import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
 export enum ReceiveDrawerType {
   ADD = "ADD",
@@ -33,6 +32,14 @@ export enum ReceiveDrawerType {
 }
 
 type Step = "entry" | "review";
+type EntryFieldKey =
+  | "bookAndPage"
+  | "dateRecieved"
+  | "caseType"
+  | "caseNumber"
+  | "content"
+  | "branchNumber"
+  | "notes";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -54,7 +61,7 @@ const emptyEntry = (id: number): ReceivingLogEntry => ({
 const REQUIRED_FIELDS = ["bookAndPage", "caseNumber", "dateRecieved"] as const;
 
 type ColDef = {
-  key: string;
+  key: EntryFieldKey;
   label: string;
   placeholder: string;
   type: "text" | "date" | "time" | "select";
@@ -100,6 +107,7 @@ const CASE_TYPE_OPTIONS = Object.values(CaseType).map((value) => ({
   value,
   label: CASE_TYPE_LABELS[value as CaseType] ?? value,
 }));
+const CASE_TYPE_VALUES = new Set<string>(Object.values(CaseType));
 
 const getCaseTypeLabel = (value: string) =>
   CASE_TYPE_LABELS[value as CaseType] ?? value;
@@ -330,13 +338,15 @@ const ReceiveDrawer = ({
   selectedLogs,
   onCreate,
   onUpdate,
+  adapter,
 }: {
   type: ReceiveDrawerType;
   onClose: () => void;
-  selectedLog?: ReceiveLog | null | any;
-  selectedLogs?: Array<ReceiveLog | any>;
-  onCreate?: (log: any) => void;
-  onUpdate?: (log: any) => void;
+  selectedLog?: RecievingLog | null;
+  selectedLogs?: Array<RecievingLog>;
+  onCreate?: (log: RecievingLog) => void;
+  onUpdate?: (log: RecievingLog) => void;
+  adapter: RecievingLogsAdapter;
 }) => {
   const isEdit = type === ReceiveDrawerType.EDIT;
   const editLogs =
@@ -353,18 +363,18 @@ const ReceiveDrawer = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
-  const makeFromLog = (log: any): ReceivingLogEntry => ({
-    id: log.id ?? nextTempIdRef.current--,
-    bookAndPage: log.bookAndPage ?? log.BookAndPages ?? log.receiptNo ?? "",
-    dateRecieved:
-      (log.dateRecieved ?? log.dateReceived)
-        ? String(log.dateRecieved ?? log.dateReceived).slice(0, 10)
-        : today,
-    caseType: log.caseType ?? log.CaseType ?? log.Abbreviation ?? "UNKNOWN",
-    caseNumber: log.caseNumber ?? log["Case No"] ?? "",
-    content: log.content ?? log.Content ?? "",
-    branchNumber: log.branchNumber ?? log["Branch No"] ?? log.branch ?? "",
-    notes: log.notes ?? log.Notes ?? log.remarks ?? "",
+  const makeFromLog = (log: RecievingLog): ReceivingLogEntry => ({
+    id: log.id,
+    bookAndPage: log.bookAndPage ?? "",
+    dateRecieved: log.dateRecieved
+      ? log.dateRecieved.toISOString().slice(0, 10)
+      : "",
+    caseType: log.caseType,
+    caseNumber: log.caseNumber ?? "",
+    content: log.content ?? "",
+    branchNumber: log.branchNumber ?? "",
+    notes: log.notes ?? "",
+    createdAt: log.createdAt,
     updatedAt: log.updatedAt ? new Date(log.updatedAt) : null,
     errors: {},
     collapsed: false,
@@ -388,14 +398,55 @@ const ReceiveDrawer = ({
     setActiveTab(0);
   }, [type, selectedLog, selectedLogs]);
 
-  const handleChange = (id: number, field: string, value: string) => {
+  const handleChange = (id: number, field: EntryFieldKey, value: string) => {
     setEntries((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
-          : e,
-      ),
+      prev.map((entry) => {
+        if (entry.id !== id) return entry;
+
+        const errors = { ...entry.errors, [field]: "" };
+
+        switch (field) {
+          case "bookAndPage":
+            return { ...entry, bookAndPage: value, errors };
+          case "dateRecieved":
+            return { ...entry, dateRecieved: value, errors };
+          case "caseType":
+            return {
+              ...entry,
+              caseType: CASE_TYPE_VALUES.has(value)
+                ? (value as CaseType)
+                : "UNKNOWN",
+              errors,
+            };
+          case "caseNumber":
+            return { ...entry, caseNumber: value, errors };
+          case "content":
+            return { ...entry, content: value, errors };
+          case "branchNumber":
+            return { ...entry, branchNumber: value, errors };
+          case "notes":
+            return { ...entry, notes: value, errors };
+          default:
+            return entry;
+        }
+      }),
     );
+  };
+
+  const getEntryCellValue = (
+    entry: ReceivingLogEntry,
+    key: EntryFieldKey,
+  ): string => {
+    const value = entry[key];
+
+    if (value == null) return "";
+
+    if (key === "dateRecieved") {
+      if (value instanceof Date) return value.toISOString().slice(0, 10);
+      return value.slice(0, 10);
+    }
+
+    return String(value);
   };
 
   const handleAddEntry = useCallback(() => {
@@ -517,7 +568,7 @@ const ReceiveDrawer = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteRecievingLog(id)),
+        createdIds.map((id) => adapter.deleteRecievingLog(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -558,7 +609,7 @@ const ReceiveDrawer = ({
             return;
           }
 
-          const result = await updateRecievingLog(
+          const result = await adapter.updateRecievingLog(
             target.id,
             buildPayload(entries[index]),
           );
@@ -579,7 +630,7 @@ const ReceiveDrawer = ({
 
         for (let index = 0; index < entries.length; index++) {
           const entry = entries[index];
-          const result = await createRecievingLog(buildPayload(entry));
+          const result = await adapter.createRecievingLog(buildPayload(entry));
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedLogs(createdIds);
             setStep("entry");
@@ -858,7 +909,7 @@ const ReceiveDrawer = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={(entry as any)[col.key]}
+                                  value={getEntryCellValue(entry, col.key)}
                                   error={entry.errors[col.key]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key, v)
@@ -870,7 +921,7 @@ const ReceiveDrawer = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={(entry as any)[col.key]}
+                                  value={getEntryCellValue(entry, col.key)}
                                   error={entry.errors[col.key]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key, v)

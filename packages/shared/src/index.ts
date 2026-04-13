@@ -62,6 +62,7 @@ export {
   default as PetitionCaseUpdatePage,
   PetitionCaseUpdateType,
 } from "./Case/Petition/PetitionCaseUpdatePage";
+export * from "./Case/RecievingLogs";
 
 export * from "./Filter/FilterDropdown";
 export { default as FilterDropdown } from "./Filter/FilterDropdown";

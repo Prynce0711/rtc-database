@@ -1,22 +1,21 @@
 "use client";
 
-import { RecievingLog } from "@/app/generated/prisma/client";
-import { CaseType } from "@/app/generated/prisma/enums";
-import { useSession } from "@/app/lib/authClient";
-import Roles from "@/app/lib/Roles";
 import {
   ActionDropdown,
+  CaseType,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
   PageListSkeleton,
   Pagination,
+  RecievingLog,
+  RecievingLogsAdapter,
+  Roles,
   Table,
   usePopup,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -30,13 +29,8 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
-import {
-  deleteRecievingLog,
-  getRecievingLogsPage,
-  getRecievingLogsStats,
-} from "./RecievingLogsActions";
-import type { ReceivingLogFilterOptions } from "./schema";
+import { useAdaptiveRouter } from "../../lib/nextCompat";
+import type { ReceivingLogFilterOptions } from "./RecievingLogsSchema";
 
 type ReceiveLog = RecievingLog;
 type ReceiveSortKey =
@@ -191,8 +185,11 @@ const toReceiveFilters = (filters: FilterValues): ReceiveLogFilterValues => ({
   caseType: normalizeCaseType(filters.caseType),
 });
 
-const ReceiveLogsPage: React.FC = () => {
-  const router = useRouter();
+const ReceiveLogsPage: React.FC<{
+  adapter: RecievingLogsAdapter;
+  role: Roles;
+}> = ({ adapter, role }) => {
+  const router = useAdaptiveRouter();
   const [logs, setLogs] = useState<ReceiveLog[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -201,10 +198,7 @@ const ReceiveLogsPage: React.FC = () => {
   const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
   const [deletingSelected, setDeletingSelected] = useState(false);
 
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
+  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -249,7 +243,7 @@ const ReceiveLogsPage: React.FC = () => {
     async (page = currentPage) => {
       try {
         const [listResult, statsResult] = await Promise.all([
-          getRecievingLogsPage({
+          adapter.getRecievingLogsPage({
             page,
             pageSize: PAGE_SIZE,
             filters: appliedFilters,
@@ -257,7 +251,7 @@ const ReceiveLogsPage: React.FC = () => {
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
-          getRecievingLogsStats({
+          adapter.getRecievingLogsStats({
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -323,7 +317,7 @@ const ReceiveLogsPage: React.FC = () => {
     ];
     if (!textFields.includes(key)) return [];
 
-    const result = await getRecievingLogsPage({
+    const result = await adapter.getRecievingLogsPage({
       page: 1,
       pageSize: 10,
       filters: toReceiveFilters({
@@ -357,7 +351,7 @@ const ReceiveLogsPage: React.FC = () => {
       ))
     )
       return;
-    const result = await deleteRecievingLog(logId);
+    const result = await adapter.deleteRecievingLog(logId);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete");
       return;
@@ -382,7 +376,7 @@ const ReceiveLogsPage: React.FC = () => {
 
     try {
       const results = await Promise.allSettled(
-        selectedLogIds.map((id) => deleteRecievingLog(id)),
+        selectedLogIds.map((id) => adapter.deleteRecievingLog(id)),
       );
 
       const deletedIds: number[] = [];
@@ -441,7 +435,7 @@ const ReceiveLogsPage: React.FC = () => {
     setUploading(true);
     try {
       statusPopup.showLoading("Importing... Please wait.");
-      const result = await uploadReceiveExcel(file);
+      const result = await adapter.uploadReceiveExcel(file);
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {
@@ -608,7 +602,7 @@ const ReceiveLogsPage: React.FC = () => {
                   onClick={async () => {
                     setExporting(true);
                     try {
-                      const result = await exportReceiveLogsExcel();
+                      const result = await adapter.exportReceiveLogsExcel();
                       if (!result.success) {
                         statusPopup.showError(
                           result.error || "Failed to export receiving logs",

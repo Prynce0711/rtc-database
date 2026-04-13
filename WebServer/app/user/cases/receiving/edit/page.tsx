@@ -1,13 +1,12 @@
 "use client";
 
-import ReceiveDrawer, {
-  ReceiveDrawerType,
-} from "@/app/components/Case/ReceivingLogs/ReceiveDrawer";
 import {
   getRecievingLogById,
   getRecievingLogsByIds,
 } from "@/app/components/Case/ReceivingLogs/RecievingLogsActions";
+import recievingLogsAdapter from "@/app/components/Case/ReceivingLogs/RecievingLogsAdapter";
 import { RecievingLog } from "@/app/generated/prisma/client";
+import { ReceiveDrawerType, ReceivingDrawer } from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -113,11 +112,14 @@ const ReceivingEditPage = () => {
   }
 
   return (
-    <ReceiveDrawer
+    <ReceivingDrawer
+      adapter={recievingLogsAdapter}
       type={ReceiveDrawerType.EDIT}
       selectedLog={selectedLog}
       selectedLogs={selectedLogs}
       onClose={goBack}
+      onCreate={goBack}
+      onUpdate={goBack}
     />
   );
 };
