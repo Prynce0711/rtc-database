@@ -1,6 +1,7 @@
 "use client";
 
-import { SherriffCaseUpdatePage } from "@/app/components/Case/Sherriff/SherriffCaseUpdatePage";
+import { sherriffCaseAdapter } from "@/app/components/Case/Sherriff/SherriffCaseAdapter";
+import { SherriffCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 
 const SheriffAddPage = () => {
@@ -16,6 +17,7 @@ const SheriffAddPage = () => {
       onCloseAction={goBackToList}
       onCreateAction={goBackToList}
       onUpdateAction={goBackToList}
+      adapter={sherriffCaseAdapter}
     />
   );
 };

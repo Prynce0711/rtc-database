@@ -4,11 +4,8 @@ import {
   getCivilCaseById,
   getCivilCasesByIds,
 } from "@/app/components/Case/Civil/CivilActions";
-import { NotarialUpdatePage } from "@/app/components/Case/Civil/CivilCaseUpdatePage";
-import {
-  caseToRecord,
-  type NotarialRecord,
-} from "@/app/components/Case/Civil/CivilTypes";
+import { civilCaseAdapter } from "@/app/components/Case/Civil/CivilCaseAdapter";
+import { CivilCaseData, CivilCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -16,10 +13,8 @@ const CivilEditPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
-    null,
-  );
-  const [selectedRecords, setSelectedRecords] = useState<NotarialRecord[]>([]);
+  const [selectedCase, setSelectedCase] = useState<CivilCaseData | null>(null);
+  const [selectedCases, setSelectedCases] = useState<CivilCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,10 +53,8 @@ const CivilEditPage = () => {
           return;
         }
 
-        const loadedRecords = result.result.map(caseToRecord);
-
-        setSelectedRecords(loadedRecords);
-        setSelectedRecord(loadedRecords[0] ?? null);
+        setSelectedCases(result.result);
+        setSelectedCase(result.result[0] ?? null);
         setError(null);
         setLoading(false);
         return;
@@ -77,9 +70,8 @@ const CivilEditPage = () => {
         return;
       }
 
-      const record = caseToRecord(result.result);
-      setSelectedRecord(record);
-      setSelectedRecords([record]);
+      setSelectedCase(result.result);
+      setSelectedCases([result.result]);
       setError(null);
       setLoading(false);
     };
@@ -101,7 +93,7 @@ const CivilEditPage = () => {
     );
   }
 
-  if (error || !selectedRecord) {
+  if (error || !selectedCase) {
     return (
       <div className="min-h-screen bg-base-100 p-6 space-y-4">
         <div className="alert alert-error">
@@ -115,13 +107,13 @@ const CivilEditPage = () => {
   }
 
   return (
-    <NotarialUpdatePage
-      type="EDIT"
-      selectedRecord={selectedRecord}
-      selectedRecords={selectedRecords}
-      onCloseAction={goBackToList}
-      onCreateAction={goBackToList}
-      onUpdateAction={goBackToList}
+    <CivilCaseUpdatePage
+      selectedCase={selectedCase}
+      selectedCases={selectedCases}
+      onClose={goBackToList}
+      onCreate={goBackToList}
+      onUpdate={goBackToList}
+      adapter={civilCaseAdapter}
     />
   );
 };

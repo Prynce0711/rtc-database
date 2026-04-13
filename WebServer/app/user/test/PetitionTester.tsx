@@ -10,7 +10,7 @@ import {
   getPetitions,
   updatePetition,
 } from "@/app/components/Case/Petition/PetitionActions";
-import { PetitionCaseData } from "@/app/components/Case/Petition/schema";
+import { PetitionCaseData } from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 
 type PetitionFormEntry = {

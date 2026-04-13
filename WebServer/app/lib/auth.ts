@@ -69,7 +69,10 @@ const createDirectChatsForRole = async (role: string, userId: string) => {
 };
 
 export const auth = betterAuth({
-  trustedOrigins: [process.env.NEXT_PUBLIC_URL || "http://localhost:3000"],
+  trustedOrigins: [
+    process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
+    process.env.NATIVE_APP_URL || "http://localhost:5173",
+  ],
   database: prismaAdapter(prisma, {
     provider: "sqlite", // or "mysql", "postgresql", ...etc
   }),
@@ -122,6 +125,8 @@ export const auth = betterAuth({
       if (ctx.path.startsWith("/sign-in") && ctx.method === "POST") {
         const email = ctx.body?.email;
         const success = ctx.context.newSession?.user ? true : false;
+
+        console.log(`Login attempt for email: ${email}, success: ${success}`);
 
         if (success) {
           await createLog({

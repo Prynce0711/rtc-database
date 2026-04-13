@@ -2,9 +2,9 @@
 
 import { User } from "@/app/generated/prisma/browser";
 import { Status } from "@/app/generated/prisma/enums";
-import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { formatDate } from "@/app/lib/utils";
+import { formatDate } from "@rtc-database/shared";
+import { Pagination, usePopup } from "@rtc-database/shared";
 import {
   useEffect,
   useMemo,
@@ -13,11 +13,10 @@ import {
   type CSSProperties,
 } from "react";
 import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
-import { Pagination } from "../Pagination";
-import { usePopup } from "../Popup/PopupProvider";
 import { getAccounts, updateRole } from "./AccountActions";
 import AccountActionsButton from "./AccountActionsButton";
 import AddAccountDrawer from "./AddAccountDrawer";
+import { useSession } from "@/app/lib/authClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RoleFilterType = Roles | "ALL";
@@ -317,7 +316,7 @@ const AccountDashboard = () => {
                 {label}
                 <span
                   className={[
-                    "px-1.5 py-0.5 rounded-full text-[15px] font-black min-w-[18px] text-center",
+                    "px-1.5 py-0.5 rounded-full text-[15px] font-black min-w-4.5 text-center",
                     isActive
                       ? "bg-primary/10 text-primary"
                       : "bg-base-300 text-base-content/40",
@@ -344,7 +343,7 @@ const AccountDashboard = () => {
             />
           </div>
           <select
-            className="h-[42px] px-4 rounded-xl border select select-bordered bg-base-100 text-[14px] text-base-content/70 font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-full sm:w-48"
+            className="h-10.5 px-4 rounded-xl border select select-bordered bg-base-100 text-[14px] text-base-content/70 font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-full sm:w-48"
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value as RoleFilterType);
@@ -432,7 +431,7 @@ const AccountDashboard = () => {
                         onSort={handleSort}
                       />
                       {canManage && (
-                        <th className="py-4 px-5 text-[11px] font-bold uppercase tracking-[0.1em] text-base-content/50 text-center whitespace-nowrap">
+                        <th className="py-4 px-5 text-[11px] font-bold uppercase tracking-widest text-base-content/50 text-center whitespace-nowrap">
                           Actions
                         </th>
                       )}

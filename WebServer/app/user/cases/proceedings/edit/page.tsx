@@ -4,8 +4,11 @@ import {
   getSpecialProceedingById,
   getSpecialProceedingsByIds,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
-import SpecialProceedingDrawer from "@/app/components/Case/SpecialProceedings/SpecialProceedingDrawer";
-import type { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
+import { specialProceedingAdapter } from "@/app/components/Case/SpecialProceedings/SpecialProceedingAdapter";
+import {
+  SpecialProceedingData,
+  SpecialProceedingUpdatePage,
+} from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -114,11 +117,14 @@ const ProceedingsEditPage = () => {
   }
 
   return (
-    <SpecialProceedingDrawer
+    <SpecialProceedingUpdatePage
       type="EDIT"
       selectedCase={selectedCase}
       selectedCases={selectedCases}
       onClose={goBack}
+      onCreate={goBack}
+      onUpdate={goBack}
+      adapter={specialProceedingAdapter}
     />
   );
 };

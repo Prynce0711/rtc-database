@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { FiEye, FiEyeOff, FiInfo } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import {
   getGarageInfo,
   getSystemSettings,
@@ -606,3 +606,4 @@ const SystemTab = () => {
 };
 
 export default SystemTab;
+

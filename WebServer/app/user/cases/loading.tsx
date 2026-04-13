@@ -1,4 +1,4 @@
-import { PageListSkeleton } from "@/app/components/Skeleton/SkeletonTable";
+import { PageListSkeleton } from "@rtc-database/shared";
 
 const loading = () => {
   return <PageListSkeleton />;

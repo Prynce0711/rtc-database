@@ -4,7 +4,7 @@ import { Employee, LogAction } from "@/app/generated/prisma/browser";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import ActionResult from "../ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 import { createLog } from "../ActivityLogs/LogActions";
 import { EmployeeSchema } from "./schema";
 

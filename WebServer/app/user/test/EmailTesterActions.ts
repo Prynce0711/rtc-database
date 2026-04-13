@@ -1,9 +1,9 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
 import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
 import { validateSession } from "@/app/lib/authActions";
 import Roles from "@/app/lib/Roles";
+import { ActionResult } from "@rtc-database/shared";
 import nodemailer from "nodemailer";
 
 export type EmailTesterPayload = {

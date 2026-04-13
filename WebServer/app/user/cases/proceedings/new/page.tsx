@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import Proceedings from "@/app/components/Case/SpecialProceedings/Proceedings";
-
-export default function Page() {
-  return <Proceedings />;
+export default function ProceedingsNewPage() {
+  redirect("/user/cases/proceedings/add");
 }

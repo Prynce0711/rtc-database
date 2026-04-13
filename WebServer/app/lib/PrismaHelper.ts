@@ -1,10 +1,11 @@
-import "server-only";
+import type { BaseCaseSchema as BaseCaseSchemaType } from "@rtc-database/shared";
+import {
+  BaseCaseSchema,
+  FilterOptions,
+  getSchemaFieldKeys,
+} from "@rtc-database/shared";
 import z from "zod";
-import type { BaseCaseSchema as BaseCaseSchemaType } from "../components/Case/schema";
-import { BaseCaseSchema } from "../components/Case/schema";
-import { FilterOptions } from "../components/Filter/FilterUtils";
 import { Prisma } from "../generated/prisma/client";
-import { getSchemaFieldKeys } from "./utils";
 
 export const DEFAULT_PAGE_SIZE = 25;
 

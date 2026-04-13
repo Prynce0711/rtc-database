@@ -25,16 +25,16 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import FilterDropdown from "@/app/components/Filter/FilterDropdown";
 import type { Employee } from "@/app/generated/prisma/browser";
-import { isRetirementEligible } from "@/app/lib/utils";
+import { isRetirementEligible } from "@rtc-database/shared";
 import {
   ExactMatchMap,
+  FilterDropdown,
   FilterOption,
   FilterValues,
-} from "../Filter/FilterTypes";
-import { usePopup } from "../Popup/PopupProvider";
-import { PageListSkeleton } from "../Skeleton/SkeletonTable";
+  PageListSkeleton,
+  usePopup,
+} from "@rtc-database/shared";
 import EmployeeTable from "./EmployeeTable";
 
 const EmployeeDashboard: React.FC = () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapse, ModalBase, usePopup } from "@rtc-database/shared";
 import {
   useCallback,
   useEffect,
@@ -16,9 +17,6 @@ import {
   FiTrash2,
   FiXCircle,
 } from "react-icons/fi";
-import Collapse from "../../Collapse/Collapse";
-import ModalBase from "../../Popup/ModalBase";
-import { usePopup } from "../../Popup/PopupProvider";
 import {
   cancelBackupNowAction,
   clearBackupAccountFiles,
@@ -228,6 +226,16 @@ type RemoteUsageState = {
   error?: string;
 };
 
+type NotarialSnapshotRetentionInterval =
+  BackupDashboardData["config"]["notarialSnapshotRetentionInterval"];
+
+const NOTARIAL_SNAPSHOT_RETENTION_INTERVAL_VALUES: NotarialSnapshotRetentionInterval[] =
+  ["5m", "15m", "1h", "1d", "1w", "1mo", "1y"];
+
+const NOTARIAL_SNAPSHOT_RETENTION_INTERVAL_SET = new Set<string>(
+  NOTARIAL_SNAPSHOT_RETENTION_INTERVAL_VALUES,
+);
+
 const pickProviderOptionValues = (
   provider: string,
   options: Record<string, string>,
@@ -317,7 +325,7 @@ const BackupTab = () => {
   const [
     notarialSnapshotRetentionInterval,
     setNotarialSnapshotRetentionInterval,
-  ] = useState("1mo");
+  ] = useState<NotarialSnapshotRetentionInterval>("1mo");
   const [notarialRestoreRemoteName, setNotarialRestoreRemoteName] =
     useState("");
   const [notarialSnapshots, setNotarialSnapshots] = useState<
@@ -1686,6 +1694,16 @@ const BackupTab = () => {
     });
   };
 
+  const handleNotarialSnapshotRetentionIntervalChange = (value: string) => {
+    if (!NOTARIAL_SNAPSHOT_RETENTION_INTERVAL_SET.has(value)) {
+      return;
+    }
+
+    setNotarialSnapshotRetentionInterval(
+      value as NotarialSnapshotRetentionInterval,
+    );
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -2150,7 +2168,7 @@ const BackupTab = () => {
         >
           <SelectField
             value={notarialSnapshotRetentionInterval}
-            onChange={setNotarialSnapshotRetentionInterval}
+            onChange={handleNotarialSnapshotRetentionIntervalChange}
             options={
               notarialRetentionDropdownOptions.length > 0
                 ? notarialRetentionDropdownOptions

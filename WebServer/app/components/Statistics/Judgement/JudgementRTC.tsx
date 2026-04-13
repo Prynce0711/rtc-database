@@ -52,6 +52,7 @@ const JudgementRTC = ({
 
   return (
     <JudgementTable<RTCJudgementLog & Record<string, unknown>>
+      title="RTC Judgement Records"
       data={records as (RTCJudgementLog & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}

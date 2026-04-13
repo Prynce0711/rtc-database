@@ -9,7 +9,17 @@ import {
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
-import FileViewerModal from "@/app/components/Popup/FileViewerModal";
+import {
+  ExactMatchMap,
+  FileViewerModal,
+  FilterDropdown,
+  FilterOption,
+  FilterValues,
+  Pagination,
+  usePopup,
+  useToast,
+} from "@rtc-database/shared";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -21,15 +31,6 @@ import {
   FiSearch,
   FiUsers,
 } from "react-icons/fi";
-import FilterDropdown from "../../Filter/FilterDropdown";
-import {
-  ExactMatchMap,
-  FilterOption,
-  FilterValues,
-} from "../../Filter/FilterTypes";
-import { Pagination } from "../../Pagination";
-import { usePopup } from "../../Popup/PopupProvider";
-import { useToast } from "../../Toast/ToastProvider";
 import NotarialRow, { NotarialRecord } from "./NotarialRow";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

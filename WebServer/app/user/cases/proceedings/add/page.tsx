@@ -1,15 +1,19 @@
 "use client";
 
-import SpecialProceedingDrawer from "@/app/components/Case/SpecialProceedings/SpecialProceedingDrawer";
+import { specialProceedingAdapter } from "@/app/components/Case/SpecialProceedings/SpecialProceedingAdapter";
+import { SpecialProceedingUpdatePage } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 
 const ProceedingsAddPage = () => {
   const router = useRouter();
 
   return (
-    <SpecialProceedingDrawer
+    <SpecialProceedingUpdatePage
       type="ADD"
+      adapter={specialProceedingAdapter}
       onClose={() => router.push("/user/cases/proceedings")}
+      onCreate={() => router.push("/user/cases/proceedings")}
+      onUpdate={() => router.push("/user/cases/proceedings")}
     />
   );
 };

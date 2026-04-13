@@ -10,13 +10,13 @@ import {
   exportCasesExcel,
   uploadExcel,
 } from "@/app/components/Case/Civil/ExcelActions";
-import {
-  CaseEntry,
-  CivilCaseData,
-  caseToEntry,
-  createEmptyEntry,
-} from "@/app/components/Case/Civil/schema";
 import { CaseType } from "@/app/generated/prisma/client";
+import {
+  CivilCaseData,
+  CivilCaseEntry,
+  civilCaseToEntry,
+  createEmptyCivilCaseEntry,
+} from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 
@@ -24,7 +24,9 @@ const CASE_TYPES: CaseType[] = ["CIVIL"];
 
 export default function CivilCaseTester() {
   const [cases, setCases] = useState<CivilCaseData[]>([]);
-  const [formData, setFormData] = useState<CaseEntry>(createEmptyEntry());
+  const [formData, setFormData] = useState<CivilCaseEntry>(
+    createEmptyCivilCaseEntry(),
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,9 +55,9 @@ export default function CivilCaseTester() {
     setLoading(false);
   };
 
-  const handleInputChange = <K extends keyof CaseEntry>(
+  const handleInputChange = <K extends keyof CivilCaseEntry>(
     field: K,
-    value: CaseEntry[K],
+    value: CivilCaseEntry[K],
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -103,7 +105,7 @@ export default function CivilCaseTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyCivilCaseEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadCases();
@@ -116,7 +118,7 @@ export default function CivilCaseTester() {
   };
 
   const handleEdit = (caseItem: CivilCaseData) => {
-    const formEntry = caseToEntry(caseItem);
+    const formEntry = civilCaseToEntry(caseItem);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(caseItem.id);
@@ -140,7 +142,7 @@ export default function CivilCaseTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyCivilCaseEntry());
     setIsEditing(false);
     setEditingId(null);
   };

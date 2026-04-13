@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  getCaseStats,
-  getCases,
-  type UnifiedCaseData,
-  type UnifiedCaseStats,
-} from "@/app/components/Case/CaseActions";
+import { getCaseStats, getCases } from "@/app/components/Case/BaseCaseActions";
+import { UnifiedCaseData, UnifiedCaseStats } from "@rtc-database/shared";
 import {
   BarChart3,
   Calendar,

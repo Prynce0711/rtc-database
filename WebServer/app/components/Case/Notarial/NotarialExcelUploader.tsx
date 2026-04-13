@@ -2,8 +2,8 @@
 
 import { createNotarial } from "@/app/components/Case/Notarial/NotarialActions";
 import { NotarialSchema as NotarialExcelSchema } from "@/app/components/Case/Notarial/schema";
-import ModalBase from "@/app/components/Popup/ModalBase";
 import { isMappedRowEmpty, normalizeRowBySchema } from "@/app/lib/excel";
+import { ModalBase } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 

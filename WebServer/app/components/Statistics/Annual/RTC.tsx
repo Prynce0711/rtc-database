@@ -67,8 +67,8 @@ const RTC = ({
 
   return (
     <AnnualTable<CourtLog & Record<string, unknown>>
-      // title="RTC Receiving Log"
-      // subtitle="Regional Trial Court — Track all received documents and case filings"
+      title="RTC Receiving Log"
+      subtitle="Regional Trial Court - Track all received documents and case filings"
       variant="court"
       data={records as (CourtLog & Record<string, unknown>)[]}
       columns={courtColumns}

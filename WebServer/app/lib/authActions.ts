@@ -1,8 +1,8 @@
 "use server";
 
+import { ActionResult } from "@rtc-database/shared";
 import { User } from "better-auth";
 import { headers } from "next/headers";
-import ActionResult from "../components/ActionResult";
 import { createLog } from "../components/ActivityLogs/LogActions";
 import { LogAction } from "../generated/prisma/enums";
 import { auth } from "./auth";

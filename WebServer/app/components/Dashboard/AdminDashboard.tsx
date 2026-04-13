@@ -1,12 +1,7 @@
 "use client";
 
 import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
-import {
-  getCaseStats,
-  getCases,
-  type UnifiedCaseData,
-  type UnifiedCaseStats,
-} from "@/app/components/Case/CaseActions";
+import { getCaseStats, getCases } from "@/app/components/Case/BaseCaseActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@/app/generated/prisma/browser";
 import {
@@ -35,6 +30,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { UnifiedCaseData, UnifiedCaseStats } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import { RecentCases } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";

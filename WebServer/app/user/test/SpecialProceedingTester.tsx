@@ -4,7 +4,6 @@ import {
   exportSpecialProceedingsExcel,
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
-import { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
 import {
   createSpecialProceeding,
   deleteSpecialProceeding,
@@ -13,6 +12,7 @@ import {
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
 import { useEffect, useState } from "react";
 import { deleteAllSpecialProceedings } from "./TestActions";
+import { SpecialProceedingData } from "@rtc-database/shared";
 
 type SpecialProceedingFormEntry = {
   caseNumber: string;

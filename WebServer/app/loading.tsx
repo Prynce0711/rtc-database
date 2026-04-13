@@ -1,4 +1,4 @@
-import RedirectingUI from "./components/Redirect/RedirectingUI";
+import { RedirectingUI } from "@rtc-database/shared";
 
 const loading = () => {
   return <RedirectingUI />;

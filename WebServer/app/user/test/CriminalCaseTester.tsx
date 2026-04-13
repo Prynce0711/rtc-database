@@ -10,13 +10,13 @@ import {
   exportCasesExcel,
   uploadExcel,
 } from "@/app/components/Case/Criminal/ExcelActions";
-import {
-  CaseEntry,
-  CriminalCaseData,
-  caseToEntry,
-  createEmptyEntry,
-} from "@/app/components/Case/Criminal/schema";
 import { CaseType } from "@/app/generated/prisma/client";
+import {
+  createEmptyCriminalEntry,
+  CriminalCaseData,
+  CriminalCaseEntry,
+  criminalCaseToEntry,
+} from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 
@@ -24,7 +24,9 @@ const CASE_TYPES: CaseType[] = ["CRIMINAL"];
 
 export default function CriminalCaseTester() {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
-  const [formData, setFormData] = useState<CaseEntry>(createEmptyEntry());
+  const [formData, setFormData] = useState<CriminalCaseEntry>(
+    createEmptyCriminalEntry(),
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,9 +55,9 @@ export default function CriminalCaseTester() {
     setLoading(false);
   };
 
-  const handleInputChange = <K extends keyof CaseEntry>(
+  const handleInputChange = <K extends keyof CriminalCaseEntry>(
     field: K,
-    value: CaseEntry[K],
+    value: CriminalCaseEntry[K],
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -121,7 +123,7 @@ export default function CriminalCaseTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyCriminalEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadCases();
@@ -134,7 +136,7 @@ export default function CriminalCaseTester() {
   };
 
   const handleEdit = (caseItem: CriminalCaseData) => {
-    const formEntry = caseToEntry(caseItem);
+    const formEntry = criminalCaseToEntry(caseItem);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(caseItem.id);
@@ -158,7 +160,7 @@ export default function CriminalCaseTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyCriminalEntry());
     setIsEditing(false);
     setEditingId(null);
   };
@@ -347,7 +349,7 @@ export default function CriminalCaseTester() {
                     onChange={(e) =>
                       handleInputChange(
                         "name",
-                        e.target.value as CaseEntry["name"],
+                        e.target.value as CriminalCaseEntry["name"],
                       )
                     }
                     className="w-full border rounded px-2 py-1"

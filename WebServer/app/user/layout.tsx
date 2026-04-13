@@ -1,9 +1,11 @@
+import { Sidebar } from "@rtc-database/shared";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import React from "react";
 import { hasPassword } from "../components/AccountManagement/AccountActions";
-import Sidebar from "../components/Sidebar/Sidebar";
+import { updateDarkMode } from "../components/Sidebar/DarkModeActions";
 import { auth } from "../lib/auth";
+import { signOut } from "../lib/authActions";
 
 const layout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth.api.getSession({
@@ -19,7 +21,15 @@ const layout = async ({ children }: { children: React.ReactNode }) => {
     redirect("/firstlogin");
   }
 
-  return <Sidebar>{children}</Sidebar>;
+  return (
+    <Sidebar
+      session={session}
+      updateDarkMode={updateDarkMode}
+      onSignOut={signOut}
+    >
+      {children}
+    </Sidebar>
+  );
 };
 
 export default layout;

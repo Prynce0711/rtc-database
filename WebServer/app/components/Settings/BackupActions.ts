@@ -38,8 +38,8 @@ import {
   type OneDriveDriveOption,
 } from "@/app/lib/backup/remotes/onedrive";
 import Roles from "@/app/lib/Roles";
+import { ActionResult } from "@rtc-database/shared";
 import { z } from "zod";
-import ActionResult from "../ActionResult";
 
 export interface BackupDashboardData {
   config: BackupConfig;
@@ -70,7 +70,7 @@ const SaveBackupSchema = z.object({
   notarialSelectedRemoteNames: z.array(z.string()).default([]),
   notarialSnapshotRetentionInterval: z
     .string()
-    .refine((value) => BACKUP_INTERVAL_VALUE_SET.has(value), {
+    .refine((value) => BACKUP_INTERVAL_VALUE_SET.has(value as any), {
       message: "Invalid notarial snapshot retention interval",
     }),
   remotePath: z.string(),

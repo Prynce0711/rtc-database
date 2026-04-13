@@ -5,9 +5,9 @@ import { auth } from "@/app/lib/auth";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { ActionResult } from "@rtc-database/shared";
 import { headers } from "next/headers";
 import z, { prettifyError } from "zod";
-import ActionResult from "../ActionResult";
 import { createLog } from "../ActivityLogs/LogActions";
 import { NewUserSchema } from "./schema";
 

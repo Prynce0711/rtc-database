@@ -1,7 +1,5 @@
 "use server";
 
-import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
-import { FilterOptions } from "@/app/components/Filter/FilterUtils";
 import { Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { GetFileOptions } from "@/app/lib/garage";
@@ -14,8 +12,12 @@ import {
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import {
+  ActionResult,
+  FilterOptions,
+  PaginatedResult,
+} from "@rtc-database/shared";
 import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
 
 type NotarialListFilterShape = {

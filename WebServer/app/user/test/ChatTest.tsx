@@ -1,15 +1,16 @@
 "use client";
 
-import { ChatData } from "@/@types/network";
 import {
   createManyChatsWithOthers,
+  getChatById,
   getChats,
   removeManyChatsWithOthers,
 } from "@/app/components/Messages/MessagesActions";
+import { useSession } from "@/app/lib/authClient";
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
 import { useSocket } from "@/app/lib/socket/SocketProvider";
+import { ChatData } from "@rtc-database/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSession } from "../../lib/authClient";
 
 export default function ChatTest() {
   const [chatIdInput, setChatIdInput] = useState("1");
@@ -29,6 +30,7 @@ export default function ChatTest() {
   const { messages, sendMessage, loading } = useMessaging(
     chatId,
     fetchMessages,
+    getChatById,
   );
   const { socket } = useSocket();
 

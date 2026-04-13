@@ -21,16 +21,17 @@ import {
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
-import { createLog } from "../../ActivityLogs/LogActions";
-import { PaginatedResult } from "../../Filter/FilterTypes";
 import {
+  ActionResult,
+  PaginatedResult,
   SheriffCaseData,
   SheriffCaseSchema,
   SheriffCasesFilterOptions,
   SheriffCaseStats,
-} from "./schema";
+} from "@rtc-database/shared";
+
+import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 
 export async function getSheriffCases(
   options?: SheriffCasesFilterOptions,

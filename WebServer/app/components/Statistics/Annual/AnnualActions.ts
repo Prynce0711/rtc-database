@@ -3,8 +3,8 @@
 import { LogAction } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import { ActionResult } from "@rtc-database/shared";
 import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
 import {
   BaseLogData,
   CaseSchema,

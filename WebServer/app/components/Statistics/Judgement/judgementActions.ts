@@ -3,7 +3,7 @@
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 // zod doesn't export a `prettifyError` helper in all versions — provide a small local formatter
-import ActionResult from "../../ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 import {
   MTCJudgementRow,
   MTCJudgementRowSchema,

@@ -1,10 +1,5 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
-import {
-  SheriffCaseData,
-  SheriffCaseSchema,
-} from "@/app/components/Case/Sherriff/schema";
 import {
   Case,
   CaseType,
@@ -31,11 +26,16 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@/app/lib/utils";
+import {
+  ActionResult,
+  BaseCaseSchema,
+  getSchemaFieldKeys,
+  SheriffCaseData,
+  SheriffCaseSchema,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../schema";
 
 export async function uploadSheriffExcel(
   file: File,

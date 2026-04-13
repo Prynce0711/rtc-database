@@ -3,7 +3,7 @@
 import { User } from "@/app/generated/prisma/browser";
 import Roles from "@/app/lib/Roles";
 import { useState } from "react";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { createAccount } from "./AccountActions";
 
 const AddAccountModal = ({
@@ -128,3 +128,4 @@ const AddAccountModal = ({
 };
 
 export default AddAccountModal;
+

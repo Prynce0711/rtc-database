@@ -1,9 +1,9 @@
+import { PopupProvider, ToastProvider } from "@rtc-database/shared";
 import type { Metadata } from "next";
 import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
-import PopupProvider from "./components/Popup/PopupProvider";
+import SessionProvider from "./components/SessionProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
-import ToastProvider from "./components/Toast/ToastProvider";
 import "./globals.css";
 import SocketProvider from "./lib/socket/SocketProvider";
 
@@ -35,7 +35,9 @@ export default async function RootLayout({
       <body className={`${montserrat.variable} font-sans antialiased`}>
         <PopupProvider>
           <ToastProvider>
-            <SocketProvider>{children}</SocketProvider>
+            <SessionProvider>
+              <SocketProvider>{children}</SocketProvider>
+            </SessionProvider>
           </ToastProvider>
         </PopupProvider>
       </body>

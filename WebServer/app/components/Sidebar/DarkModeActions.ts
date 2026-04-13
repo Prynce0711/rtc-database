@@ -2,7 +2,7 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import ActionResult from "../ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 
 export async function isDarkModeEnabled(): Promise<ActionResult<boolean>> {
   try {

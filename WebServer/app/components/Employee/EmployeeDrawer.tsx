@@ -1,7 +1,7 @@
 "use client";
 
 import { EmploymentType } from "@/app/generated/prisma/enums";
-import { enumToText } from "@/app/lib/utils";
+import { enumToText } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -19,7 +19,7 @@ import {
   FiTrash2,
   FiUser,
 } from "react-icons/fi";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import {
   createEmployee,
   deleteEmployee,
@@ -1380,3 +1380,4 @@ const EmployeeDrawer = ({
 };
 
 export default EmployeeDrawer;
+

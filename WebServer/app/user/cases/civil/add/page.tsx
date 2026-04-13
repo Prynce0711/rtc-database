@@ -1,6 +1,7 @@
 "use client";
 
-import { NotarialUpdatePage } from "@/app/components/Case/Civil/CivilCaseUpdatePage";
+import { civilCaseAdapter } from "@/app/components/Case/Civil/CivilCaseAdapter";
+import { CivilCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 
 const CivilAddPage = () => {
@@ -11,11 +12,11 @@ const CivilAddPage = () => {
   };
 
   return (
-    <NotarialUpdatePage
-      type="ADD"
-      onCloseAction={goBackToList}
-      onCreateAction={goBackToList}
-      onUpdateAction={goBackToList}
+    <CivilCaseUpdatePage
+      adapter={civilCaseAdapter}
+      onClose={goBackToList}
+      onCreate={goBackToList}
+      onUpdate={goBackToList}
     />
   );
 };

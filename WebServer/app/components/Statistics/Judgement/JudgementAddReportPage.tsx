@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import AnnualAddReportPage, {
   AnnualAddReportPageProps,
 } from "../Annual/AnnualAddReportPage";
@@ -215,3 +215,4 @@ const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
 };
 
 export default JudgementAddReportPage;
+

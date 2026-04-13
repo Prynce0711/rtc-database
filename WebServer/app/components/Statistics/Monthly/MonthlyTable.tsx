@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import Pagination from "../../Pagination/Pagination";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
+import { Pagination } from "@rtc-database/shared";
 
 const PAGE_SIZE = 10;
 

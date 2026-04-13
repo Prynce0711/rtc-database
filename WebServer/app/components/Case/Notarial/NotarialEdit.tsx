@@ -1,3 +1,9 @@
+import {
+  CellInput,
+  usePopup,
+  useToast,
+  type ColDef,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -13,10 +19,6 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
-import CellInput from "../../Table/CellInput";
-import { ColDef } from "../../Table/TableUtils";
-import { useToast } from "../../Toast/ToastProvider";
 import { NotarialFormEntry } from "./Notarial";
 import ReviewCard from "./NotarialReviewCard";
 import { NotarialRecord } from "./NotarialRow";

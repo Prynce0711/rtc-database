@@ -21,16 +21,16 @@ import {
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
-import { createLog } from "../../ActivityLogs/LogActions";
-import { PaginatedResult } from "../../Filter/FilterTypes";
 import {
+  ActionResult,
   CriminalCaseData,
   CriminalCaseSchema,
   CriminalCasesFilterOptions,
   CriminalCaseStats,
-} from "./schema";
+  PaginatedResult,
+} from "@rtc-database/shared";
+import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 
 export async function getCriminalCases(
   options?: CriminalCasesFilterOptions,

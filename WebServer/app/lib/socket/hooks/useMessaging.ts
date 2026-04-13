@@ -1,8 +1,11 @@
 "use client";
-import { Message, Messaging } from "@/@types/network";
-import { getChatById } from "@/app/components/Messages/MessagesActions";
 import { useCallback, useEffect, useState } from "react";
-import { SocketChatMessage, SocketEventType } from "../SocketEvents";
+
+import {
+  SocketChatMessage,
+  SocketEventType,
+} from "@/app/lib/socket/SocketEvents";
+import { ActionResult, Message, Messaging } from "@rtc-database/shared";
 import { useSocket } from "../SocketProvider";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -14,7 +17,11 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export function useMessaging(chatId: number, fetchMessages = true): Messaging {
+export function useMessaging(
+  chatId: number,
+  fetchMessages = true,
+  getChatByID: (id: number) => Promise<ActionResult<Message[]>>,
+): Messaging {
   const socket = useSocket().socket;
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -38,7 +45,7 @@ export function useMessaging(chatId: number, fetchMessages = true): Messaging {
     }
     let cancelled = false;
     const loadData = async () => {
-      const result = await getChatById(chatId);
+      const result = await getChatByID(chatId);
       if (!cancelled && result.success) {
         setMessages(result.result);
       }

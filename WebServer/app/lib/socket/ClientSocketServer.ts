@@ -7,13 +7,13 @@ import { WebSocket, WebSocketServer } from "ws";
 //   receiveLeaveCall,
 //   receiveSdpData,
 // } from "./handlers/calling";
-import { joinChat, leaveChat } from "./handlers/chat";
-import { receiveMessage, sendErrorResponseToSelf } from "./handlers/messaging";
 import {
   AnySocketEvent,
   SocketErrorRequestType,
   SocketEventType,
 } from "./SocketEvents";
+import { joinChat, leaveChat } from "./handlers/chat";
+import { receiveMessage, sendErrorResponseToSelf } from "./handlers/messaging";
 
 //TODO: when user connects, check if they have an active call
 

@@ -1,7 +1,20 @@
-import PetitionLogsPage from "@/app/components/Case/Petition/PetitionLogs";
+"use client";
 
-const page = () => {
-  return <PetitionLogsPage />;
-};
+import { petitionCaseAdapter } from "@/app/components/Case/Petition/PetitionCaseAdapter";
+import { useSession } from "@/app/lib/authClient";
+import { PetitionCasePage, Roles } from "@rtc-database/shared";
+import { redirect } from "next/navigation";
 
-export default page;
+export default function Page() {
+  const session = useSession();
+  if (!session?.data?.user?.role) {
+    redirect("/");
+  }
+
+  return (
+    <PetitionCasePage
+      role={session.data?.user?.role as Roles}
+      adapter={petitionCaseAdapter}
+    />
+  );
+}

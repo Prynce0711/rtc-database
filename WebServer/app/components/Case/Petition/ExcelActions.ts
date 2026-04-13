@@ -1,7 +1,5 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
-import { PetitionSchema } from "@/app/components/Case/Petition/schema";
 import {
   Case,
   CaseType,
@@ -28,11 +26,15 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@/app/lib/utils";
+import {
+  ActionResult,
+  BaseCaseSchema,
+  getSchemaFieldKeys,
+  PetitionCaseSchema,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../schema";
 
 export async function uploadPetitionExcel(
   file: File,
@@ -44,11 +46,11 @@ export async function uploadPetitionExcel(
     }
 
     console.log(
-      `📥 Received petition Excel file: ${file.name} (${file.size} bytes)`,
+      `INBOX Received petition Excel file: ${file.name} (${file.size} bytes)`,
     );
 
     console.log(
-      `✓ Petition Excel file received: ${file.name} (${file.size} bytes)`,
+      `OK Petition Excel file received: ${file.name} (${file.size} bytes)`,
     );
 
     const candidateCaseNumbers = new Set<string>();
@@ -57,7 +59,7 @@ export async function uploadPetitionExcel(
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
-        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
+        `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
 
       for (const sheetName of workbook.SheetNames) {
@@ -66,7 +68,7 @@ export async function uploadPetitionExcel(
           XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
         for (const row of rows) {
-          const normalized = normalizeRowBySchema(PetitionSchema, row);
+          const normalized = normalizeRowBySchema(PetitionCaseSchema, row);
           const caseNumber = normalized.caseNumber;
           if (typeof caseNumber !== "string") continue;
           const trimmed = caseNumber.trim();
@@ -76,7 +78,7 @@ export async function uploadPetitionExcel(
         }
       }
     } catch (peekError) {
-      console.warn("⚠ Unable to preview workbook for logging:", peekError);
+      console.warn("WARN Unable to preview workbook for logging:", peekError);
     }
 
     const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
@@ -118,11 +120,11 @@ export async function uploadPetitionExcel(
       }
     }
 
-    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const headerMap = getExcelHeaderMap(PetitionCaseSchema);
     const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(PetitionSchema, row);
+      const values = normalizeRowBySchema(PetitionCaseSchema, row);
 
       return {
         ...values,
@@ -130,12 +132,12 @@ export async function uploadPetitionExcel(
     };
 
     const result = await processExcelUpload<
-      PetitionSchema,
+      PetitionCaseSchema,
       ReturnType<typeof getMappedCells>
     >({
       file,
       requiredHeaders: { "Case Number": caseNumberHeaders },
-      schema: PetitionSchema,
+      schema: PetitionCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
       checkExactMatch: async (_cells, mappedRow) => {
@@ -195,7 +197,7 @@ export async function uploadPetitionExcel(
             cells.assistantBranch ?? cells.raffledTo ?? cells.branch ?? null,
         };
 
-        const validation = PetitionSchema.safeParse(hydrated);
+        const validation = PetitionCaseSchema.safeParse(hydrated);
         if (!validation.success) {
           return {
             errorMessage: prettifyError(validation.error),
@@ -282,7 +284,7 @@ export async function uploadPetitionExcel(
       const sheets = meta.sheetSummary;
 
       console.log(
-        `✓ Import completed: ${imported} petitions imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} petitions imported, ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach(
@@ -293,7 +295,7 @@ export async function uploadPetitionExcel(
             failed: number;
           }) => {
             console.log(
-              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
+              `  SHEET "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
             );
           },
         );
@@ -301,7 +303,7 @@ export async function uploadPetitionExcel(
 
       if (result.result?.failedExcel) {
         console.log(
-          "⚠ Failed rows file generated:",
+          "WARN Failed rows file generated:",
           result.result.failedExcel.fileName,
         );
       }
@@ -313,7 +315,7 @@ export async function uploadPetitionExcel(
         },
       });
     } else {
-      console.error("✗ Import failed:", result.error);
+      console.error("FAILED Import failed:", result.error);
     }
 
     return result;
@@ -336,7 +338,7 @@ export async function exportPetitionsExcel(): Promise<
       all: ["id"],
     });
 
-    const caseFieldKeys = getSchemaFieldKeys(PetitionSchema, {
+    const caseFieldKeys = getSchemaFieldKeys(PetitionCaseSchema, {
       all: ["id"],
       stringKeys: [...baseCaseFieldKeys.stringKeys],
       dateKeys: [...baseCaseFieldKeys.dateKeys],
@@ -359,7 +361,7 @@ export async function exportPetitionsExcel(): Promise<
         ...c,
       }));
 
-    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const headerMap = getExcelHeaderMap(PetitionCaseSchema);
     const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
 
     const header = (key: keyof typeof headerMap, fallback: string) =>

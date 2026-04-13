@@ -84,6 +84,7 @@ const JudgementMTC = ({
 
   return (
     <JudgementTable<MtcDisplayRow & Record<string, unknown>>
+      title="MTC Judgement Records"
       data={tableRecords as (MtcDisplayRow & Record<string, unknown>)[]}
       columns={rtcColumns}
       fields={rtcJudgementFields}

@@ -1,13 +1,15 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
+import {
+  CivilCaseSchema,
+  CriminalCaseSchema,
+  PetitionCaseSchema,
+  ReceivingLogSchema,
+  SheriffCaseSchema,
+  SpecialProceedingSchema,
+} from "@rtc-database/shared";
 import { z } from "zod";
-import { CivilCaseSchema } from "../Case/Civil/schema";
-import { CriminalCaseSchema } from "../Case/Criminal/schema";
 import { NotarialSchema } from "../Case/Notarial/schema";
-import { PetitionSchema } from "../Case/Petition/schema";
-import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
-import { SheriffCaseSchema } from "../Case/Sherriff/schema";
-import { SpecialProceedingSchema } from "../Case/SpecialProceedings/schema";
 import { EmployeeSchema } from "../Employee/schema";
 
 function createUpdateSchema<T>(schema: z.ZodType<T>) {
@@ -55,7 +57,7 @@ export const CreateLogData = z
       action: z.literal(LogAction.UPDATE_CASE),
       details: createUpdateSchema(CriminalCaseSchema)
         .or(createUpdateSchema(CivilCaseSchema))
-        .or(createUpdateSchema(PetitionSchema))
+        .or(createUpdateSchema(PetitionCaseSchema))
         .or(createUpdateSchema(SpecialProceedingSchema))
         .or(createUpdateSchema(ReceivingLogSchema))
         .or(createUpdateSchema(NotarialSchema))
