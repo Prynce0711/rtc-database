@@ -1,19 +1,30 @@
 "use client";
 
-import { getCivilCaseById } from "@/app/components/Case/Civil/CivilActions";
-import type { CivilCaseData } from "@/app/components/Case/Civil/schema";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useAdaptiveNavigation,
+  useAdaptivePathname,
+} from "../../lib/nextCompat";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
-  NavButton,
-} from "@rtc-database/shared";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+} from "../CaseDetailsShared";
+import NavButton from "../NavButton";
+import type { CivilCaseAdapter } from "./CivilCaseAdapter";
+import type { CivilCaseData } from "./CivilCaseSchema";
 
-export default function CivilCaseDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+export default function CivilDetailsPage({
+  adapter,
+}: {
+  adapter: CivilCaseAdapter;
+}) {
+  const router = useAdaptiveNavigation();
+  const pathname = useAdaptivePathname();
+  const idParam = useMemo(() => {
+    const segments = pathname.split("/").filter(Boolean);
+    return segments.length > 0 ? segments[segments.length - 1] : "";
+  }, [pathname]);
 
   const [caseData, setCaseData] = useState<CivilCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<CivilCaseData | null>(null);
@@ -24,13 +35,12 @@ export default function CivilCaseDetailsPage() {
     const fetchCase = async () => {
       try {
         setLoading(true);
-        const id = Array.isArray(params.id) ? params.id[0] : params.id;
-        const numId = Number(id);
+        const numId = Number(idParam);
 
         const [current, prev, next] = await Promise.allSettled([
-          getCivilCaseById(numId),
-          getCivilCaseById(numId - 1),
-          getCivilCaseById(numId + 1),
+          adapter.getCivilCaseById(numId),
+          adapter.getCivilCaseById(numId - 1),
+          adapter.getCivilCaseById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
@@ -56,8 +66,11 @@ export default function CivilCaseDetailsPage() {
         setLoading(false);
       }
     };
-    if (params.id) fetchCase();
-  }, [params.id]);
+
+    if (idParam) {
+      void fetchCase();
+    }
+  }, [idParam, adapter]);
 
   if (loading) {
     return (
@@ -65,7 +78,7 @@ export default function CivilCaseDetailsPage() {
         <div className="flex flex-col items-center gap-4">
           <span className="loading loading-spinner loading-md text-primary/40" />
           <p className="text-[12px] font-bold uppercase tracking-widest text-base-content/25 select-none">
-            Loading case…
+            Loading case...
           </p>
         </div>
       </div>
@@ -98,21 +111,6 @@ export default function CivilCaseDetailsPage() {
             onClick={() => router.back()}
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 15 15"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M9.5 2.5L4.5 7.5L9.5 12.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
             Back
           </button>
 
@@ -155,7 +153,7 @@ export default function CivilCaseDetailsPage() {
             </button>
 
             <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
-              #{Array.isArray(params.id) ? params.id[0] : params.id}
+              #{idParam}
             </span>
 
             <button
@@ -208,12 +206,6 @@ export default function CivilCaseDetailsPage() {
 
         <div className="h-px bg-base-200" />
 
-        <div className="flex items-end border-b border-base-200 gap-1">
-          <button className="px-5 pb-3 pt-1 text-[13px] font-bold capitalize tracking-wide border-b-2 -mb-px transition-all duration-150 whitespace-nowrap border-primary text-primary">
-            Case Details
-          </button>
-        </div>
-
         <div className="space-y-10 animate-slide-up">
           <DetailSection label="Case Overview">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -235,7 +227,7 @@ export default function CivilCaseDetailsPage() {
         <div className="flex items-stretch justify-between gap-3">
           <NavButton
             direction="prev"
-            label={prevCase?.caseNumber ?? "—"}
+            label={prevCase?.caseNumber ?? "-"}
             sublabel={prevCase?.petitioners ?? undefined}
             onClick={() =>
               prevCase && router.push(`/user/cases/civil/${prevCase.id}`)
@@ -244,23 +236,13 @@ export default function CivilCaseDetailsPage() {
           />
           <NavButton
             direction="next"
-            label={nextCase?.caseNumber ?? "—"}
+            label={nextCase?.caseNumber ?? "-"}
             sublabel={nextCase?.petitioners ?? undefined}
             onClick={() =>
               nextCase && router.push(`/user/cases/civil/${nextCase.id}`)
             }
             disabled={!nextCase}
           />
-        </div>
-
-        <div className="h-px bg-base-200" />
-        <div className="flex items-center justify-between py-1">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-base-content/20 select-none">
-            Case Filing System
-          </p>
-          <p className="text-[11px] text-base-content/20 font-semibold select-none">
-            Filed {formatLongDate(caseData.dateFiled)}
-          </p>
         </div>
       </main>
     </div>

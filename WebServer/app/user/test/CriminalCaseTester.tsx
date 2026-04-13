@@ -12,8 +12,8 @@ import {
 } from "@/app/components/Case/Criminal/ExcelActions";
 import { CaseType } from "@/app/generated/prisma/client";
 import {
-  CaseEntry,
   CriminalCaseData,
+  CriminalCaseEntry,
   caseToEntry,
   createEmptyEntry,
 } from "@rtc-database/shared";
@@ -24,7 +24,8 @@ const CASE_TYPES: CaseType[] = ["CRIMINAL"];
 
 export default function CriminalCaseTester() {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
-  const [formData, setFormData] = useState<CaseEntry>(createEmptyEntry());
+  const [formData, setFormData] =
+    useState<CriminalCaseEntry>(createEmptyEntry());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,9 +54,9 @@ export default function CriminalCaseTester() {
     setLoading(false);
   };
 
-  const handleInputChange = <K extends keyof CaseEntry>(
+  const handleInputChange = <K extends keyof CriminalCaseEntry>(
     field: K,
-    value: CaseEntry[K],
+    value: CriminalCaseEntry[K],
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -347,7 +348,7 @@ export default function CriminalCaseTester() {
                     onChange={(e) =>
                       handleInputChange(
                         "name",
-                        e.target.value as CaseEntry["name"],
+                        e.target.value as CriminalCaseEntry["name"],
                       )
                     }
                     className="w-full border rounded px-2 py-1"

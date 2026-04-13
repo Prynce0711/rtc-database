@@ -7,6 +7,26 @@ export { default as DefaultLoading } from "./DefaultLoading";
 export * from "./Case/BaseCaseAdapter";
 export * from "./Case/BaseCaseSchema";
 export * from "./Case/CaseDetailsShared";
+export * from "./Case/Civil/CivilCaseAdapter";
+export { default as CivilCasePage } from "./Case/Civil/CivilCasePage";
+export { default as CivilCaseRow } from "./Case/Civil/CivilCaseRow";
+export {
+  calculateCivilCaseStats,
+  CivilCaseSchema,
+} from "./Case/Civil/CivilCaseSchema";
+export type {
+  CivilCaseData,
+  CivilCaseEntry,
+  CivilCaseFilters,
+  CivilCasesFilterOptions,
+  CivilCaseStats,
+} from "./Case/Civil/CivilCaseSchema";
+export {
+  CivilCaseUpdatePage,
+  default as CivilCaseUpdatePageDefault,
+  NotarialUpdatePage,
+} from "./Case/Civil/CivilCaseUpdatePage";
+export { default as CivilDetailsPage } from "./Case/Civil/CivilDetailsPage";
 export * from "./Case/Criminal/CriminalCaseAdapter";
 export { default as CriminalCaseDetailsPage } from "./Case/Criminal/CriminalCaseDetailsPage";
 export { default as CriminalCasePage } from "./Case/Criminal/CriminalCasePage";

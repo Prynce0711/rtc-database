@@ -10,13 +10,13 @@ import {
   exportCasesExcel,
   uploadExcel,
 } from "@/app/components/Case/Civil/ExcelActions";
+import { CaseType } from "@/app/generated/prisma/client";
 import {
-  CaseEntry,
   CivilCaseData,
+  CivilCaseEntry,
   caseToEntry,
   createEmptyEntry,
-} from "@/app/components/Case/Civil/schema";
-import { CaseType } from "@/app/generated/prisma/client";
+} from "@rtc-database/shared/src/Case/Civil/CivilCaseSchema.js";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 
@@ -24,7 +24,7 @@ const CASE_TYPES: CaseType[] = ["CIVIL"];
 
 export default function CivilCaseTester() {
   const [cases, setCases] = useState<CivilCaseData[]>([]);
-  const [formData, setFormData] = useState<CaseEntry>(createEmptyEntry());
+  const [formData, setFormData] = useState<CivilCaseEntry>(createEmptyEntry());
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,9 +53,9 @@ export default function CivilCaseTester() {
     setLoading(false);
   };
 
-  const handleInputChange = <K extends keyof CaseEntry>(
+  const handleInputChange = <K extends keyof CivilCaseEntry>(
     field: K,
-    value: CaseEntry[K],
+    value: CivilCaseEntry[K],
   ) => {
     setFormData((prev) => ({
       ...prev,

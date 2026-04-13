@@ -33,7 +33,8 @@
     "../packages/shared/src/Case/Criminal/CriminalCasePage.tsx",
     "../packages/shared/src/Case/Criminal/CriminalCaseRow.tsx",
     "../packages/shared/src/Case/Criminal/CriminalCaseUpdatePage.tsx",
-    "../packages/shared/src/utils.ts"
+    "../packages/shared/src/utils.ts",
+    "../packages/shared/src/Case/Civil/CivilCaseUpdatePage.tsx"
   ],
   "exclude": ["node_modules"]
 }

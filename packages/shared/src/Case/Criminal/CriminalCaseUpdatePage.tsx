@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  CaseEntry,
   CaseType,
   CriminalCaseAdapter,
   CriminalCaseData,
+  CriminalCaseEntry,
   CriminalCaseSchema,
   caseToEntry,
   createEmptyEntry,
@@ -425,15 +425,15 @@ const TAB_GROUPS: TabGroup[] = [
 ];
 
 function validateEntry(
-  entry: CaseEntry,
+  entry: CriminalCaseEntry,
   options: { requireCaseNumber: boolean },
 ): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
     if (!options.requireCaseNumber && k === "caseNumber") return;
     if (
-      !entry[k as keyof CaseEntry] ||
-      String(entry[k as keyof CaseEntry]).trim() === ""
+      !entry[k as keyof CriminalCaseEntry] ||
+      String(entry[k as keyof CriminalCaseEntry]).trim() === ""
     )
       errs[k] = "Required";
   });
@@ -552,7 +552,7 @@ function ReviewCard({
   displayCaseNumber,
   isExistingCase,
 }: {
-  entry: CaseEntry;
+  entry: CriminalCaseEntry;
   displayCaseNumber: string;
   isExistingCase: boolean;
 }) {
@@ -822,10 +822,10 @@ const CriminalCaseUpdatePage = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useAdaptiveNavigation();
 
-  const makeFromCase = (sc: CriminalCaseData): CaseEntry =>
+  const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
     caseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
-  const [entries, setEntries] = useState<CaseEntry[]>(() => {
+  const [entries, setEntries] = useState<CriminalCaseEntry[]>(() => {
     if (isEdit) return editCases.map(makeFromCase);
     const newEntry = createEmptyEntry();
     return [
@@ -1046,7 +1046,7 @@ const CriminalCaseUpdatePage = ({
   const handleDuplicate = (id: number) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: CaseEntry = {
+    const dup: CriminalCaseEntry = {
       ...source,
       id: createTempId(),
       caseNumber: source.isManual ? "" : source.caseNumber,
@@ -1089,8 +1089,8 @@ const CriminalCaseUpdatePage = ({
       REQUIRED_FIELDS.every(
         (k) =>
           (k === "caseNumber" && !e.isManual && !isEdit) ||
-          (e[k as keyof CaseEntry] &&
-            String(e[k as keyof CaseEntry]).trim() !== ""),
+          (e[k as keyof CriminalCaseEntry] &&
+            String(e[k as keyof CriminalCaseEntry]).trim() !== ""),
       ),
   ).length;
   const incompleteCount = entries.length - completedCount;
@@ -1108,7 +1108,7 @@ const CriminalCaseUpdatePage = ({
     (entry) => entry.isManual && isCaseAlreadyExisting(entry.caseNumber),
   ).length;
 
-  const getDisplayCaseNumber = (entry: CaseEntry): string => {
+  const getDisplayCaseNumber = (entry: CriminalCaseEntry): string => {
     if (entry.isManual || isEdit) {
       return entry.caseNumber || "";
     }
@@ -1219,7 +1219,7 @@ const CriminalCaseUpdatePage = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (e: CaseEntry) => {
+  const buildPayload = (e: CriminalCaseEntry) => {
     const { id, errors, collapsed, saved, isManual, ...caseInput } = e;
 
     const caseNumberForPayload =

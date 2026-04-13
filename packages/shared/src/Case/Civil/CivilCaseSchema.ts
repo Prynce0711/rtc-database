@@ -1,8 +1,8 @@
-import type { Case, CivilCase } from "@/app/generated/prisma/client";
-import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
-import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "@rtc-database/shared";
+import { FilterOptions } from "../../Filter/FilterUtils";
+import type { Case, CivilCase } from "../../generated/prisma/browser";
+import { excelHeaders } from "../../lib/excel";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type CivilCasesFilterOptions = FilterOptions<CivilCaseSchema>;
 
@@ -64,7 +64,7 @@ const CivilCaseObjectSchema = z.object({
     .date()
     .nullable()
     .optional()
-    .describe(excelHeaders(["Consolidation Date", "Consolidation Date"])),
+    .describe(excelHeaders(["Consolidation Date", "Consolitation Date"])),
   consolidationBranch: z
     .string()
     .nullable()
@@ -106,24 +106,13 @@ export const createTempId = (): number => {
   return -tempIdCounter;
 };
 
-/** Form entry used by the grid UI (CaseSchema + UI metadata). */
-export type CaseEntry = CivilCaseSchema & {
+export type CivilCaseEntry = CivilCaseSchema & {
   id: number;
   isManual: boolean;
   errors: Record<string, string>;
   collapsed: boolean;
   saved: boolean;
 };
-
-/** Convert CaseSchema to CaseEntry (for editing existing cases). */
-export const caseToEntry = (c: CivilCaseData): CaseEntry => ({
-  ...c,
-  id: c.id ?? createTempId(),
-  isManual: Boolean(c.isManual),
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
 
 export const initialCaseFormData: Omit<CivilCaseSchema, "id" | "createdAt"> = {
   branch: null,
@@ -144,11 +133,19 @@ export const initialCaseFormData: Omit<CivilCaseSchema, "id" | "createdAt"> = {
   remandedNote: null,
 };
 
-/** Create an empty entry based on schema defaults. */
-export const createEmptyEntry = (): CaseEntry => ({
+export const createEmptyEntry = (): CivilCaseEntry => ({
   ...initialCaseFormData,
   id: createTempId(),
   isManual: false,
+  errors: {},
+  collapsed: false,
+  saved: false,
+});
+
+export const caseToEntry = (c: CivilCaseData): CivilCaseEntry => ({
+  ...c,
+  id: c.id ?? createTempId(),
+  isManual: Boolean(c.isManual),
   errors: {},
   collapsed: false,
   saved: false,
@@ -169,37 +166,3 @@ export const calculateCivilCaseStats = (
     ).length,
   };
 };
-
-export const formatCivilCaseForDisplay = (caseItem: CivilCaseData) => {
-  return {
-    ...caseItem,
-    dateFiled: caseItem.dateFiled
-      ? new Date(caseItem.dateFiled).toLocaleDateString()
-      : "-",
-    reRaffleDate: caseItem.reRaffleDate
-      ? new Date(caseItem.reRaffleDate).toLocaleDateString()
-      : "Not scheduled",
-    consolitationDate: caseItem.consolitationDate
-      ? new Date(caseItem.consolitationDate).toLocaleDateString()
-      : "-",
-  };
-};
-
-export const sortCivilCases = (
-  cases: CivilCaseData[],
-  sortBy: keyof CivilCaseData,
-  order: "asc" | "desc",
-): CivilCaseData[] => {
-  return [...cases].sort((a, b) => {
-    const aVal = a[sortBy];
-    const bVal = b[sortBy];
-
-    if (aVal === null || aVal === undefined) return 1;
-    if (bVal === null || bVal === undefined) return -1;
-
-    if (aVal < bVal) return order === "asc" ? -1 : 1;
-    if (aVal > bVal) return order === "asc" ? 1 : -1;
-    return 0;
-  });
-};
-

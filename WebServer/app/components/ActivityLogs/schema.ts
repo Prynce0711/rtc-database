@@ -1,8 +1,7 @@
 import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
-import { CriminalCaseSchema } from "@rtc-database/shared";
+import { CivilCaseSchema, CriminalCaseSchema } from "@rtc-database/shared";
 import { z } from "zod";
-import { CivilCaseSchema } from "../Case/Civil/schema";
 import { NotarialSchema } from "../Case/Notarial/schema";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";
