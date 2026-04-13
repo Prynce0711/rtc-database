@@ -3,8 +3,8 @@
 import { CaseType, Prisma, type Case } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import ActionResult from "../ActionResult";
 import type { PaginatedResult } from "@rtc-database/shared";
+import { ActionResult } from "@rtc-database/shared";
 
 export type UnifiedCaseData = Case & {
   displayParty: string;

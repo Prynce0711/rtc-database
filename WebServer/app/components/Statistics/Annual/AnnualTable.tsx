@@ -1,12 +1,11 @@
 "use client";
 
-import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
+import { usePopup, useSession } from "@rtc-database/shared";
+import Pagination from "@rtc-database/shared/src/Pagination/Pagination.js";
 import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
-import Pagination from "../../Pagination/Pagination";
-import { usePopup } from "@rtc-database/shared";
 import AnnualAddReportPage from "./AnnualAddReportPage";
 import { AnyColumnDef, flattenColumns, isGroupColumn } from "./AnnualColumnDef";
 import { FieldConfig } from "./AnnualFieldConfig";
@@ -737,4 +736,3 @@ function AnnualTable<T extends Record<string, unknown>>({
 }
 
 export default AnnualTable;
-

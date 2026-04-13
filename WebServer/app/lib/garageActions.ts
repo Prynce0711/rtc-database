@@ -12,8 +12,8 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ActionResult } from "@rtc-database/shared";
 import { createHash } from "crypto";
-import ActionResult from "../components/ActionResult";
 import { getSystemSettings } from "../components/Settings/SettingsActions";
 import { FileData } from "../generated/prisma/browser";
 import { GetFileOptions, getGarageClient } from "../lib/garage";

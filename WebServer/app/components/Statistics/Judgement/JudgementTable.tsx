@@ -1,11 +1,9 @@
 "use client";
 
-import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
+import { Pagination, usePopup, useSession } from "@rtc-database/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
-import Pagination from "../../Pagination/Pagination";
-import { usePopup } from "@rtc-database/shared";
 import AnnualRow from "../Annual/AnnualRow";
 import AnnualToolbar from "../Annual/AnnualToolbar";
 import JudgementAddReportPage from "./JudgementAddReportPage";
@@ -691,4 +689,3 @@ function JudgementTable<T extends Record<string, unknown>>({
 }
 
 export default JudgementTable;
-

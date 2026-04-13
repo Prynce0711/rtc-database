@@ -1,6 +1,5 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
 import { ReceivingLogSchema } from "@/app/components/Case/ReceivingLogs/schema";
 import { LogAction, Prisma } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
@@ -19,6 +18,7 @@ import {
 } from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

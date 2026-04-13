@@ -21,10 +21,9 @@ import {
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
+import { ActionResult, PaginatedResult } from "@rtc-database/shared";
 import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { PaginatedResult } from "@rtc-database/shared";
 import {
   SheriffCaseData,
   SheriffCaseSchema,

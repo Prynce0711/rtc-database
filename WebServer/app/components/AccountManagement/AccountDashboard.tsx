@@ -4,7 +4,7 @@ import { User } from "@/app/generated/prisma/browser";
 import { Status } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { formatDate } from "@/app/lib/utils";
-import { usePopup, useSession } from "@rtc-database/shared";
+import { Pagination, usePopup, useSession } from "@rtc-database/shared";
 import {
   useEffect,
   useMemo,
@@ -13,7 +13,6 @@ import {
   type CSSProperties,
 } from "react";
 import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
-import { Pagination } from "../Pagination";
 import { getAccounts, updateRole } from "./AccountActions";
 import AccountActionsButton from "./AccountActionsButton";
 import AddAccountDrawer from "./AddAccountDrawer";

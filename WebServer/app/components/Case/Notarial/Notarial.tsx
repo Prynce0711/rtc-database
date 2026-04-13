@@ -15,6 +15,7 @@ import {
   FilterDropdown,
   FilterOption,
   FilterValues,
+  Pagination,
   usePopup,
   useToast,
 } from "@rtc-database/shared";
@@ -29,7 +30,6 @@ import {
   FiSearch,
   FiUsers,
 } from "react-icons/fi";
-import { Pagination } from "../../Pagination";
 import NotarialRow, { NotarialRecord } from "./NotarialRow";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -1,6 +1,5 @@
 "use client";
 
-import Pagination from "@/app/components/Pagination/Pagination";
 import ActionDropdown from "@/app/components/Table/ActionDropdown";
 import TipCell from "@/app/components/Table/TipCell";
 import type { Employee } from "@/app/generated/prisma/browser";
@@ -10,6 +9,7 @@ import {
   getAgeFromDate,
   isRetirementEligible,
 } from "@/app/lib/utils";
+import { Pagination } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiTrash2, FiUsers } from "react-icons/fi";

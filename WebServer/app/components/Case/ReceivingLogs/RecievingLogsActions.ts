@@ -1,12 +1,11 @@
 "use server";
 
-import { PaginatedResult } from "@rtc-database/shared";
 import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import ActionResult from "../../ActionResult";
+import { ActionResult, PaginatedResult } from "@rtc-database/shared";
 import { createLog } from "../../ActivityLogs/LogActions";
 import { ReceivingLogFilterOptions, ReceivingLogSchema } from "./schema";
 

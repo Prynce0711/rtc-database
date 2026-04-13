@@ -2,7 +2,7 @@
 
 import { LogAction } from "@/app/generated/prisma/browser";
 import { prisma } from "@/app/lib/prisma";
-import ActionResult from "../../ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 import { createLog } from "../../ActivityLogs/LogActions";
 import { ReceiveLogSchema } from "./ReceiveSchema";
 

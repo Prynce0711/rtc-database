@@ -5,7 +5,7 @@ import { syncNotarialRemote } from "@/app/lib/backup/backupScheduler";
 import { getInfo, type GarageInfo } from "@/app/lib/garage";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import ActionResult from "../ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 import {
   defaultSystemSettings,
   SystemSettingsSchema,

@@ -2,8 +2,8 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import { ActionResult } from "@rtc-database/shared";
 import { prettifyError, z } from "zod";
-import ActionResult from "../../ActionResult";
 import { MonthlyRow, MonthlyRowSchema } from "./Schema";
 
 // ─── Get ────────────────────────────────────────────────────────────────────

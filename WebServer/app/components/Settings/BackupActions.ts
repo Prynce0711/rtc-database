@@ -38,8 +38,8 @@ import {
   type OneDriveDriveOption,
 } from "@/app/lib/backup/remotes/onedrive";
 import Roles from "@/app/lib/Roles";
+import { ActionResult } from "@rtc-database/shared";
 import { z } from "zod";
-import ActionResult from "../ActionResult";
 
 export interface BackupDashboardData {
   config: BackupConfig;

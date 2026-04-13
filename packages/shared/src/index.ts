@@ -11,6 +11,7 @@ export * from "./Filter/FilterTypes";
 export * from "./Filter/FilterUtils";
 export { default as RadioButton } from "./Filter/RadioButton";
 export { default as Suggestions } from "./Filter/Suggestions";
+export { default as Pagination } from "./Pagination/Pagination";
 
 export { default as ConfirmPopup } from "./Popup/ConfirmPopup";
 export { default as ErrorPopup } from "./Popup/ErrorPopup";

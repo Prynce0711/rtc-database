@@ -1,6 +1,6 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
+import { ActionResult } from "@rtc-database/shared";
 import { validateSession } from "../../authActions";
 import { getGarageFileUrl } from "../../garageActions";
 import { prisma } from "../../prisma";

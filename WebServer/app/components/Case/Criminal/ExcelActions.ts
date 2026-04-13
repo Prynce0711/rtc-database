@@ -1,6 +1,5 @@
 "use server";
 
-import ActionResult from "@/app/components/ActionResult";
 import {
   CriminalCaseData,
   CriminalCaseSchema,
@@ -32,6 +31,7 @@ import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import { getSchemaFieldKeys } from "@/app/lib/utils";
+import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

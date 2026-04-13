@@ -12,9 +12,12 @@ import {
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
-import { FilterOptions, PaginatedResult } from "@rtc-database/shared";
+import {
+  ActionResult,
+  FilterOptions,
+  PaginatedResult,
+} from "@rtc-database/shared";
 import { prettifyError } from "zod";
-import ActionResult from "../../ActionResult";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
 
 type NotarialListFilterShape = {
