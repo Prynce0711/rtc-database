@@ -1,6 +1,7 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
+import { usePopup, useToast } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, {
@@ -27,8 +28,6 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
-import { useToast } from "../../Toast/ToastProvider";
 import { doesCaseExist } from "../CaseActions";
 import {
   createCriminalCase,
@@ -43,7 +42,7 @@ import {
   caseToEntry,
   createEmptyEntry,
   createTempId,
-} from "./schema";
+} from "./CriminalCaseSchema";
 
 export enum CriminalCaseUpdateType {
   ADD = "ADD",

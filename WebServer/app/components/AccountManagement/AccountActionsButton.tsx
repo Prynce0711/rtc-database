@@ -1,6 +1,7 @@
 "use client";
 
 import { Status, User } from "@/app/generated/prisma/browser";
+import { usePopup } from "@rtc-database/shared";
 import {
   FiCheckCircle,
   FiLock,
@@ -10,7 +11,6 @@ import {
   FiUnlock,
   FiXCircle,
 } from "react-icons/fi";
-import { usePopup } from "../Popup/PopupProvider";
 import {
   cancelPendingAccount,
   deactivateAccount,

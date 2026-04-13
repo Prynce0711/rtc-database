@@ -32,7 +32,7 @@ import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../schema";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export async function uploadPetitionExcel(
   file: File,

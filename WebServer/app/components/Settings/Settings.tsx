@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";

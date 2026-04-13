@@ -5,9 +5,9 @@ import {
   createGroupChat as createGroupChatAction,
   getChats,
 } from "@/app/components/Messages/MessagesActions";
-import { usePopup } from "@/app/components/Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { ChatType, Roles } from "@/app/generated/prisma/browser";
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
 import { AnimatePresence, motion } from "framer-motion";
@@ -2051,3 +2051,4 @@ const Messages: React.FC = () => {
 };
 
 export default Messages;
+

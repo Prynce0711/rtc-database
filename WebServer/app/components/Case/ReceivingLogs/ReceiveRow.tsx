@@ -1,7 +1,7 @@
 "use client";
 
 import TipCell from "@/app/components/Table/TipCell";
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

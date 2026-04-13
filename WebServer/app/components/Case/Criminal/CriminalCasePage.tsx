@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import { isTextFieldKey } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,7 +30,7 @@ import {
   FilterValues,
 } from "../../Filter/FilterTypes";
 import Pagination from "../../Pagination/Pagination";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import Table from "../../Table/Table";
 import CriminalCaseRow from "./CriminalCaseRow";
@@ -39,14 +39,14 @@ import {
   getCriminalCases,
   getCriminalCaseStats,
 } from "./CriminalCasesActions";
-import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 import {
   calculateCriminalCaseStats,
   CriminalCaseStats,
   type CriminalCaseData,
   type CriminalCaseFilters,
   type CriminalCasesFilterOptions,
-} from "./schema";
+} from "./CriminalCaseSchema";
+import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 
 // TODO: Move import excel here instead of server action and just call createCase
 // TODO: Maybe add a reusable CasePage component that you put schema and it will make the filter and table?
@@ -781,3 +781,4 @@ const CriminalCasePage: React.FC = () => {
 };
 
 export default CriminalCasePage;
+

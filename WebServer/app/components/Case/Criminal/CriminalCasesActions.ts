@@ -30,7 +30,7 @@ import {
   CriminalCaseSchema,
   CriminalCasesFilterOptions,
   CriminalCaseStats,
-} from "./schema";
+} from "./CriminalCaseSchema";
 
 export async function getCriminalCases(
   options?: CriminalCasesFilterOptions,

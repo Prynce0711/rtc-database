@@ -18,7 +18,7 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { ReceiveLog } from "./ReceiveRecord";
 import {
   createRecievingLog,
@@ -1095,3 +1095,4 @@ const ReceiveDrawer = ({
 };
 
 export default ReceiveDrawer;
+

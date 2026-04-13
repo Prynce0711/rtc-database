@@ -2,7 +2,7 @@ import { Case, SheriffCase } from "@/app/generated/prisma/client";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
-import { BaseCaseSchema } from "../schema";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type SheriffCasesFilterOptions = FilterOptions<SheriffCaseSchema>;
 

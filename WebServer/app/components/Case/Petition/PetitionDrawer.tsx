@@ -24,7 +24,7 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { doesCaseExist } from "../CaseActions";
 import {
   createPetition,
@@ -1762,3 +1762,4 @@ const PetitionEntryPage = ({
 };
 
 export default PetitionEntryPage;
+

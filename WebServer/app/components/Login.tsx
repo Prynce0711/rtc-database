@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "@/app/lib/authClient";
+import { signIn } from "@rtc-database/shared";
 import {
   AnimatePresence,
   easeInOut,

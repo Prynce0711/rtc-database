@@ -5,6 +5,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
     "./src": "./src/index.ts",
     "./src/*": "./src/*"
   },
@@ -14,9 +15,20 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1"
   },
   "dependencies": {
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "xlsx": "^0.18.5",
+    "react": "19.2.3",
+    "ws": "^8.19.0",
+    "lucide-react": "^0.563.0",
+    "react-icons": "^5.5.0",
+    "react-dom": "19.2.3",
+    "@prisma/client": "^7.3.0",
+    "better-auth": "^1.4.18"
   }
 }

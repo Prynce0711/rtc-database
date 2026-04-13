@@ -33,7 +33,7 @@ import {
   FilterOption,
   FilterValues,
 } from "../Filter/FilterTypes";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import EmployeeTable from "./EmployeeTable";
 
@@ -596,3 +596,4 @@ const EmployeeDashboard: React.FC = () => {
 };
 
 export default EmployeeDashboard;
+

@@ -1,8 +1,6 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import ModalBase from "./ModalBase";
 
 type ErrorScreenProps = {
@@ -26,8 +24,6 @@ const ErrorPopup = ({
   closeText = "Close",
   buttonColor = "btn-error",
 }: ErrorScreenProps) => {
-  const router = useRouter();
-
   return (
     <ModalBase
       notTransparent={notTransparent}
@@ -55,19 +51,19 @@ const ErrorPopup = ({
             {retry && (
               <button
                 className="btn btn-primary"
-                onClick={() => router.refresh()}
+                onClick={() => window.location.reload()}
               >
                 Retry
               </button>
             )}
             {redirectTo ? (
-              <Link
+              <a
                 href={redirectTo}
                 className={`btn ${buttonColor}`}
                 onClick={onClose}
               >
                 {closeText}
-              </Link>
+              </a>
             ) : onClose ? (
               <button className={`btn ${buttonColor}`} onClick={onClose}>
                 {closeText}

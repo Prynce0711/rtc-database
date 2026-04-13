@@ -4,7 +4,7 @@ import Roles from "@/app/lib/Roles";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { FiEye, FiEyeOff, FiInfo, FiShield } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { getSystemSettings, updateSystemSettings } from "../SettingsActions";
 import {
   InputField,
@@ -218,3 +218,4 @@ const SecurityTab = ({ role }: { role: string }) => {
 };
 
 export default SecurityTab;
+

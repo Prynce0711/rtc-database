@@ -8,7 +8,7 @@ import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCriminalCases } from "../Case/Criminal/CriminalCasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
 import { Pagination } from "../Pagination";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
 import LogBadges from "./LogBadges";
@@ -690,3 +690,4 @@ const LogsDashboard: React.FC = () => {
 };
 
 export default LogsDashboard;
+

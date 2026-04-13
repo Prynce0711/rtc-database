@@ -1,4 +1,4 @@
-import { useToast } from "../../components/Toast/ToastProvider";
+import { useToast } from "@rtc-database/shared";
 
 const ToastTester = () => {
   const toast = useToast();

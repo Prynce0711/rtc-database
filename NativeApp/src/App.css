@@ -1,246 +1,382 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* ==========================================================================
+   LIGHT THEME — EXECUTIVE COUNSEL PRO
+   Palette: Navy authority · Slate professionalism · Emerald trust
+   WCAG AA+ contrast on every surface
+   ========================================================================== */
+
 @plugin "daisyui/theme" {
   name: "winter";
   default: true;
   prefersdark: false;
   color-scheme: "light";
-  --color-base-100: oklch(100% 0 0);
-  --color-base-200: oklch(97.466% 0.011 259.822);
-  --color-base-300: oklch(93.268% 0.016 262.751);
-  --color-base-content: oklch(41.886% 0.053 255.824);
-  --color-primary: oklch(56.86% 0.255 257.57);
-  --color-primary-content: oklch(91.372% 0.051 257.57);
-  --color-secondary: oklch(42.551% 0.161 282.339);
-  --color-secondary-content: oklch(88.51% 0.032 282.339);
-  --color-accent: oklch(59.939% 0.191 335.171);
-  --color-accent-content: oklch(11.988% 0.038 335.171);
-  --color-neutral: oklch(19.616% 0.063 257.651);
-  --color-neutral-content: oklch(83.923% 0.012 257.651);
-  --color-info: oklch(88.127% 0.085 214.515);
-  --color-info-content: oklch(17.625% 0.017 214.515);
-  --color-success: oklch(80.494% 0.077 197.823);
-  --color-success-content: oklch(16.098% 0.015 197.823);
-  --color-warning: oklch(89.172% 0.045 71.47);
-  --color-warning-content: oklch(17.834% 0.009 71.47);
-  --color-error: oklch(73.092% 0.11 20.076);
-  --color-error-content: oklch(14.618% 0.022 20.076);
-  --radius-selector: 1rem;
-  --radius-field: 0.5rem;
+
+  /* ── BASE SURFACES ─────────────────────────────────────────────────────── */
+  --color-base-100: oklch(98.5% 0.003 250); /* page background        */
+  --color-base-200: oklch(96% 0.007 250); /* card / section bg      */
+  --color-base-300: oklch(93% 0.012 250); /* dividers / inset wells */
+  --color-base-content: oklch(28% 0.03 250); /* body text — near-black */
+
+  /* ── PRIMARY — Deep Navy ───────────────────────────────────────────────── */
+  --color-primary: oklch(48% 0.16 255);
+  --color-primary-content: oklch(97% 0.005 255);
+
+  /* ── SECONDARY — Muted Indigo ──────────────────────────────────────────── */
+  --color-secondary: oklch(52% 0.1 278);
+  --color-secondary-content: oklch(97% 0.01 278);
+
+  /* ── ACCENT — Warm Gold ────────────────────────────────────────────────── */
+  --color-accent: oklch(72% 0.15 80);
+  --color-accent-content: oklch(22% 0.03 80);
+
+  /* ── NEUTRAL — Graphite ────────────────────────────────────────────────── */
+  --color-neutral: oklch(22% 0.015 250);
+  --color-neutral-content: oklch(94% 0.005 250);
+
+  /* ── STATUS — Accessible ───────────────────────────────────────────────── */
+  --color-success: oklch(62% 0.16 155);
+  --color-success-content: oklch(98% 0.01 155);
+
+  --color-warning: oklch(74% 0.14 75);
+  --color-warning-content: oklch(20% 0.03 75);
+
+  --color-error: oklch(60% 0.19 25);
+  --color-error-content: oklch(97% 0.01 25);
+
+  --color-info: oklch(62% 0.14 245);
+  --color-info-content: oklch(97% 0.01 245);
+
+  /* ── SOFT STATUS BACKGROUNDS ───────────────────────────────────────────── */
+  --color-success-soft: oklch(95% 0.04 155);
+  --color-warning-soft: oklch(96% 0.04 75);
+  --color-error-soft: oklch(95.5% 0.045 25);
+  --color-info-soft: oklch(95% 0.035 245);
+
+  /* ── EXTENDED PALETTE — semantic helpers ────────────────────────────────── */
+  --color-muted: oklch(56% 0.02 250); /* secondary text         */
+  --color-subtle: oklch(70% 0.015 250); /* placeholders / hints   */
+  --color-highlight: oklch(92% 0.06 80); /* selected row / search  */
+  --color-focus-ring: oklch(60% 0.18 255 / 0.45); /* keyboard focus ring    */
+  --color-link: oklch(52% 0.16 255); /* inline links           */
+  --color-link-hover: oklch(45% 0.18 255); /* link hover state       */
+
+  /* ── SURFACE TOKENS ────────────────────────────────────────────────────── */
+  --surface-card: oklch(98% 0.003 250);
+  --surface-card-hover: oklch(96% 0.008 250);
+  --surface-inset: oklch(95% 0.01 250);
+  --surface-hover: oklch(94% 0.012 250);
+  --surface-border: oklch(89% 0.015 250);
+  --surface-border-strong: oklch(82% 0.02 250);
+
+  /* Glass / Frosted */
+  --surface-glass: oklch(100% 0 0 / 0.55);
+  --surface-glass-strong: oklch(100% 0 0 / 0.82);
+
+  /* ── ELEVATION / SHADOW SYSTEM ─────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.07);
+  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.09);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.12);
+
+  /* ── SHAPE SYSTEM ──────────────────────────────────────────────────────── */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
   --radius-box: 1rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  --radius-field: 0.625rem;
+  --radius-selector: 0.875rem;
+  --radius-pill: 9999px;
+
   --border: 1px;
-  --depth: 0;
-  --noise: 0;
+
+  /* ── SPACING SCALE (reference) ─────────────────────────────────────────── */
+  --space-page-x: 2rem;
+  --space-page-y: 1.5rem;
+  --space-section-gap: 2.5rem;
+  --space-card-padding: 1.5rem;
+
+  /* ── TRANSITION TOKENS ─────────────────────────────────────────────────── */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* ==========================================================================
+   DARK THEME — EXECUTIVE OBSIDIAN PRO
+   Palette: Deep slate · Electric blue · Soft luminance
+   ========================================================================== */
 
 @plugin "daisyui/theme" {
   name: "dim";
   default: false;
-  prefersdark: false;
+  prefersdark: true;
   color-scheme: "dark";
-  --color-base-100: oklch(30.857% 0.023 264.149);
-  --color-base-200: oklch(28.036% 0.019 264.182);
-  --color-base-300: oklch(26.346% 0.018 262.177);
-  --color-base-content: oklch(82.901% 0.031 222.959);
-  --color-primary: oklch(86.133% 0.141 139.549);
-  --color-primary-content: oklch(17.226% 0.028 139.549);
-  --color-secondary: oklch(73.375% 0.165 35.353);
-  --color-secondary-content: oklch(14.675% 0.033 35.353);
-  --color-accent: oklch(74.229% 0.133 311.379);
-  --color-accent-content: oklch(14.845% 0.026 311.379);
-  --color-neutral: oklch(24.731% 0.02 264.094);
-  --color-neutral-content: oklch(82.901% 0.031 222.959);
-  --color-info: oklch(86.078% 0.142 206.182);
-  --color-info-content: oklch(17.215% 0.028 206.182);
-  --color-success: oklch(86.171% 0.142 166.534);
-  --color-success-content: oklch(17.234% 0.028 166.534);
-  --color-warning: oklch(86.163% 0.142 94.818);
-  --color-warning-content: oklch(17.232% 0.028 94.818);
-  --color-error: oklch(82.418% 0.099 33.756);
-  --color-error-content: oklch(16.483% 0.019 33.756);
-  --radius-selector: 1rem;
-  --radius-field: 0.5rem;
+
+  /* ── BASE ───────────────────────────────────────────────────────────────── */
+  --color-base-100: oklch(22% 0.015 255); /* main background        */
+  --color-base-200: oklch(19% 0.015 255); /* sidebar / aside        */
+  --color-base-300: oklch(16% 0.015 255); /* deep inset             */
+  --color-base-content: oklch(90% 0.015 255); /* body text              */
+
+  /* ── PRIMARY — Electric Blue ───────────────────────────────────────────── */
+  --color-primary: oklch(70% 0.16 255);
+  --color-primary-content: oklch(15% 0.03 255);
+
+  /* ── SECONDARY — Lavender ──────────────────────────────────────────────── */
+  --color-secondary: oklch(68% 0.11 278);
+  --color-secondary-content: oklch(15% 0.03 278);
+
+  /* ── ACCENT — Amber Glow ───────────────────────────────────────────────── */
+  --color-accent: oklch(76% 0.14 80);
+  --color-accent-content: oklch(18% 0.03 80);
+
+  /* ── NEUTRAL ───────────────────────────────────────────────────────────── */
+  --color-neutral: oklch(30% 0.015 255);
+  --color-neutral-content: oklch(90% 0.008 255);
+
+  /* ── STATUS ────────────────────────────────────────────────────────────── */
+  --color-success: oklch(72% 0.14 155);
+  --color-success-content: oklch(15% 0.02 155);
+
+  --color-warning: oklch(78% 0.13 75);
+  --color-warning-content: oklch(18% 0.03 75);
+
+  --color-error: oklch(68% 0.17 25);
+  --color-error-content: oklch(97% 0.01 25);
+
+  --color-info: oklch(70% 0.13 245);
+  --color-info-content: oklch(15% 0.02 245);
+
+  /* ── SOFT STATUS BACKGROUNDS ───────────────────────────────────────────── */
+  --color-success-soft: oklch(28% 0.04 155);
+  --color-warning-soft: oklch(30% 0.04 75);
+  --color-error-soft: oklch(28% 0.05 25);
+  --color-info-soft: oklch(28% 0.04 245);
+
+  /* ── EXTENDED ──────────────────────────────────────────────────────────── */
+  --color-muted: oklch(62% 0.015 255);
+  --color-subtle: oklch(50% 0.01 255);
+  --color-highlight: oklch(30% 0.04 255);
+  --color-focus-ring: oklch(70% 0.16 255 / 0.5);
+  --color-link: oklch(72% 0.14 255);
+  --color-link-hover: oklch(78% 0.16 255);
+
+  /* ── SURFACE ───────────────────────────────────────────────────────────── */
+  --surface-card: oklch(25% 0.015 255);
+  --surface-card-hover: oklch(28% 0.018 255);
+  --surface-inset: oklch(18% 0.012 255);
+  --surface-hover: oklch(30% 0.018 255);
+  --surface-border: oklch(34% 0.018 255);
+  --surface-border-strong: oklch(42% 0.02 255);
+
+  --surface-glass: oklch(22% 0.015 255 / 0.6);
+  --surface-glass-strong: oklch(22% 0.015 255 / 0.88);
+
+  /* ── SHADOWS ───────────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --shadow-overlay: 0 20px 60px rgba(0, 0, 0, 0.55);
+
+  /* ── SHAPE ─────────────────────────────────────────────────────────────── */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
   --radius-box: 1rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
+  --radius-field: 0.625rem;
+  --radius-selector: 0.875rem;
+  --radius-pill: 9999px;
+
   --border: 1px;
-  --depth: 0;
-  --noise: 0;
+
+  /* ── SPACING ───────────────────────────────────────────────────────────── */
+  --space-page-x: 2rem;
+  --space-page-y: 1.5rem;
+  --space-section-gap: 2.5rem;
+  --space-card-padding: 1.5rem;
+
+  /* ── TRANSITIONS ───────────────────────────────────────────────────────── */
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ================= SPEEDER LOADER ================= */
-
-.loader {
-  position: relative;
-  width: 120px;
-  height: 40px;
-  animation: speeder 0.4s linear infinite;
+/* ═══ Register custom animations with Tailwind v4 ═══════════════════════ */
+@theme {
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  --animate-skeleton-fade-in: skeletonFadeIn 0.4s ease-out both;
 }
 
-.loader > span {
-  height: 5px;
-  width: 35px;
-  background: #ffffff;
-  position: absolute;
-  top: -19px;
-  left: 60px;
-  border-radius: 2px 10px 1px 0;
+/* ==========================================================================
+   TYPOGRAPHY — Professional Type Scale
+   ========================================================================== */
+
+.font-sans {
+  font-family:
+    var(--font-montserrat, "Montserrat"),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
-/* Ship body */
-.base span {
-  position: absolute;
-  width: 0;
-  height: 0;
-  border-top: 6px solid transparent;
-  border-right: 100px solid #ffffff;
-  border-bottom: 6px solid transparent;
+@layer base {
+  html {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Better defaults for form elements */
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  /* Smooth focus rings */
+  :focus-visible {
+    outline: 2px solid var(--color-focus-ring, oklch(60% 0.18 255 / 0.45));
+    outline-offset: 2px;
+    border-radius: var(--radius-xs, 0.375rem);
+  }
+
+  /* Scrollbar polish (Webkit) */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(70% 0.01 250 / 0.3);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(60% 0.01 250 / 0.5);
+  }
 }
 
-.base span::before {
-  content: "";
-  height: 22px;
-  width: 22px;
-  border-radius: 50%;
-  background: #ffffff;
-  position: absolute;
-  right: -110px;
-  top: -16px;
+/* ==========================================================================
+   UTILITY CLASSES — Design System Helpers
+   ========================================================================== */
+
+@layer components {
+  /* ── Card Surfaces ─────────────────────────────────────────────────────── */
+  .surface-card {
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-box);
+    box-shadow: var(--shadow-soft);
+  }
+  .surface-card-hover {
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-box);
+    box-shadow: var(--shadow-soft);
+    transition: all var(--transition-base);
+  }
+  .surface-card-hover:hover {
+    background: var(--surface-card-hover);
+    box-shadow: var(--shadow-md);
+    border-color: var(--surface-border-strong);
+  }
+
+  /* ── Glass Surfaces ────────────────────────────────────────────────────── */
+  .surface-glass {
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px) saturate(1.5);
+    border: 1px solid var(--surface-border);
+  }
+  .surface-glass-strong {
+    background: var(--surface-glass-strong);
+    backdrop-filter: blur(20px) saturate(1.8);
+    border: 1px solid var(--surface-border);
+  }
+
+  /* ── Text helpers ──────────────────────────────────────────────────────── */
+  .text-muted {
+    color: var(--color-muted);
+  }
+  .text-subtle {
+    color: var(--color-subtle);
+  }
+  .text-link {
+    color: var(--color-link);
+    transition: color var(--transition-fast);
+  }
+  .text-link:hover {
+    color: var(--color-link-hover);
+  }
+
+  /* ── Status Soft Badges ────────────────────────────────────────────────── */
+  .badge-success-soft {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+  .badge-warning-soft {
+    background: var(--color-warning-soft);
+    color: var(--color-warning);
+  }
+  .badge-error-soft {
+    background: var(--color-error-soft);
+    color: var(--color-error);
+  }
+  .badge-info-soft {
+    background: var(--color-info-soft);
+    color: var(--color-info);
+  }
+
+  /* ── Highlight Row ─────────────────────────────────────────────────────── */
+  .row-highlight {
+    background: var(--color-highlight);
+    transition: background var(--transition-fast);
+  }
+
+  /* ── Divider ───────────────────────────────────────────────────────────── */
+  .divider-subtle {
+    border-color: var(--surface-border);
+  }
 }
 
-.base span::after {
-  content: "";
-  position: absolute;
-  width: 0;
-  height: 0;
-  border-top: 0 solid transparent;
-  border-right: 55px solid #ffffff;
-  border-bottom: 16px solid transparent;
-  top: -16px;
-  right: -98px;
+/* ==========================================================================
+   MICRO-INTERACTIONS — Polish & Delight
+   ========================================================================== */
+
+@layer utilities {
+  /* Smooth page-level transitions */
+  .animate-fade-in {
+    animation: fadeIn var(--transition-slow) both;
+  }
+  .animate-slide-up {
+    animation: slideUp var(--transition-slow) both;
+  }
+  .animate-scale-in {
+    animation: scaleIn var(--transition-spring) both;
+  }
 }
 
-.face {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #ffffff;
-  border-radius: 50%;
-  transform: rotate(-40deg);
-  right: -15px; /* keep mo design mo */
-  top: -10px;
-}
-
-/* speed lines */
-.loader > span > span {
-  width: 30px;
-  height: 1px;
-  background: #ffffff;
-  position: absolute;
-  animation: fazer1 0.2s linear infinite;
-}
-
-.loader > span > span:nth-child(2) {
-  top: 3px;
-  animation: fazer2 0.4s linear infinite;
-}
-
-.loader > span > span:nth-child(3) {
-  top: 1px;
-  animation: fazer3 0.4s linear infinite;
-  animation-delay: -1s;
-}
-
-.loader > span > span:nth-child(4) {
-  top: 4px;
-  animation: fazer4 1s linear infinite;
-  animation-delay: -1s;
-}
-
-/* Animations */
-@keyframes speeder {
+@keyframes shimmer {
   0% {
-    transform: translate(2px, 1px) rotate(0deg);
-  }
-  10% {
-    transform: translate(-1px, -3px) rotate(-1deg);
-  }
-  20% {
-    transform: translate(-2px, 0px) rotate(1deg);
-  }
-  30% {
-    transform: translate(1px, 2px) rotate(0deg);
-  }
-  40% {
-    transform: translate(1px, -1px) rotate(1deg);
-  }
-  50% {
-    transform: translate(-1px, 3px) rotate(-1deg);
-  }
-  60% {
-    transform: translate(-1px, 1px) rotate(0deg);
-  }
-  70% {
-    transform: translate(3px, 1px) rotate(-1deg);
-  }
-  80% {
-    transform: translate(-2px, -1px) rotate(1deg);
-  }
-  90% {
-    transform: translate(2px, 1px) rotate(0deg);
+    transform: translateX(-100%);
   }
   100% {
-    transform: translate(1px, -2px) rotate(-1deg);
+    transform: translateX(100%);
   }
 }
 
-@keyframes fazer1 {
-  0% {
-    left: 0;
-  }
-  100% {
-    left: -80px;
-    opacity: 0;
-  }
-}
-
-@keyframes fazer2 {
-  0% {
-    left: 0;
-  }
-  100% {
-    left: -100px;
-    opacity: 0;
-  }
-}
-
-@keyframes fazer3 {
-  0% {
-    left: 0;
-  }
-  100% {
-    left: -50px;
-    opacity: 0;
-  }
-}
-
-@keyframes fazer4 {
-  0% {
-    left: 0;
-  }
-  100% {
-    left: -150px;
-    opacity: 0;
-  }
-}
-
-@keyframes fade-in {
+@keyframes skeletonFadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -248,6 +384,1282 @@
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ─── Sidebar animated gradient ───────────────────────────────────────── */
+@keyframes sidebarGradientShift {
+  0% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+  75% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.sidebar-gradient {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f3f4f6 12%,
+    #e5e7eb 25%,
+    #f9fafb 38%,
+    #d1d5db 50%,
+    #f3f4f6 62%,
+    #e5e7eb 75%,
+    #f9fafb 88%,
+    #ffffff 100%
+  );
+  background-size: 300% 300%;
+  animation: sidebarGradientShift 16s ease-in-out infinite;
+}
+
+[data-theme="dim"] .sidebar-gradient {
+  background: linear-gradient(
+    135deg,
+    #1a1d23 0%,
+    #22252b 12%,
+    #2a2e36 25%,
+    #1e2127 38%,
+    #313640 50%,
+    #262a32 62%,
+    #2a2e36 75%,
+    #1e2127 88%,
+    #1a1d23 100%
+  );
+  background-size: 300% 300%;
+  animation: sidebarGradientShift 16s ease-in-out infinite;
+}
+
+/* Sidebar nav item stagger entrance */
+@keyframes sidebarItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+
+.sidebar-stagger {
+  animation: sidebarItemIn 0.35s ease-out both;
+}
+
+/* ==========================================================================
+   Component: CaseDrawer (xls-*) styles extracted from inline component CSS
+   ========================================================================== */
+
+@layer components {
+  .xls-root {
+    font-family: var(--font-montserrat), ui-sans-serif, system-ui;
+    min-height: 100vh;
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ══ TOPBAR ══ */
+  .xls-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    backdrop-filter: blur(18px) saturate(1.6);
+    border-bottom: 1px solid var(--surface-border);
+    padding: 0 32px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .xls-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .xls-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .xls-back-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-muted);
+    transition: all var(--transition-fast);
+  }
+  .xls-back-btn:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    color: var(--color-primary);
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+  .xls-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 15.5px;
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+  .xls-breadcrumb-sep {
+    opacity: 0.3;
+  }
+  .xls-breadcrumb-current {
+    color: var(--color-base-content);
+    font-weight: 700;
+  }
+
+  .xls-stepper {
+    display: flex;
+    align-items: center;
+    background: var(--surface-inset);
+    border-radius: var(--radius-pill);
+    padding: 4px;
+    border: 1px solid var(--surface-border);
+  }
+  .xls-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: var(--radius-pill);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-muted);
+    transition: all var(--transition-base);
+    white-space: nowrap;
+  }
+  .xls-step.active {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+  .xls-step.done {
+    color: var(--color-success);
+  }
+  .xls-step-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+  .xls-step.active .xls-step-dot {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .xls-step.done .xls-step-dot {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+
+  /* ── Buttons ── */
+  .xls-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 22px;
+    height: 42px;
+    border-radius: var(--radius-field);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+  }
+  .xls-btn:active {
+    transform: scale(0.97);
+  }
+  .xls-btn:disabled {
+    cursor: not-allowed;
+    transform: none;
+  }
+  .xls-btn-ghost {
+    background: transparent;
+    color: var(--color-muted);
+    border: 1px solid var(--surface-border);
+  }
+  .xls-btn-ghost:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    color: var(--color-primary);
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+  .xls-btn-ghost:active:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  }
+  .xls-btn-primary {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+  .xls-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px
+      color-mix(in srgb, var(--color-primary) 35%, transparent);
+  }
+  .xls-btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.95);
+  }
+  .xls-btn-primary:disabled {
+    opacity: 0.5;
+  }
+  .xls-btn-success {
+    background: var(--color-success);
+    color: var(--color-success-content);
+    box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-success) 30%, transparent);
+  }
+  .xls-btn-success:hover:not(:disabled) {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px
+      color-mix(in srgb, var(--color-success) 35%, transparent);
+  }
+  .xls-btn-success:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  .xls-btn-success:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+  .xls-btn-outline {
+    background: transparent;
+    color: var(--color-base-content);
+    border: 1.5px solid var(--surface-border-strong);
+  }
+  .xls-btn-outline:hover:not(:disabled) {
+    background: var(--surface-hover);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+  .xls-btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--surface-card);
+    color: var(--color-muted);
+    border: 1px solid var(--surface-border);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .xls-btn-icon:hover {
+    background: var(--surface-hover);
+    color: var(--color-base-content);
+    border-color: var(--surface-border-strong);
+  }
+  .xls-btn-icon:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* ══ MAIN ══ */
+  .xls-main {
+    padding: 28px 32px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .xls-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .xls-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    margin: 0 0 6px;
+  }
+  .xls-subtitle {
+    font-size: 15.5px;
+    color: var(--color-muted);
+    margin: 0;
+    line-height: 1.55;
+  }
+  .xls-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .xls-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 13px;
+    border-radius: var(--radius-pill);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .xls-pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+  }
+  .xls-pill-neutral {
+    background: var(--surface-inset);
+    color: var(--color-muted);
+    border: 1px solid var(--surface-border);
+  }
+  .xls-pill-ok {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+  .xls-pill-err {
+    background: var(--color-error-soft);
+    color: var(--color-error);
+  }
+  .xls-progress {
+    height: 4px;
+    background: var(--surface-border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .xls-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 99px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ══ SHEET ══ */
+  .xls-sheet-wrap {
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-box);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+  }
+  .xls-tab-bar {
+    display: flex;
+    align-items: stretch;
+    background: var(--color-base-100);
+    border-bottom: 1px solid var(--surface-border-strong);
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 1px;
+    padding: 0 12px;
+  }
+  .xls-tab-bar .xls-btn {
+    align-self: center;
+  }
+  .xls-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .xls-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    height: 50px;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    white-space: nowrap;
+    color: var(--color-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+  .xls-tab:hover {
+    color: var(--color-base-content);
+    background: var(--surface-hover);
+  }
+  .xls-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    background: var(--surface-card);
+  }
+  .xls-tab-errbadge {
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--color-error);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+  }
+
+  .xls-table-outer {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 360px);
+    position: relative;
+  }
+  .xls-table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 15px;
+    width: 100%;
+  }
+  .xls-table.xls-table-auto {
+    table-layout: auto;
+    width: auto;
+    min-width: 100%;
+  }
+  .xls-table th,
+  .xls-table td {
+    box-sizing: border-box;
+  }
+  .xls-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .xls-thead-group th {
+    background: var(--color-base-100);
+    border-bottom: 1px solid var(--surface-border);
+    padding: 0;
+    height: 30px;
+    border-right: 1px solid var(--surface-border);
+  }
+  .xls-thead-group th:last-child {
+    border-right: none;
+  }
+  .xls-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-subtle);
+    white-space: nowrap;
+    height: 100%;
+  }
+  .xls-thead-cols th {
+    background: var(--color-base-100);
+    border-bottom: 1.5px solid var(--surface-border-strong);
+    padding: 11px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-muted);
+    text-align: left;
+    white-space: nowrap;
+    border-right: 1px solid var(--surface-border);
+    user-select: none;
+  }
+  .xls-thead-cols th:last-child {
+    border-right: none;
+  }
+  .xls-thead-cols td {
+    background: var(--color-base-100);
+    border-bottom: 1.5px solid var(--surface-border-strong);
+    border-right: 1px solid var(--surface-border);
+  }
+  .xls-thead-cols td:last-child {
+    border-right: none;
+  }
+  .xls-thead-cols th.req-col::after {
+    content: " *";
+    color: var(--color-error);
+    font-size: 13px;
+  }
+
+  .xls-row {
+    border-bottom: 1px solid var(--surface-border);
+    transition: background 0.15s ease;
+  }
+  .xls-row:nth-child(even) {
+    background: color-mix(in srgb, var(--color-base-200) 30%, transparent);
+  }
+  .xls-row:last-child {
+    border-bottom: none;
+  }
+  .xls-row:hover {
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  }
+
+  /* FIX 2: Removed "padding: 0 14px" from td — inputs have their own padding: 0 14px.
+     The td padding was causing double-padding AND inflating cell widths beyond
+     their colgroup-defined widths, breaking frozen column left offsets. */
+  .xls-row td {
+    padding: 0;
+    vertical-align: top;
+    border-right: 1px solid var(--surface-border);
+  }
+  .xls-row td:last-child {
+    border-right: none;
+  }
+  .xls-row td.td-num {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 8px;
+  }
+  .xls-row td.td-actions {
+    vertical-align: middle;
+    padding: 4px 8px;
+  }
+  .xls-rownum {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--surface-inset);
+    color: var(--color-muted);
+    transition: all var(--transition-fast);
+  }
+  .xls-row:hover .xls-rownum {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+  }
+
+  .xls-input {
+    height: 44px;
+    padding: 0 14px;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--color-base-content);
+    width: 100%;
+    transition:
+      background var(--transition-fast),
+      box-shadow var(--transition-fast);
+    display: block;
+    box-sizing: border-box;
+  }
+  .xls-input.xls-mono {
+    font-size: 14.5px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .xls-input::placeholder {
+    color: var(--color-subtle);
+  }
+  .xls-input:focus {
+    background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+    border-radius: 4px;
+    outline: none;
+  }
+  .xls-input-err {
+    background: var(--color-error-soft);
+    box-shadow: inset 0 0 0 2px var(--color-error);
+    border-radius: 4px;
+  }
+  .xls-input-err:focus {
+    box-shadow: inset 0 0 0 2px var(--color-error);
+  }
+  .xls-cell-err {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-error);
+    padding: 3px 14px 5px;
+  }
+  .xls-checkbox {
+    width: 19px;
+    height: 19px;
+    border: 1.5px solid var(--surface-border-strong);
+    border-radius: 5px;
+    cursor: pointer;
+    appearance: none;
+    background: var(--surface-card);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  .xls-checkbox:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--color-primary) 12%, transparent);
+  }
+  .xls-checkbox:checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+  .xls-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 6px;
+    height: 10px;
+    border: 2px solid #fff;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+  }
+  .xls-row-actions {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+  }
+  .xls-row-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-muted);
+    transition: all var(--transition-fast);
+  }
+  .xls-row-btn:hover {
+    background: var(--surface-hover);
+    color: var(--color-base-content);
+  }
+  .xls-row-btn.del:hover {
+    background: var(--color-error-soft);
+    color: var(--color-error);
+  }
+  .xls-add-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 14px;
+    background: var(--surface-card);
+    border: none;
+    border-top: 1px dashed var(--surface-border-strong);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-muted);
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .xls-add-row:hover {
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+    color: var(--color-primary);
+    border-top-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+  .xls-add-row:active {
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  }
+  .xls-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+  }
+  .xls-footer-meta {
+    font-size: 15px;
+    color: var(--color-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .xls-footer-meta strong {
+    color: var(--color-base-content);
+  }
+  .xls-footer-right {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ══ REVIEW ══ */
+  .rv-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-box);
+    padding: 18px 24px;
+    gap: 20px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow-xs);
+  }
+  .rv-summary-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .rv-summary-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-inset);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+  .rv-summary-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 3px;
+  }
+  .rv-summary-sub {
+    font-size: 14px;
+    color: var(--color-muted);
+    margin: 0;
+  }
+  .rv-layout {
+    display: flex;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-box);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+  }
+  .rv-sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--surface-border);
+    background: var(--color-base-100);
+    display: flex;
+    flex-direction: column;
+  }
+  .rv-sidebar-head {
+    padding: 13px 16px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--color-subtle);
+    border-bottom: 1px solid var(--surface-border);
+    flex-shrink: 0;
+  }
+  .rv-sidebar-list {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .rv-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--surface-border);
+    border-left: 3px solid transparent;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    border-top: none;
+    border-right: none;
+    transition: all var(--transition-fast);
+  }
+  .rv-sidebar-item:last-child {
+    border-bottom: none;
+  }
+  .rv-sidebar-item:hover {
+    background: var(--surface-hover);
+  }
+  .rv-sidebar-item.active {
+    background: var(--surface-card);
+    border-left-color: var(--color-primary);
+  }
+  .rv-sidebar-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    background: var(--surface-border);
+    color: var(--color-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    transition: all var(--transition-fast);
+  }
+  .rv-sidebar-item.active .rv-sidebar-num {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+  .rv-sidebar-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .rv-sidebar-casenum {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--color-base-content);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .rv-sidebar-name {
+    font-size: 12px;
+    color: var(--color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+  .rv-panel {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 310px);
+  }
+  .rv-card {
+    display: flex;
+    flex-direction: column;
+  }
+  .rv-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 26px 20px;
+    border-bottom: 1px solid var(--surface-border);
+    background: var(--color-base-100);
+    flex-wrap: wrap;
+  }
+  .rv-hero-casenum {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin-bottom: 7px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rv-hero-name {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .rv-hero-charge {
+    font-size: 15px;
+    color: var(--color-muted);
+  }
+  .rv-hero-badges {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-direction: column;
+  }
+  .rv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .rv-badge-detained {
+    background: var(--color-error-soft);
+    color: var(--color-error);
+  }
+  .rv-badge-released {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+  }
+  .rv-badge-court {
+    background: var(--surface-inset);
+    color: var(--color-muted);
+    border: 1px solid var(--surface-border);
+    font-weight: 600;
+    font-size: 12.5px;
+  }
+  .rv-body {
+    display: flex;
+  }
+  .rv-body-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .rv-section {
+    padding: 18px 26px;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .rv-section:last-child {
+    border-bottom: none;
+  }
+  .rv-section-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--color-subtle);
+    margin-bottom: 14px;
+  }
+  .rv-grid {
+    display: grid;
+    gap: 0;
+  }
+  .rv-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .rv-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .rv-field {
+    padding: 8px 12px 8px 0;
+  }
+  .rv-field-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-subtle);
+    margin-bottom: 4px;
+  }
+  .rv-field-value {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-base-content);
+    line-height: 1.4;
+  }
+  .rv-field-value.rv-mono {
+    font-variant-numeric: tabular-nums;
+    font-size: 14.5px;
+  }
+  .rv-empty {
+    color: var(--color-subtle);
+    font-style: italic;
+    font-size: 14px;
+  }
+  .rv-address-line {
+    font-size: 15px;
+    color: var(--color-base-content);
+    background: var(--surface-inset);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    line-height: 1.5;
+  }
+  .rv-fin-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--surface-border);
+    background: var(--color-base-100);
+    padding: 18px 16px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+  }
+  .rv-fin-table {
+    display: flex;
+    flex-direction: column;
+  }
+  .rv-fin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 8px;
+    border-radius: var(--radius-xs);
+  }
+  .rv-fin-row:hover {
+    background: var(--surface-hover);
+  }
+  .rv-fin-total {
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+    padding: 10px 10px;
+  }
+  .rv-fin-total:hover {
+    background: var(--surface-hover);
+  }
+  .rv-fin-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+  .rv-fin-value {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-base-content);
+  }
+  .rv-fin-total .rv-fin-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-base-content);
+  }
+  .rv-fin-total .rv-fin-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+  .rv-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rv-pager-info {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-muted);
+    min-width: 50px;
+    text-align: center;
+  }
+
+  .xls-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: _xlsspin 0.65s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes _xlsspin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .xls-kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    background: var(--surface-inset);
+    border: 1px solid var(--surface-border-strong);
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--color-muted);
+    margin: 0 2px;
+  }
+}
+
+/* ==========================================================================
+   Component: Cell Tooltip (cell-tip) — hover guide for table cells
+   ========================================================================== */
+
+.cell-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 140px;
+  max-width: 320px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: oklch(0.2 0.02 260);
+  color: #f5f5f5;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  text-transform: none;
+  line-height: 1.45;
+  animation: cellTipIn 0.15s ease-out;
+}
+
+.cell-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: oklch(0.2 0.02 260);
+}
+
+/* First row has no room above; render tooltip below to avoid clipping */
+tbody tr:first-child .cell-tip {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+tbody tr:first-child .cell-tip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: oklch(0.2 0.02 260);
+}
+
+/* Keep thead below body-row tooltips */
+thead {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lift the hovered row so its tooltip sits above adjacent rows AND the header */
+tbody tr:hover {
+  position: relative;
+  z-index: 20;
+}
+
+.group\/tip:hover > .cell-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Also show tooltip when the cell receives keyboard focus (accessibility) */
+.group\/tip:focus > .cell-tip,
+.group\/tip:focus-within > .cell-tip,
+.group\/tip:active > .cell-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cell-tip-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: oklch(0.72 0.12 250);
+}
+
+.cell-tip-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.cell-tip-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 6px;
+  font-style: italic;
+  opacity: 0.95;
+}
+
+@keyframes cellTipIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Component: Native Popover Tooltip (tip-popover)
+   ========================================================================== */
+
+.tip-popover {
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: oklch(0.2 0.02 260);
+  color: #f5f5f5;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: min(320px, 80vw);
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: none;
+  text-transform: none;
+  line-height: 1.45;
+  z-index: 9999;
+
+  /* Position below the anchored table cell to avoid clipping at the top edge. */
+  position: absolute;
+  top: calc(anchor(bottom) + 8px);
+  left: anchor(center);
+  transform: translateX(-50%);
+}
+
+.tip-popover::backdrop {
+  background: transparent;
 }

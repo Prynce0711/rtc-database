@@ -7,15 +7,15 @@ import {
   updateCriminalCase,
 } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
-  exportCasesExcel,
-  uploadExcel,
-} from "@/app/components/Case/Criminal/ExcelActions";
-import {
   CaseEntry,
   CriminalCaseData,
   caseToEntry,
   createEmptyEntry,
-} from "@/app/components/Case/Criminal/schema";
+} from "@/app/components/Case/Criminal/CriminalCaseSchema";
+import {
+  exportCasesExcel,
+  uploadExcel,
+} from "@/app/components/Case/Criminal/ExcelActions";
 import { CaseType } from "@/app/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";

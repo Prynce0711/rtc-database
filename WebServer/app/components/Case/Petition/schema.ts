@@ -2,7 +2,7 @@ import type { Case, Petition } from "@/app/generated/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
-import { BaseCaseSchema } from "../schema";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type PetitionCasesFilterOptions = FilterOptions<PetitionSchema>;
 

@@ -9,7 +9,7 @@ import {
   type UnifiedCaseData,
   type UnifiedCaseStats,
 } from "../Case/CaseActions";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import DashboardLayout from "./DashboardLayout";
 import { RecentCasesCard } from "./StaffCard";
 
@@ -221,3 +221,4 @@ const StaffDashboard: React.FC<Props> = ({ staffId }) => {
 };
 
 export default StaffDashboard;
+

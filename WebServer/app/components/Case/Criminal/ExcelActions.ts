@@ -4,7 +4,7 @@ import ActionResult from "@/app/components/ActionResult";
 import {
   CriminalCaseData,
   CriminalCaseSchema,
-} from "@/app/components/Case/Criminal/schema";
+} from "@/app/components/Case/Criminal/CriminalCaseSchema";
 import {
   Case,
   CaseType,
@@ -35,7 +35,7 @@ import { getSchemaFieldKeys } from "@/app/lib/utils";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { BaseCaseSchema } from "../schema";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export async function uploadExcel(
   file: File,

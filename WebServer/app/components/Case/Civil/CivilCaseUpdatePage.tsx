@@ -24,7 +24,7 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { doesCaseExist } from "../CaseActions";
 import {
   createCivilCase,
@@ -1752,3 +1752,4 @@ export const NotarialUpdatePage = ({
     </div>
   );
 };
+

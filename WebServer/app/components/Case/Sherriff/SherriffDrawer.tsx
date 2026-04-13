@@ -18,7 +18,7 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import {
   createSheriffCase,
   deleteSheriffCase,
@@ -1014,3 +1014,4 @@ const SherriffDrawer = ({
 };
 
 export default SherriffDrawer;
+

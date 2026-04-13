@@ -1,11 +1,11 @@
 "use client";
 
-import CriminalCaseUpdatePage from "@/app/components/Case/Criminal/CriminalCaseUpdatePage";
 import {
   getCriminalCaseById,
   getCriminalCasesByIds,
 } from "@/app/components/Case/Criminal/CriminalCasesActions";
-import type { CriminalCaseData } from "@/app/components/Case/Criminal/schema";
+import type { CriminalCaseData } from "@/app/components/Case/Criminal/CriminalCaseSchema";
+import CriminalCaseUpdatePage from "@/app/components/Case/Criminal/CriminalCaseUpdatePage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 

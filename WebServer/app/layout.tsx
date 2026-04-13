@@ -1,11 +1,13 @@
+import {
+  PopupProvider,
+  SocketProvider,
+  ToastProvider,
+} from "@rtc-database/shared";
 import type { Metadata } from "next";
 import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
-import PopupProvider from "./components/Popup/PopupProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
-import ToastProvider from "./components/Toast/ToastProvider";
 import "./globals.css";
-import SocketProvider from "./lib/socket/SocketProvider";
 
 const montserrat = Montserrat({
   subsets: ["latin"],

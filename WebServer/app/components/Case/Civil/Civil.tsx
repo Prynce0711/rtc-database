@@ -1,7 +1,7 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import { isTextFieldKey } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -24,7 +24,7 @@ import {
   FilterOption,
   FilterValues,
 } from "../../Filter/FilterTypes";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   deleteCivilCase,
@@ -904,3 +904,4 @@ const Civil: React.FC = () => {
 };
 
 export default Civil;
+

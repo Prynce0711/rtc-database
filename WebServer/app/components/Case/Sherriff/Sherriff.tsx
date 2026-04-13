@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "@/app/lib/authClient";
+import { useSession } from "@rtc-database/shared";
 import { isTextFieldKey } from "@/app/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ import {
   FilterOption,
   FilterValues,
 } from "../../Filter/FilterTypes";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import { exportSheriffExcel, uploadSheriffExcel } from "./ExcelActions";
 import {
@@ -903,3 +903,4 @@ const Sherriff: React.FC = () => {
 };
 
 export default Sherriff;
+

@@ -1,6 +1,5 @@
 "use client";
 import { CheckCircle2 } from "lucide-react";
-import Link from "next/link";
 import ModalBase from "./ModalBase";
 
 type SuccessScreenProps = {
@@ -33,13 +32,13 @@ const SuccessPopup = ({
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full mt-2">
             {redirectTo ? (
-              <Link
+              <a
                 className="btn btn-primary btn-sm sm:flex-1"
                 href={redirectTo}
                 onClick={onClose}
               >
                 Close
-              </Link>
+              </a>
             ) : (
               <button
                 className="btn btn-primary btn-sm sm:flex-1"

@@ -24,7 +24,7 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { doesCaseExist } from "../CaseActions";
 import {
   createSpecialProceeding,
@@ -1739,3 +1739,4 @@ const SpecialProceedingDrawer = ({
 };
 
 export default SpecialProceedingDrawer;
+

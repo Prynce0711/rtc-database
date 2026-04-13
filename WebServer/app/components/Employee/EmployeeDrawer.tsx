@@ -19,7 +19,7 @@ import {
   FiTrash2,
   FiUser,
 } from "react-icons/fi";
-import { usePopup } from "../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import {
   createEmployee,
   deleteEmployee,
@@ -1380,3 +1380,4 @@ const EmployeeDrawer = ({
 };
 
 export default EmployeeDrawer;
+

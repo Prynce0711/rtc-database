@@ -1,7 +1,7 @@
 "use client";
 import { env } from "next-runtime-env";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSession } from "../../authClient";
+import { useSession } from "@rtc-database/shared";
 
 // TODO: Stop from disconnecting when moving out of the page, and instead only disconnect when logging out
 

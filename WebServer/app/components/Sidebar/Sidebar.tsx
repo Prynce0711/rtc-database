@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { authClient, useSession } from "@/app/lib/authClient";
+import { authClient, useSession } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,7 +23,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { updateDarkMode } from "./DarkModeActions";
-// ─── Types ────────────────────────────────────────────────────────────────────
+// --- Types --------------------------------------------------------------------
 interface SidebarProps {
   children: ReactNode;
 }
@@ -40,7 +40,7 @@ interface NavItem {
   dropdowns?: DropdownItem[];
 }
 
-// ─── Tooltip ──────────────────────────────────────────────────────────────────
+// --- Tooltip ------------------------------------------------------------------
 const Tooltip = ({ label }: { label: string }) => (
   <motion.div
     initial={{ opacity: 0, x: -6 }}
@@ -56,7 +56,7 @@ const Tooltip = ({ label }: { label: string }) => (
   </motion.div>
 );
 
-// ─── Nav Item Button ──────────────────────────────────────────────────────────
+// --- Nav Item Button ----------------------------------------------------------
 const NavBtn = ({
   item,
   isExpanded,
@@ -90,7 +90,7 @@ const NavBtn = ({
     if (isActive && hasDropdowns && isExpanded) setOpenDropdown(item.href);
   }, [isActive, hasDropdowns, item.href, setOpenDropdown, isExpanded]);
 
-  // ── Collapsed: tooltip on hover, expand sidebar on dropdown click ──
+  // -- Collapsed: tooltip on hover, expand sidebar on dropdown click --
   if (!isExpanded) {
     return (
       <div className="relative">
@@ -136,7 +136,7 @@ const NavBtn = ({
     );
   }
 
-  // ── Expanded ──
+  // -- Expanded --
   const btnClass = [
     "relative group flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
     isActive
@@ -266,7 +266,7 @@ const ActionBtn = ({
 }) => {
   const [hovered, setHovered] = useState(false);
 
-  // ── Collapsed ──
+  // -- Collapsed --
   if (!isExpanded) {
     return (
       <div className="relative">
@@ -297,7 +297,7 @@ const ActionBtn = ({
     );
   }
 
-  // ── Expanded ──
+  // -- Expanded --
   return (
     <button
       onClick={onClick}
@@ -323,7 +323,7 @@ const ActionBtn = ({
   );
 };
 
-// ─── Section label (expanded) / spacing (collapsed) ──────────────────────────
+// --- Section label (expanded) / spacing (collapsed) --------------------------
 const SectionLabel = ({
   label,
   isExpanded,
@@ -344,7 +344,7 @@ const SectionLabel = ({
   );
 };
 
-// ─── Nav config ───────────────────────────────────────────────────────────────
+// --- Nav config ---------------------------------------------------------------
 const caseNavItems: NavItem[] = [
   {
     icon: <FiFileText />,
@@ -1030,7 +1030,7 @@ function notarialSidebar({
   );
 }
 
-// ─── User card with tooltip ───────────────────────────────────────────────────
+// --- User card with tooltip ---------------------------------------------------
 const UserCard = ({
   name,
   role,
@@ -1097,7 +1097,7 @@ const UserCard = ({
   );
 };
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
+// --- Sidebar ------------------------------------------------------------------
 const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -1155,7 +1155,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
 
   return (
     <div className="flex min-h-screen bg-base-100">
-      {/* ════════════════════ SIDEBAR ════════════════════ */}
+      {/* -------------------- SIDEBAR -------------------- */}
       <motion.aside
         animate={{ width: isExpanded ? 264 : 72 }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
@@ -1166,14 +1166,14 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
         {/* Subtle right edge */}
         <div className="absolute right-0 top-0 bottom-0 w-px bg-linear-to-b from-base-300/20 via-base-300/50 to-base-300/20 z-20" />
 
-        {/* ── Header ──────────────────────────────────── */}
+        {/* -- Header ------------------------------------ */}
         <div
           className={[
             "flex flex-col items-center transition-all duration-300 relative z-10",
             isExpanded ? "px-5 pt-6 pb-5" : "px-0 pt-5 pb-4",
           ].join(" ")}
         >
-          {/* Logo — centered & large in both states */}
+          {/* Logo � centered & large in both states */}
           <motion.div
             animate={{
               width: isExpanded ? 72 : 44,
@@ -1191,7 +1191,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             />
           </motion.div>
 
-          {/* Brand text — below logo when expanded */}
+          {/* Brand text � below logo when expanded */}
           <AnimatePresence mode="wait">
             {isExpanded && (
               <motion.div
@@ -1250,7 +1250,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
             </AnimatePresence>
           </motion.button>
         </div>
-        {/* ── Nav ─────────────────────────────────────── */}
+        {/* -- Nav --------------------------------------- */}
         <nav
           className={[
             "flex-1 overflow-y-auto relative z-10",
@@ -1274,9 +1274,9 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
                       : staffSidebar(menuProps)}
         </nav>
 
-        {/* ── Collapse toggle ────────────────────────── */}
+        {/* -- Collapse toggle -------------------------- */}
 
-        {/* ── Footer / User ──────────────────────────── */}
+        {/* -- Footer / User ---------------------------- */}
         <div
           className="p-2 space-y-1 text-left relative z-10"
           style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}
@@ -1299,7 +1299,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
         </div>
       </motion.aside>
 
-      {/* ════════════════════ MAIN CONTENT ════════════════════ */}
+      {/* -------------------- MAIN CONTENT -------------------- */}
       <div className="flex-1 min-w-0 overflow-hidden">
         <main className="min-h-screen p-6 lg:p-12 animate-fadeIn">
           {children}

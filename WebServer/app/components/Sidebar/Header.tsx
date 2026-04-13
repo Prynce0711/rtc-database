@@ -1,6 +1,6 @@
 // "use client";
 
-// import { authClient } from "@/app/lib/authClient";
+// import { authClient } from "@rtc-database/shared";
 // import { useRouter } from "next/navigation";
 
 // const Header = () => {

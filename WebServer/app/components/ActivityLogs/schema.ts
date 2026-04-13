@@ -2,7 +2,7 @@ import { LogAction } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { z } from "zod";
 import { CivilCaseSchema } from "../Case/Civil/schema";
-import { CriminalCaseSchema } from "../Case/Criminal/schema";
+import { CriminalCaseSchema } from "../Case/Criminal/CriminalCaseSchema";
 import { NotarialSchema } from "../Case/Notarial/schema";
 import { PetitionSchema } from "../Case/Petition/schema";
 import { ReceivingLogSchema } from "../Case/ReceivingLogs/schema";

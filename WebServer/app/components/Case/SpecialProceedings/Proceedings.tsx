@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   exportSpecialProceedingsExcel,
@@ -24,7 +24,7 @@ import {
   FilterOption,
   FilterValues,
 } from "../../Filter/FilterTypes";
-import { usePopup } from "../../Popup/PopupProvider";
+import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   deleteSpecialProceeding,
@@ -95,11 +95,11 @@ const SortTh = ({
       {label}
       {active ? (
         <span className="ml-1 text-primary" aria-hidden>
-          {sortConfig.order === "asc" ? "↑" : "↓"}
+          {sortConfig.order === "asc" ? "?" : "?"}
         </span>
       ) : (
         <span className="opacity-30 ml-1" aria-hidden>
-          ↕
+          ?
         </span>
       )}
     </th>
@@ -895,3 +895,4 @@ const Proceedings: React.FC = () => {
 };
 
 export default Proceedings;
+
