@@ -6,6 +6,7 @@ import {
 import type { Metadata } from "next";
 import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
+import SessionProvider from "./components/SessionProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
 import "./globals.css";
 
@@ -37,7 +38,9 @@ export default async function RootLayout({
       <body className={`${montserrat.variable} font-sans antialiased`}>
         <PopupProvider>
           <ToastProvider>
-            <SocketProvider>{children}</SocketProvider>
+            <SessionProvider>
+              <SocketProvider>{children}</SocketProvider>
+            </SessionProvider>
           </ToastProvider>
         </PopupProvider>
       </body>

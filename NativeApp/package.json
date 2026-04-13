@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/montserrat": "^5.2.8",
     "@rtc-database/shared": "workspace:*",
     "@tailwindcss/vite": "^4.2.2",
     "better-auth": "^1.4.18",
