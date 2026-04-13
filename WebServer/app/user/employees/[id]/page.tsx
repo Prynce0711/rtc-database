@@ -1,13 +1,13 @@
 "use client";
 
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
-import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable";
 import type { Employee } from "@/app/generated/prisma/browser";
 import {
   enumToText,
   getAgeFromDate,
   isRetirementEligible,
 } from "@/app/lib/utils";
+import { PageDetailSkeleton } from "@rtc-database/shared";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 

@@ -5,7 +5,7 @@ import {
   getSpecialProceedingById,
   getSpecialProceedings,
 } from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
-import { PageDetailSkeleton } from "@/app/components/Skeleton/SkeletonTable";
+import { PageDetailSkeleton } from "@rtc-database/shared";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 

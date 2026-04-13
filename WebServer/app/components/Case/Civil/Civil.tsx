@@ -1,8 +1,16 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
-import { useSession } from "@rtc-database/shared";
 import { isTextFieldKey } from "@/app/lib/utils";
+import {
+  ExactMatchMap,
+  FilterDropdown,
+  FilterOption,
+  FilterValues,
+  PageListSkeleton,
+  usePopup,
+  useSession,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -18,14 +26,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import { FilterDropdown } from "@rtc-database/shared";
-import {
-  ExactMatchMap,
-  FilterOption,
-  FilterValues,
-} from "@rtc-database/shared";
-import { usePopup } from "@rtc-database/shared";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   deleteCivilCase,
   getCivilCases,
@@ -904,4 +904,3 @@ const Civil: React.FC = () => {
 };
 
 export default Civil;
-

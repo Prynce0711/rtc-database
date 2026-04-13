@@ -25,16 +25,16 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import { FilterDropdown } from "@rtc-database/shared";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { isRetirementEligible } from "@/app/lib/utils";
 import {
   ExactMatchMap,
+  FilterDropdown,
   FilterOption,
   FilterValues,
+  PageListSkeleton,
+  usePopup,
 } from "@rtc-database/shared";
-import { usePopup } from "@rtc-database/shared";
-import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import EmployeeTable from "./EmployeeTable";
 
 const EmployeeDashboard: React.FC = () => {
@@ -596,4 +596,3 @@ const EmployeeDashboard: React.FC = () => {
 };
 
 export default EmployeeDashboard;
-

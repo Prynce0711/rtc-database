@@ -1,6 +1,6 @@
 "use client";
 
-import { ModalBase, usePopup } from "@rtc-database/shared";
+import { Collapse, ModalBase, usePopup } from "@rtc-database/shared";
 import {
   useCallback,
   useEffect,
@@ -17,7 +17,6 @@ import {
   FiTrash2,
   FiXCircle,
 } from "react-icons/fi";
-import Collapse from "../../Collapse/Collapse";
 import {
   cancelBackupNowAction,
   clearBackupAccountFiles,

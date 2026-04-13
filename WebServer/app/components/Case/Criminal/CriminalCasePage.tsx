@@ -7,6 +7,7 @@ import {
   FilterOption,
   FilterValues,
   getFilterStateFromSearchParams,
+  PageListSkeleton,
   Pagination,
   Table,
   usePopup,
@@ -31,7 +32,6 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import CriminalCaseRow from "./CriminalCaseRow";
 import {
   deleteCriminalCase,

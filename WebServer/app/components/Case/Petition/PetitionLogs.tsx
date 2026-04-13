@@ -6,6 +6,7 @@ import {
   FilterDropdown,
   FilterOption,
   FilterValues,
+  PageListSkeleton,
   Pagination,
   Table,
   usePopup,
@@ -23,7 +24,6 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import { uploadPetitionExcel } from "./ExcelActions";
 import { deletePetition, getPetitions } from "./PetitionActions";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";

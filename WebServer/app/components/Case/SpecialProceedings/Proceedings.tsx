@@ -5,6 +5,14 @@ import {
   uploadSpecialProceedingExcel,
 } from "@/app/components/Case/SpecialProceedings/ExcelActions";
 import { isTextFieldKey } from "@/app/lib/utils";
+import {
+  ExactMatchMap,
+  FilterDropdown,
+  FilterOption,
+  FilterValues,
+  PageListSkeleton,
+  usePopup,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -18,14 +26,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import { FilterDropdown } from "@rtc-database/shared";
-import {
-  ExactMatchMap,
-  FilterOption,
-  FilterValues,
-} from "@rtc-database/shared";
-import { usePopup } from "@rtc-database/shared";
-import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   deleteSpecialProceeding,
   getSpecialProceedingStats,
@@ -895,4 +895,3 @@ const Proceedings: React.FC = () => {
 };
 
 export default Proceedings;
-
