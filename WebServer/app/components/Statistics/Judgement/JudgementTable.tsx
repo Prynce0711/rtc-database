@@ -1,7 +1,7 @@
 "use client";
 
 import Roles from "@/app/lib/Roles";
-import { Pagination, usePopup, useSession } from "@rtc-database/shared";
+import { Pagination, usePopup } from "@rtc-database/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import AnnualRow from "../Annual/AnnualRow";
@@ -15,6 +15,7 @@ import {
 } from "./JudgementColumnDef";
 import { FieldConfig } from "./JudgementFieldConfig";
 import JudgementViewPage from "./JudgementViewPage";
+import { useSession } from "@/app/lib/authClient";
 
 const PAGE_SIZE = 10;
 

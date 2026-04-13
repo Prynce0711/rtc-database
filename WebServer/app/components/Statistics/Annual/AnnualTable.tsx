@@ -1,7 +1,7 @@
 "use client";
 
 import Roles from "@/app/lib/Roles";
-import { Pagination, usePopup, useSession } from "@rtc-database/shared";
+import { Pagination, usePopup } from "@rtc-database/shared";
 import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
@@ -12,6 +12,7 @@ import AnnualRow from "./AnnualRow";
 import AnnualToolbar from "./AnnualToolbar";
 import { sortRecords } from "./AnnualUtils";
 import AnnualViewPage from "./AnnualViewPage";
+import { useSession } from "@/app/lib/authClient";
 
 const PAGE_SIZE = 10;
 

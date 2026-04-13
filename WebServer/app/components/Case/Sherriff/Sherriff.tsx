@@ -8,7 +8,6 @@ import {
   FilterValues,
   PageListSkeleton,
   usePopup,
-  useSession,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -39,6 +38,7 @@ import {
   type SheriffCasesFilterOptions,
   type SheriffCaseStats,
 } from "./schema";
+import { useSession } from "@/app/lib/authClient";
 
 type CaseFilterValues = SheriffCaseFilters;
 type SortKey = NonNullable<SheriffCasesFilterOptions["sortKey"]>;

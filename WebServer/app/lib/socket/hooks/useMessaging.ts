@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import ActionResult from "../../../ActionResult";
-import type {
-  Messaging,
-  Message as NetworkMessage,
-} from "../../../types/network";
-import { SocketChatMessage, SocketEventType } from "../SocketEvents";
+
+import {
+  SocketChatMessage,
+  SocketEventType,
+} from "@/app/lib/socket/SocketEvents";
+import { ActionResult, Message, Messaging } from "@rtc-database/shared";
 import { useSocket } from "../SocketProvider";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -20,14 +20,14 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export function useMessaging(
   chatId: number,
   fetchMessages = true,
-  getChatByID: (id: number) => Promise<ActionResult<NetworkMessage[]>>,
+  getChatByID: (id: number) => Promise<ActionResult<Message[]>>,
 ): Messaging {
   const socket = useSocket().socket;
   const [loading, setLoading] = useState(true);
-  const [messages, setMessages] = useState<NetworkMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const onRecieveData = useSocket().onRecieveData;
   const onMessage = useCallback(
-    (event: NetworkMessage) => {
+    (event: Message) => {
       console.log("Received socket message:", event);
       if (event.chatId !== chatId) return;
       setMessages((prev) => [...prev, event]);

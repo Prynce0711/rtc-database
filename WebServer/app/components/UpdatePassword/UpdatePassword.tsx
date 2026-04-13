@@ -1,14 +1,14 @@
 "use client";
 
-import { authClient, useSession } from "@rtc-database/shared";
+import { authClient, useSession } from "@/app/lib/authClient";
 import { isDarkMode } from "@/app/lib/utils";
+import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
 import { setInitialPassword } from "../AccountManagement/AccountActions";
-import { usePopup } from "@rtc-database/shared";
 import RequirementUI from "./RequirementUI";
 import StrengthMeter from "./StrengthMeter";
 
@@ -522,4 +522,3 @@ shadow-xl
 };
 
 export default UpdatePassword;
-

@@ -9,7 +9,6 @@ import {
   FilterValues,
   PageListSkeleton,
   usePopup,
-  useSession,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -41,6 +40,7 @@ import {
   type CivilCasesFilterOptions,
   type CivilCaseStats,
 } from "./schema";
+import { useSession } from "@/app/lib/authClient";
 
 type CaseFilterValues = CivilCaseFilters;
 type SortKey = NonNullable<CivilCasesFilterOptions["sortKey"]>;

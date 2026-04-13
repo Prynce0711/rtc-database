@@ -29,7 +29,7 @@ import {
   SidebarSession,
   SidebarTheme,
   SidebarThemeUpdateResult,
-} from "../lib/sidebarAdapter";
+} from "./SidebarAdapter";
 // --- Types --------------------------------------------------------------------
 export interface SidebarProps extends SidebarAdapterProps {
   children: ReactNode;

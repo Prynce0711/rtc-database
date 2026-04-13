@@ -1,6 +1,7 @@
 "use client";
+import { env } from "next-runtime-env";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getBackendUrl, useSession } from "../../authClient";
+import { useSession } from "../../authClient";
 
 // TODO: Stop from disconnecting when moving out of the page, and instead only disconnect when logging out
 
@@ -18,14 +19,11 @@ interface UseWebSocketReturn {
   error: string | null;
 }
 
-export function resolveSocketUrlFromBackend(backendUrl: string): string {
-  const parsed = new URL(backendUrl);
-  const protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${parsed.host}/api/user/socket`;
-}
-
 export function useWebSocket(
-  urlFn: () => string = () => resolveSocketUrlFromBackend(getBackendUrl()),
+  urlFn: () => string = () =>
+    env("NEXT_PUBLIC_URL")?.startsWith("https")
+      ? `wss://${window.location.host}/api/user/socket`
+      : `ws://${window.location.host}/api/user/socket`,
   options: UseWebSocketOptions = {},
 ): UseWebSocketReturn {
   const {
@@ -50,8 +48,7 @@ export function useWebSocket(
       return;
     }
 
-    const user = session.user as { banned?: boolean };
-    if (user.banned) {
+    if (session.user.banned) {
       console.log("[WebSocket] Skipping connect: user is banned");
       return;
     }

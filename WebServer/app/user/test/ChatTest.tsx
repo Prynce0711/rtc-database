@@ -6,12 +6,10 @@ import {
   getChats,
   removeManyChatsWithOthers,
 } from "@/app/components/Messages/MessagesActions";
-import {
-  ChatData,
-  useMessaging,
-  useSession,
-  useSocket,
-} from "@rtc-database/shared";
+import { useSession } from "@/app/lib/authClient";
+import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
+import { useSocket } from "@/app/lib/socket/SocketProvider";
+import { ChatData } from "@rtc-database/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function ChatTest() {

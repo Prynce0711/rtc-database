@@ -3,6 +3,9 @@ import "server-only";
 import { messageSchema } from "@/app/components/Messages/schema";
 import { prisma } from "@/app/lib/prisma";
 import ClientSocketServer from "@/app/lib/socket/ClientSocketServer";
+import { createHash } from "crypto";
+import { WebSocket } from "ws";
+import { uploadFileToGarageTrusted } from "../../garageActions";
 import {
   SocketChatMessage,
   SocketErrorRequestType,
@@ -10,10 +13,7 @@ import {
   SocketEvent,
   SocketEventPayload,
   SocketEventType,
-} from "@rtc-database/shared";
-import { createHash } from "crypto";
-import { WebSocket } from "ws";
-import { uploadFileToGarageTrusted } from "../../garageActions";
+} from "../SocketEvents";
 
 function sanitizeFileName(fileName: string): string {
   const base = fileName

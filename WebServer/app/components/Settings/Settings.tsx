@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +7,7 @@ import DashboardLayout from "../Dashboard/DashboardLayout";
 import SettingsTab from "./SettingsTab";
 import { TABS } from "./tabConfig";
 import TabContent from "./Tabs/TabContent";
+import { useSession } from "@/app/lib/authClient";
 
 const Settings = () => {
   const { data: session } = useSession();

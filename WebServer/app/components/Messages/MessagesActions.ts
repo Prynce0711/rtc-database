@@ -1,16 +1,12 @@
 "use server";
 
 import { ChatType } from "@/app/generated/prisma/browser";
-import {
-  ActionResult,
-  ChatData,
-  Message,
-  Recipient,
-} from "@rtc-database/shared";
+import { ActionResult, ChatData, Message } from "@rtc-database/shared";
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { Recipient } from "@/app/lib/socket/SocketEvents";
 
 // TODO: Make it so chat name is dependent on the other user's name if it is direct
 

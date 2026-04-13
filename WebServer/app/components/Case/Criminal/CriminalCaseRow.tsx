@@ -1,16 +1,12 @@
 "use client";
 
 import Roles from "@/app/lib/Roles";
-import {
-  ActionDropdown,
-  Table,
-  TipCell,
-  useSession,
-} from "@rtc-database/shared";
+import { ActionDropdown, Table, TipCell } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 import type { CriminalCaseData } from "./CriminalCaseSchema";
+import { useSession } from "@/app/lib/authClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

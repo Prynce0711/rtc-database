@@ -11,7 +11,6 @@ import {
   Pagination,
   Table,
   usePopup,
-  useSession,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,6 +45,7 @@ import {
   type CriminalCasesFilterOptions,
 } from "./CriminalCaseSchema";
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
+import { useSession } from "@/app/lib/authClient";
 
 // TODO: Move import excel here instead of server action and just call createCase
 // TODO: Maybe add a reusable CasePage component that you put schema and it will make the filter and table?

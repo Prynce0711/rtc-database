@@ -10,7 +10,6 @@ import {
   Pagination,
   Table,
   usePopup,
-  useSession,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -29,6 +28,7 @@ import { deletePetition, getPetitions } from "./PetitionActions";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
 import { PetitionCaseData } from "./schema";
+import { useSession } from "@/app/lib/authClient";
 
 type PetitionFilterValues = {
   caseNumber?: string;

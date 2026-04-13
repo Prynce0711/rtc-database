@@ -48,35 +48,12 @@ export { default as ToastProvider } from "./Toast/ToastProvider";
 export * from "./generated/prisma/browser";
 export * from "./generated/prisma/enums";
 
-export {
-  authBaseUrl,
-  authClient,
-  getAuthClient,
-  getBackendUrl,
-  setBackendUrl,
-  signIn,
-  signOut,
-  signUp,
-  useSession,
-} from "./lib/authClient";
-export type {
-  Session as AuthSession,
-  User as AuthUser,
-} from "./lib/authClient";
 export * from "./lib/excel";
 export * from "./lib/nextCompat";
 export { default as Roles } from "./lib/Roles";
-export * from "./lib/sidebarAdapter";
-export * from "./lib/socket";
-export * from "./lib/socket/hooks/useMessaging";
-export { default as useIsMobile } from "./lib/socket/hooks/useMobile";
-export { default as usePrevious } from "./lib/socket/hooks/usePrevious";
-export * from "./lib/socket/hooks/useWebsocket";
-export {
-  default as SocketProvider,
-  useSocket,
-} from "./lib/socket/SocketProvider";
+
 export * from "./lib/utils";
+export * from "./Sidebar/SidebarAdapter";
 
 export { UDP_SERVICE_NAME, UdpData } from "./UdpData";
 export type { BackendInfo } from "./UdpData";

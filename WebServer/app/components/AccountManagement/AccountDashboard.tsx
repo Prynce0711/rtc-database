@@ -4,7 +4,7 @@ import { User } from "@/app/generated/prisma/browser";
 import { Status } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { formatDate } from "@/app/lib/utils";
-import { Pagination, usePopup, useSession } from "@rtc-database/shared";
+import { Pagination, usePopup } from "@rtc-database/shared";
 import {
   useEffect,
   useMemo,
@@ -16,6 +16,7 @@ import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { getAccounts, updateRole } from "./AccountActions";
 import AccountActionsButton from "./AccountActionsButton";
 import AddAccountDrawer from "./AddAccountDrawer";
+import { useSession } from "@/app/lib/authClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RoleFilterType = Roles | "ALL";

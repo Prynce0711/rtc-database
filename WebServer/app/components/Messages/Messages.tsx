@@ -6,14 +6,10 @@ import {
   getChats,
 } from "@/app/components/Messages/MessagesActions";
 import { ChatType, Roles } from "@/app/generated/prisma/browser";
+import { useSession } from "@/app/lib/authClient";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
-import {
-  ChatData,
-  Message,
-  useMessaging,
-  usePopup,
-  useSession,
-} from "@rtc-database/shared";
+import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
+import { ChatData, Message, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import React, {

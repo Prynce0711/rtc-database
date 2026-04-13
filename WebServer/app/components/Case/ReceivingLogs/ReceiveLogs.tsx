@@ -13,7 +13,6 @@ import {
   Pagination,
   Table,
   usePopup,
-  useSession,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -36,6 +35,7 @@ import {
   getRecievingLogsStats,
 } from "./RecievingLogsActions";
 import type { ReceivingLogFilterOptions } from "./schema";
+import { useSession } from "@/app/lib/authClient";
 
 type ReceiveLog = RecievingLog;
 type ReceiveSortKey =

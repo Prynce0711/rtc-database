@@ -11,7 +11,7 @@ import {
   AnySocketEvent,
   SocketErrorRequestType,
   SocketEventType,
-} from "@rtc-database/shared";
+} from "./SocketEvents";
 import { joinChat, leaveChat } from "./handlers/chat";
 import { receiveMessage, sendErrorResponseToSelf } from "./handlers/messaging";
 
