@@ -2,13 +2,12 @@
 
 import {
   CaseType,
+  createEmptyCriminalEntry,
   CriminalCaseAdapter,
   CriminalCaseData,
   CriminalCaseEntry,
   CriminalCaseSchema,
-  caseToEntry,
-  createEmptyEntry,
-  createTempId,
+  criminalCaseToEntry,
   usePopup,
   useToast,
 } from "@rtc-database/shared";
@@ -38,6 +37,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import { createTempId } from "../../utils";
 
 export enum CriminalCaseUpdateType {
   ADD = "ADD",
@@ -823,11 +823,11 @@ const CriminalCaseUpdatePage = ({
   const router = useAdaptiveNavigation();
 
   const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
-    caseToEntry({ ...sc, id: sc.id ?? createTempId() });
+    criminalCaseToEntry({ ...sc, id: sc.id ?? createTempId() });
 
   const [entries, setEntries] = useState<CriminalCaseEntry[]>(() => {
     if (isEdit) return editCases.map(makeFromCase);
-    const newEntry = createEmptyEntry();
+    const newEntry = createEmptyCriminalEntry();
     return [
       {
         ...newEntry,
@@ -849,7 +849,7 @@ const CriminalCaseUpdatePage = ({
       return;
     }
 
-    const newEntry = createEmptyEntry();
+    const newEntry = createEmptyCriminalEntry();
     setEntries([
       {
         ...newEntry,
@@ -997,7 +997,7 @@ const CriminalCaseUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    const newEntry = createEmptyEntry();
+    const newEntry = createEmptyCriminalEntry();
     setEntries((prev) => [
       ...prev,
       {
@@ -1025,7 +1025,7 @@ const CriminalCaseUpdatePage = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
-    const newEntry = createEmptyEntry();
+    const newEntry = createEmptyCriminalEntry();
     setEntries([
       {
         ...newEntry,

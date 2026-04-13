@@ -12,10 +12,10 @@ import {
 } from "@/app/components/Case/Criminal/ExcelActions";
 import { CaseType } from "@/app/generated/prisma/client";
 import {
+  createEmptyCriminalEntry,
   CriminalCaseData,
   CriminalCaseEntry,
-  caseToEntry,
-  createEmptyEntry,
+  criminalCaseToEntry,
 } from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
@@ -24,8 +24,9 @@ const CASE_TYPES: CaseType[] = ["CRIMINAL"];
 
 export default function CriminalCaseTester() {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
-  const [formData, setFormData] =
-    useState<CriminalCaseEntry>(createEmptyEntry());
+  const [formData, setFormData] = useState<CriminalCaseEntry>(
+    createEmptyCriminalEntry(),
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +123,7 @@ export default function CriminalCaseTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyCriminalEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadCases();
@@ -135,7 +136,7 @@ export default function CriminalCaseTester() {
   };
 
   const handleEdit = (caseItem: CriminalCaseData) => {
-    const formEntry = caseToEntry(caseItem);
+    const formEntry = criminalCaseToEntry(caseItem);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(caseItem.id);
@@ -159,7 +160,7 @@ export default function CriminalCaseTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyCriminalEntry());
     setIsEditing(false);
     setEditingId(null);
   };

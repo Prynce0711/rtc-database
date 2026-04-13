@@ -1,20 +1,31 @@
 "use client";
 
-import { getSheriffCaseById } from "@/app/components/Case/Sherriff/SherriffActions";
-import type { SheriffCaseData } from "@/app/components/Case/Sherriff/schema";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
   NavButton,
   PageDetailSkeleton,
+  SheriffCaseData,
+  SherriffCaseAdapter,
 } from "@rtc-database/shared";
-import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useAdaptivePathname, useAdaptiveRouter } from "../../lib/nextCompat";
 
-export default function SheriffDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+const getSheriffIdFromPathname = (pathname: string): number | null => {
+  const segments = pathname.split("/").filter(Boolean);
+  const rawId = segments[segments.length - 1];
+  const numId = Number(rawId);
+  return Number.isInteger(numId) && numId > 0 ? numId : null;
+};
+
+export default function SheriffDetailsPage({
+  adapter,
+}: {
+  adapter: SherriffCaseAdapter;
+}) {
+  const router = useAdaptiveRouter();
+  const pathname = useAdaptivePathname();
 
   const [caseData, setCaseData] = useState<SheriffCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<SheriffCaseData | null>(null);
@@ -25,13 +36,18 @@ export default function SheriffDetailsPage() {
     const fetchCase = async () => {
       try {
         setLoading(true);
-        const id = Array.isArray(params.id) ? params.id[0] : params.id;
-        const numId = Number(id);
+        const numId = getSheriffIdFromPathname(pathname);
+        if (numId === null) {
+          setCaseData(null);
+          setPrevCase(null);
+          setNextCase(null);
+          return;
+        }
 
         const [current, prev, next] = await Promise.allSettled([
-          getSheriffCaseById(numId),
-          getSheriffCaseById(numId - 1),
-          getSheriffCaseById(numId + 1),
+          adapter.getSheriffCaseById(numId),
+          adapter.getSheriffCaseById(numId - 1),
+          adapter.getSheriffCaseById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
@@ -58,8 +74,8 @@ export default function SheriffDetailsPage() {
       }
     };
 
-    if (params.id) fetchCase();
-  }, [params.id]);
+    if (pathname) fetchCase();
+  }, [pathname, adapter]);
 
   if (loading) return <PageDetailSkeleton />;
 
@@ -81,7 +97,7 @@ export default function SheriffDetailsPage() {
     );
   }
 
-  const currentId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const currentId = getSheriffIdFromPathname(pathname);
 
   return (
     <div className="min-h-screen bg-base-100 animate-fade-in">
@@ -103,7 +119,7 @@ export default function SheriffDetailsPage() {
           </div>
 
           <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
-            #{currentId}
+            #{currentId ?? "-"}
           </span>
         </div>
       </header>

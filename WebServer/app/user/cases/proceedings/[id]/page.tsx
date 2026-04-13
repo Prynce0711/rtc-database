@@ -1,7 +1,10 @@
-import SpecialProceedingDetailsPage from "@/app/components/Case/SpecialProceedings/SpecialProceedingDetailsPage";
+"use client";
+
+import { specialProceedingAdapter } from "@/app/components/Case/SpecialProceedings/SpecialProceedingAdapter";
+import { SpecialProceedingDetailsPage } from "@rtc-database/shared";
 
 const page = () => {
-  return <SpecialProceedingDetailsPage />;
+  return <SpecialProceedingDetailsPage adapter={specialProceedingAdapter} />;
 };
 
 export default page;

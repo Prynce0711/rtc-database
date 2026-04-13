@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
 import type { Case, CivilCase } from "../../generated/prisma/browser";
 import { excelHeaders } from "../../lib/excel";
+import { createTempId } from "../../utils";
 import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type CivilCasesFilterOptions = FilterOptions<CivilCaseSchema>;
@@ -99,13 +100,6 @@ export type CivilCaseSchema = z.infer<typeof CivilCaseSchema>;
 
 export type CivilCaseData = Case & CivilCase;
 
-let tempIdCounter = 0;
-
-export const createTempId = (): number => {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-};
-
 export type CivilCaseEntry = CivilCaseSchema & {
   id: number;
   isManual: boolean;
@@ -133,7 +127,7 @@ export const initialCaseFormData: Omit<CivilCaseSchema, "id" | "createdAt"> = {
   remandedNote: null,
 };
 
-export const createEmptyEntry = (): CivilCaseEntry => ({
+export const createEmptyCivilEntry = (): CivilCaseEntry => ({
   ...initialCaseFormData,
   id: createTempId(),
   isManual: false,
@@ -142,7 +136,7 @@ export const createEmptyEntry = (): CivilCaseEntry => ({
   saved: false,
 });
 
-export const caseToEntry = (c: CivilCaseData): CivilCaseEntry => ({
+export const civilCaseToEntry = (c: CivilCaseData): CivilCaseEntry => ({
   ...c,
   id: c.id ?? createTempId(),
   isManual: Boolean(c.isManual),

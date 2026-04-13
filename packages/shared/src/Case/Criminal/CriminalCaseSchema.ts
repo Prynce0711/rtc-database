@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
 import type { Case, CriminalCase } from "../../generated/prisma/browser";
 import { excelHeaders } from "../../lib/excel";
+import { createTempId } from "../../utils";
 import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type CriminalCasesFilterOptions = FilterOptions<CriminalCaseSchema>;
@@ -169,13 +170,6 @@ export type CriminalCaseSchema = z.infer<typeof CriminalCaseSchema>;
 
 export type CriminalCaseData = Case & CriminalCase;
 
-let tempIdCounter = 0;
-
-export const createTempId = (): number => {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-};
-
 /** Form entry used by the grid UI (CaseSchema + UI metadata). */
 export type CriminalCaseEntry = CriminalCaseSchema & {
   id: number;
@@ -186,7 +180,9 @@ export type CriminalCaseEntry = CriminalCaseSchema & {
 };
 
 /** Convert CaseSchema to CriminalCaseEntry (for editing existing cases). */
-export const caseToEntry = (c: CriminalCaseData): CriminalCaseEntry => ({
+export const criminalCaseToEntry = (
+  c: CriminalCaseData,
+): CriminalCaseEntry => ({
   ...c,
   id: c.id ?? createTempId(),
   isManual: Boolean(c.isManual),
@@ -233,7 +229,7 @@ export const initialCaseFormData: Omit<CriminalCaseSchema, "id" | "createdAt"> =
   };
 
 /** Create an empty entry based on schema defaults. */
-export const createEmptyEntry = (): CriminalCaseEntry => ({
+export const createEmptyCriminalEntry = (): CriminalCaseEntry => ({
   ...initialCaseFormData,
   id: createTempId(),
   isManual: false,

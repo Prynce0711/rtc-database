@@ -1,10 +1,6 @@
 "use server";
 
 import {
-  SpecialProceedingData,
-  SpecialProceedingSchema,
-} from "@/app/components/Case/SpecialProceedings/schema";
-import {
   Case,
   CaseType,
   LogAction,
@@ -30,8 +26,13 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@rtc-database/shared";
-import { ActionResult, BaseCaseSchema } from "@rtc-database/shared";
+import {
+  ActionResult,
+  BaseCaseSchema,
+  getSchemaFieldKeys,
+  SpecialProceedingData,
+  SpecialProceedingSchema,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

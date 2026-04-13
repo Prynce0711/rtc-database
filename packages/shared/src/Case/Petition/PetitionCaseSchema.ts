@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FilterOptions } from "../../Filter/FilterUtils";
 import type { Case, Petition } from "../../generated/prisma/browser";
 import { excelHeaders } from "../../lib/excel";
+import { createTempId } from "../../utils";
 import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type PetitionCasesFilterOptions = FilterOptions<PetitionCaseSchema>;
@@ -45,13 +46,6 @@ export const PetitionCaseSchema = BaseCaseSchema.merge(
 export type PetitionCaseSchema = z.infer<typeof PetitionCaseSchema>;
 export type PetitionCaseData = Case & Petition;
 
-let tempIdCounter = 0;
-
-export const createTempId = (): number => {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-};
-
 export type PetitionCaseEntry = PetitionCaseSchema & {
   id: number;
   isManual: boolean;
@@ -60,7 +54,9 @@ export type PetitionCaseEntry = PetitionCaseSchema & {
   saved: boolean;
 };
 
-export const caseToEntry = (item: PetitionCaseData): PetitionCaseEntry => ({
+export const petitionCaseToEntry = (
+  item: PetitionCaseData,
+): PetitionCaseEntry => ({
   ...item,
   id: item.id ?? createTempId(),
   isManual: Boolean(item.isManual),
@@ -84,7 +80,7 @@ export const initialPetitionFormData: Omit<
   nature: null,
 };
 
-export const createEmptyEntry = (): PetitionCaseEntry => ({
+export const createEmptyPetitionEntry = (): PetitionCaseEntry => ({
   ...initialPetitionFormData,
   id: createTempId(),
   isManual: false,

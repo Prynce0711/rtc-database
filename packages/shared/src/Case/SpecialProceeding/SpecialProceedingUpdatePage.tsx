@@ -1,7 +1,14 @@
 "use client";
 
-import { CaseType } from "@/app/generated/prisma/enums";
-import { usePopup } from "@rtc-database/shared";
+import {
+  CaseType,
+  createEmptySpecialProceedingEntry,
+  SpecialProceedingAdapter,
+  SpecialProceedingData,
+  SpecialProceedingEntry,
+  usePopup,
+} from "../../index";
+
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -25,18 +32,6 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { doesCaseExist } from "../BaseCaseActions";
-import {
-  createSpecialProceeding,
-  deleteSpecialProceeding,
-  getSpecialProceedingCaseNumberPreview,
-  updateSpecialProceeding,
-} from "./SpecialProceedingActions";
-import {
-  createEmptyEntry,
-  SpecialProceedingData,
-  SpecialProceedingEntry,
-} from "./schema";
 
 type ColDef = {
   key: keyof Omit<
@@ -372,13 +367,14 @@ function ReviewCard({
   );
 }
 
-const SpecialProceedingDrawer = ({
+const SpecialProceedingUpdatePage = ({
   type,
   selectedCase,
   selectedCases,
   onClose,
   onCreate,
   onUpdate,
+  adapter,
 }: {
   type: ModalType;
   selectedCase?: SpecialProceedingData | null;
@@ -386,6 +382,7 @@ const SpecialProceedingDrawer = ({
   onClose: () => void;
   onCreate?: () => void;
   onUpdate?: () => void;
+  adapter: SpecialProceedingAdapter;
 }) => {
   const isEdit = type === "EDIT";
   const editCases =
@@ -418,7 +415,7 @@ const SpecialProceedingDrawer = ({
     }
     return [
       {
-        ...createEmptyEntry(),
+        ...createEmptySpecialProceedingEntry(),
         id: nextTempIdRef.current--,
         caseNumber: formatCaseNumber(
           AUTO_DEFAULT_AREA,
@@ -450,7 +447,7 @@ const SpecialProceedingDrawer = ({
 
     setEntries([
       {
-        ...createEmptyEntry(),
+        ...createEmptySpecialProceedingEntry(),
         id: nextTempIdRef.current--,
         caseNumber: formatCaseNumber(
           AUTO_DEFAULT_AREA,
@@ -514,7 +511,10 @@ const SpecialProceedingDrawer = ({
       for (const bucket of uniqueBuckets) {
         const [area, yearRaw] = bucket.split("|");
         const year = Number.parseInt(yearRaw, 10);
-        const preview = await getSpecialProceedingCaseNumberPreview(area, year);
+        const preview = await adapter.getSpecialProceedingCaseNumberPreview(
+          area,
+          year,
+        );
         nextPerBucket.set(
           bucket,
           preview.success ? preview.result!.nextNumber : 1,
@@ -602,7 +602,7 @@ const SpecialProceedingDrawer = ({
     setEntries((prev) => [
       ...prev,
       {
-        ...createEmptyEntry(),
+        ...createEmptySpecialProceedingEntry(),
         id: nextTempIdRef.current--,
         date: TODAY,
         dateFiled: TODAY,
@@ -631,7 +631,7 @@ const SpecialProceedingDrawer = ({
 
     setEntries([
       {
-        ...createEmptyEntry(),
+        ...createEmptySpecialProceedingEntry(),
         id: nextTempIdRef.current--,
         date: TODAY,
         dateFiled: TODAY,
@@ -773,7 +773,7 @@ const SpecialProceedingDrawer = ({
       return [];
     }
 
-    const result = await doesCaseExist(caseNumbers, CaseType.SCA);
+    const result = await adapter.doesCaseExist(caseNumbers, CaseType.SCA);
     if (!result.success || !result.result) {
       setExistingCaseNumbers([]);
       return [];
@@ -875,7 +875,7 @@ const SpecialProceedingDrawer = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteSpecialProceeding(id)),
+        createdIds.map((id) => adapter.deleteSpecialProceeding(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -919,7 +919,10 @@ const SpecialProceedingDrawer = ({
           }
 
           const payload = buildPayload(e);
-          const result = await updateSpecialProceeding(target.id, payload);
+          const result = await adapter.updateSpecialProceeding(
+            target.id,
+            payload,
+          );
           if (!result.success) {
             popup.showError(
               result.error || `Update failed for row ${index + 1}`,
@@ -939,7 +942,7 @@ const SpecialProceedingDrawer = ({
         for (let index = 0; index < entries.length; index++) {
           const e = entries[index];
           const payload = buildPayload(e);
-          const result = await createSpecialProceeding(payload);
+          const result = await adapter.createSpecialProceeding(payload);
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedCases(createdIds);
             setStep("entry");
@@ -1738,4 +1741,4 @@ const SpecialProceedingDrawer = ({
   );
 };
 
-export default SpecialProceedingDrawer;
+export default SpecialProceedingUpdatePage;

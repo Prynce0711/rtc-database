@@ -1,8 +1,12 @@
-import { Case, SheriffCase } from "@/app/generated/prisma/client";
-import { excelHeaders } from "@/app/lib/excel";
+import {
+  BaseCaseSchema,
+  Case,
+  excelHeaders,
+  FilterOptions,
+  SheriffCase,
+} from "@rtc-database/shared";
 import { z } from "zod";
-import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "@rtc-database/shared";
+import { createTempId } from "../../utils";
 
 export type SheriffCasesFilterOptions = FilterOptions<SheriffCaseSchema>;
 
@@ -43,15 +47,8 @@ export type SheriffCaseSchema = z.infer<typeof SheriffCaseSchema>;
 
 export type SheriffCaseData = Case & SheriffCase;
 
-let tempIdCounter = 0;
-
-export const createTempId = (): number => {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-};
-
 /** Form entry used by the grid UI (CaseSchema + UI metadata). */
-export type CaseEntry = SheriffCaseSchema & {
+export type SherriffCaseEntry = SheriffCaseSchema & {
   id: number;
   isManual: boolean;
   errors: Record<string, string>;
@@ -60,7 +57,7 @@ export type CaseEntry = SheriffCaseSchema & {
 };
 
 /** Convert CaseSchema to CaseEntry (for editing existing cases). */
-export const caseToEntry = (c: SheriffCaseData): CaseEntry => ({
+export const sherriffCaseToEntry = (c: SheriffCaseData): SherriffCaseEntry => ({
   ...c,
   id: c.id ?? createTempId(),
   isManual: Boolean(c.isManual),
@@ -83,7 +80,7 @@ export const initialSheriffCaseFormData: Omit<
 };
 
 /** Create an empty entry based on schema defaults. */
-export const createEmptyEntry = (): CaseEntry => ({
+export const createEmptySherriffEntry = (): SherriffCaseEntry => ({
   ...initialSheriffCaseFormData,
   id: createTempId(),
   isManual: false,
@@ -140,4 +137,3 @@ export const sortSheriffCases = (
     return 0;
   });
 };
-

@@ -13,8 +13,8 @@ export { default as CivilCaseRow } from "./Case/Civil/CivilCaseRow";
 export {
   calculateCivilCaseStats,
   CivilCaseSchema,
-  caseToEntry as civilCaseToEntry,
-  createEmptyEntry as createEmptyCivilCaseEntry,
+  civilCaseToEntry as civilCaseToEntry,
+  createEmptyCivilEntry as createEmptyCivilCaseEntry,
 } from "./Case/Civil/CivilCaseSchema";
 export type {
   CivilCaseData,
@@ -63,6 +63,8 @@ export {
   PetitionCaseUpdateType,
 } from "./Case/Petition/PetitionCaseUpdatePage";
 export * from "./Case/RecievingLogs";
+export * from "./Case/Sherriff";
+export * from "./Case/SpecialProceeding";
 
 export * from "./Filter/FilterDropdown";
 export { default as FilterDropdown } from "./Filter/FilterDropdown";

@@ -1,8 +1,12 @@
-import type { Case, SpecialProceeding } from "@/app/generated/prisma/browser";
-import { excelHeaders } from "@/app/lib/excel";
+import {
+  BaseCaseSchema,
+  Case,
+  excelHeaders,
+  FilterOptions,
+  SpecialProceeding,
+} from "@rtc-database/shared";
 import { z } from "zod";
-import { FilterOptions } from "@rtc-database/shared";
-import { BaseCaseSchema } from "@rtc-database/shared";
+import { createTempId } from "../../utils";
 
 export type SpecialProceedingsFilterOptions =
   FilterOptions<SpecialProceedingSchema>;
@@ -70,13 +74,6 @@ export const SpecialProceedingSchema = BaseCaseSchema.merge(
 export type SpecialProceedingSchema = z.infer<typeof SpecialProceedingSchema>;
 export type SpecialProceedingData = Case & SpecialProceeding;
 
-let tempIdCounter = 0;
-
-export const createTempId = (): number => {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-};
-
 /** Form entry used by the grid UI (SpecialProceedingData + UI metadata). */
 export type SpecialProceedingEntry = Omit<
   SpecialProceedingData,
@@ -121,29 +118,30 @@ export const initialSpecialProceedingFormData: Omit<
 };
 
 /** Create an empty entry based on schema defaults. */
-export const createEmptyEntry = (): SpecialProceedingEntry => ({
-  baseCaseID: createTempId(),
-  branch: initialSpecialProceedingFormData.branch ?? null,
-  assistantBranch: initialSpecialProceedingFormData.assistantBranch ?? null,
-  caseNumber: initialSpecialProceedingFormData.caseNumber,
-  number: null,
-  area: null,
-  year: null,
-  isManual: false,
-  caseType: initialSpecialProceedingFormData.caseType,
-  petitioner: initialSpecialProceedingFormData.petitioner ?? null,
-  raffledTo: initialSpecialProceedingFormData.raffledTo ?? null,
-  date: initialSpecialProceedingFormData.date ?? null,
-  nature: initialSpecialProceedingFormData.nature ?? null,
-  respondent: initialSpecialProceedingFormData.respondent ?? null,
-  dateFiled: initialSpecialProceedingFormData.dateFiled ?? null,
-  id: createTempId(),
-  createdAt: new Date(),
-  updatedAt: null,
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
+export const createEmptySpecialProceedingEntry =
+  (): SpecialProceedingEntry => ({
+    baseCaseID: createTempId(),
+    branch: initialSpecialProceedingFormData.branch ?? null,
+    assistantBranch: initialSpecialProceedingFormData.assistantBranch ?? null,
+    caseNumber: initialSpecialProceedingFormData.caseNumber,
+    number: null,
+    area: null,
+    year: null,
+    isManual: false,
+    caseType: initialSpecialProceedingFormData.caseType,
+    petitioner: initialSpecialProceedingFormData.petitioner ?? null,
+    raffledTo: initialSpecialProceedingFormData.raffledTo ?? null,
+    date: initialSpecialProceedingFormData.date ?? null,
+    nature: initialSpecialProceedingFormData.nature ?? null,
+    respondent: initialSpecialProceedingFormData.respondent ?? null,
+    dateFiled: initialSpecialProceedingFormData.dateFiled ?? null,
+    id: createTempId(),
+    createdAt: new Date(),
+    updatedAt: null,
+    errors: {},
+    collapsed: false,
+    saved: false,
+  });
 
 export const calculateSpecialProceedingStats = (
   cases: SpecialProceedingData[],
@@ -165,4 +163,3 @@ export const calculateSpecialProceedingStats = (
     branches: new Set(cases.map((c) => c.raffledTo)).size,
   };
 };
-

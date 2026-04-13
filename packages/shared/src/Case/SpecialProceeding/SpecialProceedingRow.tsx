@@ -1,8 +1,7 @@
 "use client";
 
-import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import { SpecialProceedingData } from "./schema";
+import { ActionDropdown, SpecialProceedingData, TipCell } from "../../index";
 
 const formatDate = (value: Date | string | null | undefined) => {
   if (!value) return "—";

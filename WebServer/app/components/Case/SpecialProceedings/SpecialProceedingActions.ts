@@ -21,15 +21,17 @@ import {
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { ActionResult, PaginatedResult } from "@rtc-database/shared";
-import { prettifyError } from "zod";
-import { createLog } from "../../ActivityLogs/LogActions";
 import {
+  ActionResult,
+  PaginatedResult,
   SpecialProceedingData,
   SpecialProceedingSchema,
   SpecialProceedingsFilterOptions,
   SpecialProceedingStats,
-} from "./schema";
+} from "@rtc-database/shared";
+
+import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 
 export async function getSpecialProceedings(
   options?: SpecialProceedingsFilterOptions,

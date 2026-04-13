@@ -1,7 +1,16 @@
 "use client";
 
-import { CaseType } from "@/app/generated/prisma/enums";
-import { usePopup } from "@rtc-database/shared";
+import {
+  CaseType,
+  createEmptySherriffEntry,
+  SheriffCaseData,
+  SheriffCaseSchema,
+  SherriffCaseAdapter,
+  SherriffCaseEntry,
+  sherriffCaseToEntry,
+  usePopup,
+} from "@rtc-database/shared";
+
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -25,33 +34,18 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { doesCaseExist } from "../BaseCaseActions";
-import {
-  createSheriffCase,
-  deleteSheriffCase,
-  getSheriffCaseNumberPreview,
-  updateSheriffCase,
-} from "./SherriffActions";
-import type { SheriffRecord } from "./SherriffTypes";
-import { SheriffCaseSchema } from "./schema";
+import { createTempId } from "../../utils";
 
-type FormEntry = {
-  id: string;
-  sourceId?: number;
-  title: string;
-  isManual: boolean;
-  mortgagee?: string;
-  mortgagor?: string;
-  sheriffName?: string;
-  date: string;
-  remarks?: string;
-
-  errors: Record<string, string>;
-  saved: boolean;
-};
+type SherriffColKey =
+  | "caseNumber"
+  | "sheriffName"
+  | "mortgagee"
+  | "mortgagor"
+  | "dateFiled"
+  | "remarks";
 
 type ColDef = {
-  key: keyof Omit<FormEntry, "id" | "errors" | "saved" | "sourceId">;
+  key: SherriffColKey;
   label: string;
   placeholder: string;
   type: "text" | "date";
@@ -62,7 +56,7 @@ type ColDef = {
 
 const FROZEN_COLS: ColDef[] = [
   {
-    key: "title",
+    key: "caseNumber",
     label: "Case Number",
     placeholder: "01-2026",
     type: "text",
@@ -94,7 +88,7 @@ const DETAIL_COLS: ColDef[] = [
     width: 240,
   },
   {
-    key: "date",
+    key: "dateFiled",
     label: "Date Filed",
     placeholder: "",
     type: "date",
@@ -109,13 +103,9 @@ const DETAIL_COLS: ColDef[] = [
     width: 280,
   },
 ];
+const REQUIRED_FIELDS = ["caseNumber"] as const;
 
-const REQUIRED_FIELDS: Array<keyof Omit<FormEntry, "id" | "errors" | "saved">> =
-  ["title"];
-
-const uid = () => Math.random().toString(36).slice(2, 9);
 const normalizeCaseNumber = (value: string) => value.trim();
-const TODAY = new Date().toISOString().slice(0, 10);
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
 
 const parseSheriffCaseNumberParts = (
@@ -140,61 +130,29 @@ const parseSheriffCaseNumberParts = (
 const formatSheriffCaseNumber = (number: number, year: number): string =>
   `${String(number).padStart(2, "0")}-${year}`;
 
-const getYearFromDateField = (value: string): number => {
-  if (!value) {
-    return AUTO_DEFAULT_YEAR;
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return AUTO_DEFAULT_YEAR;
-  }
-
-  return parsed.getFullYear();
+const getAutoYearFromDate = (
+  value: string | Date | null | undefined,
+): number => {
+  if (!value) return AUTO_DEFAULT_YEAR;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return AUTO_DEFAULT_YEAR;
+  return date.getFullYear();
 };
 
-const createEmptyEntry = (id: string): FormEntry => ({
-  id,
-  sourceId: undefined,
-  title: "",
-  isManual: false,
-  mortgagee: "",
-  mortgagor: "",
-  sheriffName: "",
-  date: TODAY,
-  remarks: "",
-  errors: {},
-  saved: false,
-});
-
-const recordToEntry = (id: string, r: SheriffRecord): FormEntry => ({
-  id,
-  sourceId: r.id,
-  title: r.title,
-  isManual: r.isManual ?? true,
-  mortgagee: r.mortgagee ?? "",
-  mortgagor: r.mortgagor ?? "",
-  sheriffName: r.sheriffName ?? "",
-  date: r.date,
-  remarks: r.remarks ?? "",
-  errors: {},
-  saved: false,
-});
-
 function validateEntry(
-  entry: FormEntry,
+  entry: SherriffCaseEntry,
   options: { requireCaseNumber: boolean },
 ): Record<string, string> {
   const errs: Record<string, string> = {};
   REQUIRED_FIELDS.forEach((k) => {
-    if (k === "title" && !options.requireCaseNumber) {
-      return;
-    }
-
-    if (!entry[k] || String(entry[k]).trim() === "") {
-      errs[k as string] = "Required";
-    }
+    if (!options.requireCaseNumber && k === "caseNumber") return;
+    if (
+      !entry[k as keyof SherriffCaseEntry] ||
+      String(entry[k as keyof SherriffCaseEntry]).trim() === ""
+    )
+      errs[k] = "Required";
   });
+
   return errs;
 }
 
@@ -206,47 +164,59 @@ const CellInput = ({
   onKeyDown,
 }: {
   col: ColDef;
-  value: string;
+  value: string | Date | null | undefined;
   error?: string;
   onChange: (v: string) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-}) => (
-  <div style={{ display: "flex", flexDirection: "column" }}>
-    <input
-      type={col.type === "date" ? "date" : "text"}
-      value={value}
-      placeholder={col.placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      title={error || col.label}
-      className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
-    />
-    {error && (
-      <span className="xls-cell-err">
-        <FiAlertCircle size={10} />
-        {error}
-      </span>
-    )}
-  </div>
-);
+}) => {
+  const inputValue =
+    value == null
+      ? ""
+      : value instanceof Date
+        ? value.toISOString().slice(0, 10)
+        : String(value);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <input
+        type={col.type === "date" ? "date" : "text"}
+        value={inputValue}
+        placeholder={col.placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        title={error || col.label}
+        className={`xls-input${error ? " xls-input-err" : ""}${col.mono ? " xls-mono" : ""}`}
+      />
+      {error && (
+        <span className="xls-cell-err">
+          <FiAlertCircle size={10} />
+          {error}
+        </span>
+      )}
+    </div>
+  );
+};
 
 function ReviewCard({
   entry,
   displayCaseNumber,
   isExistingCase,
 }: {
-  entry: FormEntry;
+  entry: SherriffCaseEntry;
   displayCaseNumber: string;
   isExistingCase: boolean;
 }) {
-  const fmtDate = (d: string) =>
-    d
-      ? new Date(d).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    // Accept Date objects or ISO/string values from server
+    const date = d instanceof Date ? d : new Date(String(d));
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="rv-card">
@@ -271,9 +241,9 @@ function ReviewCard({
           </div>
         </div>
         <div className="rv-hero-badges">
-          {entry.date && (
+          {entry.dateFiled && (
             <span className="rv-badge rv-badge-court">
-              {fmtDate(entry.date)}
+              {fmtDate(entry.dateFiled) || <span className="rv-empty">—</span>}
             </span>
           )}
         </div>
@@ -302,7 +272,9 @@ function ReviewCard({
               <div className="rv-field">
                 <div className="rv-field-label">Date Filed</div>
                 <div className="rv-field-value rv-mono">
-                  {fmtDate(entry.date) || <span className="rv-empty">—</span>}
+                  {fmtDate(entry.dateFiled) || (
+                    <span className="rv-empty">—</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -350,13 +322,15 @@ export const SherriffCaseUpdatePage = ({
   onCloseAction,
   onCreateAction,
   onUpdateAction,
+  adapter,
 }: {
   type: UpdateType;
-  selectedRecord?: SheriffRecord | null;
-  selectedRecords?: SheriffRecord[];
+  selectedRecord?: SheriffCaseData | null;
+  selectedRecords?: SheriffCaseData[];
   onCloseAction: () => void;
   onCreateAction?: () => void;
   onUpdateAction?: () => void;
+  adapter: SherriffCaseAdapter;
 }) => {
   const statusPopup = usePopup();
   const editRecords =
@@ -376,22 +350,22 @@ export const SherriffCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const [entries, setEntries] = useState<FormEntry[]>(() => {
+  const [entries, setEntries] = useState<SherriffCaseEntry[]>(() => {
     if (isEdit) {
-      return editRecords.map((record) => recordToEntry(uid(), record));
+      return editRecords.map(sherriffCaseToEntry);
     }
-    return [createEmptyEntry(uid())];
+    return [createEmptySherriffEntry()];
   });
 
   useEffect(() => {
     setStep("entry");
 
     if (isEdit) {
-      setEntries(editRecords.map((record) => recordToEntry(uid(), record)));
+      setEntries(editRecords.map(sherriffCaseToEntry));
       return;
     }
 
-    setEntries([createEmptyEntry(uid())]);
+    setEntries([createEmptySherriffEntry()]);
   }, [type, selectedRecord, selectedRecords, isEdit]);
 
   useEffect(() => {
@@ -413,7 +387,7 @@ export const SherriffCaseUpdatePage = ({
       entries
         .filter((entry) => entry.isManual)
         .forEach((entry) => {
-          const parsed = parseSheriffCaseNumberParts(entry.title);
+          const parsed = parseSheriffCaseNumberParts(entry.caseNumber);
           if (!parsed) return;
 
           const key = `${parsed.year}`;
@@ -424,10 +398,10 @@ export const SherriffCaseUpdatePage = ({
         });
 
       const rowBuckets = autoRows.map((entry) => {
-        const parsed = parseSheriffCaseNumberParts(entry.title);
+        const parsed = parseSheriffCaseNumberParts(entry.caseNumber);
         return {
           entryId: entry.id,
-          year: getYearFromDateField(entry.date),
+          year: getAutoYearFromDate(entry.dateFiled),
         };
       });
 
@@ -439,7 +413,7 @@ export const SherriffCaseUpdatePage = ({
 
       for (const bucket of uniqueBuckets) {
         const year = Number.parseInt(bucket, 10);
-        const preview = await getSheriffCaseNumberPreview(year);
+        const preview = await adapter.getSheriffCaseNumberPreview(year);
         nextPerBucket.set(
           bucket,
           preview.success ? preview.result!.nextNumber : 1,
@@ -467,7 +441,7 @@ export const SherriffCaseUpdatePage = ({
     return () => window.clearTimeout(timer);
   }, [entries, isEdit]);
 
-  const handleChange = (id: string, field: string, value: string | boolean) => {
+  const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
@@ -478,7 +452,7 @@ export const SherriffCaseUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
+    setEntries((prev) => [...prev, createEmptySherriffEntry()]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -495,24 +469,24 @@ export const SherriffCaseUpdatePage = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
-    setEntries([createEmptyEntry(uid())]);
+    setEntries([createEmptySherriffEntry()]);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [entries.length, statusPopup]);
 
-  const handleRemove = (id: string) =>
+  const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = (id: number) => {
     const source = entries.find((e) => e.id === id);
     if (!source) return;
-    const dup: FormEntry = {
+    const dup: SherriffCaseEntry = {
       ...source,
-      id: uid(),
-      sourceId: undefined,
-      title: source.isManual ? "" : source.title,
+      id: createTempId(),
+      caseNumber: source.isManual ? "" : source.caseNumber,
       errors: {},
       saved: false,
+      collapsed: false,
     };
     setEntries((prev) => {
       const idx = prev.findIndex((e) => e.id === id);
@@ -524,10 +498,10 @@ export const SherriffCaseUpdatePage = ({
 
   const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    entryId: string,
-    isLastCol: boolean,
+    entryId: number,
+    isLastColOfTab: boolean,
   ) => {
-    if (e.key === "Tab" && !e.shiftKey && isLastCol) {
+    if (e.key === "Tab" && !e.shiftKey && isLastColOfTab) {
       const isLastRow = entries[entries.length - 1]?.id === entryId;
       if (isLastRow && !isEdit) {
         e.preventDefault();
@@ -544,15 +518,15 @@ export const SherriffCaseUpdatePage = ({
   const completedCount = entries.filter((e) =>
     REQUIRED_FIELDS.every(
       (k) =>
-        (k === "title" && !e.isManual && !isEdit) ||
+        (k === "caseNumber" && !e.isManual && !isEdit) ||
         (e[k] && String(e[k]).trim() !== ""),
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;
 
-  const getDisplayCaseNumber = (entry: FormEntry): string => {
+  const getDisplayCaseNumber = (entry: SherriffCaseEntry): string => {
     if (entry.isManual || isEdit) {
-      return entry.title || "";
+      return entry.caseNumber || "";
     }
 
     return autoCaseNumbersByRow[entry.id] ?? "";
@@ -568,7 +542,7 @@ export const SherriffCaseUpdatePage = ({
   );
 
   const existingCaseRowCount = entries.filter(
-    (entry) => entry.isManual && isCaseAlreadyExisting(entry.title),
+    (entry) => entry.isManual && isCaseAlreadyExisting(entry.caseNumber),
   ).length;
 
   const duplicateCaseNumbers = useMemo(() => {
@@ -613,7 +587,7 @@ export const SherriffCaseUpdatePage = ({
       new Set(
         entries
           .filter((entry) => entry.isManual)
-          .map((entry) => normalizeCaseNumber(entry.title))
+          .map((entry) => normalizeCaseNumber(entry.caseNumber))
           .filter((value) => value.length > 0),
       ),
     );
@@ -623,7 +597,7 @@ export const SherriffCaseUpdatePage = ({
       return [];
     }
 
-    const result = await doesCaseExist(caseNumbers, CaseType.SHERRIFF);
+    const result = await adapter.doesCaseExist(caseNumbers, CaseType.SHERRIFF);
     if (!result.success || !result.result) {
       setExistingCaseNumbers([]);
       return [];
@@ -674,24 +648,20 @@ export const SherriffCaseUpdatePage = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (entry: FormEntry) => {
+  const buildPayload = (entry: SherriffCaseEntry) => {
+    const { id, errors, collapsed, saved, isManual, ...caseInput } = entry;
+
     const caseNumberForPayload =
-      !isEdit && !entry.isManual
+      !isEdit && !isManual
         ? autoCaseNumbersByRow[entry.id] ||
-          formatSheriffCaseNumber(1, getYearFromDateField(entry.date))
-        : entry.title.trim();
+          formatSheriffCaseNumber(1, getAutoYearFromDate(caseInput.dateFiled))
+        : caseInput.caseNumber;
 
-    const payload = {
+    return SheriffCaseSchema.safeParse({
+      ...caseInput,
       caseNumber: caseNumberForPayload,
-      dateFiled: entry.date ? new Date(entry.date).toISOString() : null,
-      caseType: CaseType.SHERRIFF,
-      mortgagee: entry.mortgagee?.trim() || null,
-      mortgagor: entry.mortgagor?.trim() || null,
-      sheriffName: entry.sheriffName?.trim() || null,
-      remarks: entry.remarks?.trim() || null,
-    };
-
-    return SheriffCaseSchema.safeParse(payload);
+      caseType: "SHERRIFF",
+    });
   };
 
   const handleSubmit = async () => {
@@ -725,7 +695,7 @@ export const SherriffCaseUpdatePage = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteSheriffCase(id)),
+        createdIds.map((id) => adapter.deleteSheriffCase(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -747,15 +717,22 @@ export const SherriffCaseUpdatePage = ({
 
     try {
       if (isEdit) {
+        const originalById = new Map(
+          editRecords.map((item) => [item.id, item]),
+        );
+
         for (const entry of entries) {
-          const sourceId = entry.sourceId;
-          if (!sourceId) {
-            throw new Error("Missing source case id for edit");
+          const original = originalById.get(entry.id);
+          if (!original) {
+            throw new Error("Original case not found for edit");
           }
 
           const parsed = buildPayload(entry);
           if (!parsed.success) throw new Error("Invalid case data");
-          const response = await updateSheriffCase(sourceId, parsed.data);
+          const response = await adapter.updateSheriffCase(
+            original.id,
+            parsed.data,
+          );
           if (!response.success) {
             throw new Error(response.error || "Failed to update case");
           }
@@ -788,7 +765,7 @@ export const SherriffCaseUpdatePage = ({
             return;
           }
 
-          const response = await createSheriffCase({
+          const response = await adapter.createSheriffCase({
             ...parsed.data,
             isManual: entry.isManual,
           });
@@ -1115,7 +1092,7 @@ export const SherriffCaseUpdatePage = ({
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                {!isEdit && col.key === "title" ? (
+                                {!isEdit && col.key === "caseNumber" ? (
                                   <div style={{ display: "grid", gap: 6 }}>
                                     <div style={{ display: "grid", gap: 6 }}>
                                       <select
@@ -1141,7 +1118,7 @@ export const SherriffCaseUpdatePage = ({
                                         style={{ width: "100%" }}
                                         value={
                                           entry.isManual
-                                            ? String(entry.title ?? "")
+                                            ? String(entry.caseNumber ?? "")
                                             : (autoCaseNumbersByRow[entry.id] ??
                                               "")
                                         }
@@ -1149,7 +1126,7 @@ export const SherriffCaseUpdatePage = ({
                                         onChange={(e) =>
                                           handleChange(
                                             entry.id,
-                                            "title",
+                                            "caseNumber",
                                             e.target.value,
                                           )
                                         }
@@ -1167,17 +1144,17 @@ export const SherriffCaseUpdatePage = ({
                                         }
                                       />
                                     </div>
-                                    {entry.errors[col.key as string] && (
+                                    {entry.errors.caseNumber && (
                                       <span className="xls-cell-err">
                                         <FiAlertCircle size={10} />
-                                        {entry.errors[col.key as string]}
+                                        {entry.errors.caseNumber}
                                       </span>
                                     )}
                                   </div>
                                 ) : (
                                   <CellInput
                                     col={col}
-                                    value={entry[col.key] as string}
+                                    value={entry[col.key]}
                                     error={entry.errors[col.key as string]}
                                     onChange={(v) =>
                                       handleChange(
@@ -1194,7 +1171,7 @@ export const SherriffCaseUpdatePage = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={entry[col.key] as string}
+                                  value={entry[col.key]}
                                   error={entry.errors[col.key as string]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key as string, v)

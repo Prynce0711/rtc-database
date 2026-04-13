@@ -26,7 +26,7 @@ import {
 
 import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
-export enum ReceiveDrawerType {
+export enum ReceivingUpdateType {
   ADD = "ADD",
   EDIT = "EDIT",
 }
@@ -331,7 +331,7 @@ function ReviewCard({ entry }: { entry: ReceivingLogEntry }) {
 }
 
 /* ─── Main Component ─────────────────────────────────────────── */
-const ReceiveDrawer = ({
+const ReceiveUpdatePage = ({
   type,
   onClose,
   selectedLog = null,
@@ -340,7 +340,7 @@ const ReceiveDrawer = ({
   onUpdate,
   adapter,
 }: {
-  type: ReceiveDrawerType;
+  type: ReceivingUpdateType;
   onClose: () => void;
   selectedLog?: RecievingLog | null;
   selectedLogs?: Array<RecievingLog>;
@@ -348,7 +348,7 @@ const ReceiveDrawer = ({
   onUpdate?: (log: RecievingLog) => void;
   adapter: RecievingLogsAdapter;
 }) => {
-  const isEdit = type === ReceiveDrawerType.EDIT;
+  const isEdit = type === ReceivingUpdateType.EDIT;
   const editLogs =
     selectedLogs && selectedLogs.length > 0
       ? selectedLogs
@@ -1146,4 +1146,4 @@ const ReceiveDrawer = ({
   );
 };
 
-export default ReceiveDrawer;
+export default ReceiveUpdatePage;

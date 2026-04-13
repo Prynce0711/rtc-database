@@ -39,11 +39,22 @@
     "../packages/shared/src/Case/Petition/PetitionCaseRow.tsx",
     "../packages/shared/src/Case/Petition/PetitionCaseDetailsPage.tsx",
     "../packages/shared/src/Case/Petition/PetitionCaseUpdatePage.tsx",
-    "../packages/shared/src/Case/RecievingLogs/ReceivingDrawer.tsx",
+    "../packages/shared/src/Case/RecievingLogs/ReceivingUpdatePage.tsx",
     "../packages/shared/src/Case/RecievingLogs/ReceivingLogs.tsx",
     "../packages/shared/src/Case/RecievingLogs/ReceivingRow.tsx",
     "../packages/shared/src/Case/RecievingLogs/RecievingLogsSchema.ts",
-    "../packages/shared/src/Case/RecievingLogs/ReceivingDetailsPage.tsx"
+    "../packages/shared/src/Case/RecievingLogs/ReceivingDetailsPage.tsx",
+    "../packages/shared/src/Case/Sherriff/SherriffSchema.ts",
+    "../packages/shared/src/Case/Sherriff/SherriffCaseRow.tsx",
+    "../packages/shared/src/Case/Sherriff/SherriffCaseUpdatePage.tsx",
+    "../packages/shared/src/Case/Sherriff/SherriffUpdatePage.tsx",
+    "../packages/shared/src/Case/Sherriff/Sherriff.tsx",
+    "../packages/shared/src/Case/Sherriff/SheriffDetailsPage.tsx",
+    "../packages/shared/src/Case/SpecialProceeding/SpecialProceedingsSchema.ts",
+    "../packages/shared/src/Case/SpecialProceeding/SpecialProceedingRow.tsx",
+    "../packages/shared/src/Case/SpecialProceeding/SpecialProceedingDetailsPage.tsx",
+    "../packages/shared/src/Case/SpecialProceeding/SpecialProceedingUpdatePage.tsx",
+    "../packages/shared/src/Case/SpecialProceeding/Proceedings.tsx"
   ],
   "exclude": ["node_modules"]
 }

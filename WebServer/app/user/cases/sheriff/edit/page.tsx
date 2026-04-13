@@ -4,11 +4,8 @@ import {
   getSheriffCaseById,
   getSheriffCasesByIds,
 } from "@/app/components/Case/Sherriff/SherriffActions";
-import { SherriffCaseUpdatePage } from "@/app/components/Case/Sherriff/SherriffCaseUpdatePage";
-import {
-  caseToRecord,
-  type SheriffRecord,
-} from "@/app/components/Case/Sherriff/SherriffTypes";
+import { sherriffCaseAdapter } from "@/app/components/Case/Sherriff/SherriffCaseAdapter";
+import { SheriffCaseData, SherriffCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -16,10 +13,10 @@ const SheriffEditPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [selectedRecord, setSelectedRecord] = useState<SheriffRecord | null>(
+  const [selectedRecord, setSelectedRecord] = useState<SheriffCaseData | null>(
     null,
   );
-  const [selectedRecords, setSelectedRecords] = useState<SheriffRecord[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<SheriffCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,10 +55,8 @@ const SheriffEditPage = () => {
           return;
         }
 
-        const loadedRecords = result.result.map(caseToRecord);
-
-        setSelectedRecords(loadedRecords);
-        setSelectedRecord(loadedRecords[0] ?? null);
+        setSelectedRecords(result.result);
+        setSelectedRecord(result.result[0] ?? null);
         setError(null);
         setLoading(false);
         return;
@@ -77,7 +72,7 @@ const SheriffEditPage = () => {
         return;
       }
 
-      const record = caseToRecord(result.result);
+      const record = result.result;
       setSelectedRecord(record);
       setSelectedRecords([record]);
       setError(null);
@@ -122,6 +117,7 @@ const SheriffEditPage = () => {
       onCloseAction={goBackToList}
       onCreateAction={goBackToList}
       onUpdateAction={goBackToList}
+      adapter={sherriffCaseAdapter}
     />
   );
 };

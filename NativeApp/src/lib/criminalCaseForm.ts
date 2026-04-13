@@ -1,4 +1,5 @@
 import type { CriminalCaseData } from "@rtc-database/shared";
+import { createTempId } from "@rtc-database/shared/src/utils.js";
 
 export type CaseEntry = {
   id: number;
@@ -41,13 +42,6 @@ export type CaseEntry = {
   total: string | null;
   amountInvolved: string | null;
 };
-
-let tempIdCounter = 0;
-
-function createTempId(): number {
-  tempIdCounter += 1;
-  return -tempIdCounter;
-}
 
 export const createEmptyEntry = (): CaseEntry => ({
   id: createTempId(),

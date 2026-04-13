@@ -1,16 +1,24 @@
 "use client";
 
-import { isTextFieldKey } from "@rtc-database/shared";
 import {
+  calculateSheriffCaseStats,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
+  isTextFieldKey,
   PageListSkeleton,
+  Pagination,
+  Roles,
+  SheriffCaseData,
+  SheriffCaseFilters,
+  SheriffCasesFilterOptions,
+  SheriffCaseStats,
+  SherriffCaseAdapter,
   usePopup,
 } from "@rtc-database/shared";
+
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
@@ -22,23 +30,8 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import { exportSheriffExcel, uploadSheriffExcel } from "./ExcelActions";
-import {
-  deleteSheriffCase,
-  getSheriffCases,
-  getSheriffCaseStats,
-} from "./SherriffActions";
+import { useAdaptiveRouter } from "../../lib/nextCompat";
 import SherriffCaseRow from "./SherriffCaseRow";
-import { caseToRecord, type SheriffRecord } from "./SherriffTypes";
-import {
-  calculateSheriffCaseStats,
-  type SheriffCaseData,
-  type SheriffCaseFilters,
-  type SheriffCasesFilterOptions,
-  type SheriffCaseStats,
-} from "./schema";
-import { useSession } from "@/app/lib/authClient";
 
 type CaseFilterValues = SheriffCaseFilters;
 type SortKey = NonNullable<SheriffCasesFilterOptions["sortKey"]>;
@@ -104,110 +97,13 @@ function PageButton({
   );
 }
 
-const Pagination: React.FC<{
-  pageCount: number;
-  currentPage: number;
-  onPageChange?: (page: number) => void;
-}> = ({ pageCount, currentPage, onPageChange }) => {
-  const [activeEllipsis, setActiveEllipsis] = useState<number | null>(null);
-  const [ellipsisValue, setEllipsisValue] = useState<string>("");
-
-  const getPages = (): (number | string)[] => {
-    const pages: (number | string)[] = [];
-    const delta = 1;
-    if (pageCount <= 1) return [1];
-    const rangeStart = Math.max(2, currentPage - delta);
-    const rangeEnd = Math.min(pageCount - 1, currentPage + delta);
-    pages.push(1);
-    if (rangeStart > 2) pages.push("...");
-    for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
-    if (rangeEnd < pageCount - 1) pages.push("...");
-    if (pageCount > 1) pages.push(pageCount);
-    return pages;
-  };
-
-  const submitEllipsis = (val?: string) => {
-    const n = Number((val ?? ellipsisValue).trim());
-    if (!Number.isNaN(n) && n >= 1 && n <= pageCount) onPageChange?.(n);
-    setActiveEllipsis(null);
-    setEllipsisValue("");
-  };
-  const pages = getPages();
-
-  return (
-    <div className="w-full flex justify-center py-4">
-      <div className="join shadow-sm bg-base-100 rounded-lg p-1">
-        {currentPage > 1 && (
-          <button
-            className="join-item btn btn-sm btn-ghost"
-            onClick={() => onPageChange?.(Math.max(1, currentPage - 1))}
-          >
-            <GrFormPrevious className="w-5 h-5" />
-          </button>
-        )}
-
-        {pages.map((page, index) => {
-          if (page === "...") {
-            if (activeEllipsis === index) {
-              return (
-                <div key={`ell-${index}`} className="join-item">
-                  <input
-                    autoFocus
-                    className="input input-sm w-20 text-center"
-                    value={ellipsisValue}
-                    onChange={(e) => setEllipsisValue(e.target.value)}
-                    onBlur={() => submitEllipsis()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitEllipsis();
-                      if (e.key === "Escape") {
-                        setActiveEllipsis(null);
-                        setEllipsisValue("");
-                      }
-                    }}
-                  />
-                </div>
-              );
-            }
-            return (
-              <button
-                key={`ell-btn-${index}`}
-                className="join-item btn btn-sm btn-ghost"
-                onClick={() => {
-                  setActiveEllipsis(index);
-                  setEllipsisValue("");
-                }}
-              >
-                ...
-              </button>
-            );
-          }
-          return (
-            <PageButton
-              key={page}
-              isActive={currentPage === page}
-              onClick={() => onPageChange?.(page as number)}
-            >
-              {page}
-            </PageButton>
-          );
-        })}
-
-        <button
-          className="join-item btn btn-sm btn-ghost"
-          onClick={() => onPageChange?.(Math.min(pageCount, currentPage + 1))}
-          disabled={currentPage >= pageCount}
-        >
-          <GrFormNext className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const Sherriff: React.FC = () => {
-  const router = useRouter();
+const Sherriff: React.FC<{
+  role: Roles;
+  adapter: SherriffCaseAdapter;
+}> = ({ role, adapter }) => {
+  const router = useAdaptiveRouter();
   const statusPopup = usePopup();
-  const [records, setRecords] = useState<SheriffRecord[]>([]);
+  const [records, setRecords] = useState<SheriffCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -227,10 +123,7 @@ const Sherriff: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === "admin" ||
-    session?.data?.user?.role === "atty";
+  const isAdminOrAtty = role === "admin" || role === "atty";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -262,7 +155,7 @@ const Sherriff: React.FC = () => {
     async (page = currentPage) => {
       try {
         const [casesRes, statsRes] = await Promise.all([
-          getSheriffCases({
+          adapter.getSheriffCases({
             page,
             pageSize: PAGE_SIZE,
             filters: appliedFilters,
@@ -270,7 +163,7 @@ const Sherriff: React.FC = () => {
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
-          getSheriffCaseStats({
+          adapter.getSheriffCaseStats({
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -287,7 +180,7 @@ const Sherriff: React.FC = () => {
         }
 
         const result = casesRes.result;
-        setRecords(result.items.map(caseToRecord));
+        setRecords(result.items);
         setTotalCount(result.total ?? result.items.length);
         setStats(calculateSheriffCaseStats(result.items));
 
@@ -336,7 +229,7 @@ const Sherriff: React.FC = () => {
 
     if (!isTextField) return [];
 
-    const res = await getSheriffCases({
+    const res = await adapter.getSheriffCases({
       page: 1,
       pageSize: 10,
       filters: { [key]: inputValue } as CaseFilters,
@@ -378,7 +271,7 @@ const Sherriff: React.FC = () => {
     )
       return;
 
-    const result = await deleteSheriffCase(id);
+    const result = await adapter.deleteSheriffCase(id);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to delete case");
       return;
@@ -404,7 +297,7 @@ const Sherriff: React.FC = () => {
 
     try {
       const results = await Promise.allSettled(
-        selectedRecordIds.map((id) => deleteSheriffCase(id)),
+        selectedRecordIds.map((id) => adapter.deleteSheriffCase(id)),
       );
 
       const failedIds: number[] = [];
@@ -444,7 +337,7 @@ const Sherriff: React.FC = () => {
 
     setUploading(true);
     try {
-      const result = await uploadSheriffExcel(file);
+      const result = await adapter.uploadSheriffExcel(file);
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {
@@ -497,7 +390,7 @@ const Sherriff: React.FC = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const result = await exportSheriffExcel();
+      const result = await adapter.exportSheriffExcel();
       if (!result.success) {
         statusPopup.showError(result.error || "Failed to export cases");
         return;

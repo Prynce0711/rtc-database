@@ -1,6 +1,13 @@
 import z from "zod";
 import { excelDateToJSDate, isValidDate } from "./lib/excel";
 
+let tempIdCounter = 0;
+
+export const createTempId = (): number => {
+  tempIdCounter += 1;
+  return -tempIdCounter;
+};
+
 export const formatDate = (date?: Date | string | null) =>
   date
     ? new Date(date).toLocaleDateString("en-PH", {

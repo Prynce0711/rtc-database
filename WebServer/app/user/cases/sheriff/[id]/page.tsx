@@ -1,7 +1,8 @@
-import SheriffDetailsPage from "@/app/components/Case/Sherriff/SheriffDetailsPage";
+import { sherriffCaseAdapter } from "@/app/components/Case/Sherriff/SherriffCaseAdapter";
+import { SheriffDetailsPage } from "@rtc-database/shared";
 
-const page = () => {
-  return <SheriffDetailsPage />;
+const Page = () => {
+  return <SheriffDetailsPage adapter={sherriffCaseAdapter} />;
 };
 
-export default page;
+export default Page;

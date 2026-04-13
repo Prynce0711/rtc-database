@@ -1,6 +1,6 @@
 "use client";
 
-import { Sherriff } from "@/app/generated/prisma/client";
+import { Sherriff, SherriffCaseAdapter, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,12 +18,6 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
-import {
-  createSheriffCase,
-  deleteSheriffCase,
-  updateSheriffCase,
-} from "./SherriffActions";
 
 export enum SherriffDrawerType {
   ADD = "ADD",
@@ -273,11 +267,13 @@ const SherriffDrawer = ({
   onClose,
   selectedLog = null,
   selectedLogs,
+  adapter,
 }: {
   type: SherriffDrawerType;
   onClose: () => void;
   selectedLog?: Sherriff | null;
   selectedLogs?: Array<Sherriff>;
+  adapter: SherriffCaseAdapter;
 }) => {
   const isEdit = type === SherriffDrawerType.EDIT;
   const editLogs =
@@ -454,7 +450,7 @@ const SherriffDrawer = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deleteSheriffCase(id)),
+        createdIds.map((id) => adapter.deleteSheriffCase(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -495,7 +491,7 @@ const SherriffDrawer = ({
             return;
           }
 
-          const result = await updateSheriffCase(
+          const result = await adapter.updateSheriffCase(
             target.id,
             buildPayload(entries[index]),
           );
@@ -515,7 +511,7 @@ const SherriffDrawer = ({
 
         for (let index = 0; index < entries.length; index++) {
           const entry = entries[index];
-          const result = await createSheriffCase(buildPayload(entry));
+          const result = await adapter.createSheriffCase(buildPayload(entry));
           if (!result.success || !result.result) {
             const rollbackErrors = await rollbackCreatedLogs(createdIds);
             setStep("entry");
@@ -1014,4 +1010,3 @@ const SherriffDrawer = ({
 };
 
 export default SherriffDrawer;
-

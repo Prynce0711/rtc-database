@@ -1,24 +1,33 @@
 "use client";
 
-import type { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
-import {
-  getSpecialProceedingById,
-  getSpecialProceedings,
-} from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
+import { useEffect, useMemo, useState } from "react";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
   NavButton,
   PageDetailSkeleton,
-} from "@rtc-database/shared";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+  SpecialProceedingAdapter,
+  SpecialProceedingData,
+} from "../../index";
+import {
+  useAdaptiveNavigation,
+  useAdaptivePathname,
+} from "../../lib/nextCompat";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function SpecialProceedingDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+export default function SpecialProceedingDetailsPage({
+  adapter,
+}: {
+  adapter: SpecialProceedingAdapter;
+}) {
+  const router = useAdaptiveNavigation();
+  const pathname = useAdaptivePathname();
+
+  const idParam = useMemo(() => {
+    const segments = pathname.split("/").filter(Boolean);
+    return segments.length > 0 ? segments[segments.length - 1] : "";
+  }, [pathname]);
 
   const [caseData, setCaseData] = useState<SpecialProceedingData | null>(null);
   const [prevCase, setPrevCase] = useState<SpecialProceedingData | null>(null);
@@ -28,11 +37,19 @@ export default function SpecialProceedingDetailsPage() {
 
   useEffect(() => {
     const load = async () => {
+      if (!idParam) {
+        setCaseData(null);
+        setPrevCase(null);
+        setNextCase(null);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
-      const numId = Number(params.id);
+      const numId = Number(idParam);
 
       // Fetch the current record
-      const res = await getSpecialProceedingById(numId);
+      const res = await adapter.getSpecialProceedingById(numId);
       if (!res.success || !res.result) {
         setCaseData(null);
         setPrevCase(null);
@@ -43,7 +60,7 @@ export default function SpecialProceedingDetailsPage() {
       setCaseData(res.result);
 
       // Fetch all for prev/next navigation
-      const allRes = await getSpecialProceedings();
+      const allRes = await adapter.getSpecialProceedings();
       if (allRes.success && allRes.result?.items) {
         const all = allRes.result.items;
         const idx = all.findIndex((c) => c.id === numId);
@@ -52,8 +69,9 @@ export default function SpecialProceedingDetailsPage() {
       }
       setLoading(false);
     };
-    load();
-  }, [params.id]);
+
+    void load();
+  }, [adapter, idParam]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -79,7 +97,7 @@ export default function SpecialProceedingDetailsPage() {
     );
   }
 
-  const currentId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const currentId = idParam;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (

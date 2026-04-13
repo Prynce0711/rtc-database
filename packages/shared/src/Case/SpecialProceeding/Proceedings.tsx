@@ -1,20 +1,22 @@
 "use client";
 
 import {
-  exportSpecialProceedingsExcel,
-  uploadSpecialProceedingExcel,
-} from "@/app/components/Case/SpecialProceedings/ExcelActions";
-import { isTextFieldKey } from "@rtc-database/shared";
-import {
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
   PageListSkeleton,
+  Pagination,
+  SpecialProceedingAdapter,
+  SpecialProceedingData,
+  SpecialProceedingStats,
+  SpecialProceedingsFilterOptions,
+  calculateSpecialProceedingStats,
+  isTextFieldKey,
   usePopup,
-} from "@rtc-database/shared";
+} from "../../index";
+
 import { AnimatePresence, motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FiBarChart2,
@@ -25,19 +27,8 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import {
-  deleteSpecialProceeding,
-  getSpecialProceedingStats,
-  getSpecialProceedings,
-} from "./SpecialProceedingActions";
+import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import SpecialProceedingRow from "./SpecialProceedingRow";
-import {
-  SpecialProceedingData,
-  SpecialProceedingStats,
-  SpecialProceedingsFilterOptions,
-  calculateSpecialProceedingStats,
-} from "./schema";
 
 type SPFilterValues = {
   caseNumber?: string;
@@ -128,109 +119,10 @@ function PageButton({
   );
 }
 
-const Pagination: React.FC<{
-  pageCount: number;
-  currentPage: number;
-  onPageChange?: (page: number) => void;
-}> = ({ pageCount, currentPage, onPageChange }) => {
-  const [activeEllipsis, setActiveEllipsis] = useState<number | null>(null);
-  const [ellipsisValue, setEllipsisValue] = useState<string>("");
-
-  const getPages = (): (number | string)[] => {
-    const pages: (number | string)[] = [];
-    const delta = 1;
-    if (pageCount <= 1) return [1];
-    const rangeStart = Math.max(2, currentPage - delta);
-    const rangeEnd = Math.min(pageCount - 1, currentPage + delta);
-    pages.push(1);
-    if (rangeStart > 2) pages.push("...");
-    for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
-    if (rangeEnd < pageCount - 1) pages.push("...");
-    if (pageCount > 1) pages.push(pageCount);
-    return pages;
-  };
-
-  const submitEllipsis = (val?: string) => {
-    const v = (val ?? ellipsisValue).trim();
-    const n = Number(v);
-    if (!Number.isNaN(n) && n >= 1 && n <= pageCount) onPageChange?.(n);
-    setActiveEllipsis(null);
-    setEllipsisValue("");
-  };
-
-  const pages = getPages();
-
-  return (
-    <div className="w-full flex justify-center py-4">
-      <div className="join shadow-sm bg-base-100 rounded-lg p-1">
-        {currentPage > 1 && (
-          <button
-            className="join-item btn btn-sm btn-ghost"
-            onClick={() => onPageChange?.(Math.max(1, currentPage - 1))}
-          >
-            <GrFormPrevious className="w-5 h-5" />
-          </button>
-        )}
-        {pages.map((page, index) => {
-          if (page === "...") {
-            if (activeEllipsis === index) {
-              return (
-                <div key={`ell-${index}`} className="join-item">
-                  <input
-                    autoFocus
-                    className="input input-sm w-20 text-center"
-                    value={ellipsisValue}
-                    onChange={(e) => setEllipsisValue(e.target.value)}
-                    onBlur={() => submitEllipsis()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitEllipsis();
-                      if (e.key === "Escape") {
-                        setActiveEllipsis(null);
-                        setEllipsisValue("");
-                      }
-                    }}
-                  />
-                </div>
-              );
-            }
-            return (
-              <button
-                key={`ell-btn-${index}`}
-                className="join-item btn btn-sm btn-ghost"
-                onClick={() => {
-                  setActiveEllipsis(index);
-                  setEllipsisValue("");
-                }}
-              >
-                ...
-              </button>
-            );
-          }
-          return (
-            <PageButton
-              key={page}
-              isActive={page === currentPage}
-              onClick={() => onPageChange?.(page as number)}
-            >
-              {page}
-            </PageButton>
-          );
-        })}
-        {currentPage < pageCount && (
-          <button
-            className="join-item btn btn-sm btn-ghost"
-            onClick={() => onPageChange?.(Math.min(pageCount, currentPage + 1))}
-          >
-            <GrFormNext className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const Proceedings: React.FC = () => {
-  const router = useRouter();
+const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
+  adapter,
+}) => {
+  const router = useAdaptiveNavigation();
   const popup = usePopup();
   const [cases, setCases] = useState<SpecialProceedingData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -266,7 +158,7 @@ const Proceedings: React.FC = () => {
 
       try {
         const [listResult, statsResult] = await Promise.all([
-          getSpecialProceedings({
+          adapter.getSpecialProceedings({
             page,
             pageSize: PAGE_SIZE,
             filters: appliedFilters,
@@ -274,7 +166,7 @@ const Proceedings: React.FC = () => {
             sortOrder: sortConfig.order,
             exactMatchMap,
           }),
-          getSpecialProceedingStats({
+          adapter.getSpecialProceedingStats({
             filters: appliedFilters,
             exactMatchMap,
           }),
@@ -350,7 +242,7 @@ const Proceedings: React.FC = () => {
 
     if (!isTextField) return [];
 
-    const result = await getSpecialProceedings({
+    const result = await adapter.getSpecialProceedings({
       page: 1,
       pageSize: 10,
       filters: { [key]: inputValue } as SPFilters,
@@ -377,7 +269,7 @@ const Proceedings: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this case?")) return;
-    const result = await deleteSpecialProceeding(id);
+    const result = await adapter.deleteSpecialProceeding(id);
     if (!result.success) {
       popup.showError(result.error || "Failed to delete");
       return;
@@ -402,7 +294,7 @@ const Proceedings: React.FC = () => {
 
     try {
       const results = await Promise.allSettled(
-        selectedCaseIds.map((id) => deleteSpecialProceeding(id)),
+        selectedCaseIds.map((id) => adapter.deleteSpecialProceeding(id)),
       );
 
       const deletedIds: number[] = [];
@@ -441,7 +333,7 @@ const Proceedings: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const result = await uploadSpecialProceedingExcel(file);
+    const result = await adapter.uploadSpecialProceedingExcel(file);
     const importPayload = result.success ? result.result : result.errorResult;
 
     if (importPayload?.failedExcel) {
@@ -494,7 +386,7 @@ const Proceedings: React.FC = () => {
 
   const handleExportExcel = async () => {
     setExporting(true);
-    const result = await exportSpecialProceedingsExcel();
+    const result = await adapter.exportSpecialProceedingsExcel();
     if (!result.success) {
       popup.showError(result.error || "Export failed");
     } else {

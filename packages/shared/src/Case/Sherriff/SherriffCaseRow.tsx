@@ -1,10 +1,9 @@
 "use client";
 
-import { ActionDropdown, TipCell } from "@rtc-database/shared";
+import { ActionDropdown, SheriffCaseData, TipCell } from "@rtc-database/shared";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import type { SheriffRecord } from "./SherriffTypes";
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr: string | Date | null | undefined) => {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-PH", {
     year: "numeric",
@@ -21,10 +20,10 @@ const SherriffCaseRow = ({
   selected = false,
   onToggleSelect,
 }: {
-  record: SheriffRecord;
-  onEdit: (r: SheriffRecord) => void;
+  record: SheriffCaseData;
+  onEdit: (r: SheriffCaseData) => void;
   onDelete: (id: number) => void;
-  onRowClick: (r: SheriffRecord) => void;
+  onRowClick: (r: SheriffCaseData) => void;
   selected?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
@@ -50,7 +49,7 @@ const SherriffCaseRow = ({
             className="checkbox checkbox-sm"
             checked={selected}
             onChange={(e) => onToggleSelect?.(record.id, e.target.checked)}
-            aria-label={`Select case ${record.title}`}
+            aria-label={`Select case ${record.caseNumber}`}
             onClick={(e) => e.stopPropagation()}
           />
           <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
@@ -98,7 +97,7 @@ const SherriffCaseRow = ({
       </td>
       <TipCell
         label="Case Number"
-        value={record.title}
+        value={record.caseNumber}
         truncate
         className="font-semibold"
       />
@@ -107,7 +106,7 @@ const SherriffCaseRow = ({
       <TipCell label="Mortgagor" value={record.mortgagor} truncate />
       <TipCell
         label="Date Filed"
-        value={formatDate(record.date)}
+        value={formatDate(record.dateFiled)}
         className="text-base-content/70"
       />
       <TipCell label="Remarks" value={record.remarks} />

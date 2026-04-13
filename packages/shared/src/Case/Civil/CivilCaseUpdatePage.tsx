@@ -26,8 +26,15 @@ import {
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
+import { createTempId } from "../../utils";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
-import { CivilCaseSchema, type CivilCaseData } from "./CivilCaseSchema";
+import {
+  CivilCaseEntry,
+  CivilCaseSchema,
+  civilCaseToEntry,
+  createEmptyCivilEntry,
+  type CivilCaseData,
+} from "./CivilCaseSchema";
 
 export enum CivilCaseUpdateType {
   ADD = "ADD",
@@ -291,14 +298,14 @@ const formatCaseNumber = (area: string, number: number, year: number): string =>
   `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
 
 const getAreaFromCaseNumber = (value: string, fallbackArea: string): string =>
-  parseCaseNumberParts(value)?.area ?? normalizeAreaCode(fallbackArea);
+  parseCaseNumberParts(value)?.area || resolveAreaCode(fallbackArea);
 
 const applyAreaToCaseNumber = (
   value: string,
   area: string,
   year?: number,
 ): string => {
-  const normalizedArea = normalizeAreaCode(area);
+  const normalizedArea = resolveAreaCode(area);
   const parsed = parseCaseNumberParts(value);
   const resolvedYear = year ?? parsed?.year ?? AUTO_DEFAULT_YEAR;
   if (!parsed) {
@@ -308,66 +315,24 @@ const applyAreaToCaseNumber = (
   return formatCaseNumber(normalizedArea, parsed.number, resolvedYear);
 };
 
-const createTempId = (() => {
-  let seq = 0;
-  return () => {
-    seq += 1;
-    return -seq;
+const withDefaultAreaForAutoEntry = (
+  entry: CivilCaseEntry,
+  defaultArea: string,
+): CivilCaseEntry => {
+  if (entry.isManual) return entry;
+
+  return {
+    ...entry,
+    caseNumber: applyAreaToCaseNumber(
+      entry.caseNumber ?? "",
+      defaultArea,
+      getAutoYearFromDate(entry.dateFiled),
+    ),
   };
-})();
-
-const createEmptyEntry = (defaultArea: string): FormEntry => ({
-  id: createTempId(),
-  sourceId: undefined,
-  caseNumber: formatCaseNumber(
-    resolveAreaCode(defaultArea),
-    1,
-    AUTO_DEFAULT_YEAR,
-  ),
-  isManual: false,
-  branch: "",
-  assistantBranch: "",
-  petitioners: "",
-  defendants: "",
-  dateFiled: toDateInput(new Date()),
-  notes: "",
-  nature: "",
-  originCaseNumber: "",
-  reRaffleDate: "",
-  reRaffleBranch: "",
-  consolitationDate: "",
-  consolidationBranch: "",
-  dateRemanded: "",
-  remandedNote: "",
-  errors: {},
-  saved: false,
-});
-
-const caseToEntry = (item: CivilCaseData): FormEntry => ({
-  id: item.id,
-  sourceId: item.id,
-  caseNumber: item.caseNumber ?? "",
-  isManual: Boolean(item.isManual),
-  branch: item.branch ?? "",
-  assistantBranch: item.assistantBranch ?? "",
-  petitioners: item.petitioners ?? "",
-  defendants: item.defendants ?? "",
-  dateFiled: toDateInput(item.dateFiled),
-  notes: item.notes ?? "",
-  nature: item.nature ?? "",
-  originCaseNumber: item.originCaseNumber ?? "",
-  reRaffleDate: toDateInput(item.reRaffleDate),
-  reRaffleBranch: item.reRaffleBranch ?? "",
-  consolitationDate: toDateInput(item.consolitationDate),
-  consolidationBranch: item.consolidationBranch ?? "",
-  dateRemanded: toDateInput(item.dateRemanded),
-  remandedNote: item.remandedNote ?? "",
-  errors: {},
-  saved: false,
-});
+};
 
 function validateEntry(
-  entry: FormEntry,
+  entry: CivilCaseEntry,
   options: { requireCaseNumber: boolean },
 ): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -391,6 +356,24 @@ function validateEntry(
 
   return errors;
 }
+
+const toCellInputValue = (entry: CivilCaseEntry, col: ColDef): string => {
+  const rawValue = entry[col.key];
+
+  if (col.type === "date") {
+    return toDateInput(rawValue as string | Date | null | undefined);
+  }
+
+  if (typeof rawValue === "string") {
+    return rawValue;
+  }
+
+  if (rawValue == null) {
+    return "";
+  }
+
+  return String(rawValue);
+};
 
 const CellInput = ({
   col,
@@ -429,18 +412,21 @@ function ReviewCard({
   displayCaseNumber,
   isExistingCase,
 }: {
-  entry: FormEntry;
+  entry: CivilCaseEntry;
   displayCaseNumber: string;
   isExistingCase: boolean;
 }) {
-  const fmtDate = (d: string) =>
-    d
-      ? new Date(d).toLocaleDateString("en-PH", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : null;
+  const fmtDate = (d: Date | string | null | undefined) => {
+    if (!d) return null;
+    // Accept Date objects or ISO/string values from server
+    const date = d instanceof Date ? d : new Date(String(d));
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   return (
     <div className="rv-card">
@@ -626,9 +612,9 @@ export const CivilCaseUpdatePage = ({
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const [entries, setEntries] = useState<FormEntry[]>(() => {
-    if (isEdit) return editCases.map(caseToEntry);
-    return [createEmptyEntry(AUTO_DEFAULT_AREA)];
+  const [entries, setEntries] = useState<CivilCaseEntry[]>(() => {
+    if (isEdit) return editCases.map(civilCaseToEntry);
+    return [withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea)];
   });
 
   useEffect(() => {
@@ -636,11 +622,13 @@ export const CivilCaseUpdatePage = ({
     setActiveTab(0);
 
     if (isEdit) {
-      setEntries(editCases.map(caseToEntry));
+      setEntries(editCases.map(civilCaseToEntry));
       return;
     }
 
-    setEntries([createEmptyEntry(AUTO_DEFAULT_AREA)]);
+    setEntries([
+      withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea),
+    ]);
   }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
@@ -675,7 +663,7 @@ export const CivilCaseUpdatePage = ({
         const parsed = parseCaseNumberParts(entry.caseNumber);
         return {
           entryId: entry.id,
-          area: parsed?.area ?? "",
+          area: parsed?.area || resolveAreaCode(defaultArea),
           year: getAutoYearFromDate(entry.dateFiled),
         };
       });
@@ -724,10 +712,10 @@ export const CivilCaseUpdatePage = ({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [adapter, entries, isEdit]);
+  }, [adapter, entries, isEdit, defaultArea]);
 
   const handleAreaChange = useCallback((id: number, areaInput: string) => {
-    const normalizedArea = normalizeAreaCode(areaInput);
+    const normalizedArea = resolveAreaCode(areaInput);
 
     setEntries((prev) =>
       prev.map((entry) =>
@@ -750,7 +738,7 @@ export const CivilCaseUpdatePage = ({
   }, []);
 
   const handleApplyDefaultAreaToRows = useCallback(() => {
-    const effectiveDefaultArea = normalizeAreaCode(defaultArea);
+    const effectiveDefaultArea = resolveAreaCode(defaultArea);
     setDefaultArea(effectiveDefaultArea);
 
     setEntries((prev) =>
@@ -787,7 +775,10 @@ export const CivilCaseUpdatePage = ({
   };
 
   const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(defaultArea)]);
+    setEntries((prev) => [
+      ...prev,
+      withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea),
+    ]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -804,7 +795,9 @@ export const CivilCaseUpdatePage = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
-    setEntries([createEmptyEntry(defaultArea)]);
+    setEntries([
+      withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea),
+    ]);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [defaultArea, entries.length, statusPopup]);
@@ -814,22 +807,20 @@ export const CivilCaseUpdatePage = ({
   };
 
   const handleDuplicate = (id: number) => {
-    const source = entries.find((entry) => entry.id === id);
+    const source = entries.find((e) => e.id === id);
     if (!source) return;
-
-    const dup: FormEntry = {
+    const dup: CivilCaseEntry = {
       ...source,
       id: createTempId(),
-      sourceId: undefined,
       caseNumber: source.isManual ? "" : source.caseNumber,
       errors: {},
       saved: false,
+      collapsed: false,
     };
-
     setEntries((prev) => {
-      const index = prev.findIndex((entry) => entry.id === id);
+      const idx = prev.findIndex((e) => e.id === id);
       const next = [...prev];
-      next.splice(index + 1, 0, dup);
+      next.splice(idx + 1, 0, dup);
       return next;
     });
   };
@@ -867,7 +858,7 @@ export const CivilCaseUpdatePage = ({
 
   const incompleteCount = entries.length - completedCount;
 
-  const getDisplayCaseNumber = (entry: FormEntry): string => {
+  const getDisplayCaseNumber = (entry: CivilCaseEntry): string => {
     if (entry.isManual || isEdit) {
       return entry.caseNumber || "";
     }
@@ -993,45 +984,24 @@ export const CivilCaseUpdatePage = ({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const buildPayload = (entry: FormEntry) => {
+  const buildPayload = (e: CivilCaseEntry) => {
+    const { id, errors, collapsed, saved, isManual, ...caseInput } = e;
+
     const caseNumberForPayload =
-      !isEdit && !entry.isManual
-        ? autoCaseNumbersByRow[entry.id] ||
+      !isEdit && !isManual
+        ? autoCaseNumbersByRow[e.id] ||
           formatCaseNumber(
-            getAreaFromCaseNumber(entry.caseNumber, ""),
+            getAreaFromCaseNumber(String(caseInput.caseNumber ?? ""), ""),
             1,
-            getAutoYearFromDate(entry.dateFiled),
+            getAutoYearFromDate(caseInput.dateFiled),
           )
-        : entry.caseNumber.trim();
+        : caseInput.caseNumber;
 
-    const payload = {
+    return CivilCaseSchema.safeParse({
+      ...caseInput,
       caseNumber: caseNumberForPayload,
-      branch: entry.branch.trim() || null,
-      assistantBranch: entry.assistantBranch.trim() || null,
-      dateFiled: entry.dateFiled
-        ? new Date(entry.dateFiled).toISOString()
-        : null,
-      caseType: CaseType.CIVIL,
-      petitioners: entry.petitioners.trim() || null,
-      defendants: entry.defendants.trim() || null,
-      notes: entry.notes.trim() || null,
-      nature: entry.nature.trim() || null,
-      originCaseNumber: entry.originCaseNumber.trim() || null,
-      reRaffleDate: entry.reRaffleDate
-        ? new Date(entry.reRaffleDate).toISOString()
-        : null,
-      reRaffleBranch: entry.reRaffleBranch.trim() || null,
-      consolitationDate: entry.consolitationDate
-        ? new Date(entry.consolitationDate).toISOString()
-        : null,
-      consolidationBranch: entry.consolidationBranch.trim() || null,
-      dateRemanded: entry.dateRemanded
-        ? new Date(entry.dateRemanded).toISOString()
-        : null,
-      remandedNote: entry.remandedNote.trim() || null,
-    };
-
-    return CivilCaseSchema.safeParse(payload);
+      caseType: "CIVIL",
+    });
   };
 
   const handleSubmit = async () => {
@@ -1087,17 +1057,21 @@ export const CivilCaseUpdatePage = ({
 
     try {
       if (isEdit) {
+        const originalById = new Map(editCases.map((item) => [item.id, item]));
+
         for (const entry of entries) {
-          const sourceId =
-            entry.sourceId ?? (entry.id > 0 ? entry.id : undefined);
-          if (!sourceId) {
-            throw new Error("Missing source case id for edit");
+          const original = originalById.get(entry.id);
+          if (!original) {
+            throw new Error("Missing original case for edit");
           }
 
           const parsed = buildPayload(entry);
           if (!parsed.success) throw new Error("Invalid case data");
 
-          const response = await adapter.updateCivilCase(sourceId, parsed.data);
+          const response = await adapter.updateCivilCase(
+            original.id,
+            parsed.data,
+          );
           if (!response.success) {
             throw new Error(response.error || "Failed to update case");
           }
@@ -1493,7 +1467,7 @@ export const CivilCaseUpdatePage = ({
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           entry.caseNumber,
-                          "",
+                          defaultArea,
                         );
                         const autoAreaMissing = !autoAreaValue;
                         const rowHasExistingCase =
@@ -1544,7 +1518,7 @@ export const CivilCaseUpdatePage = ({
                                         <input
                                           className="xls-input xls-mono"
                                           style={{ width: "100%" }}
-                                          value={entry.caseNumber}
+                                          value={entry.caseNumber ?? ""}
                                           onChange={(e) =>
                                             handleChange(
                                               entry.id,
@@ -1614,7 +1588,7 @@ export const CivilCaseUpdatePage = ({
                                 ) : (
                                   <CellInput
                                     col={col}
-                                    value={entry[col.key] as string}
+                                    value={toCellInputValue(entry, col)}
                                     error={entry.errors[col.key]}
                                     onChange={(v) =>
                                       handleChange(entry.id, col.key, v)
@@ -1628,7 +1602,7 @@ export const CivilCaseUpdatePage = ({
                               <td key={col.key}>
                                 <CellInput
                                   col={col}
-                                  value={entry[col.key] as string}
+                                  value={toCellInputValue(entry, col)}
                                   error={entry.errors[col.key]}
                                   onChange={(v) =>
                                     handleChange(entry.id, col.key, v)
