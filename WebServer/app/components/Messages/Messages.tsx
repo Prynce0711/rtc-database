@@ -1,6 +1,5 @@
 "use client";
 
-import { ChatData, Message } from "@/@types/network";
 import {
   createGroupChat as createGroupChatAction,
   getChatById,
@@ -8,7 +7,13 @@ import {
 } from "@/app/components/Messages/MessagesActions";
 import { ChatType, Roles } from "@/app/generated/prisma/browser";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
-import { useMessaging, usePopup, useSession } from "@rtc-database/shared";
+import {
+  ChatData,
+  Message,
+  useMessaging,
+  usePopup,
+  useSession,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import React, {

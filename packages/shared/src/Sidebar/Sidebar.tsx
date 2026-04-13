@@ -1,10 +1,6 @@
 "use client";
 
-import { authClient, useSession } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import React, { ReactNode, useEffect, useState } from "react";
 import { FaHistory, FaUserCog } from "react-icons/fa";
 import {
@@ -22,9 +18,20 @@ import {
   FiSun,
   FiUsers,
 } from "react-icons/fi";
-import { updateDarkMode } from "./DarkModeActions";
+import {
+  AdaptiveImage as Image,
+  AdaptiveLink as Link,
+  useAdaptivePathname as usePathname,
+  useAdaptiveNavigation as useRouter,
+} from "../lib/nextCompat";
+import {
+  SidebarAdapterProps,
+  SidebarSession,
+  SidebarTheme,
+  SidebarThemeUpdateResult,
+} from "../lib/sidebarAdapter";
 // --- Types --------------------------------------------------------------------
-interface SidebarProps {
+export interface SidebarProps extends SidebarAdapterProps {
   children: ReactNode;
 }
 
@@ -389,9 +396,6 @@ const caseNavItems: NavItem[] = [
 // Backwards-compatible aliases used across the file
 const caseManagementNavItem: NavItem = caseNavItems[0];
 const statisticsNavItem: NavItem = caseNavItems[1];
-const adminStatisticsNavItem: NavItem = caseNavItems[2];
-const archivesNavItem: NavItem = caseNavItems[3];
-const notarialNavItem: NavItem = caseNavItems[4];
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
@@ -654,7 +658,6 @@ function statsSidebar({
   theme,
   onToggleTheme,
   onOpenMessages,
-  onOpenNotifications,
   onOpenSettings,
 }: SidebarMenuProps) {
   return (
@@ -1097,12 +1100,31 @@ const UserCard = ({
   );
 };
 
+const isThemeUpdateFailure = (result: SidebarThemeUpdateResult): boolean => {
+  if (typeof result === "boolean") {
+    return result === false;
+  }
+
+  if (result && typeof result === "object" && "success" in result) {
+    return result.success === false;
+  }
+
+  return false;
+};
+
 // --- Sidebar ------------------------------------------------------------------
-const Sidebar: React.FC<SidebarProps> = ({ children }) => {
-  const { data: session } = useSession();
+const Sidebar: React.FC<SidebarProps> = ({
+  children,
+  session: providedSession,
+  sessionState,
+  onSignOut,
+  updateDarkMode,
+}) => {
   const router = useRouter();
   const pathname = usePathname();
-  const activeView = pathname.split("/")[2] || "dashboard";
+  const session: SidebarSession | null =
+    providedSession ?? sessionState?.data ?? null;
+  const activeView = pathname.split("/")[2] || "";
 
   const [theme, setTheme] = useState<"winter" | "dim">("winter");
   const [collapsed, setCollapsed] = useState(false);
@@ -1118,23 +1140,31 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     setTheme(current);
   }, []);
 
-  async function updateTheme(newTheme: "winter" | "dim") {
-    const result = await updateDarkMode(newTheme);
-    if (result.success) {
-      setTheme(newTheme);
+  async function updateTheme(newTheme: SidebarTheme) {
+    if (updateDarkMode) {
+      const result = await updateDarkMode(newTheme);
+      if (isThemeUpdateFailure(result)) {
+        return;
+      }
+    }
+
+    setTheme(newTheme);
+    if (typeof document !== "undefined") {
       document.documentElement.setAttribute("data-theme", newTheme);
     }
   }
 
   async function handleLogout() {
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          document.documentElement.setAttribute("data-theme", "winter");
-          router.push("/");
-        },
-      },
-    });
+    try {
+      if (onSignOut) {
+        await onSignOut();
+      }
+    } finally {
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("data-theme", "winter");
+      }
+      router.push("/");
+    }
   }
 
   const role = session?.user?.role;

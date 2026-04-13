@@ -1,3 +1,6 @@
+/// <reference path="./types/electron.d.ts" />
+/// <reference path="./types/network.d.ts" />
+
 export type { default as ActionResult } from "./ActionResult";
 export { default as DefaultLoading } from "./DefaultLoading";
 
@@ -23,6 +26,8 @@ export { default as SuccessPopup } from "./Popup/SuccessPopup";
 
 export { default as RedirectingUI } from "./Redirect/RedirectingUI";
 export { default as SpinningLoader } from "./Redirect/SpinningLoader";
+
+export { default as Sidebar } from "./Sidebar/Sidebar";
 
 export { default as Collapse } from "./Collapse";
 
@@ -59,7 +64,9 @@ export type {
   User as AuthUser,
 } from "./lib/authClient";
 export * from "./lib/excel";
+export * from "./lib/nextCompat";
 export { default as Roles } from "./lib/Roles";
+export * from "./lib/sidebarAdapter";
 export * from "./lib/socket";
 export * from "./lib/socket/hooks/useMessaging";
 export { default as useIsMobile } from "./lib/socket/hooks/useMobile";
@@ -74,4 +81,5 @@ export * from "./lib/utils";
 export { UDP_SERVICE_NAME, UdpData } from "./UdpData";
 export type { BackendInfo } from "./UdpData";
 
+export type * from "./types/electron";
 export type * from "./types/network";

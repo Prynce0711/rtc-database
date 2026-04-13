@@ -1,13 +1,17 @@
 "use client";
 
-import { ChatData } from "@/@types/network";
 import {
   createManyChatsWithOthers,
   getChatById,
   getChats,
   removeManyChatsWithOthers,
 } from "@/app/components/Messages/MessagesActions";
-import { useMessaging, useSession, useSocket } from "@rtc-database/shared";
+import {
+  ChatData,
+  useMessaging,
+  useSession,
+  useSocket,
+} from "@rtc-database/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function ChatTest() {

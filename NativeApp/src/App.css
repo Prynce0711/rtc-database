@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui";
+@source "../../packages/shared/src";
 
 /* ==========================================================================
    LIGHT THEME — EXECUTIVE COUNSEL PRO

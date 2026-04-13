@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import React from "react";
+import { AdaptiveLink } from "../lib/nextCompat";
 import SidebarDropdown, { SidebarDropdownProps } from "./SidebarDropdown";
 
 const SidebarButton = ({
@@ -11,14 +10,15 @@ const SidebarButton = ({
   label,
   active,
   dropdowns,
+  pathname,
 }: {
   icon: React.ReactNode;
   href: string;
   label: string;
   active: string;
   dropdowns?: SidebarDropdownProps[];
+  pathname: string;
 }) => {
-  const pathname = usePathname();
   const isActive = active === href || pathname.startsWith(`/user/${href}`);
   const currentSub = pathname.split("/")[3] || "";
 
@@ -49,7 +49,7 @@ const SidebarButton = ({
           {open ? null : null}
         </button>
       ) : (
-        <Link
+        <AdaptiveLink
           href={`/user/${href}`}
           className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-150 ${
             isActive
@@ -66,13 +66,13 @@ const SidebarButton = ({
           {isActive && (
             <div className="h-1.5 w-1.5 rounded-full bg-primary-content/70 shrink-0" />
           )}
-        </Link>
+        </AdaptiveLink>
       )}
 
       {open && dropdowns && dropdowns.length > 0 && (
         <div className="mt-0.5 ml-4 pl-3 border-l border-base-300 space-y-0.5 py-1">
           {dropdowns.map((dropdown) => (
-            <Link
+            <AdaptiveLink
               key={dropdown.href}
               href={`/user/${href}${dropdown.href ? `/${dropdown.href}` : ""}`}
               className={`group flex items-center rounded-lg px-3 py-2 transition-all duration-150 ${
@@ -82,7 +82,7 @@ const SidebarButton = ({
               }`}
             >
               <SidebarDropdown {...dropdown} />
-            </Link>
+            </AdaptiveLink>
           ))}
         </div>
       )}

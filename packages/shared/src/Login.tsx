@@ -7,11 +7,13 @@ import {
   motion,
   useAnimation,
 } from "framer-motion";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import { isDarkMode } from "../lib/utils";
+import {
+  AdaptiveImage as Image,
+  useAdaptiveNavigation as useRouter,
+} from "./lib/nextCompat";
+import { isDarkMode } from "./lib/utils";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
