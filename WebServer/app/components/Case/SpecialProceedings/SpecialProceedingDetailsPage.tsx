@@ -1,82 +1,63 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import type { SpecialProceedingData } from "@/app/components/Case/SpecialProceedings/schema";
 import {
-  useAdaptiveNavigation,
-  useAdaptivePathname,
-} from "../../lib/nextCompat";
+  getSpecialProceedingById,
+  getSpecialProceedings,
+} from "@/app/components/Case/SpecialProceedings/SpecialProceedingActions";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
-} from "../CaseDetailsShared";
-import NavButton from "../NavButton";
-import type { CriminalCaseAdapter } from "./CriminalCaseAdapter";
-import type { CriminalCaseData } from "./CriminalCaseSchema";
+  NavButton,
+  PageDetailSkeleton,
+} from "@rtc-database/shared";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function CriminalCaseDetailsPage({
-  adapter,
-}: {
-  adapter: CriminalCaseAdapter;
-}) {
-  const router = useAdaptiveNavigation();
-  const pathname = useAdaptivePathname();
-  const idParam = useMemo(() => {
-    const segments = pathname.split("/").filter(Boolean);
-    return segments.length > 0 ? segments[segments.length - 1] : "";
-  }, [pathname]);
+export default function SpecialProceedingDetailsPage() {
+  const router = useRouter();
+  const params = useParams();
 
-  const [caseData, setCaseData] = useState<CriminalCaseData | null>(null);
-  const [prevCase, setPrevCase] = useState<CriminalCaseData | null>(null);
-  const [nextCase, setNextCase] = useState<CriminalCaseData | null>(null);
+  const [caseData, setCaseData] = useState<SpecialProceedingData | null>(null);
+  const [prevCase, setPrevCase] = useState<SpecialProceedingData | null>(null);
+  const [nextCase, setNextCase] = useState<SpecialProceedingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"details" | "additional">(
-    "details",
-  );
+  const [activeTab, setActiveTab] = useState<"details" | "parties">("details");
 
   useEffect(() => {
-    const fetchCase = async () => {
-      try {
-        setLoading(true);
-        const numId = Number(idParam);
+    const load = async () => {
+      setLoading(true);
+      const numId = Number(params.id);
 
-        // Fetch current + adjacent cases in parallel
-        const [current, prev, next] = await Promise.allSettled([
-          adapter.getCriminalCaseById(numId),
-          adapter.getCriminalCaseById(numId - 1),
-          adapter.getCriminalCaseById(numId + 1),
-        ]);
-
-        if (current.status === "fulfilled" && current.value.success)
-          setCaseData(current.value.result);
-        if (prev.status === "fulfilled" && prev.value.success)
-          setPrevCase(prev.value.result);
-        else setPrevCase(null);
-        if (next.status === "fulfilled" && next.value.success)
-          setNextCase(next.value.result);
-        else setNextCase(null);
-      } catch (err) {
-        console.error(err);
-      } finally {
+      // Fetch the current record
+      const res = await getSpecialProceedingById(numId);
+      if (!res.success || !res.result) {
+        setCaseData(null);
+        setPrevCase(null);
+        setNextCase(null);
         setLoading(false);
+        return;
       }
+      setCaseData(res.result);
+
+      // Fetch all for prev/next navigation
+      const allRes = await getSpecialProceedings();
+      if (allRes.success && allRes.result?.items) {
+        const all = allRes.result.items;
+        const idx = all.findIndex((c) => c.id === numId);
+        setPrevCase(idx > 0 ? all[idx - 1] : null);
+        setNextCase(idx < all.length - 1 ? all[idx + 1] : null);
+      }
+      setLoading(false);
     };
-    if (idParam) fetchCase();
-  }, [idParam, adapter]);
+    load();
+  }, [params.id]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="min-h-screen bg-base-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <span className="loading loading-spinner loading-md text-primary/40" />
-          <p className="text-[12px] font-bold uppercase tracking-widest text-base-content/25 select-none">
-            Loading case…
-          </p>
-        </div>
-      </div>
-    );
+    return <PageDetailSkeleton />;
   }
 
   // ── Not found ──────────────────────────────────────────────────────────────
@@ -85,7 +66,7 @@ export default function CriminalCaseDetailsPage({
       <div className="min-h-screen bg-base-100 flex items-center justify-center">
         <div className="text-center space-y-4">
           <p className="text-[11px] font-bold uppercase tracking-widest text-base-content/30">
-            Case not found
+            Record not found
           </p>
           <button
             onClick={() => router.back()}
@@ -97,6 +78,8 @@ export default function CriminalCaseDetailsPage({
       </div>
     );
   }
+
+  const currentId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -131,7 +114,7 @@ export default function CriminalCaseDetailsPage({
 
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-[12px] font-semibold text-base-content/30 select-none">
-            <span>Cases</span>
+            <span>Special Proceedings</span>
             <span className="opacity-40">/</span>
             <span className="text-base-content/55 font-bold">
               {caseData.caseNumber}
@@ -142,13 +125,14 @@ export default function CriminalCaseDetailsPage({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() =>
-                prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
+                prevCase &&
+                router.push(`/user/cases/proceedings/${prevCase.id}`)
               }
               disabled={!prevCase}
               title={
                 prevCase
                   ? `Previous: ${prevCase.caseNumber}`
-                  : "No previous case"
+                  : "No previous record"
               }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
             >
@@ -169,17 +153,20 @@ export default function CriminalCaseDetailsPage({
               </svg>
             </button>
 
-            {/* ID counter */}
+            {/* Counter */}
             <span className="text-[11px] font-bold text-base-content/25 tabular-nums px-2 select-none min-w-9 text-center">
-              #{idParam}
+              #{currentId}
             </span>
 
             <button
               onClick={() =>
-                nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
+                nextCase &&
+                router.push(`/user/cases/proceedings/${nextCase.id}`)
               }
               disabled={!nextCase}
-              title={nextCase ? `Next: ${nextCase.caseNumber}` : "No next case"}
+              title={
+                nextCase ? `Next: ${nextCase.caseNumber}` : "No next record"
+              }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
             >
               <svg
@@ -209,32 +196,18 @@ export default function CriminalCaseDetailsPage({
         {/* ── Hero Block ───────────────────────────────────── */}
         <div className="space-y-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary/55">
-            Case Record
+            Special Proceeding
           </p>
           <h1 className="text-[34px] font-bold text-base-content tracking-tight leading-tight">
             {caseData.caseNumber}
           </h1>
           <div className="flex items-center gap-4 flex-wrap">
             <p className="text-[15px] text-base-content/45 font-medium">
-              Filed {formatLongDate(caseData.dateFiled)}
+              Filed {formatLongDate(caseData.date)}
             </p>
-
-            {/* Detention badge */}
-            <span
-              className={[
-                "inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold border",
-                caseData.detained
-                  ? "bg-error/8 text-error border-error/15"
-                  : "bg-success/8 text-success border-success/15",
-              ].join(" ")}
-            >
-              {caseData.detained ? "Detained" : "Released"}
-            </span>
-
-            {/* Branch badge */}
-            {caseData.branch && (
+            {caseData.raffledTo && (
               <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-semibold bg-base-200 text-base-content/50 border border-base-200">
-                {caseData.branch}
+                {caseData.raffledTo}
               </span>
             )}
           </div>
@@ -245,7 +218,7 @@ export default function CriminalCaseDetailsPage({
 
         {/* ── Tabs ─────────────────────────────────────────── */}
         <div className="flex items-end border-b border-base-200 gap-1">
-          {(["details", "additional"] as const).map((tab) => (
+          {(["details", "parties"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -256,7 +229,7 @@ export default function CriminalCaseDetailsPage({
                   : "border-transparent text-base-content/30 hover:text-base-content/55",
               ].join(" ")}
             >
-              {tab === "details" ? "Case Details" : "Additional Info"}
+              {tab === "details" ? "Case Details" : "Parties & Nature"}
             </button>
           ))}
         </div>
@@ -266,98 +239,47 @@ export default function CriminalCaseDetailsPage({
         ══════════════════════════════════════════ */}
         {activeTab === "details" && (
           <div className="space-y-10 animate-slide-up">
-            <DetailSection label="Case Overview">
+            <DetailSection label="Case Information">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <DetailField label="Case Number" value={caseData.caseNumber} />
-                <DetailField label="Branch" value={caseData.branch} />
+                <DetailField label="SPC No." value={caseData.caseNumber} />
                 <DetailField
-                  label="Assistant Branch"
-                  value={caseData.assistantBranch}
-                />
-                <DetailField label="Accused" value={caseData.name} />
-                <DetailField label="Charge" value={caseData.charge} />
-                <DetailField label="Court" value={caseData.court} />
-                <DetailField label="Info Sheet" value={caseData.infoSheet} />
-                <DetailField label="Bond" value={caseData.bond} />
-                <DetailField label="EQC Number" value={caseData.eqcNumber} />
-                <DetailField
-                  label="Consolidation"
-                  value={caseData.consolidation}
+                  label="Raffled to Branch"
+                  value={caseData.raffledTo}
                 />
                 <DetailField
                   label="Date Filed"
-                  value={formatLongDate(caseData.dateFiled)}
+                  value={formatLongDate(caseData.date)}
                 />
-                <DetailField
-                  label="Raffle Date"
-                  value={formatLongDate(caseData.raffleDate)}
-                />
+                <div className="md:col-span-2 lg:col-span-3">
+                  <DetailField
+                    label="Nature of Petition"
+                    value={caseData.nature}
+                  />
+                </div>
               </div>
             </DetailSection>
           </div>
         )}
 
         {/* ══════════════════════════════════════════
-            TAB — ADDITIONAL INFO
+            TAB — PARTIES & NATURE
         ══════════════════════════════════════════ */}
-        {activeTab === "additional" && (
-          <div className="space-y-12 animate-slide-up">
-            {/* Parties */}
-            <DetailSection label="Parties">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <DetailField label="Judge" value={caseData.judge} />
-                <DetailField label="AO" value={caseData.ao} />
-                <DetailField label="Complainant" value={caseData.complainant} />
-              </div>
-            </DetailSection>
-
-            {/* Divider */}
-            <div className="h-px bg-base-200" />
-
-            {/* Committee */}
-            <DetailSection label="Committee">
+        {activeTab === "parties" && (
+          <div className="space-y-10 animate-slide-up">
+            <DetailSection label="Parties Involved">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <DetailField label="Committee 1" value={caseData.committee1} />
-                <DetailField label="Committee 2" value={caseData.committee2} />
+                <DetailField label="Petitioners" value={caseData.petitioner} />
+                <DetailField label="Respondent" value={caseData.respondent} />
               </div>
             </DetailSection>
 
-            {/* Divider */}
             <div className="h-px bg-base-200" />
 
-            {/* Address */}
-            <DetailSection label="Address">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <DetailField label="House No." value={caseData.houseNo} />
-                <DetailField label="Street" value={caseData.street} />
-                <DetailField label="Barangay" value={caseData.barangay} />
+            <DetailSection label="Nature">
+              <div className="grid grid-cols-1 gap-5">
                 <DetailField
-                  label="Municipality"
-                  value={caseData.municipality}
-                />
-                <DetailField label="Province" value={caseData.province} />
-              </div>
-            </DetailSection>
-
-            {/* Divider */}
-            <div className="h-px bg-base-200" />
-
-            {/* Financial */}
-            <DetailSection label="Financial Details">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <DetailField label="Counts" value={caseData.counts} />
-                <DetailField label="JDF" value={caseData.jdf} mono />
-                <DetailField label="SAJJ" value={caseData.sajj} mono />
-                <DetailField label="SAJJ2" value={caseData.sajj2} mono />
-                <DetailField label="MF" value={caseData.mf} mono />
-                <DetailField label="STF" value={caseData.stf} mono />
-                <DetailField label="LRF" value={caseData.lrf} mono />
-                <DetailField label="VCF" value={caseData.vcf} mono />
-                <DetailField label="Total" value={caseData.total} mono />
-                <DetailField
-                  label="Amount Involved"
-                  value={caseData.amountInvolved}
-                  mono
+                  label="Nature of Petition"
+                  value={caseData.nature}
                 />
               </div>
             </DetailSection>
@@ -366,22 +288,22 @@ export default function CriminalCaseDetailsPage({
 
         {/* ── Prev / Next bottom nav ────────────────────────── */}
         <div className="h-px bg-base-200" />
-        <div className="flex items-stretch justify-between gap-3">
+        <div className="flex items-stretch gap-3">
           <NavButton
             direction="prev"
             label={prevCase?.caseNumber ?? "—"}
-            sublabel={prevCase?.name ?? undefined}
+            sublabel={prevCase?.petitioner ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
+              prevCase && router.push(`/user/cases/proceedings/${prevCase.id}`)
             }
             disabled={!prevCase}
           />
           <NavButton
             direction="next"
             label={nextCase?.caseNumber ?? "—"}
-            sublabel={nextCase?.name ?? undefined}
+            sublabel={nextCase?.petitioner ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
+              nextCase && router.push(`/user/cases/proceedings/${nextCase.id}`)
             }
             disabled={!nextCase}
           />
@@ -391,10 +313,10 @@ export default function CriminalCaseDetailsPage({
         <div className="h-px bg-base-200" />
         <div className="flex items-center justify-between py-1">
           <p className="text-[11px] font-bold uppercase tracking-widest text-base-content/20 select-none">
-            Case Filing System
+            Special Proceedings System
           </p>
           <p className="text-[11px] text-base-content/20 font-semibold select-none">
-            Filed {formatLongDate(caseData.dateFiled)}
+            Filed {formatLongDate(caseData.date)}
           </p>
         </div>
       </main>

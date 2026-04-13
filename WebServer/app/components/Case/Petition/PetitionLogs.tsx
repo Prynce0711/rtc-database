@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import {
   ExactMatchMap,
@@ -28,7 +29,6 @@ import { deletePetition, getPetitions } from "./PetitionActions";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";
 import ReceiveRow from "./PetitionRow";
 import { PetitionCaseData } from "./schema";
-import { useSession } from "@/app/lib/authClient";
 
 type PetitionFilterValues = {
   caseNumber?: string;
@@ -704,6 +704,7 @@ const ReceiveLogsPage: React.FC = () => {
             <ReceiveRow
               key={log.id}
               log={log}
+              onView={(l) => router.push(`/user/cases/petition/${l.id}`)}
               onEdit={(l) =>
                 router.push(`/user/cases/petition/edit?id=${l.id}`)
               }

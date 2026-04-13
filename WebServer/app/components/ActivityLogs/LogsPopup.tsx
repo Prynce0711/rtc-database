@@ -1,150 +1,14 @@
 import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
+import {
+  DetailField,
+  DetailSection,
+  formatLongDate,
+  NavButton,
+} from "@rtc-database/shared";
 import { useMemo, useState } from "react";
 import LogBadges from "./LogBadges";
 import { CompleteLogData } from "./schema";
-
-// ─── Shared UI pieces (copied layout style from Cases details page) ─────────-
-
-const NavButton = ({
-  direction,
-  label,
-  sublabel,
-  onClick,
-  disabled,
-}: {
-  direction: "prev" | "next";
-  label: string;
-  sublabel?: string;
-  onClick: () => void;
-  disabled: boolean;
-}) => {
-  const isPrev = direction === "prev";
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={[
-        "group flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150 min-w-0",
-        disabled
-          ? "opacity-25 cursor-not-allowed border-base-200 bg-transparent"
-          : "border-base-200 bg-base-100 hover:bg-base-200/60 hover:border-base-content/15",
-        isPrev ? "" : "flex-row-reverse text-right",
-      ].join(" ")}
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        className="shrink-0 text-base-content/30 group-hover:text-base-content/60 transition-colors"
-        aria-hidden="true"
-      >
-        {isPrev ? (
-          <path
-            d="M10 3L5 8L10 13"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : (
-          <path
-            d="M6 3L11 8L6 13"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
-      </svg>
-
-      <div
-        className={["min-w-0", isPrev ? "" : "items-end flex flex-col"].join(
-          " ",
-        )}
-      >
-        <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
-          {isPrev ? "Previous" : "Next"}
-        </p>
-        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-40 transition-colors leading-snug">
-          {label}
-        </p>
-        {sublabel && (
-          <p className="text-[11px] text-base-content/30 truncate max-w-40 leading-snug mt-0.5">
-            {sublabel}
-          </p>
-        )}
-      </div>
-    </button>
-  );
-};
-
-const Detail = ({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: unknown;
-  mono?: boolean;
-}) => {
-  const isEmpty =
-    value === null || value === undefined || value === "" || value === "N/A";
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-base-content/30 select-none">
-        {label}
-      </span>
-      <div
-        className={[
-          "px-5 py-4 rounded-xl border min-h-14.5 flex items-center",
-          isEmpty
-            ? "bg-base-200/40 border-base-200/60"
-            : "bg-base-200/70 border-base-200",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "leading-relaxed",
-            isEmpty
-              ? "text-[13px] italic text-base-content/25 font-normal"
-              : mono
-                ? "font-mono text-[13px] text-base-content/60"
-                : "text-[15px] font-semibold text-base-content",
-          ].join(" ")}
-        >
-          {isEmpty ? "—" : String(value)}
-        </span>
-      </div>
-    </div>
-  );
-};
-
-const Section = ({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) => (
-  <div className="space-y-5">
-    <p className="text-[15px] font-bold uppercase tracking-[0.14em] text-base-content">
-      {label}
-    </p>
-    {children}
-  </div>
-);
-
-const formatDate = (date: Date | string | null | undefined) => {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-PH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
 
 const LogsPopup = ({
   selectedLog,
@@ -295,7 +159,7 @@ const LogsPopup = ({
 
           <div className="flex items-center gap-4 flex-wrap">
             <p className="text-[15px] text-base-content/45 font-medium">
-              Logged {formatDate(selectedLog.timestamp)}
+              Logged {formatLongDate(selectedLog.timestamp)}
             </p>
             <LogBadges logAction={selectedLog.action as LogAction} />
           </div>
@@ -326,26 +190,40 @@ const LogsPopup = ({
         ══════════════════════════════════════════ */}
         {activeTab === "details" && (
           <div className="space-y-10 animate-slide-up">
-            <Section label="Overview">
+            <DetailSection label="Overview">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <Detail label="User" value={selectedLog.user?.name ?? "N/A"} />
-                <Detail
+                <DetailField
+                  label="User"
+                  value={selectedLog.user?.name ?? "N/A"}
+                />
+                <DetailField
                   label="Email"
                   value={selectedLog.user?.email ?? "N/A"}
                 />
-                <Detail label="Role" value={selectedLog.user?.role ?? "N/A"} />
-                <Detail label="Action" value={selectedLog.action} mono />
-                <Detail
+                <DetailField
+                  label="Role"
+                  value={selectedLog.user?.role ?? "N/A"}
+                />
+                <DetailField label="Action" value={selectedLog.action} mono />
+                <DetailField
                   label="Timestamp"
                   value={new Date(selectedLog.timestamp).toLocaleString()}
                   mono
                 />
-                <Detail label="IP Address" value={selectedLog.ipAddress} mono />
-                <Detail label="User Agent" value={selectedLog.userAgent} mono />
+                <DetailField
+                  label="IP Address"
+                  value={selectedLog.ipAddress}
+                  mono
+                />
+                <DetailField
+                  label="User Agent"
+                  value={selectedLog.userAgent}
+                  mono
+                />
               </div>
-            </Section>
+            </DetailSection>
 
-            <Section label="Summary">
+            <DetailSection label="Summary">
               <div className="px-5 py-4 rounded-xl border bg-base-200/70 border-base-200 space-y-3">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-base-content/30 select-none">
@@ -364,7 +242,7 @@ const LogsPopup = ({
                   </p>
                 </div>
               </div>
-            </Section>
+            </DetailSection>
           </div>
         )}
 
@@ -373,13 +251,13 @@ const LogsPopup = ({
         ══════════════════════════════════════════ */}
         {activeTab === "additional" && (
           <div className="space-y-10 animate-slide-up">
-            <Section label="Raw Details">
+            <DetailSection label="Raw Details">
               <div className="px-5 py-4 rounded-xl border bg-base-200/70 border-base-200">
                 <pre className="bg-base-300/50 p-3 rounded-lg overflow-auto max-h-105 text-xs font-mono text-base-content/70 leading-relaxed">
                   {JSON.stringify(selectedLog.details ?? null, null, 2)}
                 </pre>
               </div>
-            </Section>
+            </DetailSection>
           </div>
         )}
 

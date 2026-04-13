@@ -2,6 +2,7 @@
 
 import { RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import {
   ActionDropdown,
@@ -21,6 +22,7 @@ import {
   FiBarChart2,
   FiDownload,
   FiEdit,
+  FiEye,
   FiFileText,
   FiLock,
   FiSearch,
@@ -35,7 +37,6 @@ import {
   getRecievingLogsStats,
 } from "./RecievingLogsActions";
 import type { ReceivingLogFilterOptions } from "./schema";
-import { useSession } from "@/app/lib/authClient";
 
 type ReceiveLog = RecievingLog;
 type ReceiveSortKey =
@@ -65,6 +66,7 @@ const extractTime = (date: Date | string | null | undefined): string => {
 
 const ReceiveRow = ({
   log,
+  onView,
   onEdit,
   onDelete,
   isAdminOrAtty,
@@ -72,6 +74,7 @@ const ReceiveRow = ({
   onToggleSelect,
 }: {
   log: ReceiveLog;
+  onView?: (log: ReceiveLog) => void;
   onEdit: (log: ReceiveLog) => void;
   onDelete: (log: ReceiveLog) => void;
   isAdminOrAtty: boolean;
@@ -91,7 +94,10 @@ const ReceiveRow = ({
   };
 
   return (
-    <tr className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm">
+    <tr
+      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
+      onClick={() => onView?.(log)}
+    >
       {isAdminOrAtty && onToggleSelect && (
         <td className="text-center" onClick={(e) => e.stopPropagation()}>
           <input
@@ -109,6 +115,19 @@ const ReceiveRow = ({
           onClick={(e) => e.stopPropagation()}
         >
           <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+            <li>
+              <button
+                className="flex items-center gap-3 text-info"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onView?.(log);
+                }}
+              >
+                <FiEye size={16} />
+                <span>View</span>
+              </button>
+            </li>
             <li>
               <button
                 className="flex items-center gap-3 text-warning"
@@ -848,6 +867,7 @@ const ReceiveLogsPage: React.FC = () => {
               <ReceiveRow
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
+                onView={(l) => router.push(`/user/cases/receiving/${l.id}`)}
                 isAdminOrAtty={isAdminOrAtty}
                 onEdit={(l) =>
                   router.push(`/user/cases/receiving/edit?id=${l.id}`)

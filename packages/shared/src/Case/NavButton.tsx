@@ -1,5 +1,3 @@
-"use client";
-
 const NavButton = ({
   direction,
   label,
@@ -23,7 +21,7 @@ const NavButton = ({
         disabled
           ? "opacity-25 cursor-not-allowed border-base-200 bg-transparent"
           : "border-base-200 bg-base-100 hover:bg-base-200/60 hover:border-base-content/15",
-        isPrev ? "" : "flex-row-reverse",
+        isPrev ? "" : "flex-row-reverse text-right",
       ].join(" ")}
     >
       {/* Chevron */}
@@ -63,11 +61,11 @@ const NavButton = ({
         <p className="text-[10px] font-bold uppercase tracking-widest text-base-content/25 select-none leading-none mb-1">
           {isPrev ? "Previous" : "Next"}
         </p>
-        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-[200px] transition-colors leading-snug">
+        <p className="text-[13px] font-bold text-base-content/60 group-hover:text-base-content truncate max-w-40 transition-colors leading-snug">
           {label}
         </p>
         {sublabel && (
-          <p className="text-[11px] text-base-content/30 truncate max-w-[200px] leading-snug mt-0.5">
+          <p className="text-[11px] text-base-content/30 truncate max-w-40 leading-snug mt-0.5">
             {sublabel}
           </p>
         )}

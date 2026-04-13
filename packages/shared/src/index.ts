@@ -6,6 +6,7 @@ export { default as DefaultLoading } from "./DefaultLoading";
 
 export * from "./Case/BaseCaseAdapter";
 export * from "./Case/BaseCaseSchema";
+export * from "./Case/CaseDetailsShared";
 export * from "./Case/Criminal/CriminalCaseAdapter";
 export { default as CriminalCaseDetailsPage } from "./Case/Criminal/CriminalCaseDetailsPage";
 export { default as CriminalCasePage } from "./Case/Criminal/CriminalCasePage";
@@ -19,6 +20,7 @@ export {
   default as CriminalCaseUpdatePage,
   CriminalCaseUpdateType,
 } from "./Case/Criminal/CriminalCaseUpdatePage";
+export { default as NavButton } from "./Case/NavButton";
 
 export * from "./Filter/FilterDropdown";
 export { default as FilterDropdown } from "./Filter/FilterDropdown";

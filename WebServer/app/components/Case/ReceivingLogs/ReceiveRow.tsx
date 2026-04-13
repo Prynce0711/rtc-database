@@ -1,12 +1,12 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 import { ReceiveLog } from "./ReceiveRecord";
-import { useSession } from "@/app/lib/authClient";
 
 function ExpandableContent({
   text,
@@ -114,7 +114,7 @@ const ReceiveRow = ({
               className="btn btn-ghost btn-sm px-2"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/user/cases/proceedings/${log.id}`);
+                router.push(`/user/cases/receiving/${log.id}`);
               }}
             >
               <FiEye size={18} />
@@ -129,7 +129,7 @@ const ReceiveRow = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       closeActionsPopover();
-                      router.push(`/user/cases/proceedings/${log.id}`);
+                      router.push(`/user/cases/receiving/${log.id}`);
                     }}
                   >
                     <FiEye size={16} />
