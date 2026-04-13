@@ -1,12 +1,10 @@
 "use client";
 
-import TipCell from "@/app/components/Table/TipCell";
-import { useSession } from "@rtc-database/shared";
 import Roles from "@/app/lib/Roles";
+import { ActionDropdown, TipCell, useSession } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import ActionDropdown from "../../Table/ActionDropdown";
 import { ReceiveLog } from "./ReceiveRecord";
 
 function ExpandableContent({

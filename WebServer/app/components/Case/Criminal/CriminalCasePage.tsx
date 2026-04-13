@@ -7,10 +7,11 @@ import {
   FilterOption,
   FilterValues,
   getFilterStateFromSearchParams,
+  Pagination,
+  Table,
   usePopup,
   useSession,
 } from "@rtc-database/shared";
-import Pagination from "@rtc-database/shared/src/Pagination/Pagination.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, {
@@ -31,7 +32,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
-import Table from "../../Table/Table";
 import CriminalCaseRow from "./CriminalCaseRow";
 import {
   deleteCriminalCase,

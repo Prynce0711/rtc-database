@@ -6,10 +6,11 @@ import {
   FilterDropdown,
   FilterOption,
   FilterValues,
+  Pagination,
+  Table,
   usePopup,
   useSession,
 } from "@rtc-database/shared";
-import Pagination from "@rtc-database/shared/src/Pagination/Pagination.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -23,7 +24,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
-import Table from "../../Table/Table";
 import { uploadPetitionExcel } from "./ExcelActions";
 import { deletePetition, getPetitions } from "./PetitionActions";
 import { calculatePetitionStats, sortPetitions } from "./PetitionRecord";

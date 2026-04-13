@@ -1,7 +1,12 @@
 "use client";
 
-import ActionDropdown from "@/app/components/Table/ActionDropdown";
-import TipCell from "@/app/components/Table/TipCell";
+import {
+  ActionDropdown,
+  FilterDropdown,
+  FilterOption,
+  FilterValues,
+  TipCell,
+} from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, {
@@ -35,8 +40,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import { FilterDropdown } from "@rtc-database/shared";
-import { FilterOption, FilterValues } from "@rtc-database/shared";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

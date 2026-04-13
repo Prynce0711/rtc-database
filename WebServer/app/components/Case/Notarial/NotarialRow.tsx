@@ -1,9 +1,8 @@
 "use client";
 
 import { formatDate } from "@/app/lib/utils";
+import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { FiDownload, FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import ActionDropdown from "../../Table/ActionDropdown";
-import TipCell from "../../Table/TipCell";
 
 export type NotarialRecord = {
   id: number;

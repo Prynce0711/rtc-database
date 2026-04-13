@@ -1,14 +1,13 @@
 "use client";
 import { Case, Employee, User } from "@/app/generated/prisma/browser";
 import { LogAction } from "@/app/generated/prisma/enums";
-import { Pagination, usePopup } from "@rtc-database/shared";
+import { Pagination, Table, usePopup } from "@rtc-database/shared";
 import { Activity, CalendarCheck, Users, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiDownload, FiFilter, FiSearch, FiX } from "react-icons/fi";
 import { getAccounts } from "../AccountManagement/AccountActions";
 import { getCriminalCases } from "../Case/Criminal/CriminalCasesActions";
 import { getEmployees } from "../Employee/EmployeeActions";
-import Table from "../Table/Table";
 import { getLogs } from "./LogActions";
 import LogBadges from "./LogBadges";
 import LogsPopup from "./LogsPopup";

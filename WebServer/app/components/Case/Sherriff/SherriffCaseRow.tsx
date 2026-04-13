@@ -1,7 +1,6 @@
 "use client";
 
-import ActionDropdown from "@/app/components/Table/ActionDropdown";
-import TipCell from "@/app/components/Table/TipCell";
+import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 import type { SheriffRecord } from "./SherriffTypes";
 

@@ -11,7 +11,6 @@ export * from "./Filter/FilterTypes";
 export * from "./Filter/FilterUtils";
 export { default as RadioButton } from "./Filter/RadioButton";
 export { default as Suggestions } from "./Filter/Suggestions";
-export { default as Pagination } from "./Pagination/Pagination";
 
 export { default as ConfirmPopup } from "./Popup/ConfirmPopup";
 export { default as ErrorPopup } from "./Popup/ErrorPopup";
@@ -21,6 +20,13 @@ export { default as ModalBase } from "./Popup/ModalBase";
 export * from "./Popup/PopupProvider";
 export { default as PopupProvider } from "./Popup/PopupProvider";
 export { default as SuccessPopup } from "./Popup/SuccessPopup";
+
+export { default as ActionDropdown } from "./Table/ActionDropdown";
+export { default as CellInput } from "./Table/CellInput";
+export { default as Pagination } from "./Table/Pagination";
+export { default as Table } from "./Table/Table";
+export * from "./Table/TableUtils";
+export { default as TipCell } from "./Table/TipCell";
 
 export { default as Toast } from "./Toast/Toast";
 export * from "./Toast/ToastProvider";

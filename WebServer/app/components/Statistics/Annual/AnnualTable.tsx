@@ -1,8 +1,7 @@
 "use client";
 
 import Roles from "@/app/lib/Roles";
-import { usePopup, useSession } from "@rtc-database/shared";
-import Pagination from "@rtc-database/shared/src/Pagination/Pagination.js";
+import { Pagination, usePopup, useSession } from "@rtc-database/shared";
 import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";

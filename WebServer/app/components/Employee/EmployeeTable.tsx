@@ -1,7 +1,5 @@
 "use client";
 
-import ActionDropdown from "@/app/components/Table/ActionDropdown";
-import TipCell from "@/app/components/Table/TipCell";
 import type { Employee } from "@/app/generated/prisma/browser";
 import {
   enumToText,
@@ -9,7 +7,7 @@ import {
   getAgeFromDate,
   isRetirementEligible,
 } from "@/app/lib/utils";
-import { Pagination } from "@rtc-database/shared";
+import { ActionDropdown, Pagination, TipCell } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
 import { FiEdit, FiEye, FiTrash2, FiUsers } from "react-icons/fi";
@@ -468,18 +466,18 @@ const EmployeeTable: React.FC<Props> = ({
         </table>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center justify-center gap-3 px-5 py-4 border-t border-base-200">
-        {/* Info */}
-
-        {/* Page buttons (shared design) */}
-        {totalPages > 1 && (
-          <Pagination
-            pageCount={totalPages}
-            currentPage={page}
-            onPageChange={setCurrentPage}
-            className="w-full md:w-auto flex justify-center md:justify-end py-0"
-          />
-        )}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-base-content/40">
+          Showing page {page} of {totalPages}
+        </p>
+        <Pagination
+          pageCount={totalPages}
+          currentPage={page}
+          onPageChange={(p) => {
+            setCurrentPage(p);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
       </div>
     </div>
   );

@@ -4,14 +4,16 @@ import { RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import {
+  ActionDropdown,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
+  Pagination,
+  Table,
   usePopup,
   useSession,
 } from "@rtc-database/shared";
-import Pagination from "@rtc-database/shared/src/Pagination/Pagination.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -27,8 +29,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
-import ActionDropdown from "../../Table/ActionDropdown";
-import Table from "../../Table/Table";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import {
   deleteRecievingLog,
