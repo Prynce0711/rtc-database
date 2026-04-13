@@ -3,13 +3,12 @@
 import { ChatData, Message } from "@/@types/network";
 import {
   createGroupChat as createGroupChatAction,
+  getChatById,
   getChats,
 } from "@/app/components/Messages/MessagesActions";
-import { usePopup } from "@rtc-database/shared";
 import { ChatType, Roles } from "@/app/generated/prisma/browser";
-import { useSession } from "@rtc-database/shared";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
-import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
+import { useMessaging, usePopup, useSession } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import React, {
@@ -310,6 +309,7 @@ const Messages: React.FC = () => {
   const { messages: backendMessages, sendMessage } = useMessaging(
     activeChatId ?? 0,
     Boolean(activeChatId),
+    getChatById,
   );
 
   const loadChats = useCallback(async () => {
@@ -2051,4 +2051,3 @@ const Messages: React.FC = () => {
 };
 
 export default Messages;
-

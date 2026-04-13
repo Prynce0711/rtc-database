@@ -4,6 +4,7 @@ export { default as DefaultLoading } from "./DefaultLoading";
 export * from "./Case/BaseCaseSchema";
 export * from "./Case/Criminal/CriminalCaseSchema";
 
+export * from "./Filter/FilterDropdown";
 export { default as FilterDropdown } from "./Filter/FilterDropdown";
 export { default as FilterRow } from "./Filter/FilterRow";
 export * from "./Filter/FilterTypes";

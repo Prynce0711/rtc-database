@@ -1,7 +1,7 @@
 import type { Case, CivilCase } from "@/app/generated/prisma/client";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
-import { FilterOptions } from "../../Filter/FilterUtils";
+import { FilterOptions } from "@rtc-database/shared";
 import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type CivilCasesFilterOptions = FilterOptions<CivilCaseSchema>;

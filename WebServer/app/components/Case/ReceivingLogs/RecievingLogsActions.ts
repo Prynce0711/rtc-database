@@ -1,6 +1,6 @@
 "use server";
 
-import { PaginatedResult } from "@/app/components/Filter/FilterTypes";
+import { PaginatedResult } from "@rtc-database/shared";
 import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";

@@ -3,7 +3,7 @@
 import { ChatData, Message } from "@/@types/network";
 import ActionResult from "@/app/components/ActionResult";
 import { ChatType } from "@/app/generated/prisma/browser";
-import { Recipient } from "@/app/lib/socket/SocketEvents";
+import { Recipient } from "@rtc-database/shared";
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";

@@ -35,8 +35,8 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterDropdown from "../../Filter/FilterDropdown";
-import { FilterOption, FilterValues } from "../../Filter/FilterTypes";
+import { FilterDropdown } from "@rtc-database/shared";
+import { FilterOption, FilterValues } from "@rtc-database/shared";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

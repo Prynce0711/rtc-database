@@ -24,7 +24,7 @@ import Roles from "@/app/lib/Roles";
 import { prettifyError } from "zod";
 import ActionResult from "../../ActionResult";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { PaginatedResult } from "../../Filter/FilterTypes";
+import { PaginatedResult } from "@rtc-database/shared";
 import {
   SheriffCaseData,
   SheriffCaseSchema,

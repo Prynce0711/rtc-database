@@ -1,7 +1,7 @@
 import type { Case, CriminalCase } from "@/app/generated/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
-import { FilterOptions } from "../../Filter/FilterUtils";
+import { FilterOptions } from "@rtc-database/shared";
 import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type CriminalCasesFilterOptions = FilterOptions<CriminalCaseSchema>;

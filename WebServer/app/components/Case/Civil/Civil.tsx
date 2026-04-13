@@ -18,12 +18,12 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { GrFormNext, GrFormPrevious } from "react-icons/gr";
-import FilterDropdown from "../../Filter/FilterDropdown";
+import { FilterDropdown } from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterOption,
   FilterValues,
-} from "../../Filter/FilterTypes";
+} from "@rtc-database/shared";
 import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import {

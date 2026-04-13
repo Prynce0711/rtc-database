@@ -25,14 +25,14 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import FilterDropdown from "@/app/components/Filter/FilterDropdown";
+import { FilterDropdown } from "@rtc-database/shared";
 import type { Employee } from "@/app/generated/prisma/browser";
 import { isRetirementEligible } from "@/app/lib/utils";
 import {
   ExactMatchMap,
   FilterOption,
   FilterValues,
-} from "../Filter/FilterTypes";
+} from "@rtc-database/shared";
 import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../Skeleton/SkeletonTable";
 import EmployeeTable from "./EmployeeTable";

@@ -10,7 +10,7 @@ import {
   SocketEvent,
   SocketEventPayload,
   SocketEventType,
-} from "@/app/lib/socket/SocketEvents";
+} from "@rtc-database/shared";
 import { createHash } from "crypto";
 import { WebSocket } from "ws";
 import { uploadFileToGarageTrusted } from "../../garageActions";

@@ -2,7 +2,7 @@ import { RecievingLog } from "@/app/generated/prisma/client";
 import { CaseType } from "@/app/generated/prisma/enums";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
-import { FilterOptions } from "../../Filter/FilterUtils";
+import { FilterOptions } from "@rtc-database/shared";
 
 const ReceivingLogObjectSchema = z.object({
   bookAndPage: z

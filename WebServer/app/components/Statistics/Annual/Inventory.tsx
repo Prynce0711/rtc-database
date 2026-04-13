@@ -129,7 +129,7 @@ const Inventory = ({
 
   const inventoryTitle = useMemo(() => {
     const yearLabel = selectedYear ?? new Date().getFullYear().toString();
-    // return `INVENTORY OF FILED AND DISPOSED CASES FROM JANUARY TO DECEMBER ${yearLabel}`;
+    return `INVENTORY OF FILED AND DISPOSED CASES FROM JANUARY TO DECEMBER ${yearLabel}`;
   }, [selectedYear]);
 
   const inventorySubtitle = useMemo(() => {

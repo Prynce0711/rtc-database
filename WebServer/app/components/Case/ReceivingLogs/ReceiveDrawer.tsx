@@ -1,6 +1,7 @@
 "use client";
 
 import { CaseType } from "@/app/generated/prisma/enums";
+import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,7 +19,6 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
 import { ReceiveLog } from "./ReceiveRecord";
 import {
   createRecievingLog,
@@ -92,6 +92,7 @@ const CASE_TYPE_LABELS: Record<CaseType, string> = {
   PETITION: "Petition",
   ELECTION: "Election",
   SCA: "SCA",
+  SHERRIFF: "Sheriff",
   UNKNOWN: "Unknown",
 };
 
@@ -1095,4 +1096,3 @@ const ReceiveDrawer = ({
 };
 
 export default ReceiveDrawer;
-

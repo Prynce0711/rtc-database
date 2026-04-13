@@ -21,14 +21,14 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import FilterDropdown, {
+import { FilterDropdown, 
   getFilterStateFromSearchParams,
-} from "../../Filter/FilterDropdown";
+} from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterOption,
   FilterValues,
-} from "../../Filter/FilterTypes";
+} from "@rtc-database/shared";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";

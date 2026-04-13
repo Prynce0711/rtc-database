@@ -3,6 +3,7 @@
 import { User } from "@/app/generated/prisma/browser";
 import { Employee } from "@/app/generated/prisma/client";
 import Roles from "@/app/lib/Roles";
+import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
@@ -18,7 +19,6 @@ import {
   FiUserPlus,
 } from "react-icons/fi";
 import { getEmployees } from "../Employee/EmployeeActions";
-import { usePopup } from "@rtc-database/shared";
 import { createAccount } from "./AccountActions";
 import { NewUserSchema } from "./schema";
 
@@ -186,7 +186,7 @@ const AddAccountDrawer = ({
                 whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-start gap-5">
-                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors">
                     <FiUser className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1">
@@ -212,7 +212,7 @@ const AddAccountDrawer = ({
                 whileTap={{ scale: 0.99 }}
               >
                 <div className="flex items-start gap-5">
-                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center shrink-0 transition-colors">
                     <FiUserPlus className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1">
@@ -614,4 +614,3 @@ const AddAccountDrawer = ({
 };
 
 export default AddAccountDrawer;
-

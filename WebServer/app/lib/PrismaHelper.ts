@@ -2,7 +2,7 @@ import "server-only";
 import z from "zod";
 import type { BaseCaseSchema as BaseCaseSchemaType } from "../components/Case/BaseCaseSchema";
 import { BaseCaseSchema } from "../components/Case/BaseCaseSchema";
-import { FilterOptions } from "../components/Filter/FilterUtils";
+import { FilterOptions } from "@rtc-database/shared";
 import { Prisma } from "../generated/prisma/client";
 import { getSchemaFieldKeys } from "./utils";
 

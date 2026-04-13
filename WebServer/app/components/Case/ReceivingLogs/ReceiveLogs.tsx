@@ -18,12 +18,12 @@ import {
   FiUpload,
   FiUsers,
 } from "react-icons/fi";
-import FilterDropdown from "../../Filter/FilterDropdown";
+import { FilterDropdown } from "@rtc-database/shared";
 import {
   ExactMatchMap,
   FilterOption,
   FilterValues,
-} from "../../Filter/FilterTypes";
+} from "@rtc-database/shared";
 import Pagination from "../../Pagination/Pagination";
 import { usePopup } from "@rtc-database/shared";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
