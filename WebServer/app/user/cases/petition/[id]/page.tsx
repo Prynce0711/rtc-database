@@ -1,7 +1,8 @@
-import PetitionDetailsPage from "@/app/components/Case/Petition/PetitionDetailsPage";
+import { petitionCaseAdapter } from "@/app/components/Case/Petition/PetitionCaseAdapter";
+import { PetitionCaseDetailsPage } from "@rtc-database/shared";
 
 const page = () => {
-  return <PetitionDetailsPage />;
+  return <PetitionCaseDetailsPage adapter={petitionCaseAdapter} />;
 };
 
 export default page;

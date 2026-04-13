@@ -34,7 +34,11 @@
     "../packages/shared/src/Case/Criminal/CriminalCaseRow.tsx",
     "../packages/shared/src/Case/Criminal/CriminalCaseUpdatePage.tsx",
     "../packages/shared/src/utils.ts",
-    "../packages/shared/src/Case/Civil/CivilCaseUpdatePage.tsx"
+    "../packages/shared/src/Case/Civil/CivilCaseUpdatePage.tsx",
+    "../packages/shared/src/Case/Petition/PetitionCasePage.tsx",
+    "../packages/shared/src/Case/Petition/PetitionCaseRow.tsx",
+    "../packages/shared/src/Case/Petition/PetitionCaseDetailsPage.tsx",
+    "../packages/shared/src/Case/Petition/PetitionCaseUpdatePage.tsx"
   ],
   "exclude": ["node_modules"]
 }

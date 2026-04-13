@@ -4,10 +4,8 @@ import {
   getPetitionById,
   getPetitionsByIds,
 } from "@/app/components/Case/Petition/PetitionActions";
-import PetitionEntryPage, {
-  ReceiveDrawerType,
-} from "@/app/components/Case/Petition/PetitionDrawer";
-import type { PetitionCaseData } from "@/app/components/Case/Petition/schema";
+import { petitionCaseAdapter } from "@/app/components/Case/Petition/PetitionCaseAdapter";
+import { PetitionCaseData, PetitionCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -15,8 +13,10 @@ const PetitionEditPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [selectedLog, setSelectedLog] = useState<PetitionCaseData | null>(null);
-  const [selectedLogs, setSelectedLogs] = useState<PetitionCaseData[]>([]);
+  const [selectedCase, setSelectedCase] = useState<PetitionCaseData | null>(
+    null,
+  );
+  const [selectedCases, setSelectedCases] = useState<PetitionCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,10 +56,10 @@ const PetitionEditPage = () => {
           return;
         }
 
-        const loadedLogs = result.result;
+        const loadedCases = result.result;
 
-        setSelectedLogs(loadedLogs);
-        setSelectedLog(loadedLogs[0] ?? null);
+        setSelectedCases(loadedCases);
+        setSelectedCase(loadedCases[0] ?? null);
         setError(null);
         setLoading(false);
         return;
@@ -78,8 +78,8 @@ const PetitionEditPage = () => {
         return;
       }
 
-      setSelectedLog(result.result);
-      setSelectedLogs([result.result]);
+      setSelectedCase(result.result);
+      setSelectedCases([result.result]);
       setError(null);
       setLoading(false);
     };
@@ -99,7 +99,7 @@ const PetitionEditPage = () => {
     );
   }
 
-  if (error || !selectedLog || selectedLogs.length === 0) {
+  if (error || !selectedCase || selectedCases.length === 0) {
     return (
       <div className="min-h-screen bg-base-100 p-6 space-y-4">
         <div className="alert alert-error">
@@ -113,11 +113,13 @@ const PetitionEditPage = () => {
   }
 
   return (
-    <PetitionEntryPage
-      type={ReceiveDrawerType.EDIT}
-      selectedLog={selectedLog}
-      selectedLogs={selectedLogs}
+    <PetitionCaseUpdatePage
+      selectedCase={selectedCase}
+      selectedCases={selectedCases}
       onClose={goBack}
+      onCreate={goBack}
+      onUpdate={goBack}
+      adapter={petitionCaseAdapter}
     />
   );
 };

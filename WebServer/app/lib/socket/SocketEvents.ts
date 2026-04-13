@@ -1,5 +1,5 @@
 import { User } from "@/app/generated/prisma/browser";
-import { Message } from "@rtc-database/shared/src/types/network.js";
+import type { Message } from "@rtc-database/shared";
 
 export type SocketUser = Pick<User, "id" | "name" | "role" | "email">;
 

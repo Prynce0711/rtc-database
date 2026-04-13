@@ -1,41 +1,36 @@
 "use client";
 
-import Roles from "@/app/lib/Roles";
-import { ActionDropdown, TipCell } from "@rtc-database/shared";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import { PetitionCaseData } from "./schema";
-import { useSession } from "@/app/lib/authClient";
+import { ActionDropdown, TipCell } from "../../index";
+import type { PetitionCaseData } from "./PetitionCaseSchema";
 
-const ReceiveRow = ({
-  log,
+const PetitionCaseRow = ({
+  caseItem,
   onEdit,
   onDelete,
   onView,
-  isSelected,
+  selected = false,
   onToggleSelect,
+  canManage,
 }: {
-  log: PetitionCaseData;
-  onEdit: (log: PetitionCaseData) => void;
-  onDelete: (log: PetitionCaseData) => void;
-  onView?: (log: PetitionCaseData) => void;
-  isSelected?: boolean;
-  onToggleSelect?: (id: number) => void;
+  caseItem: PetitionCaseData;
+  onEdit: (item: PetitionCaseData) => void;
+  onDelete: (id: number) => void;
+  onView: (item: PetitionCaseData) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: number, checked: boolean) => void;
+  canManage: boolean;
 }) => {
-  const session = useSession();
-  const isAdminOrAtty =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.ATTY;
-
-  const dateStr = log.date
-    ? new Date(log.date).toLocaleDateString("en-PH", {
+  const dateStr = caseItem.date
+    ? new Date(caseItem.date).toLocaleDateString("en-PH", {
         year: "numeric",
         month: "short",
         day: "numeric",
       })
     : "—";
 
-  const popoverId = `petition-actions-popover-${log.id}`;
-  const anchorName = `--petition-actions-anchor-${log.id}`;
+  const popoverId = `petition-actions-popover-${caseItem.id}`;
+  const anchorName = `--petition-actions-anchor-${caseItem.id}`;
 
   const closeActionsPopover = () => {
     const popoverEl = document.getElementById(popoverId) as
@@ -47,21 +42,21 @@ const ReceiveRow = ({
   return (
     <tr
       className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onView?.(log)}
+      onClick={() => onView(caseItem)}
     >
-      {isAdminOrAtty && onToggleSelect && (
+      {canManage && onToggleSelect && (
         <td className="text-center" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             className="checkbox checkbox-sm"
-            checked={Boolean(isSelected)}
-            onChange={() => onToggleSelect(log.id)}
-            aria-label={`Select petition ${log.id}`}
+            checked={selected}
+            onChange={(e) => onToggleSelect(caseItem.id, e.target.checked)}
+            aria-label={`Select petition ${caseItem.id}`}
           />
         </td>
       )}
       {/* ACTIONS */}
-      {isAdminOrAtty && (
+      {canManage && (
         <td
           className="relative text-center"
           onClick={(e) => e.stopPropagation()}
@@ -73,7 +68,7 @@ const ReceiveRow = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   closeActionsPopover();
-                  onView?.(log);
+                  onView(caseItem);
                 }}
               >
                 <FiEye size={16} />
@@ -86,7 +81,7 @@ const ReceiveRow = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   closeActionsPopover();
-                  onEdit(log);
+                  onEdit(caseItem);
                 }}
               >
                 <FiEdit size={16} />
@@ -99,7 +94,7 @@ const ReceiveRow = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   closeActionsPopover();
-                  onDelete(log);
+                  onDelete(caseItem.id);
                 }}
               >
                 <FiTrash2 size={16} />
@@ -113,20 +108,20 @@ const ReceiveRow = ({
       {/* DATA CELLS */}
       <TipCell
         label="Case No."
-        value={log.caseNumber}
+        value={caseItem.caseNumber}
         className="font-semibold"
       />
-      <TipCell label="Raffled To" value={log.raffledTo ?? "—"} />
+      <TipCell label="Raffled To" value={caseItem.raffledTo ?? "—"} />
       <TipCell label="Date" value={dateStr} className="text-base-content/70" />
       <TipCell
         label="Petitioner"
-        value={log.petitioner ?? "—"}
+        value={caseItem.petitioner ?? "—"}
         truncate
         className="font-medium"
       />
-      <TipCell label="Nature" value={log.nature ?? "—"} truncate />
+      <TipCell label="Nature" value={caseItem.nature ?? "—"} truncate />
     </tr>
   );
 };
 
-export default ReceiveRow;
+export default PetitionCaseRow;

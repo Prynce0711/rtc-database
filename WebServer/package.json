@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n next,sidecar,prisma \"next dev\" \"nodemon\" \"prisma studio --browser none\"",
+    "dev": "concurrently -k -n next,sidecar,prisma \"next dev\" \"pnpm dev:sidecar\" \"prisma studio --browser none\"",
+    "dev:sidecar": "nodemon",
     "dev:noudp": "concurrently \"next dev\" \"prisma studio --browser none\"",
-    "build": "next build",
-    "start": "cross-env NODE_ENV=production node dist/server.js",
+    "build": "next build && pnpm build:sidecar",
+    "build:sidecar": "tsc -p tsconfig.server.json",
+    "start:sidecar": "node dist/server.js",
+    "start": "cross-env NODE_ENV=production concurrently -k -n next,sidecar \"next start\" \"pnpm start:sidecar\"",
     "lint": "eslint",
     "prepare": "next-ws patch"
   },

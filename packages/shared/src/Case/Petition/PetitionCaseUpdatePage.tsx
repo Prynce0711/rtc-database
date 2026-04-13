@@ -1,7 +1,5 @@
 "use client";
 
-import { CaseType } from "@/app/generated/prisma/enums";
-import { usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -25,16 +23,13 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
-import { doesCaseExist } from "../BaseCaseActions";
-import {
-  createPetition,
-  deletePetition,
-  getPetitionCaseNumberPreview,
-  updatePetition,
-} from "./PetitionActions";
-import { PetitionCaseData } from "./schema";
+import { CaseType } from "../../generated/prisma/enums";
+import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import { usePopup } from "../../Popup/PopupProvider";
+import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
+import type { PetitionCaseData } from "./PetitionCaseSchema";
 
-export enum ReceiveDrawerType {
+export enum PetitionCaseUpdateType {
   ADD = "ADD",
   EDIT = "EDIT",
 }
@@ -405,29 +400,30 @@ function validateEntry(
 }
 
 /* ─── Main Page Component ────────────────────────────────────── */
-const PetitionEntryPage = ({
-  type,
+const PetitionCaseUpdatePage = ({
   onClose,
-  selectedLog = null,
-  selectedLogs,
+  selectedCase = null,
+  selectedCases,
   onCreate,
   onUpdate,
+  adapter,
 }: {
-  type: ReceiveDrawerType;
-  onClose: () => void;
-  selectedLog?: PetitionCaseData | null;
-  selectedLogs?: PetitionCaseData[];
-  onCreate?: (log: any) => void;
-  onUpdate?: (log: any) => void;
+  onClose?: () => void;
+  selectedCase?: PetitionCaseData | null;
+  selectedCases?: PetitionCaseData[];
+  onCreate?: () => void;
+  onUpdate?: () => void;
+  adapter: PetitionCaseAdapter;
 }) => {
-  const isEdit = type === ReceiveDrawerType.EDIT;
-  const editLogs =
-    selectedLogs && selectedLogs.length > 0
-      ? selectedLogs
-      : selectedLog
-        ? [selectedLog]
+  const editCases =
+    selectedCases && selectedCases.length > 0
+      ? selectedCases
+      : selectedCase
+        ? [selectedCase]
         : [];
+  const isEdit = editCases.length > 0;
   const statusPopup = usePopup();
+  const router = useAdaptiveNavigation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -440,8 +436,8 @@ const PetitionEntryPage = ({
   const tableRef = useRef<HTMLDivElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
-    if (isEdit && editLogs.length > 0) {
-      return editLogs.map((log) => ({
+    if (isEdit && editCases.length > 0) {
+      return editCases.map((log) => ({
         ...emptyEntry(uid()),
         caseNumber: log.caseNumber ?? "",
         isManual: Boolean(log.isManual),
@@ -461,9 +457,9 @@ const PetitionEntryPage = ({
     setStep("entry");
 
     if (isEdit) {
-      if (editLogs.length > 0) {
+      if (editCases.length > 0) {
         setEntries(
-          editLogs.map((log) => ({
+          editCases.map((log) => ({
             ...emptyEntry(uid()),
             caseNumber: log.caseNumber ?? "",
             isManual: Boolean(log.isManual),
@@ -481,7 +477,7 @@ const PetitionEntryPage = ({
     }
 
     setEntries([emptyEntry(uid(), AUTO_DEFAULT_AREA)]);
-  }, [type, selectedLog, selectedLogs]);
+  }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
     if (isEdit) {
@@ -534,7 +530,7 @@ const PetitionEntryPage = ({
       for (const bucket of uniqueBuckets) {
         const [area, yearRaw] = bucket.split("|");
         const year = Number.parseInt(yearRaw, 10);
-        const preview = await getPetitionCaseNumberPreview(area, year);
+        const preview = await adapter.getPetitionCaseNumberPreview(area, year);
         nextPerBucket.set(
           bucket,
           preview.success ? preview.result!.nextNumber : 1,
@@ -768,7 +764,7 @@ const PetitionEntryPage = ({
       return [];
     }
 
-    const result = await doesCaseExist(caseNumbers, CaseType.PETITION);
+    const result = await adapter.doesCaseExist(caseNumbers, CaseType.PETITION);
     if (!result.success || !result.result) {
       setExistingCaseNumbers([]);
       return [];
@@ -875,7 +871,7 @@ const PetitionEntryPage = ({
       if (createdIds.length === 0) return [];
 
       const rollbackResults = await Promise.allSettled(
-        createdIds.map((id) => deletePetition(id)),
+        createdIds.map((id) => adapter.deletePetition(id)),
       );
 
       const rollbackErrors: string[] = [];
@@ -904,14 +900,14 @@ const PetitionEntryPage = ({
 
     try {
       if (isEdit) {
-        if (entries.length !== editLogs.length) {
+        if (entries.length !== editCases.length) {
           statusPopup.showError("Petition row count mismatch. Please reload.");
           return;
         }
 
         for (let index = 0; index < entries.length; index++) {
           const e = entries[index];
-          const target = editLogs[index];
+          const target = editCases[index];
 
           if (!target?.id) {
             statusPopup.showError(`Missing petition id for row ${index + 1}`);
@@ -919,14 +915,14 @@ const PetitionEntryPage = ({
           }
 
           const payload = buildPayload(e);
-          const result = await updatePetition(target.id, payload);
+          const result = await adapter.updatePetition(target.id, payload);
           if (!result.success) {
             statusPopup.showError(
               result.error || `Update failed for row ${index + 1}`,
             );
             return;
           }
-          onUpdate?.(result.result as any);
+          onUpdate?.();
         }
 
         statusPopup.showSuccess(
@@ -939,7 +935,7 @@ const PetitionEntryPage = ({
         for (let index = 0; index < entries.length; index++) {
           const e = entries[index];
           const payload = buildPayload(e);
-          const result = await createPetition(payload);
+          const result = await adapter.createPetition(payload);
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedPetitions(createdIds);
             setStep("entry");
@@ -956,7 +952,7 @@ const PetitionEntryPage = ({
           if (result.result?.id) {
             createdIds.push(result.result.id);
           }
-          onCreate?.(result.result as any);
+          onCreate?.();
         }
         statusPopup.showSuccess(
           entries.length === 1
@@ -964,7 +960,11 @@ const PetitionEntryPage = ({
             : `${entries.length} petition entries created successfully`,
         );
       }
-      onClose();
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
     } catch (err) {
       statusPopup.showError(
         err instanceof Error
@@ -986,7 +986,13 @@ const PetitionEntryPage = ({
         <div className="xls-topbar-left">
           <button
             className="xls-back-btn"
-            onClick={step === "review" ? () => setStep("entry") : onClose}
+            onClick={
+              step === "review"
+                ? () => setStep("entry")
+                : onClose
+                  ? onClose
+                  : () => router.back()
+            }
             title="Back"
           >
             <FiArrowLeft size={16} />
@@ -1506,7 +1512,10 @@ const PetitionEntryPage = ({
                 </span>
               </div>
               <div className="xls-footer-right">
-                <button className="xls-btn xls-btn-ghost" onClick={onClose}>
+                <button
+                  className="xls-btn xls-btn-ghost"
+                  onClick={onClose ? onClose : () => router.back()}
+                >
                   Cancel
                 </button>
                 <button
@@ -1761,4 +1770,6 @@ const PetitionEntryPage = ({
   );
 };
 
-export default PetitionEntryPage;
+export const PetitionEntryPage = PetitionCaseUpdatePage;
+
+export default PetitionCaseUpdatePage;

@@ -1,17 +1,22 @@
 "use client";
 
-import PetitionEntryPage, {
-  ReceiveDrawerType,
-} from "@/app/components/Case/Petition/PetitionDrawer";
+import { petitionCaseAdapter } from "@/app/components/Case/Petition/PetitionCaseAdapter";
+import { PetitionCaseUpdatePage } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
 
 const PetitionAddPage = () => {
   const router = useRouter();
 
+  const goBackToList = () => {
+    router.push("/user/cases/petition");
+  };
+
   return (
-    <PetitionEntryPage
-      type={ReceiveDrawerType.ADD}
-      onClose={() => router.push("/user/cases/petition")}
+    <PetitionCaseUpdatePage
+      onClose={goBackToList}
+      onCreate={goBackToList}
+      onUpdate={goBackToList}
+      adapter={petitionCaseAdapter}
     />
   );
 };

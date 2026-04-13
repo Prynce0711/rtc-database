@@ -1,20 +1,31 @@
 "use client";
 
-import { getPetitionById } from "@/app/components/Case/Petition/PetitionActions";
-import type { PetitionCaseData } from "@/app/components/Case/Petition/schema";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useAdaptiveNavigation,
+  useAdaptivePathname,
+} from "../../lib/nextCompat";
+import { PageDetailSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
-  NavButton,
-  PageDetailSkeleton,
-} from "@rtc-database/shared";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+} from "../CaseDetailsShared";
+import NavButton from "../NavButton";
+import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
+import type { PetitionCaseData } from "./PetitionCaseSchema";
 
-export default function PetitionDetailsPage() {
-  const router = useRouter();
-  const params = useParams();
+export default function PetitionCaseDetailsPage({
+  adapter,
+}: {
+  adapter: PetitionCaseAdapter;
+}) {
+  const router = useAdaptiveNavigation();
+  const pathname = useAdaptivePathname();
+  const idParam = useMemo(() => {
+    const segments = pathname.split("/").filter(Boolean);
+    return segments.length > 0 ? segments[segments.length - 1] : "";
+  }, [pathname]);
 
   const [caseData, setCaseData] = useState<PetitionCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<PetitionCaseData | null>(null);
@@ -25,13 +36,12 @@ export default function PetitionDetailsPage() {
     const fetchCase = async () => {
       try {
         setLoading(true);
-        const id = Array.isArray(params.id) ? params.id[0] : params.id;
-        const numId = Number(id);
+        const numId = Number(idParam);
 
         const [current, prev, next] = await Promise.allSettled([
-          getPetitionById(numId),
-          getPetitionById(numId - 1),
-          getPetitionById(numId + 1),
+          adapter.getPetitionById(numId),
+          adapter.getPetitionById(numId - 1),
+          adapter.getPetitionById(numId + 1),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
@@ -58,8 +68,10 @@ export default function PetitionDetailsPage() {
       }
     };
 
-    if (params.id) fetchCase();
-  }, [params.id]);
+    if (idParam) {
+      void fetchCase();
+    }
+  }, [adapter, idParam]);
 
   if (loading) return <PageDetailSkeleton />;
 
@@ -81,7 +93,7 @@ export default function PetitionDetailsPage() {
     );
   }
 
-  const currentId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const currentId = idParam;
 
   return (
     <div className="min-h-screen bg-base-100 animate-fade-in">

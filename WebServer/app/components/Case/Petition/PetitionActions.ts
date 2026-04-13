@@ -21,14 +21,17 @@ import {
   splitCaseDataBySchema,
 } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { ActionResult, PaginatedResult } from "@rtc-database/shared";
+import {
+  ActionResult,
+  calculatePetitionCaseStats,
+  PaginatedResult,
+  PetitionCaseData,
+  PetitionCaseSchema,
+  PetitionCasesFilterOptions,
+  PetitionCaseStats,
+} from "@rtc-database/shared";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
-import {
-  PetitionCaseData,
-  PetitionCasesFilterOptions,
-  PetitionSchema,
-} from "./schema";
 
 export async function getPetitions(
   options?: PetitionCasesFilterOptions,
@@ -46,7 +49,7 @@ export async function getPetitions(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const find = buildCaseFind(PetitionSchema, "petition", options);
+    const find = buildCaseFind(PetitionCaseSchema, "petition", options);
     const skip = shouldPaginate ? (page - 1) * pageSize : 0;
     const take = shouldPaginate ? pageSize : DEFAULT_PAGE_SIZE;
 
@@ -88,6 +91,45 @@ export async function getPetitions(
   }
 }
 
+export async function getPetitionStats(
+  options?: PetitionCasesFilterOptions,
+): Promise<ActionResult<PetitionCaseStats>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const find = buildCaseFind(PetitionCaseSchema, "petition", options);
+
+    const cases = await prisma.case.findMany({
+      where: find.where,
+      include: {
+        petition: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const petitionCases: PetitionCaseData[] = cases
+      .filter((c): c is Case & { petition: Petition } => !!c.petition)
+      .map((c) => ({
+        ...c.petition,
+        ...c,
+      }));
+
+    return {
+      success: true,
+      result: calculatePetitionCaseStats(petitionCases),
+    };
+  } catch (error) {
+    console.error("Error fetching petition stats:", error);
+    return { success: false, error: "Error fetching petition stats" };
+  }
+}
+
 export async function createPetition(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
@@ -110,7 +152,7 @@ export async function createPetition(
         data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
     };
 
-    const petitionData = PetitionSchema.safeParse(normalized);
+    const petitionData = PetitionCaseSchema.safeParse(normalized);
     if (!petitionData.success) {
       throw new Error(
         `Invalid petition data: ${prettifyError(petitionData.error)}`,
@@ -266,7 +308,7 @@ export async function updatePetition(
         data.assistantBranch ?? data.raffledToBranch ?? data.raffledTo ?? null,
     };
 
-    const petitionData = PetitionSchema.safeParse(normalized);
+    const petitionData = PetitionCaseSchema.safeParse(normalized);
     if (!petitionData.success) {
       throw new Error(
         `Invalid petition data: ${prettifyError(petitionData.error)}`,

@@ -14,9 +14,9 @@ import { CaseType } from "@/app/generated/prisma/client";
 import {
   CivilCaseData,
   CivilCaseEntry,
-  caseToEntry,
-  createEmptyEntry,
-} from "@rtc-database/shared/src/Case/Civil/CivilCaseSchema.js";
+  civilCaseToEntry,
+  createEmptyCivilCaseEntry,
+} from "@rtc-database/shared";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 
@@ -24,7 +24,9 @@ const CASE_TYPES: CaseType[] = ["CIVIL"];
 
 export default function CivilCaseTester() {
   const [cases, setCases] = useState<CivilCaseData[]>([]);
-  const [formData, setFormData] = useState<CivilCaseEntry>(createEmptyEntry());
+  const [formData, setFormData] = useState<CivilCaseEntry>(
+    createEmptyCivilCaseEntry(),
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,7 @@ export default function CivilCaseTester() {
       if (!result.success) {
         setMessage({ type: "error", text: result.error || "Operation failed" });
       } else {
-        setFormData(createEmptyEntry());
+        setFormData(createEmptyCivilCaseEntry());
         setIsEditing(false);
         setEditingId(null);
         await loadCases();
@@ -116,7 +118,7 @@ export default function CivilCaseTester() {
   };
 
   const handleEdit = (caseItem: CivilCaseData) => {
-    const formEntry = caseToEntry(caseItem);
+    const formEntry = civilCaseToEntry(caseItem);
     setFormData(formEntry);
     setIsEditing(true);
     setEditingId(caseItem.id);
@@ -140,7 +142,7 @@ export default function CivilCaseTester() {
   };
 
   const handleCancel = () => {
-    setFormData(createEmptyEntry());
+    setFormData(createEmptyCivilCaseEntry());
     setIsEditing(false);
     setEditingId(null);
   };

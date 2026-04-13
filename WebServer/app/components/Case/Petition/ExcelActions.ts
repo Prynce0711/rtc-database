@@ -1,6 +1,5 @@
 "use server";
 
-import { PetitionSchema } from "@/app/components/Case/Petition/schema";
 import {
   Case,
   CaseType,
@@ -27,8 +26,12 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
-import { getSchemaFieldKeys } from "@rtc-database/shared";
-import { ActionResult, BaseCaseSchema } from "@rtc-database/shared";
+import {
+  ActionResult,
+  BaseCaseSchema,
+  getSchemaFieldKeys,
+  PetitionCaseSchema,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
@@ -65,7 +68,7 @@ export async function uploadPetitionExcel(
           XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
         for (const row of rows) {
-          const normalized = normalizeRowBySchema(PetitionSchema, row);
+          const normalized = normalizeRowBySchema(PetitionCaseSchema, row);
           const caseNumber = normalized.caseNumber;
           if (typeof caseNumber !== "string") continue;
           const trimmed = caseNumber.trim();
@@ -117,11 +120,11 @@ export async function uploadPetitionExcel(
       }
     }
 
-    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const headerMap = getExcelHeaderMap(PetitionCaseSchema);
     const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(PetitionSchema, row);
+      const values = normalizeRowBySchema(PetitionCaseSchema, row);
 
       return {
         ...values,
@@ -129,12 +132,12 @@ export async function uploadPetitionExcel(
     };
 
     const result = await processExcelUpload<
-      PetitionSchema,
+      PetitionCaseSchema,
       ReturnType<typeof getMappedCells>
     >({
       file,
       requiredHeaders: { "Case Number": caseNumberHeaders },
-      schema: PetitionSchema,
+      schema: PetitionCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
       checkExactMatch: async (_cells, mappedRow) => {
@@ -194,7 +197,7 @@ export async function uploadPetitionExcel(
             cells.assistantBranch ?? cells.raffledTo ?? cells.branch ?? null,
         };
 
-        const validation = PetitionSchema.safeParse(hydrated);
+        const validation = PetitionCaseSchema.safeParse(hydrated);
         if (!validation.success) {
           return {
             errorMessage: prettifyError(validation.error),
@@ -335,7 +338,7 @@ export async function exportPetitionsExcel(): Promise<
       all: ["id"],
     });
 
-    const caseFieldKeys = getSchemaFieldKeys(PetitionSchema, {
+    const caseFieldKeys = getSchemaFieldKeys(PetitionCaseSchema, {
       all: ["id"],
       stringKeys: [...baseCaseFieldKeys.stringKeys],
       dateKeys: [...baseCaseFieldKeys.dateKeys],
@@ -358,7 +361,7 @@ export async function exportPetitionsExcel(): Promise<
         ...c,
       }));
 
-    const headerMap = getExcelHeaderMap(PetitionSchema);
+    const headerMap = getExcelHeaderMap(PetitionCaseSchema);
     const headerKeys = Object.keys(headerMap) as (keyof typeof headerMap)[];
 
     const header = (key: keyof typeof headerMap, fallback: string) =>
