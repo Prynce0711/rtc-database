@@ -1,7 +1,5 @@
 "use server";
 
-import { LogAction, Prisma } from "@/app/generated/prisma/client";
-import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
 import {
   ExportExcelData,
@@ -18,6 +16,8 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult, ReceivingLogSchema } from "@rtc-database/shared";
+import { LogAction, Prisma } from "@rtc-database/shared/prisma/client";
+import { CaseType } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

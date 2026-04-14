@@ -1,6 +1,6 @@
 "use client";
 
-import type { Employee } from "@/app/generated/prisma/browser";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
 import {
   enumToText,
   formatDate,

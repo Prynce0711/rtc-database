@@ -1,5 +1,5 @@
 import type { CriminalCaseData } from "@rtc-database/shared";
-import { createTempId } from "@rtc-database/shared/src/utils.js";
+import { createTempId } from "@rtc-database/shared/src/utils";
 
 export type CaseEntry = {
   id: number;

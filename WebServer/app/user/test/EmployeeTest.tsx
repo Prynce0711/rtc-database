@@ -10,8 +10,8 @@ import {
   exportEmployeesExcel,
   uploadEmployeeExcel,
 } from "@/app/components/Employee/ExcelActions";
-import type { Employee } from "@/app/generated/prisma/browser";
-import { EmploymentType } from "@/app/generated/prisma/enums";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
+import { EmploymentType } from "@rtc-database/shared/prisma/enums";
 import { useEffect, useMemo, useState } from "react";
 
 type EmployeeFormData = {

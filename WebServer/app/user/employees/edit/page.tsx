@@ -7,7 +7,7 @@ import {
 import EmployeeDrawer, {
   EmployeeDrawerType,
 } from "@/app/components/Employee/EmployeeDrawer";
-import { Employee } from "@/app/generated/prisma/browser";
+import { Employee } from "@rtc-database/shared/prisma/browser";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 

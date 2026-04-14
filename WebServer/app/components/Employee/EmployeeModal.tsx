@@ -1,7 +1,7 @@
 "use client";
 
-import type { Employee } from "@/app/generated/prisma/browser";
-import { EmploymentType } from "@/app/generated/prisma/enums";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
+import { EmploymentType } from "@rtc-database/shared/prisma/enums";
 import { enumToText } from "@rtc-database/shared";
 import React from "react";
 

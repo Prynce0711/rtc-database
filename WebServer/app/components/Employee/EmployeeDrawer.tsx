@@ -1,6 +1,6 @@
 "use client";
 
-import { EmploymentType } from "@/app/generated/prisma/enums";
+import { EmploymentType } from "@rtc-database/shared/prisma/enums";
 import { enumToText } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";

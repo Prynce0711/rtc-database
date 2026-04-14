@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "@/app/generated/prisma/browser";
+import { User } from "@rtc-database/shared/prisma/browser";
 import Roles from "@/app/lib/Roles";
 import { useState } from "react";
 import { usePopup } from "@rtc-database/shared";

@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
   serverExternalPackages: ["rclone.js"],
   turbopack: {
-    root: "..",
+    root: path.join(__dirname, ".."),
   },
   experimental: {
     serverActions: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Status, User } from "@/app/generated/prisma/browser";
+import { Status, User } from "@rtc-database/shared/prisma/browser";
 import { usePopup } from "@rtc-database/shared";
 import {
   FiCheckCircle,

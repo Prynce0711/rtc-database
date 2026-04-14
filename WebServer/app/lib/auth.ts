@@ -3,8 +3,8 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, magicLink, twoFactor } from "better-auth/plugins";
 import { createLog } from "../components/ActivityLogs/LogActions";
-import { ChatType } from "../generated/prisma/browser";
-import { LogAction, Roles as PrismaRole } from "../generated/prisma/enums";
+import { ChatType } from "@rtc-database/shared/prisma/browser";
+import { LogAction, Roles as PrismaRole } from "@rtc-database/shared/prisma/enums";
 import { sendEmail } from "./email";
 import { prisma } from "./prisma";
 // If your Prisma file is located elsewhere, you can change the path
