@@ -1,6 +1,19 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const allowedDevOrigins = new Set(["localhost", "127.0.0.1"]);
+
+try {
+  const configuredDevHost = process.env.NEXT_PUBLIC_URL
+    ? new URL(process.env.NEXT_PUBLIC_URL).hostname
+    : undefined;
+  if (configuredDevHost) {
+    allowedDevOrigins.add(configuredDevHost);
+  }
+} catch {
+  // Ignore malformed NEXT_PUBLIC_URL in local development.
+}
+
 const nextConfig: NextConfig = {
   /* config options here */
   serverExternalPackages: ["rclone.js"],
@@ -12,7 +25,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
-  allowedDevOrigins: ["http://127.0.0.1:3000", "http://192.168.100.113:3000"],
+  allowedDevOrigins: [...allowedDevOrigins],
 };
 
 export default nextConfig;
