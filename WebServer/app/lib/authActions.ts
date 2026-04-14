@@ -4,7 +4,7 @@ import { ActionResult } from "@rtc-database/shared";
 import { User } from "better-auth";
 import { headers } from "next/headers";
 import { createLog } from "../components/ActivityLogs/LogActions";
-import { LogAction } from "../generated/prisma/enums";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { auth } from "./auth";
 import Roles from "./Roles";
 

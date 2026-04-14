@@ -1,7 +1,7 @@
 "use server";
 
 import { ActionResult } from "@rtc-database/shared";
-import { CaseType } from "../../generated/prisma/client";
+import { CaseType } from "@rtc-database/shared/prisma/client";
 import { validateSession } from "../../lib/authActions";
 import { deleteGarageFile } from "../../lib/garageActions";
 import { prisma } from "../../lib/prisma";

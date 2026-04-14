@@ -1,12 +1,5 @@
 "use server";
 
-import {
-  Case,
-  CaseType,
-  LogAction,
-  Prisma,
-  SpecialProceeding,
-} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   parseCaseNumber,
@@ -29,7 +22,12 @@ import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
   BaseCaseSchema,
+  Case,
+  CaseType,
   getSchemaFieldKeys,
+  LogAction,
+  Prisma,
+  SpecialProceeding,
   SpecialProceedingData,
   SpecialProceedingSchema,
 } from "@rtc-database/shared";

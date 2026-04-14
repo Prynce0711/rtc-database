@@ -1,4 +1,4 @@
-import { EmploymentType } from "@/app/generated/prisma/enums";
+import { EmploymentType } from "@rtc-database/shared/prisma/enums";
 import { excelHeaders } from "@/app/lib/excel";
 import { z } from "zod";
 

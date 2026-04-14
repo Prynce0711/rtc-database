@@ -1,4 +1,4 @@
-import { Prisma } from "@/app/generated/prisma/browser";
+import { Prisma } from "@rtc-database/shared/prisma/browser";
 import { excelHeaders } from "@/app/lib/excel";
 import z from "zod";
 

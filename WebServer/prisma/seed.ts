@@ -1,4 +1,4 @@
-import { Status } from "@/app/generated/prisma/enums";
+import { Status } from "@rtc-database/shared/prisma/enums";
 import { auth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 

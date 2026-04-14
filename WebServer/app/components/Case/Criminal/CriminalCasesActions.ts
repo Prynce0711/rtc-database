@@ -1,12 +1,5 @@
 "use server";
 
-import {
-  Case,
-  CaseType,
-  CriminalCase,
-  LogAction,
-  Prisma,
-} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   formatAutoCaseNumber,
@@ -23,11 +16,16 @@ import {
 import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
+  Case,
+  CaseType,
+  CriminalCase,
   CriminalCaseData,
   CriminalCaseSchema,
   CriminalCasesFilterOptions,
   CriminalCaseStats,
+  LogAction,
   PaginatedResult,
+  Prisma,
 } from "@rtc-database/shared";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

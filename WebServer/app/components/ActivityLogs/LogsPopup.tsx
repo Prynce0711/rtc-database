@@ -1,5 +1,5 @@
-import { Case, Employee, User } from "@/app/generated/prisma/browser";
-import { LogAction } from "@/app/generated/prisma/enums";
+import { Case, Employee, User } from "@rtc-database/shared/prisma/browser";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import {
   DetailField,
   DetailSection,

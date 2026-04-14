@@ -3,7 +3,7 @@
 import { getAccounts } from "@/app/components/AccountManagement/AccountActions";
 import { getCaseStats, getCases } from "@/app/components/Case/BaseCaseActions";
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
-import type { Employee, User } from "@/app/generated/prisma/browser";
+import type { Employee, User } from "@rtc-database/shared/prisma/browser";
 import {
   AlertTriangle,
   BarChart3,

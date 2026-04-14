@@ -1,9 +1,9 @@
 "use client";
 
-import { User } from "@/app/generated/prisma/browser";
-import { Employee } from "@/app/generated/prisma/client";
 import Roles from "@/app/lib/Roles";
 import { usePopup } from "@rtc-database/shared";
+import { User } from "@rtc-database/shared/prisma/browser";
+import { Employee } from "@rtc-database/shared/prisma/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {

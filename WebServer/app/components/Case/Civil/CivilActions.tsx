@@ -1,12 +1,5 @@
 "use server";
 
-import {
-  Case,
-  CaseType,
-  CivilCase,
-  LogAction,
-  Prisma,
-} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   formatAutoCaseNumber,
@@ -29,6 +22,13 @@ import {
   CivilCaseStats,
   PaginatedResult,
 } from "@rtc-database/shared";
+import {
+  Case,
+  CaseType,
+  CivilCase,
+  LogAction,
+  Prisma,
+} from "@rtc-database/shared/prisma/client";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 

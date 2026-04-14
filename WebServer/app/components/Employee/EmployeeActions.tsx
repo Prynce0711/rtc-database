@@ -1,6 +1,6 @@
 "use server";
 
-import { Employee, LogAction } from "@/app/generated/prisma/browser";
+import { Employee, LogAction } from "@rtc-database/shared/prisma/browser";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";

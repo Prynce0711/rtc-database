@@ -1,7 +1,6 @@
 "use server";
 
 import { EmployeeSchema } from "@/app/components/Employee/schema";
-import { LogAction } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   ExportExcelData,
@@ -15,6 +14,7 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/client";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";

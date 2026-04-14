@@ -1,12 +1,5 @@
 "use server";
 
-import {
-  Case,
-  CaseType,
-  LogAction,
-  Prisma,
-  SpecialProceeding,
-} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   formatAutoCaseNumber,
@@ -23,7 +16,12 @@ import {
 import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
+  Case,
+  CaseType,
+  LogAction,
   PaginatedResult,
+  Prisma,
+  SpecialProceeding,
   SpecialProceedingData,
   SpecialProceedingSchema,
   SpecialProceedingsFilterOptions,

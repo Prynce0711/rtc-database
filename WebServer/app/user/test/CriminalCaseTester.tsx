@@ -10,13 +10,13 @@ import {
   exportCasesExcel,
   uploadExcel,
 } from "@/app/components/Case/Criminal/ExcelActions";
-import { CaseType } from "@/app/generated/prisma/client";
 import {
   createEmptyCriminalEntry,
   CriminalCaseData,
   CriminalCaseEntry,
   criminalCaseToEntry,
 } from "@rtc-database/shared";
+import { CaseType } from "@rtc-database/shared/prisma/client";
 import { useEffect, useState } from "react";
 import { deleteAllCases } from "./TestActions";
 

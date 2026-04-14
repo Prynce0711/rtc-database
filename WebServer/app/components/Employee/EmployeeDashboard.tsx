@@ -25,7 +25,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import type { Employee } from "@/app/generated/prisma/browser";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
 import { isRetirementEligible } from "@rtc-database/shared";
 import {
   ExactMatchMap,

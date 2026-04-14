@@ -1,12 +1,5 @@
 "use server";
 
-import {
-  Case,
-  CaseType,
-  CriminalCase,
-  LogAction,
-  Prisma,
-} from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import {
   parseCaseNumber,
@@ -30,9 +23,14 @@ import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
   BaseCaseSchema,
+  Case,
+  CaseType,
+  CriminalCase,
   CriminalCaseData,
   CriminalCaseSchema,
   getSchemaFieldKeys,
+  LogAction,
+  Prisma,
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";

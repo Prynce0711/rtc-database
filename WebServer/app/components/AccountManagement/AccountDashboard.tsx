@@ -1,7 +1,7 @@
 "use client";
 
-import { User } from "@/app/generated/prisma/browser";
-import { Status } from "@/app/generated/prisma/enums";
+import { User } from "@rtc-database/shared/prisma/browser";
+import { Status } from "@rtc-database/shared/prisma/enums";
 import Roles from "@/app/lib/Roles";
 import { formatDate } from "@rtc-database/shared";
 import { Pagination, usePopup } from "@rtc-database/shared";

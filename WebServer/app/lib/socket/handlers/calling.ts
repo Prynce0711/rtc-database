@@ -1,6 +1,6 @@
 // import "server-only";
 
-// import { CallStatus } from "@/app/generated/prisma/browser";
+// import { CallStatus } from "@rtc-database/shared/prisma/browser";
 // import {
 //   answerCallSchema,
 //   initiateCallSchema,
