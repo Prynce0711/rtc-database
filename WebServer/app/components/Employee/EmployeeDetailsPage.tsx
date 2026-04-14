@@ -1,7 +1,7 @@
 "use client";
 
 import { getEmployees } from "@/app/components/Employee/EmployeeActions";
-import type { Employee } from "@/app/generated/prisma/browser";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
 import {
   DetailField,
   DetailSection,

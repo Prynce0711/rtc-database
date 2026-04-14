@@ -1,6 +1,5 @@
 "use server";
 
-import { Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { GetFileOptions } from "@/app/lib/garage";
 import {
@@ -17,6 +16,7 @@ import {
   FilterOptions,
   PaginatedResult,
 } from "@rtc-database/shared";
+import { Prisma } from "@rtc-database/shared/prisma/client";
 import { prettifyError } from "zod";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
 

@@ -4,8 +4,8 @@ import {
   FilterOptions,
   getSchemaFieldKeys,
 } from "@rtc-database/shared";
+import { Prisma } from "@rtc-database/shared/prisma/client";
 import z from "zod";
-import { Prisma } from "../generated/prisma/client";
 
 export const DEFAULT_PAGE_SIZE = 25;
 

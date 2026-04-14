@@ -1,4 +1,4 @@
-import { CaseType, Prisma } from "@/app/generated/prisma/client";
+import { CaseType, Prisma } from "@rtc-database/shared/prisma/client";
 
 type ParsedCaseNumber = {
   area: string;

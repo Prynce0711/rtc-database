@@ -1,6 +1,6 @@
 "use server";
 
-import { ChatType } from "@/app/generated/prisma/browser";
+import { ChatType } from "@rtc-database/shared/prisma/browser";
 import { ActionResult, ChatData, Message } from "@rtc-database/shared";
 
 import { validateSession } from "@/app/lib/authActions";

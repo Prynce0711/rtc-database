@@ -1,15 +1,19 @@
 "use server";
 
-import { LogAction, Prisma, RecievingLog } from "@/app/generated/prisma/client";
-import { CaseType } from "@/app/generated/prisma/enums";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult, PaginatedResult } from "@rtc-database/shared";
 import {
+  LogAction,
+  Prisma,
+  RecievingLog,
+} from "@rtc-database/shared/prisma/client";
+import { CaseType } from "@rtc-database/shared/prisma/enums";
+import {
   ReceivingLogFilterOptions,
   ReceivingLogSchema,
-} from "@rtc-database/shared/src/Case/RecievingLogs/RecievingLogsSchema.js";
+} from "@rtc-database/shared/src/Case/RecievingLogs/RecievingLogsSchema";
 import { createLog } from "../../ActivityLogs/LogActions";
 
 const CASE_TYPE_VALUES = new Set(Object.values(CaseType));

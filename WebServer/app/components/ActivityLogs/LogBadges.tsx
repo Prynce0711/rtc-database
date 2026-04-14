@@ -1,4 +1,4 @@
-import { LogAction } from "@/app/generated/prisma/enums";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import React from "react";
 import {
   FiCheckCircle,

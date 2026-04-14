@@ -15,7 +15,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ActionResult } from "@rtc-database/shared";
 import { createHash } from "crypto";
 import { getSystemSettings } from "../components/Settings/SettingsActions";
-import { FileData } from "../generated/prisma/browser";
+import { FileData } from "@rtc-database/shared/prisma/browser";
 import { GetFileOptions, getGarageClient } from "../lib/garage";
 import { validateSession } from "./authActions";
 import { prisma } from "./prisma";

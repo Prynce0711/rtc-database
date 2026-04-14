@@ -4,7 +4,7 @@ import {
   LogRetention,
   PasswordExpiration,
   SessionTimeout,
-} from "@/app/generated/prisma/enums";
+} from "@rtc-database/shared/prisma/enums";
 import { z } from "zod";
 
 export const SystemSettingsSchema = z.object({

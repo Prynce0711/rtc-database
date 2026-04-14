@@ -5,7 +5,7 @@ import {
   getChatById,
   getChats,
 } from "@/app/components/Messages/MessagesActions";
-import { ChatType, Roles } from "@/app/generated/prisma/browser";
+import { ChatType, Roles } from "@rtc-database/shared/prisma/browser";
 import { useSession } from "@/app/lib/authClient";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";

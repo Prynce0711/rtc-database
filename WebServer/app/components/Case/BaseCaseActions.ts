@@ -1,6 +1,5 @@
 "use server";
 
-import { CaseType, Prisma } from "@/app/generated/prisma/client";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { DEFAULT_PAGE_SIZE } from "@/app/lib/PrismaHelper";
@@ -11,6 +10,7 @@ import type {
   UnifiedCaseStats,
 } from "@rtc-database/shared";
 import { ActionResult } from "@rtc-database/shared";
+import { CaseType, Prisma } from "@rtc-database/shared/prisma/client";
 
 const toUnifiedCase = (
   c: Prisma.CaseGetPayload<{

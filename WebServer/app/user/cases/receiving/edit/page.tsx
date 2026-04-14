@@ -5,8 +5,8 @@ import {
   getRecievingLogsByIds,
 } from "@/app/components/Case/ReceivingLogs/RecievingLogsActions";
 import recievingLogsAdapter from "@/app/components/Case/ReceivingLogs/RecievingLogsAdapter";
-import { RecievingLog } from "@/app/generated/prisma/client";
 import { ReceiveDrawerType, ReceivingDrawer } from "@rtc-database/shared";
+import { RecievingLog } from "@rtc-database/shared/prisma/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
