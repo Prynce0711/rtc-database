@@ -2,10 +2,10 @@
 
 import {
   CaseType,
-  RecievingLog,
-  RecievingLogsAdapter,
-  usePopup,
-} from "@rtc-database/shared";
+} from "../../generated/prisma/enums";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
+import { usePopup } from "../../Popup/PopupProvider";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -1147,3 +1147,4 @@ const ReceiveUpdatePage = ({
 };
 
 export default ReceiveUpdatePage;
+

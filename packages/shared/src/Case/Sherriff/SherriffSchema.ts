@@ -1,12 +1,9 @@
-import {
-  BaseCaseSchema,
-  Case,
-  excelHeaders,
-  FilterOptions,
-  SheriffCase,
-} from "@rtc-database/shared";
 import { z } from "zod";
+import type { FilterOptions } from "../../Filter/FilterUtils";
+import type { Case, SheriffCase } from "../../generated/prisma/browser";
+import { excelHeaders } from "../../lib/excel";
 import { createTempId } from "../../utils";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type SheriffCasesFilterOptions = FilterOptions<SheriffCaseSchema>;
 
