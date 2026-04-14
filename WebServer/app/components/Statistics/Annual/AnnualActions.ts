@@ -6,11 +6,11 @@ import { ActionResult } from "@rtc-database/shared";
 import { LogAction } from "@rtc-database/shared/prisma/client";
 import { prettifyError } from "zod";
 import {
-  BaseLogData,
-  CaseSchema,
-  CompleteLogData,
-  CreateLogData,
-  InventoryDocumentSchema,
+    BaseLogData,
+    CaseSchema,
+    CompleteLogData,
+    CreateLogData,
+    InventoryDocumentSchema,
 } from "./Schema";
 
 const normalizeReportYear = (value: unknown): number => {
