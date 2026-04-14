@@ -393,7 +393,16 @@ const caseNavItems: NavItem[] = [
 
 // Backwards-compatible aliases used across the file
 const caseManagementNavItem: NavItem = caseNavItems[0];
-const statisticsNavItem: NavItem = caseNavItems[1];
+const archiveOnlyNavItem: NavItem = {
+  icon: <FiFileText />,
+  href: "cases/receiving",
+  label: "Archive",
+};
+const notarialOnlyNavItem: NavItem = {
+  icon: <FiFileText />,
+  href: "cases/notarial",
+  label: "Notarial",
+};
 
 const adminNavItems: NavItem[] = [
   { icon: <FiUsers />, href: "employees", label: "Employees" },
@@ -878,7 +887,7 @@ function archiveSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={archiveOnlyNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -974,7 +983,7 @@ function notarialSidebar({
 
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
-          item={statisticsNavItem}
+          item={notarialOnlyNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
           openDropdown={openDropdown}
@@ -1293,12 +1302,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               ? attySidebar(menuProps)
               : normalizedRole === "statistics" || normalizedRole === "stats"
                 ? statsSidebar(menuProps)
-                : normalizedRole === "user" || normalizedRole === "staff"
+                : normalizedRole === "archive" || normalizedRole === "archives"
                   ? archiveSidebar(menuProps)
-                  : normalizedRole === "archives"
+                  : normalizedRole === "notarial"
                     ? notarialSidebar(menuProps)
-                    : normalizedRole === "notarial"
-                      ? notarialSidebar(menuProps)
+                    : normalizedRole === "user" || normalizedRole === "staff"
+                      ? staffSidebar(menuProps)
                       : staffSidebar(menuProps)}
         </nav>
 

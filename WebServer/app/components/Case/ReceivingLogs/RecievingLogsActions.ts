@@ -5,14 +5,14 @@ import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult, PaginatedResult } from "@rtc-database/shared";
 import {
-  LogAction,
-  Prisma,
-  RecievingLog,
+    LogAction,
+    Prisma,
+    RecievingLog,
 } from "@rtc-database/shared/prisma/client";
 import { CaseType } from "@rtc-database/shared/prisma/enums";
 import {
-  ReceivingLogFilterOptions,
-  ReceivingLogSchema,
+    ReceivingLogFilterOptions,
+    ReceivingLogSchema,
 } from "@rtc-database/shared/src/Case/RecievingLogs/RecievingLogsSchema";
 import { createLog } from "../../ActivityLogs/LogActions";
 
@@ -23,6 +23,16 @@ export type ReceivingLogStats = {
   today: number;
   thisMonth: number;
   docTypes: number;
+};
+
+export type ArchiveRecentFile = {
+  id: number;
+  fileName: string;
+  caseNumber: string | null;
+  caseType: CaseType;
+  branchNumber: string | null;
+  dateRecieved: Date | null;
+  uploadedAt: Date;
 };
 
 function buildReceivingLogWhere(
@@ -265,6 +275,57 @@ export async function getRecievingLogsStats(
   } catch (error) {
     console.error("Error fetching receiving log stats:", error);
     return { success: false, error: "Failed to fetch receiving log stats" };
+  }
+}
+
+export async function getRecentArchiveFiles(
+  limit = 5,
+): Promise<ActionResult<ArchiveRecentFile[]>> {
+  try {
+    const sessionValidation = await validateSession([
+      Roles.ARCHIVE,
+      Roles.ADMIN,
+      Roles.ATTY,
+    ]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLimit = Math.min(Math.max(Math.trunc(limit || 5), 1), 20);
+
+    const logs = await prisma.recievingLog.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: normalizedLimit,
+      select: {
+        id: true,
+        content: true,
+        caseNumber: true,
+        caseType: true,
+        branchNumber: true,
+        dateRecieved: true,
+        createdAt: true,
+      },
+    });
+
+    const result: ArchiveRecentFile[] = logs.map((log) => ({
+      id: log.id,
+      fileName:
+        log.content?.trim() ||
+        [log.caseType, log.caseNumber].filter(Boolean).join(" - ") ||
+        `Archive File #${log.id}`,
+      caseNumber: log.caseNumber,
+      caseType: log.caseType,
+      branchNumber: log.branchNumber,
+      dateRecieved: log.dateRecieved,
+      uploadedAt: log.createdAt,
+    }));
+
+    return { success: true, result };
+  } catch (error) {
+    console.error("Error fetching recent archive files:", error);
+    return { success: false, error: "Failed to fetch recent archive files" };
   }
 }
 
