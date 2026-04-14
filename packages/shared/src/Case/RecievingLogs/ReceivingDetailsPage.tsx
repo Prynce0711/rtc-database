@@ -1,16 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import { useAdaptivePathname, useAdaptiveRouter } from "../../lib/nextCompat";
+import { PageDetailSkeleton } from "../../Skeleton/SkeletonTable";
 import {
   DetailField,
   DetailSection,
   formatLongDate,
 } from "../CaseDetailsShared";
-import type { RecievingLog } from "../../generated/prisma/browser";
-import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 import NavButton from "../NavButton";
-import { PageDetailSkeleton } from "../../Skeleton/SkeletonTable";
-import { useEffect, useState } from "react";
-import { useAdaptivePathname, useAdaptiveRouter } from "../../lib/nextCompat";
+import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 
 const getReceivingIdFromPathname = (pathname: string): number | null => {
   const segments = pathname.split("/").filter(Boolean);
@@ -26,7 +26,6 @@ export default function ReceivingDetailsPage({
 }) {
   const router = useAdaptiveRouter();
   const pathname = useAdaptivePathname();
-
   const [logData, setLogData] = useState<RecievingLog | null>(null);
   const [prevLog, setPrevLog] = useState<RecievingLog | null>(null);
   const [nextLog, setNextLog] = useState<RecievingLog | null>(null);
@@ -181,4 +180,3 @@ export default function ReceivingDetailsPage({
     </div>
   );
 }
-

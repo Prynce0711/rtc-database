@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  CaseType,
-} from "../../generated/prisma/enums";
-import type { RecievingLog } from "../../generated/prisma/browser";
-import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
-import { usePopup } from "../../Popup/PopupProvider";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,6 +17,10 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import { CaseType } from "../../generated/prisma/enums";
+import { usePopup } from "../../Popup/PopupProvider";
+import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 
 import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
@@ -1147,4 +1145,3 @@ const ReceiveUpdatePage = ({
 };
 
 export default ReceiveUpdatePage;
-

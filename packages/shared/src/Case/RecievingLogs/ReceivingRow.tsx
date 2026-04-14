@@ -1,12 +1,12 @@
 "use client";
 
-import ActionDropdown from "../../Table/ActionDropdown";
-import type { RecievingLog } from "../../generated/prisma/browser";
-import Roles from "../../lib/Roles";
-import TipCell from "../../Table/TipCell";
 import { useState, type SyntheticEvent } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
+import type { RecievingLog } from "../../generated/prisma/browser";
 import { useAdaptiveRouter } from "../../lib/nextCompat";
+import Roles from "../../lib/Roles";
+import ActionDropdown from "../../Table/ActionDropdown";
+import TipCell from "../../Table/TipCell";
 
 function ExpandableContent({
   text,
@@ -324,4 +324,3 @@ const ReceiveRow = ({
 };
 
 export default ReceiveRow;
-
