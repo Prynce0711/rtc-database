@@ -1,10 +1,13 @@
+import { ChatType } from "@rtc-database/shared/prisma/browser";
+import {
+  LogAction,
+  Roles as PrismaRole,
+} from "@rtc-database/shared/prisma/enums";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, magicLink, twoFactor } from "better-auth/plugins";
 import { createLog } from "../components/ActivityLogs/LogActions";
-import { ChatType } from "@rtc-database/shared/prisma/browser";
-import { LogAction, Roles as PrismaRole } from "@rtc-database/shared/prisma/enums";
 import { sendEmail } from "./email";
 import { prisma } from "./prisma";
 // If your Prisma file is located elsewhere, you can change the path
@@ -122,7 +125,7 @@ export const auth = betterAuth({
   },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      if (ctx.path.startsWith("/sign-in") && ctx.method === "POST") {
+      if (ctx.path.startsWith("/") && ctx.method === "POST") {
         const email = ctx.body?.email;
         const success = ctx.context.newSession?.user ? true : false;
 
