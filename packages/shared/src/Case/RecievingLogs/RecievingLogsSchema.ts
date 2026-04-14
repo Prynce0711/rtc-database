@@ -131,4 +131,3 @@ export const createEmptyRecievingLogEntry = (): ReceivingLogEntry => ({
   collapsed: false,
   saved: false,
 });
-

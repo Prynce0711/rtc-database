@@ -1,9 +1,9 @@
-import type { Case, SheriffCase } from "../../generated/prisma/browser";
-import type { FilterOptions } from "../../Filter/FilterUtils";
-import { excelHeaders } from "../../lib/excel";
-import { BaseCaseSchema } from "../BaseCaseSchema";
 import { z } from "zod";
+import type { FilterOptions } from "../../Filter/FilterUtils";
+import type { Case, SheriffCase } from "../../generated/prisma/browser";
+import { excelHeaders } from "../../lib/excel";
 import { createTempId } from "../../utils";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 
 export type SheriffCasesFilterOptions = FilterOptions<SheriffCaseSchema>;
 
@@ -134,4 +134,3 @@ export const sortSheriffCases = (
     return 0;
   });
 };
-
