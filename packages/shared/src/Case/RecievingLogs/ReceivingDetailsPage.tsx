@@ -4,11 +4,11 @@ import {
   DetailField,
   DetailSection,
   formatLongDate,
-  NavButton,
-  PageDetailSkeleton,
-  RecievingLog,
-  RecievingLogsAdapter,
-} from "@rtc-database/shared";
+} from "../CaseDetailsShared";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
+import NavButton from "../NavButton";
+import { PageDetailSkeleton } from "../../Skeleton/SkeletonTable";
 import { useEffect, useState } from "react";
 import { useAdaptivePathname, useAdaptiveRouter } from "../../lib/nextCompat";
 
@@ -181,3 +181,4 @@ export default function ReceivingDetailsPage({
     </div>
   );
 }
+

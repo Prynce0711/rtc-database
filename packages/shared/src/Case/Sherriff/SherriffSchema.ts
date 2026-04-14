@@ -1,10 +1,7 @@
-import {
-  BaseCaseSchema,
-  Case,
-  excelHeaders,
-  FilterOptions,
-  SheriffCase,
-} from "@rtc-database/shared";
+import type { Case, SheriffCase } from "../../generated/prisma/browser";
+import type { FilterOptions } from "../../Filter/FilterUtils";
+import { excelHeaders } from "../../lib/excel";
+import { BaseCaseSchema } from "../BaseCaseSchema";
 import { z } from "zod";
 import { createTempId } from "../../utils";
 
@@ -137,3 +134,4 @@ export const sortSheriffCases = (
     return 0;
   });
 };
+

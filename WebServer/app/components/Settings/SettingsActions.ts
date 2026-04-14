@@ -1,15 +1,14 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import { syncNotarialRemote } from "@/app/lib/backup/backupScheduler";
-import { getInfo, type GarageInfo } from "@/app/lib/garage";
+import type { GarageInfo } from "@/app/lib/garage";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
 import {
-  defaultSystemSettings,
-  SystemSettingsSchema,
-  type SystemSettingsSchema as SystemSettingsData,
+    defaultSystemSettings,
+    SystemSettingsSchema,
+    type SystemSettingsSchema as SystemSettingsData,
 } from "./schema";
 
 const normalizeSettingsRecord = (
@@ -93,6 +92,8 @@ export async function updateSystemSettings(
     const normalized = normalizeSettingsRecord(updated);
 
     // Keep notarial remote in lockstep with Garage settings.
+    const { syncNotarialRemote } =
+      await import("@/app/lib/backup/backupScheduler");
     await syncNotarialRemote();
 
     return { success: true, result: normalized };
@@ -114,6 +115,8 @@ export async function getGarageInfo(): Promise<ActionResult<GarageInfo>> {
     if (!sessionValidation.success) {
       return sessionValidation;
     }
+
+    const { getInfo } = await import("@/app/lib/garage");
 
     return {
       success: true,

@@ -1,11 +1,9 @@
 "use client";
 
-import {
-  ActionDropdown,
-  RecievingLog,
-  Roles,
-  TipCell,
-} from "@rtc-database/shared";
+import ActionDropdown from "../../Table/ActionDropdown";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import Roles from "../../lib/Roles";
+import TipCell from "../../Table/TipCell";
 import { useState, type SyntheticEvent } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 import { useAdaptiveRouter } from "../../lib/nextCompat";
@@ -326,3 +324,4 @@ const ReceiveRow = ({
 };
 
 export default ReceiveRow;
+

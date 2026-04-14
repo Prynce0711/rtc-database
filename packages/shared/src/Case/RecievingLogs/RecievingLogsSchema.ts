@@ -1,10 +1,8 @@
-import {
-  CaseType,
-  excelHeaders,
-  FilterOptions,
-  RecievingLog,
-} from "@rtc-database/shared";
 import { z } from "zod";
+import type { FilterOptions } from "../../Filter/FilterUtils";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import { CaseType } from "../../generated/prisma/enums";
+import { excelHeaders } from "../../lib/excel";
 
 const ReceivingLogObjectSchema = z.object({
   bookAndPage: z
@@ -133,3 +131,4 @@ export const createEmptyRecievingLogEntry = (): ReceivingLogEntry => ({
   collapsed: false,
   saved: false,
 });
+
