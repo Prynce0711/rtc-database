@@ -414,7 +414,7 @@ const runRcloneAuthorizeForToken = async (
 
   const subprocess = rclone("authorize", provider, {
     "auto-confirm": true,
-  });
+  }) as import("node:child_process").ChildProcess;
 
   let stdoutText = "";
   let stderrText = "";
@@ -440,11 +440,11 @@ const runRcloneAuthorizeForToken = async (
       }
     });
 
-    subprocess.on("error", (error) => {
+    subprocess.on("error", (error: Error) => {
       reject(error);
     });
 
-    subprocess.on("close", (code) => {
+    subprocess.on("close", (code: number | null) => {
       if ((code ?? 0) === 0) {
         const token = extractAuthorizeToken(stdoutText, stderrText);
 
