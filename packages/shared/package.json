@@ -6,7 +6,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./prisma/client": "./src/generated/prisma/client.ts",
     "./prisma/*": "./src/generated/prisma/*.ts",
     "./prisma/internal/*": "./src/generated/prisma/internal/*.ts",
     "./prisma/models/*": "./src/generated/prisma/models/*.ts",
