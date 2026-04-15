@@ -22,10 +22,12 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   socket.on("message", (msg, rinfo) => {
     try {
       const payload = UdpData.parse(JSON.parse(msg.toString()));
+      const address =
+        import.meta.env.MODE === "development" ? "localhost" : rinfo.address;
 
       const backend: BackendInfo = {
-        url: `http://${rinfo.address}:${payload.port}`,
-        ip: rinfo.address,
+        url: `http://${address}:${payload.port}`,
+        ip: address,
         port: payload.port,
         lastSeen: Date.now(),
       };
