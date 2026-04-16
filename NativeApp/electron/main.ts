@@ -1,3 +1,4 @@
+import { SYNC_CHANNELS } from "@rtc-database/shared/src/lib/sync";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 
 import { execFile } from "node:child_process";
@@ -5,6 +6,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import rclone from "rclone.js";
+import { upsertSingleCriminalCase } from "./Case/CriminalCaseActions";
 import { startUdpListener } from "./udpListener";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -669,6 +671,29 @@ ipcMain.handle("session:sync-user-minimal", async (_event, args: unknown) => {
     };
   }
 });
+
+ipcMain.handle(
+  SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+  async (_event, payload: unknown) => {
+    console.log("[sync:criminal] IPC request received from renderer.", {
+      channel: SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+    });
+
+    const response = await upsertSingleCriminalCase(payload);
+
+    if (!response.success) {
+      console.warn("[sync:criminal] IPC request failed.", response.error);
+      return response;
+    }
+
+    console.log(
+      "[sync:criminal] IPC request completed successfully.",
+      response.result,
+    );
+
+    return response;
+  },
+);
 
 async function createWindow() {
   win = new BrowserWindow({

@@ -1,14 +1,9 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-generator electron_client {
-  provider = "prisma-client"
-  output   = "../../NativeApp/src/generated/prisma"
-}
-
 generator shared_client {
   provider = "prisma-client"
-  output   = "../../packages/shared/src/generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {

@@ -5,7 +5,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts",
+    "./schema": "./schema/schema.prisma",
     "./prisma/*": "./src/generated/prisma/*.ts",
     "./prisma/internal/*": "./src/generated/prisma/internal/*.ts",
     "./prisma/models/*": "./src/generated/prisma/models/*.ts",
