@@ -110,6 +110,7 @@ export * from "./generated/prisma/enums";
 export * from "./lib/excel";
 export * from "./lib/nextCompat";
 export { default as Roles } from "./lib/Roles";
+export * from "./lib/sync";
 
 export * from "./lib/utils";
 export * from "./Sidebar/SidebarAdapter";
