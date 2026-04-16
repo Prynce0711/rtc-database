@@ -34,7 +34,7 @@ export function startUdpListener(mainWindow: BrowserWindow) {
 
       // 🔁 Forward to renderer
       console.log(
-        `📨 Received UDP from ${rinfo.address}:${payload.port} - forwarding to renderer`,
+        `📨 Received UDP from ${address}:${payload.port} - forwarding to renderer`,
       );
       mainWindow.webContents.send("udp:backend", backend);
     } catch (err) {

@@ -11,6 +11,7 @@
     "start:sidecar": "node dist/server.js",
     "start": "cross-env NODE_ENV=production concurrently -k -n next,sidecar \"next start\" \"pnpm start:sidecar\"",
     "lint": "eslint",
+    "postinstall": "pnpm rebuild better-sqlite3",
     "prepare": "next-ws patch"
   },
   "dependencies": {
@@ -20,7 +21,7 @@
     "@prisma/client": "^7.3.0",
     "@rtc-database/shared": "workspace:*",
     "better-auth": "^1.4.18",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "12.9.0",
     "cross-env": "^7.0.3",
     "daisyui": "^5.5.17",
     "dotenv": "^17.2.3",
