@@ -18,7 +18,13 @@ export default defineConfig({
             rollupOptions: {
               // Keep rclone.js as a runtime dependency so its CommonJS internals
               // execute in their native environment instead of being ESM-bundled.
-              external: ["rclone.js"],
+              external: [
+                "rclone.js",
+                "better-sqlite3",
+                "@prisma/adapter-better-sqlite3",
+                "@prisma/client",
+                "@prisma/client/runtime/client",
+              ],
             },
           },
         },

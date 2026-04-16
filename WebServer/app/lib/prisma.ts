@@ -10,7 +10,6 @@ if (typeof window !== "undefined") {
 const connectionString = env("DATABASE_URL") || "";
 const adapter = new PrismaBetterSqlite3({ url: connectionString });
 
-// Use standard Prisma Client without adapter to avoid bundling issues
 const prisma = new PrismaClient({ adapter });
 
 export { prisma };
