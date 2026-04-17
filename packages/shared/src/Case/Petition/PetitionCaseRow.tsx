@@ -10,6 +10,7 @@ const PetitionCaseRow = ({
   onDelete,
   onView,
   selected = false,
+  isSelecting = false,
   onToggleSelect,
   canManage,
 }: {
@@ -18,6 +19,7 @@ const PetitionCaseRow = ({
   onDelete: (id: number) => void;
   onView: (item: PetitionCaseData) => void;
   selected?: boolean;
+  isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
   canManage: boolean;
 }) => {
@@ -41,10 +43,18 @@ const PetitionCaseRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onView(caseItem)}
+      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm ${
+        isSelecting && selected ? "bg-primary/10" : ""
+      }`}
+      onClick={() => {
+        if (canManage && isSelecting && onToggleSelect) {
+          onToggleSelect(caseItem.id, !selected);
+          return;
+        }
+        onView(caseItem);
+      }}
     >
-      {canManage && onToggleSelect && (
+      {canManage && isSelecting && onToggleSelect && (
         <td className="text-center" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -56,7 +66,7 @@ const PetitionCaseRow = ({
         </td>
       )}
       {/* ACTIONS */}
-      {canManage && (
+      {canManage && !isSelecting && (
         <td
           className="relative text-center"
           onClick={(e) => e.stopPropagation()}

@@ -29,18 +29,24 @@ import React, {
 } from "react";
 import {
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import {
   useAdaptiveNavigation,
   useAdaptivePathname,
 } from "../../lib/nextCompat";
+import StatsCard from "../../Stats/StatsCard";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
 import CriminalCaseRow from "./CriminalCaseRow";
 
 // TODO: Move import excel here instead of server action and just call createCase
@@ -85,6 +91,10 @@ const CriminalCasePage: React.FC<{
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
+  const isSelecting = selectionMode !== null;
 
   const urlFilterState = useMemo(
     () => getFilterStateFromSearchParams(searchParams),
@@ -169,12 +179,18 @@ const CriminalCasePage: React.FC<{
 
   const handleToggleCaseSelection = (caseId: number, checked: boolean) => {
     setSelectedCaseIds((prev) => {
+      if (!isSelecting) return prev;
       if (checked) {
         if (prev.includes(caseId)) return prev;
         return [...prev, caseId];
       }
       return prev.filter((id) => id !== caseId);
     });
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedCaseIds([]);
   };
 
   const fetchCases = useCallback(
@@ -293,6 +309,31 @@ const CriminalCasePage: React.FC<{
     setCurrentPage(1);
   };
 
+  const handleEditSelectedCases = () => {
+    if (selectedCaseIds.length === 0) {
+      statusPopup.showError("Select at least one row to edit.");
+      return;
+    }
+
+    router.push(`/user/cases/criminal/edit?ids=${selectedCaseIds.join(",")}`);
+  };
+
+  const handleApplySelectionMode = async () => {
+    if (selectedCaseIds.length === 0) {
+      statusPopup.showError("Select at least one case first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelectedCases();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedCases();
+    }
+  };
+
   const handleDeleteCase = async (caseId: number) => {
     if (
       !(await statusPopup.showConfirm(
@@ -352,9 +393,8 @@ const CriminalCasePage: React.FC<{
         );
       }
 
-      setSelectedCaseIds((prev) =>
-        prev.filter((id) => !deletedIds.includes(id)),
-      );
+      setSelectionMode(null);
+      setSelectedCaseIds([]);
       await fetchCases();
     } finally {
       setDeletingSelected(false);
@@ -455,6 +495,11 @@ const CriminalCasePage: React.FC<{
     }
   };
 
+  const activeFilterCount = useMemo(
+    () => Object.keys(appliedFilters ?? {}).length,
+    [appliedFilters],
+  );
+
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={10} tableRows={8} />;
   }
@@ -469,57 +514,65 @@ const CriminalCasePage: React.FC<{
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* Header */}
       <header className="card bg-base-100 shadow-xl">
         <div className="card-body p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
+              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                <span>Cases</span>
+                <span className="text-base-content/30">/</span>
+                <span className="text-base-content/70 font-medium">
+                  Criminal
+                </span>
+              </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
                 Criminal Cases
               </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                <FiFileText className="shrink-0" />
-                <span>Manage all criminal cases</span>
+              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/50">
+                <FiCalendar className="shrink-0" />
+                <span>Manage criminal cases and filings</span>
               </p>
             </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <div className="flex items-center gap-2 flex-nowrap">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleImportExcel}
-                />
-                {isAdminOrAtty && (
-                  <>
-                    <button
-                      className={`btn btn-outline btn-md gap-2 ${uploading ? "loading" : ""}`}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <FiUpload className="h-5 w-5" />
-                      {uploading ? "Importing..." : "Import"}
-                    </button>
-                    <button
-                      className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
-                      onClick={handleExportExcel}
-                      disabled={exporting}
-                    >
-                      <FiDownload className="h-5 w-5" />
-                      {exporting ? "Exporting..." : "Export"}
-                    </button>
-                    <button
-                      className="btn btn-success btn-md gap-2"
-                      onClick={() => router.push("/user/cases/criminal/add")}
-                    >
-                      <FiFileText className="h-5 w-5" />
-                      Add Case
-                    </button>
-                  </>
-                )}
-              </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {isAdminOrAtty && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImportExcel}
+                  />
+                  <button
+                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <FiUpload className="h-5 w-5" />
+                    {uploading ? "Importing..." : "Import Excel"}
+                  </button>
+                </>
+              )}
+
+              <button
+                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                onClick={handleExportExcel}
+                disabled={exporting}
+              >
+                <FiDownload className="h-5 w-5" />
+                {exporting ? "Exporting..." : "Export Excel"}
+              </button>
+
+              {isAdminOrAtty && (
+                <button
+                  className={ButtonStyles.primary}
+                  onClick={() => router.push("/user/cases/criminal/add")}
+                >
+                  <FiFileText className="h-5 w-5" />
+                  Add Record
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -532,9 +585,10 @@ const CriminalCasePage: React.FC<{
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
             <input
               type="text"
-              placeholder="Search case number..."
+              placeholder="Search by case number..."
               className="input input-bordered w-full pl-11"
               value={appliedFilters?.caseNumber || ""}
+              disabled={isSelecting}
               onChange={(e) =>
                 setAppliedFilters((prev) => ({
                   ...prev,
@@ -546,14 +600,8 @@ const CriminalCasePage: React.FC<{
 
           <button
             type="button"
-            className="btn btn-md btn-outline gap-2"
-            onClick={() => {
-              console.log(
-                "Criminal Filter button clicked, current state:",
-                filterModalOpen,
-              );
-              setFilterModalOpen((prev) => !prev);
-            }}
+            className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+            onClick={() => setFilterModalOpen((prev) => !prev)}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -568,9 +616,70 @@ const CriminalCasePage: React.FC<{
               />
             </svg>
             Filter
+            {activeFilterCount > 0 && (
+              <span className="badge badge-sm badge-primary ml-1">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
 
-          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {isAdminOrAtty &&
+            (isSelecting ? (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <span className="text-sm text-base-content/60 whitespace-nowrap">
+                  {selectedCaseIds.length} selected
+                </span>
+                <button
+                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                  onClick={() => void handleApplySelectionMode()}
+                  disabled={
+                    selectedCaseIds.length === 0 ||
+                    (selectionMode === "delete" && deletingSelected)
+                  }
+                >
+                  <FiCheck className="h-4 w-4" />
+                  <span>
+                    {selectionMode === "edit"
+                      ? "Edit Selected"
+                      : "Delete Selected"}
+                  </span>
+                </button>
+                <button
+                  className="btn btn-md btn-ghost text-base-content/50"
+                  onClick={cancelSelectionMode}
+                  title="Cancel selection"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <button
+                  className="btn btn-md btn-outline gap-2"
+                  onClick={() => {
+                    setSelectionMode("edit");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiEdit2 className="h-4 w-4" />
+                  <span>Edit Rows</span>
+                </button>
+                <button
+                  className="btn btn-md btn-outline btn-error gap-2"
+                  onClick={() => {
+                    setSelectionMode("delete");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiTrash2 className="h-4 w-4" />
+                  <span>Delete Rows</span>
+                </button>
+              </div>
+            ))}
+
+          <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
             {totalCount} case{totalCount !== 1 && "s"}
           </span>
         </div>
@@ -587,66 +696,55 @@ const CriminalCasePage: React.FC<{
 
       {/* Stats Cards (KPI style) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Total Cases",
-            value: stats.totalCases ?? 0,
-            subtitle: `${(stats.recentlyFiled ?? 0).toLocaleString()} filed recently`,
-            icon: FiBarChart2,
-          },
-          {
-            label: "In Detention",
-            value: stats.detainedCases ?? 0,
-            subtitle: `${(((stats.detainedCases ?? 0) / Math.max(1, stats.totalCases ?? 1)) * 100).toFixed(1)}% of total`,
-            icon: FiLock,
-          },
-          {
-            label: "Pending Raffle",
-            value: stats.pendingCases ?? 0,
-            subtitle: `Requires raffle assignment`,
-            icon: FiFileText,
-          },
-          {
-            label: "Recently Filed",
-            value: stats.recentlyFiled ?? 0,
-            subtitle: `Last 30 days`,
-            icon: FiUsers,
-          },
-        ].map((card, idx) => {
-          const Icon = card.icon as React.ComponentType<
-            React.SVGProps<SVGSVGElement>
-          >;
-          return (
-            <div
-              key={idx}
-              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+        <StatsCard
+          label="TOTAL CASES"
+          value={(stats.totalCases ?? 0).toLocaleString()}
+          subtitle="All criminal cases"
+          icon={
+            FiBarChart2 as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
             >
-              <div className="card-body relative overflow-hidden p-4 sm:p-6">
-                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10">
-                  <Icon className="h-full w-full" />
-                </div>
-                <div className="relative text-center">
-                  <div className="mb-2">
-                    <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
-                      {card.label}
-                    </span>
-                  </div>
-                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
-                    {card.value.toLocaleString()}
-                  </p>
-                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
-                    {card.subtitle}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+          }
+          delay={0}
+        />
+        <StatsCard
+          label="RECENTLY FILED"
+          value={(stats.recentlyFiled ?? 0).toLocaleString()}
+          subtitle="Filed in the last 30 days"
+          icon={
+            FiFileText as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={100}
+        />
+        <StatsCard
+          label="IN DETENTION"
+          value={(stats.detainedCases ?? 0).toLocaleString()}
+          subtitle="Cases currently detained"
+          icon={
+            FiLock as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={200}
+        />
+        <StatsCard
+          label="PENDING RAFFLE"
+          value={(stats.pendingCases ?? 0).toLocaleString()}
+          subtitle="Waiting raffle assignment"
+          icon={
+            FiUsers as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={300}
+        />
       </div>
 
       {/* Cases Table */}
       {/* Selected Cases Bar */}
-      {isAdminOrAtty && (
+      {isAdminOrAtty && isSelecting && (
         <AnimatePresence>
           {selectedCaseIds.length > 0 && (
             <motion.div
@@ -659,34 +757,15 @@ const CriminalCasePage: React.FC<{
               <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-primary">
                   {selectedCaseIds.length} case
-                  {selectedCaseIds.length > 1 ? "s" : ""} selected
+                  {selectedCaseIds.length > 1 ? "s" : ""} selected for{" "}
+                  {selectionMode === "edit" ? "editing" : "deletion"}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() =>
-                      router.push(
-                        `/user/cases/criminal/edit?ids=${selectedCaseIds.join(",")}`,
-                      )
-                    }
-                  >
-                    Edit Selected
-                  </button>
-                  <button
-                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                    onClick={handleDeleteSelectedCases}
-                    disabled={deletingSelected}
-                  >
-                    <FiTrash2 className="h-4 w-4" />
-                    Delete Selected
-                  </button>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setSelectedCaseIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setSelectedCaseIds([])}
+                >
+                  Clear Selection
+                </button>
               </div>
             </motion.div>
           )}
@@ -696,11 +775,11 @@ const CriminalCasePage: React.FC<{
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
         <Table
           headers={[
-            ...(isAdminOrAtty
+            ...(isAdminOrAtty && isSelecting
               ? [
                   {
-                    key: "actions",
-                    label: "Actions",
+                    key: "select",
+                    label: "Select",
                     align: "center" as const,
                   },
                 ]
@@ -771,7 +850,10 @@ const CriminalCasePage: React.FC<{
                 router.push(`/user/cases/criminal/edit?id=${item.id}`);
               }}
               selected={selectedCaseIds.includes(caseItem.id)}
-              onToggleSelect={handleToggleCaseSelection}
+              isSelecting={isSelecting}
+              onToggleSelect={
+                isSelecting ? handleToggleCaseSelection : undefined
+              }
               role={role}
             />
           )}

@@ -18,6 +18,7 @@ const SherriffCaseRow = ({
   onDelete,
   onRowClick,
   selected = false,
+  isSelecting = false,
   onToggleSelect,
 }: {
   record: SheriffCaseData;
@@ -25,6 +26,7 @@ const SherriffCaseRow = ({
   onDelete: (id: number) => void;
   onRowClick: (r: SheriffCaseData) => void;
   selected?: boolean;
+  isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
   const popoverId = `sheriff-actions-popover-${record.id}`;
@@ -39,19 +41,32 @@ const SherriffCaseRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onRowClick(record)}
+      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm ${
+        isSelecting && selected ? "bg-primary/10" : ""
+      }`}
+      onClick={() => {
+        if (isSelecting) {
+          onToggleSelect?.(record.id, !selected);
+          return;
+        }
+        onRowClick(record);
+      }}
     >
-      <td onClick={(e) => e.stopPropagation()} className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-sm"
-            checked={selected}
-            onChange={(e) => onToggleSelect?.(record.id, e.target.checked)}
-            aria-label={`Select case ${record.caseNumber}`}
-            onClick={(e) => e.stopPropagation()}
-          />
+      {isSelecting ? (
+        <td onClick={(e) => e.stopPropagation()} className="text-center">
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={selected}
+              onChange={(e) => onToggleSelect?.(record.id, e.target.checked)}
+              aria-label={`Select case ${record.caseNumber}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </td>
+      ) : (
+        <td onClick={(e) => e.stopPropagation()} className="text-center">
           <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
             <li>
               <button
@@ -93,8 +108,8 @@ const SherriffCaseRow = ({
               </button>
             </li>
           </ActionDropdown>
-        </div>
-      </td>
+        </td>
+      )}
       <TipCell
         label="Case Number"
         value={record.caseNumber}

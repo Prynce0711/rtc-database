@@ -89,7 +89,7 @@ const ModalBase = ({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.38, ease: "easeOut" }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e: ReactMouseEvent) => e.stopPropagation()}
               >
                 <div className="w-auto">{childWithStop}</div>
               </motion.div>

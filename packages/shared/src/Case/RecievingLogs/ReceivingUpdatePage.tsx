@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  CaseType,
-} from "../../generated/prisma/enums";
-import type { RecievingLog } from "../../generated/prisma/browser";
-import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
-import { usePopup } from "../../Popup/PopupProvider";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,6 +17,11 @@ import {
   FiSave,
   FiTrash2,
 } from "react-icons/fi";
+import type { RecievingLog } from "../../generated/prisma/browser";
+import { CaseType } from "../../generated/prisma/enums";
+import { usePopup } from "../../Popup/PopupProvider";
+import CaseEntryToolbar from "../CaseEntryToolbar";
+import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 
 import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
@@ -449,8 +448,13 @@ const ReceiveUpdatePage = ({
     return String(value);
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, emptyEntry(nextTempIdRef.current--)]);
+  const handleAddEntry = useCallback((count: number = 1) => {
+    const normalizedCount = Math.max(1, Math.floor(count));
+    const nextRows = Array.from({ length: normalizedCount }, () =>
+      emptyEntry(nextTempIdRef.current--),
+    );
+
+    setEntries((prev) => [...prev, ...nextRows]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -814,6 +818,15 @@ const ReceiveUpdatePage = ({
               </div>
             )}
 
+            {!isEdit && (
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
+                }}
+              />
+            )}
+
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 {TAB_GROUPS.map((grp, idx) => (
@@ -828,17 +841,6 @@ const ReceiveUpdatePage = ({
                     )}
                   </button>
                 ))}
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
@@ -970,7 +972,7 @@ const ReceiveUpdatePage = ({
                 <button
                   type="button"
                   className="xls-add-row"
-                  onClick={handleAddEntry}
+                  onClick={() => handleAddEntry()}
                 >
                   <FiPlus size={14} strokeWidth={2.5} />
                   Add Row
@@ -1147,4 +1149,3 @@ const ReceiveUpdatePage = ({
 };
 
 export default ReceiveUpdatePage;
-

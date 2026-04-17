@@ -805,6 +805,7 @@ const CriminalCaseUpdatePage = ({
         ? [selectedCase]
         : [];
   const isEdit = editCases.length > 0;
+  const isMultiEdit = isEdit && editCases.length > 1;
   const statusPopup = usePopup();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -994,26 +995,31 @@ const CriminalCaseUpdatePage = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    const newEntry = createEmptyCriminalEntry();
-    setEntries((prev) => [
-      ...prev,
-      {
-        ...newEntry,
-        caseNumber: formatCaseNumber(
-          normalizeAreaCode(defaultArea),
-          1,
-          getAutoYearFromDate(newEntry.dateFiled),
-        ),
-      },
-    ]);
-    setTimeout(() => {
-      scrollAreaRef.current?.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 60);
-  }, [defaultArea]);
+  const handleAddEntry = useCallback(
+    (count: number = 1) => {
+      setEntries((prev) => [
+        ...prev,
+        ...Array.from({ length: count }, () => {
+          const newEntry = createEmptyCriminalEntry();
+          return {
+            ...newEntry,
+            caseNumber: formatCaseNumber(
+              normalizeAreaCode(defaultArea),
+              1,
+              getAutoYearFromDate(newEntry.dateFiled),
+            ),
+          };
+        }),
+      ]);
+      setTimeout(() => {
+        scrollAreaRef.current?.scrollTo({
+          top: scrollAreaRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 60);
+    },
+    [defaultArea],
+  );
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1465,10 +1471,14 @@ const CriminalCaseUpdatePage = ({
               <FiArrowLeft size={16} />
             </button>
             <nav className="xls-breadcrumb">
-              <span>Cases</span>
+              <span>Criminal Cases</span>
               <FiChevronRight size={12} className="xls-breadcrumb-sep" />
               <span className="xls-breadcrumb-current">
-                {isEdit ? "Edit Case" : "New Cases"}
+                {isEdit
+                  ? isMultiEdit
+                    ? "Edit Criminal Cases"
+                    : "Edit Criminal Case"
+                  : "New Criminal Case"}
               </span>
               {step === "review" && (
                 <>
@@ -1516,11 +1526,15 @@ const CriminalCaseUpdatePage = ({
               <div className="xls-title-row">
                 <div>
                   <h1 className="text-5xl xls-title">
-                    {isEdit ? "Edit Case Record" : "New Case Entries"}
+                    {isEdit
+                      ? isMultiEdit
+                        ? "Edit Criminal Cases"
+                        : "Edit Criminal Case"
+                      : "New Criminal Case"}
                   </h1>
                   <p className="text-lg mb-9 xls-subtitle">
                     {isEdit ? (
-                      "Update case details. Required fields are marked *."
+                      "Update record details. Required fields are marked *."
                     ) : (
                       <>
                         Use tabs to switch between field groups.{" "}
@@ -1639,6 +1653,11 @@ const CriminalCaseUpdatePage = ({
                       >
                         Update All To This Area
                       </button>
+                      {isPreviewLoading && (
+                        <span className="text-xs text-base-content/50">
+                          Previewing numbers...
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1651,6 +1670,50 @@ const CriminalCaseUpdatePage = ({
                       width: `${entries.length ? (completedCount / entries.length) * 100 : 0}%`,
                     }}
                   />
+                </div>
+              )}
+
+              {!isEdit && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginBottom: 12,
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-success gap-2"
+                    onClick={() => handleAddEntry(1)}
+                  >
+                    <FiPlus size={15} />
+                    Add Row
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success btn-outline gap-2"
+                    onClick={() => handleAddEntry(5)}
+                  >
+                    <FiPlus size={15} />
+                    +5 Rows
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success btn-outline gap-2"
+                    onClick={() => handleAddEntry(10)}
+                  >
+                    <FiPlus size={15} />
+                    +10 Rows
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-warning btn-outline"
+                    onClick={() => void handleClearTable()}
+                  >
+                    Clear All
+                  </button>
                 </div>
               )}
 
@@ -1669,17 +1732,6 @@ const CriminalCaseUpdatePage = ({
                       </button>
                     );
                   })}
-                  {!isEdit && (
-                    <button
-                      type="button"
-                      className="xls-btn xls-btn-ghost"
-                      onClick={() => void handleClearTable()}
-                      style={{ marginLeft: "auto" }}
-                    >
-                      <FiTrash2 size={14} />
-                      Clear Table
-                    </button>
-                  )}
                 </div>
                 <div className="xls-table-outer" ref={scrollAreaRef}>
                   <table className="xls-table">
@@ -1937,16 +1989,6 @@ const CriminalCaseUpdatePage = ({
                     </tbody>
                   </table>
                 </div>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-add-row"
-                    onClick={handleAddEntry}
-                  >
-                    <FiPlus size={14} strokeWidth={2.5} />
-                    Add Row
-                  </button>
-                )}
               </div>
 
               <div className="xls-footer">

@@ -23,14 +23,20 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import { useAdaptiveRouter } from "../../lib/nextCompat";
+import StatsCard from "../../Stats/StatsCard";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
 import SherriffCaseRow from "./SherriffCaseRow";
 
 type CaseFilterValues = SheriffCaseFilters;
@@ -86,6 +92,9 @@ const Sherriff: React.FC<{
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
   const [stats, setStats] = useState<SheriffCaseStats>({
     totalCases: 0,
     thisMonthCases: 0,
@@ -106,6 +115,7 @@ const Sherriff: React.FC<{
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const isSelecting = selectionMode !== null;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -119,6 +129,36 @@ const Sherriff: React.FC<{
       }
       return prev.filter((item) => item !== id);
     });
+  };
+
+  const handleEditSelectedRecords = () => {
+    if (selectedRecordIds.length === 0) {
+      statusPopup.showError("Select at least one row to edit.");
+      return;
+    }
+
+    router.push(`/user/cases/sheriff/edit?ids=${selectedRecordIds.join(",")}`);
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedRecordIds([]);
+  };
+
+  const applySelectionMode = async () => {
+    if (selectedRecordIds.length === 0) {
+      statusPopup.showError("Select at least one case first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelectedRecords();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedRecords();
+    }
   };
 
   const handleSort = (key: SortKey) => {
@@ -420,44 +460,106 @@ const Sherriff: React.FC<{
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
         {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Sheriff Cases
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Manage sheriff cases and filings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
+        <header className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                  <span>Cases</span>
+                  <span className="text-base-content/30">/</span>
+                  <span className="text-base-content/70 font-medium">
+                    Sheriff
+                  </span>
+                </div>
+                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
+                  Sheriff Cases
+                </h2>
+                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
+                  <FiCalendar className="shrink-0 w-4 h-4" />
+                  <span>Manage sheriff cases and filings</span>
+                </p>
+              </div>
+              {isAdminOrAtty && (
+                <div className="flex flex-col items-end gap-3">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button
+                      className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <FiUpload className="h-5 w-5" />
+                      {uploading ? "Importing..." : "Import Excel"}
+                    </button>
+                    <button
+                      className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                      onClick={handleExport}
+                      disabled={exporting}
+                    >
+                      <FiDownload className="h-5 w-5" />
+                      {exporting ? "Exporting..." : "Export Excel"}
+                    </button>
+                    <button
+                      className={ButtonStyles.primary}
+                      onClick={() => router.push("/user/cases/sheriff/add")}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Add Record
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImport}
+            />
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>Hover over table cells to see full details</span>
+            </div>
           </div>
-        </div>
+        </header>
 
         {/* Search and Actions */}
         <div className="relative mb-6">
           <div className="flex gap-4">
-            <div className="relative flex-1">
+            <div className="relative w-full sm:flex-1 sm:max-w-md">
               <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
               <input
                 type="text"
                 placeholder="Search by case number, sheriff name..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
                 value={appliedFilters?.caseNumber || ""}
+                disabled={isSelecting}
                 onChange={(e) =>
                   setAppliedFilters((prev) => ({
                     ...prev,
@@ -468,7 +570,7 @@ const Sherriff: React.FC<{
             </div>
 
             <button
-              className={`btn btn-outline ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
+              className={`${ButtonStyles.secondary} ${appliedFilters && Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
               onClick={() => setFilterModalOpen((prev) => !prev)}
             >
               <svg
@@ -491,54 +593,65 @@ const Sherriff: React.FC<{
               )}
             </button>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleImport}
-            />
-
-            {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <FiUpload className="h-5 w-5" />
-                {uploading ? "Importing..." : "Import Excel"}
-              </button>
-            )}
-            {isAdminOrAtty && (
-              <button
-                className={`btn btn-outline ${exporting ? "loading" : ""}`}
-                onClick={handleExport}
-                disabled={exporting}
-              >
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
-              </button>
-            )}
-            {isAdminOrAtty && (
-              <button
-                className="btn btn-primary"
-                onClick={() => router.push("/user/cases/sheriff/add")}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Add Record
-              </button>
-            )}
+            {isAdminOrAtty &&
+              (isSelecting ? (
+                <div className="flex items-center gap-2 ml-3">
+                  <span className="text-xs text-base-content/40 tabular-nums">
+                    {selectedRecordIds.length} selected
+                  </span>
+                  <button
+                    type="button"
+                    className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                    onClick={() => void applySelectionMode()}
+                    disabled={
+                      selectedRecordIds.length === 0 || deletingSelected
+                    }
+                  >
+                    <FiCheck className="h-4 w-4" />
+                    <span>
+                      {selectionMode === "edit"
+                        ? "Edit Selected"
+                        : "Delete Selected"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-md btn-ghost text-base-content/50"
+                    onClick={cancelSelectionMode}
+                  >
+                    <FiX className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 ml-3">
+                  <button
+                    type="button"
+                    className="btn btn-md btn-outline gap-2"
+                    onClick={() => {
+                      if (totalCount > 0) {
+                        setSelectionMode("edit");
+                        setSelectedRecordIds([]);
+                      }
+                    }}
+                  >
+                    <FiEdit2 className="h-4 w-4" />
+                    Edit rows
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
+                    onClick={() => {
+                      if (totalCount > 0) {
+                        setSelectionMode("delete");
+                        setSelectedRecordIds([]);
+                      }
+                    }}
+                  >
+                    <FiTrash2 className="h-4 w-4" />
+                    Delete rows
+                  </button>
+                </div>
+              ))}
           </div>
 
           <FilterDropdown
@@ -553,76 +666,54 @@ const Sherriff: React.FC<{
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "TOTAL CASES",
-              value: (stats.totalCases ?? 0).toLocaleString(),
-              subtitle: "All sheriff cases",
-              icon: FiBarChart2,
-              delay: 0,
-            },
-            {
-              label: "RECENTLY FILED",
-              value: (stats.recentlyFiled ?? 0).toLocaleString(),
-              subtitle: "Filed in the last 30 days",
-              icon: FiFileText,
-              delay: 100,
-            },
-            {
-              label: "THIS MONTH",
-              value: (stats.thisMonthCases ?? 0).toLocaleString(),
-              subtitle: "Cases this month",
-              icon: FiUsers,
-              delay: 200,
-            },
-            {
-              label: "TODAY",
-              value: (stats.todayCases ?? 0).toLocaleString(),
-              subtitle: "Cases filed today",
-              icon: FiFileText,
-              delay: 300,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className={`transform hover:scale-105 card surface-card-hover group`}
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
+          <StatsCard
+            label="TOTAL CASES"
+            value={(stats.totalCases ?? 0).toLocaleString()}
+            subtitle="All sheriff cases"
+            icon={
+              FiBarChart2 as unknown as React.ComponentType<
+                React.SVGProps<SVGSVGElement>
               >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                    <Icon className="h-full w-full" />
-                  </div>
-                  <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
-                    </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
-                      {card.subtitle}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+            }
+            delay={0}
+          />
+          <StatsCard
+            label="RECENTLY FILED"
+            value={(stats.recentlyFiled ?? 0).toLocaleString()}
+            subtitle="Filed in the last 30 days"
+            icon={
+              FiFileText as unknown as React.ComponentType<
+                React.SVGProps<SVGSVGElement>
+              >
+            }
+            delay={100}
+          />
+          <StatsCard
+            label="THIS MONTH"
+            value={(stats.thisMonthCases ?? 0).toLocaleString()}
+            subtitle="Cases this month"
+            icon={
+              FiUsers as unknown as React.ComponentType<
+                React.SVGProps<SVGSVGElement>
+              >
+            }
+            delay={200}
+          />
+          <StatsCard
+            label="TODAY"
+            value={(stats.todayCases ?? 0).toLocaleString()}
+            subtitle="Cases filed today"
+            icon={
+              FiFileText as unknown as React.ComponentType<
+                React.SVGProps<SVGSVGElement>
+              >
+            }
+            delay={300}
+          />
         </div>
 
         {/* Table */}
-        {isAdminOrAtty && (
+        {isAdminOrAtty && isSelecting && (
           <AnimatePresence>
             {selectedRecordIds.length > 0 && (
               <motion.div
@@ -637,32 +728,12 @@ const Sherriff: React.FC<{
                     {selectedRecordIds.length} case
                     {selectedRecordIds.length > 1 ? "s" : ""} selected
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/sheriff/edit?ids=${selectedRecordIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedRecords}
-                      disabled={deletingSelected}
-                    >
-                      <FiTrash2 className="h-4 w-4" />
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedRecordIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setSelectedRecordIds([])}
+                  >
+                    Clear
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -673,7 +744,8 @@ const Sherriff: React.FC<{
           <table className="table table-zebra w-full text-center">
             <thead className="bg-base-300">
               <tr className="text-center">
-                {isAdminOrAtty && <th>ACTIONS</th>}
+                {isAdminOrAtty && isSelecting && <th>Select</th>}
+                {isAdminOrAtty && !isSelecting && <th>Actions</th>}
                 <SortTh
                   label="CASE NUMBER"
                   colKey="caseNumber"
@@ -710,7 +782,7 @@ const Sherriff: React.FC<{
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminOrAtty ? 8 : 7}>
+                  <td colSpan={isAdminOrAtty ? 7 : 6}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-55">
                       <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
@@ -749,7 +821,10 @@ const Sherriff: React.FC<{
                       router.push(`/user/cases/sheriff/${item.id}`);
                     }}
                     selected={selectedRecordIds.includes(r.id)}
-                    onToggleSelect={handleToggleRecordSelection}
+                    isSelecting={isSelecting}
+                    onToggleSelect={
+                      isSelecting ? handleToggleRecordSelection : undefined
+                    }
                   />
                 ))
               )}

@@ -1,9 +1,8 @@
 "use client";
 
 import type { CriminalCaseData } from "@rtc-database/shared";
-import { ActionDropdown, Table, TipCell } from "@rtc-database/shared";
+import { Table, TipCell } from "@rtc-database/shared";
 import { useMemo, useState } from "react";
-import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
 import Roles from "../../lib/Roles";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 
@@ -32,6 +31,7 @@ const CriminalCaseRow = ({
   handleDeleteCase,
   onEdit,
   selected = false,
+  isSelecting = false,
   onToggleSelect,
   role,
 }: {
@@ -39,36 +39,33 @@ const CriminalCaseRow = ({
   handleDeleteCase: (caseId: number) => void;
   onEdit: (caseItem: CriminalCaseData) => void;
   selected?: boolean;
+  isSelecting?: boolean;
   onToggleSelect?: (caseId: number, checked: boolean) => void;
   role: Roles;
 }) => {
   const router = useAdaptiveNavigation();
   const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
-  const popoverId = `criminal-actions-popover-${caseItem.id}`;
-  const anchorName = `--criminal-actions-anchor-${caseItem.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
 
   return (
     <tr
-      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-xs"
+      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-xs ${
+        isSelecting && selected ? "bg-primary/10" : ""
+      }`}
       onClick={() => {
+        if (isSelecting && isAdminOrAtty) {
+          onToggleSelect?.(caseItem.id, !selected);
+          return;
+        }
         console.log(caseItem);
         router.push(`/user/cases/criminal/${caseItem.id}`);
       }}
     >
-      {/* ACTIONS */}
-      {isAdminOrAtty && (
+      {isAdminOrAtty && isSelecting && (
         <td
           onClick={(e) => e.stopPropagation()}
           className="relative text-center px-4 py-3.5"
         >
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center">
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
@@ -77,47 +74,6 @@ const CriminalCaseRow = ({
               aria-label={`Select case ${caseItem.caseNumber}`}
               onClick={(e) => e.stopPropagation()}
             />
-            <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-info"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    router.push(`/user/cases/criminal/${caseItem.id}`);
-                  }}
-                >
-                  <FiEye size={16} />
-                  <span>View</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-warning"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    onEdit(caseItem);
-                  }}
-                >
-                  <FiEdit size={16} />
-                  <span>Edit</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-error"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    handleDeleteCase(caseItem.id);
-                  }}
-                >
-                  <FiTrash2 size={16} />
-                  <span>Delete</span>
-                </button>
-              </li>
-            </ActionDropdown>
           </div>
         </td>
       )}
@@ -228,8 +184,6 @@ export const CaseTable = ({
   onEdit: (caseItem: CriminalCaseData) => void;
   role: Roles;
 }) => {
-  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
-
   const [sortConfig, setSortConfig] = useState<CaseSortConfig>({
     key: "dateFiled",
     order: "desc",
@@ -256,9 +210,6 @@ export const CaseTable = ({
   }, [data, sortConfig]);
 
   const headers = [
-    ...(isAdminOrAtty
-      ? [{ key: "actions", label: "ACTIONS", align: "center" as const }]
-      : []),
     {
       key: "caseNumber",
       label: "CASE NO.",

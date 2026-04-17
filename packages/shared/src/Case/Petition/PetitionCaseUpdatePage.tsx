@@ -26,6 +26,7 @@ import {
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
+import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
 import type { PetitionCaseData } from "./PetitionCaseSchema";
 
@@ -612,15 +613,22 @@ const PetitionCaseUpdatePage = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, emptyEntry(uid(), defaultArea)]);
-    setTimeout(() => {
-      tableRef.current?.scrollTo({
-        top: tableRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 60);
-  }, [defaultArea]);
+  const handleAddEntry = useCallback(
+    (count: number = 1) => {
+      const normalizedCount = Math.max(1, Math.floor(count));
+      const nextRows = Array.from({ length: normalizedCount }, () =>
+        emptyEntry(uid(), defaultArea),
+      );
+      setEntries((prev) => [...prev, ...nextRows]);
+      setTimeout(() => {
+        tableRef.current?.scrollTo({
+          top: tableRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 60);
+    },
+    [defaultArea],
+  );
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1195,21 +1203,19 @@ const PetitionCaseUpdatePage = ({
               </div>
             )}
 
+            {!isEdit && (
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
+                }}
+              />
+            )}
+
             {/* Spreadsheet */}
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 <button className="xls-tab active">Petition Info</button>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={tableRef}>
@@ -1486,7 +1492,7 @@ const PetitionCaseUpdatePage = ({
                 <button
                   type="button"
                   className="xls-add-row"
-                  onClick={handleAddEntry}
+                  onClick={() => handleAddEntry()}
                 >
                   <FiPlus size={14} strokeWidth={2.5} />
                   Add Row

@@ -20,6 +20,7 @@ const SpecialProceedingRow = ({
   onDelete,
   onRowClick,
   isSelected,
+  isSelecting = false,
   onToggleSelect,
 }: {
   caseItem: SpecialProceedingData;
@@ -27,6 +28,7 @@ const SpecialProceedingRow = ({
   onDelete: (id: number) => void;
   onRowClick: (c: SpecialProceedingData) => void;
   isSelected?: boolean;
+  isSelecting?: boolean;
   onToggleSelect?: (id: number) => void;
 }) => {
   const popoverId = `special-proceeding-actions-popover-${caseItem.id}`;
@@ -41,10 +43,18 @@ const SpecialProceedingRow = ({
 
   return (
     <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs"
-      onClick={() => onRowClick(caseItem)}
+      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs ${
+        isSelecting && isSelected ? "bg-primary/10" : ""
+      }`}
+      onClick={() => {
+        if (isSelecting && onToggleSelect) {
+          onToggleSelect(caseItem.id);
+          return;
+        }
+        onRowClick(caseItem);
+      }}
     >
-      {onToggleSelect && (
+      {isSelecting && onToggleSelect && (
         <td className="text-center" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -55,49 +65,54 @@ const SpecialProceedingRow = ({
           />
         </td>
       )}
-      <td onClick={(e) => e.stopPropagation()} className="relative text-center">
-        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-          <li>
-            <button
-              className="flex items-center gap-3 text-info"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onRowClick(caseItem);
-              }}
-            >
-              <FiEye size={16} />
-              <span>View</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-warning"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onEdit(caseItem);
-              }}
-            >
-              <FiEdit size={16} />
-              <span>Edit</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-error"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onDelete(caseItem.id);
-              }}
-            >
-              <FiTrash2 size={16} />
-              <span>Delete</span>
-            </button>
-          </li>
-        </ActionDropdown>
-      </td>
+      {!isSelecting && (
+        <td
+          onClick={(e) => e.stopPropagation()}
+          className="relative text-center"
+        >
+          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
+            <li>
+              <button
+                className="flex items-center gap-3 text-info"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onRowClick(caseItem);
+                }}
+              >
+                <FiEye size={16} />
+                <span>View</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-warning"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onEdit(caseItem);
+                }}
+              >
+                <FiEdit size={16} />
+                <span>Edit</span>
+              </button>
+            </li>
+            <li>
+              <button
+                className="flex items-center gap-3 text-error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeActionsPopover();
+                  onDelete(caseItem.id);
+                }}
+              >
+                <FiTrash2 size={16} />
+                <span>Delete</span>
+              </button>
+            </li>
+          </ActionDropdown>
+        </td>
+      )}
       <TipCell
         label="SPC. No."
         value={caseItem.caseNumber}

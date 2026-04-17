@@ -10,13 +10,17 @@ import React, {
 } from "react";
 import {
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import {
   ExactMatchMap,
@@ -30,6 +34,8 @@ import {
   usePopup,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import StatsCard from "../../Stats/StatsCard";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
 import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
 import PetitionCaseRow from "./PetitionCaseRow";
 import type {
@@ -92,6 +98,9 @@ const PetitionCasePage: React.FC<{
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
   const [stats, setStats] = useState<PetitionCaseStats>({
     totalEntries: 0,
     todayEntries: 0,
@@ -112,6 +121,7 @@ const PetitionCasePage: React.FC<{
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
+  const isSelecting = selectionMode !== null;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -286,6 +296,36 @@ const PetitionCasePage: React.FC<{
     }
   };
 
+  const handleEditSelectedCases = () => {
+    if (selectedCaseIds.length === 0) {
+      statusPopup.showError("Select at least one row to edit.");
+      return;
+    }
+
+    router.push(`/user/cases/petition/edit?ids=${selectedCaseIds.join(",")}`);
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedCaseIds([]);
+  };
+
+  const handleApplySelectionMode = async () => {
+    if (selectedCaseIds.length === 0) {
+      statusPopup.showError("Select at least one petition first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelectedCases();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedCases();
+    }
+  };
+
   const handleUpload = async (file: File) => {
     setUploading(true);
     const result = await adapter.uploadPetitionExcel(file);
@@ -364,11 +404,18 @@ const PetitionCasePage: React.FC<{
         <div className="card-body p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
+              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                <span>Cases</span>
+                <span className="text-base-content/30">/</span>
+                <span className="text-base-content/70 font-medium">
+                  Petition
+                </span>
+              </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
                 Petition Cases
               </h1>
               <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                <FiFileText className="shrink-0" />
+                <FiCalendar className="shrink-0" />
                 <span>Track all petition entries and case filings</span>
               </p>
             </div>
@@ -390,7 +437,7 @@ const PetitionCasePage: React.FC<{
                     }}
                   />
                   <button
-                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
@@ -401,7 +448,7 @@ const PetitionCasePage: React.FC<{
               )}
 
               <button
-                className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
+                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                 onClick={() => void handleExport()}
                 disabled={exporting}
               >
@@ -411,7 +458,7 @@ const PetitionCasePage: React.FC<{
 
               {canManage && (
                 <button
-                  className="btn btn-success btn-md gap-2"
+                  className={ButtonStyles.primary}
                   onClick={() => router.push("/user/cases/petition/add")}
                 >
                   <FiFileText className="h-5 w-5" />
@@ -432,6 +479,7 @@ const PetitionCasePage: React.FC<{
               placeholder="Search case number..."
               className="input input-bordered w-full pl-11"
               value={appliedFilters?.caseNumber || ""}
+              disabled={isSelecting}
               onChange={(e) =>
                 setAppliedFilters((prev) => ({
                   ...prev,
@@ -443,7 +491,7 @@ const PetitionCasePage: React.FC<{
 
           <button
             type="button"
-            className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+            className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
             onClick={() => setFilterModalOpen((prev) => !prev)}
           >
             Filter
@@ -453,6 +501,62 @@ const PetitionCasePage: React.FC<{
               </span>
             )}
           </button>
+
+          {canManage &&
+            (isSelecting ? (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <span className="text-sm text-base-content/60 whitespace-nowrap">
+                  {selectedCaseIds.length} selected
+                </span>
+                <button
+                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                  onClick={() => void handleApplySelectionMode()}
+                  disabled={
+                    selectedCaseIds.length === 0 ||
+                    (selectionMode === "delete" && deletingSelected)
+                  }
+                >
+                  <FiCheck className="h-4 w-4" />
+                  <span>
+                    {selectionMode === "edit"
+                      ? "Edit Selected"
+                      : "Delete Selected"}
+                  </span>
+                </button>
+                <button
+                  className="btn btn-md btn-ghost text-base-content/50"
+                  onClick={cancelSelectionMode}
+                  title="Cancel selection"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <button
+                  className="btn btn-md btn-outline gap-2"
+                  onClick={() => {
+                    setSelectionMode("edit");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiEdit2 className="h-4 w-4" />
+                  <span>Edit Rows</span>
+                </button>
+                <button
+                  className="btn btn-md btn-outline btn-error gap-2"
+                  onClick={() => {
+                    setSelectionMode("delete");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiTrash2 className="h-4 w-4" />
+                  <span>Delete Rows</span>
+                </button>
+              </div>
+            ))}
 
           <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
             {totalCount} record{totalCount !== 1 && "s"}
@@ -469,7 +573,7 @@ const PetitionCasePage: React.FC<{
         />
       </div>
 
-      {canManage && (
+      {canManage && isSelecting && (
         <AnimatePresence>
           {selectedCaseIds.length > 0 && (
             <motion.div
@@ -484,32 +588,12 @@ const PetitionCasePage: React.FC<{
                   {selectedCaseIds.length} petition
                   {selectedCaseIds.length > 1 ? "s" : ""} selected
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() =>
-                      router.push(
-                        `/user/cases/petition/edit?ids=${selectedCaseIds.join(",")}`,
-                      )
-                    }
-                  >
-                    Edit Selected
-                  </button>
-                  <button
-                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                    onClick={() => void handleDeleteSelectedCases()}
-                    disabled={deletingSelected}
-                  >
-                    <FiTrash2 size={14} />
-                    Delete Selected
-                  </button>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setSelectedCaseIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setSelectedCaseIds([])}
+                >
+                  Clear
+                </button>
               </div>
             </motion.div>
           )}
@@ -517,57 +601,50 @@ const PetitionCasePage: React.FC<{
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Total Entries",
-            value: stats.totalEntries,
-            subtitle: "All petition records",
-            icon: FiBarChart2,
-          },
-          {
-            label: "Today",
-            value: stats.todayEntries,
-            subtitle: "Filed today",
-            icon: FiFileText,
-          },
-          {
-            label: "This Month",
-            value: stats.thisMonthEntries,
-            subtitle: "Filed this month",
-            icon: FiLock,
-          },
-          {
-            label: "Branches",
-            value: stats.distinctBranches,
-            subtitle: "Distinct raffle branches",
-            icon: FiUsers,
-          },
-        ].map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+        <StatsCard
+          label="TOTAL ENTRIES"
+          value={(stats.totalEntries ?? 0).toLocaleString()}
+          subtitle="All petition records"
+          icon={
+            FiBarChart2 as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
             >
-              <div className="card-body relative overflow-hidden p-4 sm:p-6">
-                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5">
-                  <Icon className="h-full w-full" />
-                </div>
-                <div className="relative text-center">
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    {card.label}
-                  </span>
-                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
-                    {(card.value ?? 0).toLocaleString()}
-                  </p>
-                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
-                    {card.subtitle}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+          }
+          delay={0}
+        />
+        <StatsCard
+          label="TODAY"
+          value={(stats.todayEntries ?? 0).toLocaleString()}
+          subtitle="Filed today"
+          icon={
+            FiFileText as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={100}
+        />
+        <StatsCard
+          label="THIS MONTH"
+          value={(stats.thisMonthEntries ?? 0).toLocaleString()}
+          subtitle="Filed this month"
+          icon={
+            FiLock as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={200}
+        />
+        <StatsCard
+          label="BRANCHES"
+          value={(stats.distinctBranches ?? 0).toLocaleString()}
+          subtitle="Distinct raffle branches"
+          icon={
+            FiUsers as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={300}
+        />
       </div>
 
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
@@ -575,12 +652,12 @@ const PetitionCasePage: React.FC<{
           <table className="table table-sm w-full text-center">
             <thead>
               <tr className="bg-base-200/50 border-b border-base-200">
-                {canManage && (
+                {canManage && isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
                     Select
                   </th>
                 )}
-                {canManage && (
+                {canManage && !isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
                     Actions
                   </th>
@@ -620,7 +697,7 @@ const PetitionCasePage: React.FC<{
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 7 : 5} className="py-16">
+                  <td colSpan={canManage ? 6 : 5} className="py-16">
                     <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
                       <FiFileText className="w-16 h-16 opacity-20 mb-4" />
                       <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
@@ -642,14 +719,18 @@ const PetitionCasePage: React.FC<{
                       router.push(`/user/cases/petition/${item.id}`)
                     }
                     selected={selectedCaseIds.includes(caseItem.id)}
-                    onToggleSelect={(id, checked) =>
-                      setSelectedCaseIds((prev) => {
-                        if (checked) {
-                          if (prev.includes(id)) return prev;
-                          return [...prev, id];
-                        }
-                        return prev.filter((entryId) => entryId !== id);
-                      })
+                    isSelecting={isSelecting}
+                    onToggleSelect={
+                      isSelecting
+                        ? (id, checked) =>
+                            setSelectedCaseIds((prev) => {
+                              if (checked) {
+                                if (prev.includes(id)) return prev;
+                                return [...prev, id];
+                              }
+                              return prev.filter((entryId) => entryId !== id);
+                            })
+                        : undefined
                     }
                     canManage={canManage}
                   />

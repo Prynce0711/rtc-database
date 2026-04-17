@@ -599,6 +599,7 @@ export const CivilCaseUpdatePage = ({
         ? [selectedCase]
         : [];
   const isEdit = editCases.length > 0;
+  const isMultiEdit = isEdit && editCases.length > 1;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
@@ -774,18 +775,23 @@ export const CivilCaseUpdatePage = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [
-      ...prev,
-      withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea),
-    ]);
-    setTimeout(() => {
-      scrollAreaRef.current?.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 60);
-  }, [defaultArea]);
+  const handleAddEntry = useCallback(
+    (count = 1) => {
+      setEntries((prev) => [
+        ...prev,
+        ...Array.from({ length: count }, () =>
+          withDefaultAreaForAutoEntry(createEmptyCivilEntry(), defaultArea),
+        ),
+      ]);
+      setTimeout(() => {
+        scrollAreaRef.current?.scrollTo({
+          top: scrollAreaRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 60);
+    },
+    [defaultArea],
+  );
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1019,7 +1025,9 @@ export const CivilCaseUpdatePage = ({
     }
 
     const label = isEdit
-      ? "Save changes to this case?"
+      ? entries.length === 1
+        ? "Save changes to this case?"
+        : `Save changes to ${entries.length} cases?`
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
@@ -1199,7 +1207,11 @@ export const CivilCaseUpdatePage = ({
             <span>Civil Cases</span>
             <FiChevronRight size={12} className="xls-breadcrumb-sep" />
             <span className="xls-breadcrumb-current">
-              {isEdit ? "Edit Civil Case" : "New Civil Case"}
+              {isEdit
+                ? isMultiEdit
+                  ? "Edit Civil Cases"
+                  : "Edit Civil Case"
+                : "New Civil Case"}
             </span>
             {step === "review" && (
               <>
@@ -1244,7 +1256,11 @@ export const CivilCaseUpdatePage = ({
             <div className="xls-title-row">
               <div>
                 <h1 className="text-5xl xls-title">
-                  {isEdit ? "Edit Civil Case" : "New Civil Case"}
+                  {isEdit
+                    ? isMultiEdit
+                      ? "Edit Civil Cases"
+                      : "Edit Civil Case"
+                    : "New Civil Case"}
                 </h1>
                 <p className="text-lg mb-9 xls-subtitle">
                   {isEdit ? (
@@ -1320,6 +1336,20 @@ export const CivilCaseUpdatePage = ({
                 )}
 
                 {!isEdit && (
+                  <p
+                    style={{
+                      marginTop: 10,
+                      fontSize: 13,
+                      color: "var(--color-subtle)",
+                    }}
+                  >
+                    Auto: system assigns the next case number based on sequence.
+                    Manual: you type the case number yourself (duplicates
+                    allowed).
+                  </p>
+                )}
+
+                {!isEdit && (
                   <div
                     style={{
                       marginTop: 12,
@@ -1372,6 +1402,50 @@ export const CivilCaseUpdatePage = ({
               </div>
             )}
 
+            {!isEdit && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 12,
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-success gap-2"
+                  onClick={() => handleAddEntry(1)}
+                >
+                  <FiPlus size={15} />
+                  Add Row
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success btn-outline gap-2"
+                  onClick={() => handleAddEntry(5)}
+                >
+                  <FiPlus size={15} />
+                  +5 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success btn-outline gap-2"
+                  onClick={() => handleAddEntry(10)}
+                >
+                  <FiPlus size={15} />
+                  +10 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-warning btn-outline"
+                  onClick={() => void handleClearTable()}
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
+
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 {TAB_GROUPS.map((group, idx) => {
@@ -1387,18 +1461,6 @@ export const CivilCaseUpdatePage = ({
                     </button>
                   );
                 })}
-
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
@@ -1649,17 +1711,6 @@ export const CivilCaseUpdatePage = ({
                   </tbody>
                 </table>
               </div>
-
-              {!isEdit && (
-                <button
-                  type="button"
-                  className="xls-add-row"
-                  onClick={handleAddEntry}
-                >
-                  <FiPlus size={14} strokeWidth={2.5} />
-                  Add Row
-                </button>
-              )}
             </div>
 
             <div className="xls-footer">
@@ -1708,7 +1759,7 @@ export const CivilCaseUpdatePage = ({
                       ? "Review your edits"
                       : entries.length === 1
                         ? "Review before saving"
-                        : `Review ${entries.length} records before saving`}
+                        : `Review ${entries.length} cases before saving`}
                   </p>
                   <p className="font-light text-md mt-1">
                     {isEdit
@@ -1852,7 +1903,7 @@ export const CivilCaseUpdatePage = ({
                       ? "Save Changes"
                       : entries.length === 1
                         ? "Confirm & Save"
-                        : `Save All ${entries.length} Records`}
+                        : `Save All ${entries.length} Cases`}
                   </>
                 )}
               </button>

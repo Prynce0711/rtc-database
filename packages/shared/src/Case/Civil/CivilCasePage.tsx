@@ -10,13 +10,17 @@ import React, {
 } from "react";
 import {
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import {
   ExactMatchMap,
@@ -30,6 +34,8 @@ import {
   usePopup,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import StatsCard from "../../Stats/StatsCard";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import CivilCaseRow from "./CivilCaseRow";
 import {
@@ -96,6 +102,9 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"delete" | "edit" | null>(
+    null,
+  );
   const [stats, setStats] = useState<CivilCaseStats>({
     totalCases: 0,
     reRaffledCases: 0,
@@ -112,6 +121,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const canManage = role === Roles.ADMIN || role === Roles.ATTY;
+  const isSelecting = canManage && selectionMode !== null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -231,23 +241,27 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  const handleDeleteCase = async (caseId: number) => {
-    if (
-      !(await statusPopup.showConfirm(
-        "Are you sure you want to delete this case?",
-      ))
-    ) {
-      return;
-    }
+  const handleToggleCaseSelection = useCallback(
+    (id: number, checked: boolean) => {
+      setSelectedCaseIds((prev) => {
+        if (checked) {
+          if (prev.includes(id)) return prev;
+          return [...prev, id];
+        }
+        return prev.filter((entryId) => entryId !== id);
+      });
+    },
+    [],
+  );
 
-    const result = await adapter.deleteCivilCase(caseId);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete case");
-      return;
-    }
+  const cancelSelectionMode = useCallback(() => {
+    setSelectionMode(null);
+    setSelectedCaseIds([]);
+  }, []);
 
-    await fetchCases();
-    setSelectedCaseIds((prev) => prev.filter((id) => id !== caseId));
+  const handleEditSelectedCases = () => {
+    if (selectedCaseIds.length === 0) return;
+    router.push(`/user/cases/civil/edit?ids=${selectedCaseIds.join(",")}`);
   };
 
   const handleDeleteSelectedCases = async () => {
@@ -280,6 +294,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
         );
       }
 
+      setSelectionMode(null);
       setSelectedCaseIds([]);
       await fetchCases();
     } finally {
@@ -287,18 +302,60 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
     }
   };
 
-  const handleUpload = async (file: File) => {
-    setUploading(true);
-    const result = await adapter.uploadExcel(file);
-    setUploading(false);
-
-    if (!result.success) {
-      statusPopup.showError(result.error || "Upload failed");
+  const handleApplySelectionMode = async () => {
+    if (selectedCaseIds.length === 0) {
+      statusPopup.showError("Select at least one case first.");
       return;
     }
 
-    statusPopup.showSuccess("Excel upload completed.");
-    await fetchCases();
+    if (selectionMode === "edit") {
+      handleEditSelectedCases();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedCases();
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await adapter.uploadExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const failedFileLink = document.createElement("a");
+        failedFileLink.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${importPayload.failedExcel.base64}`;
+        failedFileLink.download = importPayload.failedExcel.fileName;
+        failedFileLink.click();
+      }
+
+      if (!result.success || !result.result) {
+        statusPopup.showError(
+          !result.success ? result.error || "Upload failed" : "Upload failed",
+        );
+        return;
+      }
+
+      if ((result.result.meta?.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          importPayload?.failedExcel
+            ? "No valid rows were imported. Failed rows were downloaded for review."
+            : "No valid rows were imported.",
+        );
+        return;
+      }
+
+      statusPopup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows were downloaded for review."
+          : "Excel upload completed.",
+      );
+      await fetchCases();
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleExport = async () => {
@@ -342,12 +399,17 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
         <div className="card-body p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
+              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                <span>Cases</span>
+                <span className="text-base-content/30">/</span>
+                <span className="text-base-content/70 font-medium">Civil</span>
+              </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                Civil Case Records
+                Civil Cases
               </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                <FiFileText className="shrink-0" />
-                <span>Manage civil case reports and filings</span>
+              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/50">
+                <FiCalendar className="shrink-0" />
+                <span>Manage civil cases and filings</span>
               </p>
             </div>
 
@@ -368,32 +430,32 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
                     }}
                   />
                   <button
-                    className={`btn btn-outline btn-info btn-md gap-2 ${uploading ? "loading" : ""}`}
+                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
                     <FiUpload className="h-5 w-5" />
-                    {uploading ? "Uploading..." : "Upload"}
+                    {uploading ? "Importing..." : "Import Excel"}
                   </button>
                 </>
               )}
 
               <button
-                className={`btn btn-outline btn-info btn-md gap-2 ${exporting ? "loading" : ""}`}
+                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                 onClick={() => void handleExport()}
                 disabled={exporting}
               >
                 <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export"}
+                {exporting ? "Exporting..." : "Export Excel"}
               </button>
 
               {canManage && (
                 <button
-                  className="btn btn-success btn-md gap-2"
+                  className={ButtonStyles.primary}
                   onClick={() => router.push("/user/cases/civil/add")}
                 >
                   <FiFileText className="h-5 w-5" />
-                  Add Case
+                  Add Record
                 </button>
               )}
             </div>
@@ -410,6 +472,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
               placeholder="Search by case number..."
               className="input input-bordered w-full pl-11"
               value={appliedFilters?.caseNumber || ""}
+              disabled={isSelecting}
               onChange={(e) =>
                 setAppliedFilters((prev) => ({
                   ...prev,
@@ -421,9 +484,21 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 
           <button
             type="button"
-            className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+            className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
             onClick={() => setFilterModalOpen((prev) => !prev)}
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
             Filter
             {activeFilterCount > 0 && (
               <span className="badge badge-sm badge-primary ml-1">
@@ -432,7 +507,63 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             )}
           </button>
 
-          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {canManage &&
+            (isSelecting ? (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <span className="text-sm text-base-content/60 whitespace-nowrap">
+                  {selectedCaseIds.length} selected
+                </span>
+                <button
+                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                  onClick={() => void handleApplySelectionMode()}
+                  disabled={
+                    selectedCaseIds.length === 0 ||
+                    (selectionMode === "delete" && deletingSelected)
+                  }
+                >
+                  <FiCheck className="h-4 w-4" />
+                  <span>
+                    {selectionMode === "edit"
+                      ? "Edit Selected"
+                      : "Delete Selected"}
+                  </span>
+                </button>
+                <button
+                  className="btn btn-md btn-ghost text-base-content/50"
+                  onClick={cancelSelectionMode}
+                  title="Cancel selection"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <button
+                  className="btn btn-md btn-outline gap-2"
+                  onClick={() => {
+                    setSelectionMode("edit");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiEdit2 className="h-4 w-4" />
+                  <span>Edit Rows</span>
+                </button>
+                <button
+                  className="btn btn-md btn-outline btn-error gap-2"
+                  onClick={() => {
+                    setSelectionMode("delete");
+                    setSelectedCaseIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiTrash2 className="h-4 w-4" />
+                  <span>Delete Rows</span>
+                </button>
+              </div>
+            ))}
+
+          <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
             {totalCount} case{totalCount !== 1 && "s"}
           </span>
         </div>
@@ -447,7 +578,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
         />
       </div>
 
-      {canManage && (
+      {canManage && isSelecting && (
         <AnimatePresence>
           {selectedCaseIds.length > 0 && (
             <motion.div
@@ -460,32 +591,15 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
               <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-primary">
                   {selectedCaseIds.length} case
-                  {selectedCaseIds.length > 1 ? "s" : ""} selected
+                  {selectedCaseIds.length > 1 ? "s" : ""} selected for{" "}
+                  {selectionMode === "edit" ? "editing" : "deletion"}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() =>
-                      router.push(
-                        `/user/cases/civil/edit?ids=${selectedCaseIds.join(",")}`,
-                      )
-                    }
-                  >
-                    Edit Selected
-                  </button>
-                  <button
-                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                    onClick={() => void handleDeleteSelectedCases()}
-                    disabled={deletingSelected}
-                  >
-                    <FiTrash2 size={14} />
-                    Delete Selected
-                  </button>
                   <button
                     className="btn btn-sm btn-ghost"
                     onClick={() => setSelectedCaseIds([])}
                   >
-                    Clear
+                    Clear Selection
                   </button>
                 </div>
               </div>
@@ -495,57 +609,50 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Total Cases",
-            value: stats.totalCases,
-            subtitle: "Total civil caseload",
-            icon: FiBarChart2,
-          },
-          {
-            label: "Re-Raffled",
-            value: stats.reRaffledCases,
-            subtitle: "Cases with re-raffle date",
-            icon: FiUsers,
-          },
-          {
-            label: "Remanded",
-            value: stats.remandedCases,
-            subtitle: "Cases marked remanded",
-            icon: FiLock,
-          },
-          {
-            label: "Recently Filed",
-            value: stats.recentlyFiled,
-            subtitle: "Filed in last 30 days",
-            icon: FiFileText,
-          },
-        ].map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+        <StatsCard
+          label="TOTAL CASES"
+          value={(stats.totalCases ?? 0).toLocaleString()}
+          subtitle="All civil cases"
+          icon={
+            FiBarChart2 as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
             >
-              <div className="card-body relative overflow-hidden p-4 sm:p-6">
-                <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5">
-                  <Icon className="h-full w-full" />
-                </div>
-                <div className="relative text-center">
-                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    {card.label}
-                  </span>
-                  <p className="text-3xl sm:text-4xl font-black text-base-content mb-1">
-                    {(card.value ?? 0).toLocaleString()}
-                  </p>
-                  <p className="text-xs sm:text-sm font-medium text-base-content/60">
-                    {card.subtitle}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+          }
+          delay={0}
+        />
+        <StatsCard
+          label="RECENTLY FILED"
+          value={(stats.recentlyFiled ?? 0).toLocaleString()}
+          subtitle="Filed in the last 30 days"
+          icon={
+            FiFileText as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={100}
+        />
+        <StatsCard
+          label="RE-RAFFLED"
+          value={(stats.reRaffledCases ?? 0).toLocaleString()}
+          subtitle="Re-raffled cases"
+          icon={
+            FiUsers as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={200}
+        />
+        <StatsCard
+          label="REMANDED"
+          value={(stats.remandedCases ?? 0).toLocaleString()}
+          subtitle="Cases remanded"
+          icon={
+            FiLock as unknown as React.ComponentType<
+              React.SVGProps<SVGSVGElement>
+            >
+          }
+          delay={300}
+        />
       </div>
 
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
@@ -553,9 +660,9 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
           <table className="table table-sm w-full text-center">
             <thead>
               <tr className="bg-base-200/50 border-b border-base-200">
-                {canManage && (
+                {isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Actions
+                    Select
                   </th>
                 )}
                 <SortTh
@@ -605,7 +712,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 8 : 7} className="py-16">
+                  <td colSpan={isSelecting ? 8 : 7} className="py-16">
                     <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
                       <FiFileText className="w-16 h-16 opacity-20 mb-4" />
                       <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
@@ -619,24 +726,14 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
                   <CivilCaseRow
                     key={caseItem.id}
                     caseItem={caseItem}
-                    onEdit={(item) =>
-                      router.push(`/user/cases/civil/edit?id=${item.id}`)
-                    }
-                    onDelete={handleDeleteCase}
                     onView={(item) =>
                       router.push(`/user/cases/civil/${item.id}`)
                     }
                     selected={selectedCaseIds.includes(caseItem.id)}
-                    onToggleSelect={(id, checked) =>
-                      setSelectedCaseIds((prev) => {
-                        if (checked) {
-                          if (prev.includes(id)) return prev;
-                          return [...prev, id];
-                        }
-                        return prev.filter((entryId) => entryId !== id);
-                      })
+                    isSelecting={isSelecting}
+                    onToggleSelect={
+                      isSelecting ? handleToggleCaseSelection : undefined
                     }
-                    canManage={canManage}
                   />
                 ))
               )}

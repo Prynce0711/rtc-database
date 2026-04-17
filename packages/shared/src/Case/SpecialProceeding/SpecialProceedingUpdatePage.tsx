@@ -32,6 +32,7 @@ import {
   FiTrash2,
   FiUsers,
 } from "react-icons/fi";
+import CaseEntryToolbar from "../CaseEntryToolbar";
 
 type ColDef = {
   key: keyof Omit<
@@ -596,10 +597,10 @@ const SpecialProceedingUpdatePage = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [
-      ...prev,
-      {
+  const handleAddEntry = useCallback(
+    (count: number = 1) => {
+      const normalizedCount = Math.max(1, Math.floor(count));
+      const nextRows = Array.from({ length: normalizedCount }, () => ({
         ...createEmptySpecialProceedingEntry(),
         id: nextTempIdRef.current--,
         date: TODAY,
@@ -609,15 +610,18 @@ const SpecialProceedingUpdatePage = ({
           1,
           getYearFromDateField(TODAY),
         ),
-      },
-    ]);
-    setTimeout(() => {
-      scrollAreaRef.current?.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 60);
-  }, [defaultArea]);
+      }));
+
+      setEntries((prev) => [...prev, ...nextRows]);
+      setTimeout(() => {
+        scrollAreaRef.current?.scrollTo({
+          top: scrollAreaRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 60);
+    },
+    [defaultArea],
+  );
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1186,21 +1190,21 @@ const SpecialProceedingUpdatePage = ({
               </div>
             )}
 
+            {!isEdit && (
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
+                }}
+              />
+            )}
+
             <div className="xls-sheet-wrap">
               {/* Tab bar */}
               <div className="xls-tab-bar">
-                <button className="xls-tab active">Petition Info</button>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
+                <button className="xls-tab active">
+                  Special Proceeding Info
+                </button>
               </div>
               <div className="xls-table-outer" ref={scrollAreaRef}>
                 <table className="xls-table">
@@ -1221,7 +1225,9 @@ const SpecialProceedingUpdatePage = ({
                         <div className="xls-group-label">Identity</div>
                       </th>
                       <th colSpan={allCols.length}>
-                        <div className="xls-group-label">Petition Info</div>
+                        <div className="xls-group-label">
+                          Special Proceeding Info
+                        </div>
                       </th>
                       <th />
                     </tr>
@@ -1465,7 +1471,7 @@ const SpecialProceedingUpdatePage = ({
                 <button
                   type="button"
                   className="xls-add-row"
-                  onClick={handleAddEntry}
+                  onClick={() => handleAddEntry()}
                 >
                   <FiPlus size={14} strokeWidth={2.5} />
                   Add Row

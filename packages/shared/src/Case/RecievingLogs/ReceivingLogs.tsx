@@ -4,15 +4,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
-  FiEdit,
-  FiEye,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
   FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import FilterDropdown from "../../Filter/FilterDropdown";
 import type {
@@ -26,9 +28,11 @@ import { useAdaptiveRouter } from "../../lib/nextCompat";
 import Roles from "../../lib/Roles";
 import { usePopup } from "../../Popup/PopupProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
-import ActionDropdown from "../../Table/ActionDropdown";
+import StatsCard from "../../Stats/StatsCard";
 import Pagination from "../../Table/Pagination";
 import Table from "../../Table/Table";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
+import ReceiveRow from "./ReceivingRow";
 import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 import type { ReceivingLogFilterOptions } from "./RecievingLogsSchema";
 
@@ -41,131 +45,6 @@ type ReceiveSortKey =
   | "content"
   | "branchNumber"
   | "notes";
-
-const formatDate = (date: Date | string | null | undefined): string => {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleDateString();
-};
-
-const extractTime = (date: Date | string | null | undefined): string => {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-};
-
-const ReceiveRow = ({
-  log,
-  onView,
-  onEdit,
-  onDelete,
-  isAdminOrAtty,
-  isSelected,
-  onToggleSelect,
-}: {
-  log: ReceiveLog;
-  onView?: (log: ReceiveLog) => void;
-  onEdit: (log: ReceiveLog) => void;
-  onDelete: (log: ReceiveLog) => void;
-  isAdminOrAtty: boolean;
-  isSelected?: boolean;
-  onToggleSelect?: (id: number) => void;
-}) => {
-  const time = extractTime(log.dateRecieved);
-  const date = formatDate(log.dateRecieved);
-  const popoverId = `receive-logs-actions-popover-${log.id}`;
-  const anchorName = `--receive-logs-actions-anchor-${log.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
-
-  return (
-    <tr
-      className="bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm"
-      onClick={() => onView?.(log)}
-    >
-      {isAdminOrAtty && onToggleSelect && (
-        <td className="text-center" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            className="checkbox checkbox-sm"
-            checked={Boolean(isSelected)}
-            onChange={() => onToggleSelect(log.id)}
-            aria-label={`Select receiving log ${log.id}`}
-          />
-        </td>
-      )}
-      {isAdminOrAtty && (
-        <td
-          className="relative text-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-            <li>
-              <button
-                className="flex items-center gap-3 text-info"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onView?.(log);
-                }}
-              >
-                <FiEye size={16} />
-                <span>View</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-warning"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onEdit(log);
-                }}
-              >
-                <FiEdit size={16} />
-                <span>Edit</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onDelete(log);
-                }}
-              >
-                <FiTrash2 size={16} />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ActionDropdown>
-        </td>
-      )}
-      <td className="font-semibold text-center whitespace-nowrap">
-        {log.bookAndPage || "-"}
-      </td>
-      <td className="text-center text-base-content/70 whitespace-nowrap">
-        {date}
-      </td>
-      <td className="text-center">{log.caseType || "-"}</td>
-      <td className="text-center">{log.caseNumber || "-"}</td>
-      <td className="text-center">{log.content || "-"}</td>
-      <td className="text-center">{log.branchNumber || "-"}</td>
-      <td className="text-center">{time}</td>
-      <td className="text-base-content/60 text-center">{log.notes || "-"}</td>
-    </tr>
-  );
-};
 
 type ReceiveLogFilterValues = NonNullable<ReceivingLogFilterOptions["filters"]>;
 
@@ -196,6 +75,9 @@ const ReceiveLogsPage: React.FC<{
   const [error, setError] = useState<string | null>(null);
 
   const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
   const [deletingSelected, setDeletingSelected] = useState(false);
 
   const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
@@ -221,6 +103,7 @@ const ReceiveLogsPage: React.FC<{
     thisMonth: 0,
     docTypes: 0,
   });
+  const isSelecting = selectionMode !== null;
 
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
@@ -411,6 +294,36 @@ const ReceiveLogsPage: React.FC<{
     }
   };
 
+  const handleEditSelectedLogs = () => {
+    if (selectedLogIds.length === 0) {
+      statusPopup.showError("Select at least one row to edit.");
+      return;
+    }
+
+    router.push(`/user/cases/receiving/edit?ids=${selectedLogIds.join(",")}`);
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedLogIds([]);
+  };
+
+  const applySelectionMode = async () => {
+    if (selectedLogIds.length === 0) {
+      statusPopup.showError("Select at least one entry first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelectedLogs();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedLogs();
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     if (!input.files || input.files.length === 0) return;
@@ -509,50 +422,112 @@ const ReceiveLogsPage: React.FC<{
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
         {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Receiving Logs
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Track all received documents and case filings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
-          </div>
-        </div>
+        <header className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                  <span>Cases</span>
+                  <span className="text-base-content/30">/</span>
+                  <span className="text-base-content/70 font-medium">
+                    Receiving Logs
+                  </span>
+                </div>
+                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
+                  Receiving Logs
+                </h2>
+                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
+                  <FiCalendar className="shrink-0 w-4 h-4" />
+                  <span>Track all received documents and case filings</span>
+                </p>
+              </div>
+              {isAdminOrAtty && (
+                <div className="flex flex-col items-end gap-3">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button
+                      className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      aria-busy={uploading}
+                      aria-label="Import Excel file"
+                    >
+                      <FiUpload className="h-5 w-5" />
+                      {uploading ? "Importing..." : "Import Excel"}
+                    </button>
+                    <button
+                      className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                      onClick={async () => {
+                        setExporting(true);
+                        try {
+                          const result = await adapter.exportReceiveLogsExcel();
+                          if (!result.success) {
+                            statusPopup.showError(
+                              result.error || "Failed to export receiving logs",
+                            );
+                            return;
+                          }
 
-        {/* Search + Filter + Add */}
-        <div className="relative mb-6">
-          <div className="flex gap-4">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-            <input
-              type="text"
-              placeholder="Search case number..."
-              className="input input-bordered input-lg w-full pl-12 text-base"
-              value={appliedFilters?.caseNumber || ""}
-              onChange={(e) =>
-                setAppliedFilters((prev) => ({
-                  ...prev,
-                  caseNumber: e.target.value,
-                }))
-              }
-            />
+                          if (!result.result) {
+                            statusPopup.showError("No data to export");
+                            return;
+                          }
+
+                          const { fileName, base64 } = result.result;
+                          const byteCharacters = atob(base64);
+                          const byteNumbers = new Array(byteCharacters.length);
+                          for (let i = 0; i < byteCharacters.length; i++) {
+                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                          }
+                          const byteArray = new Uint8Array(byteNumbers);
+                          const blob = new Blob([byteArray], {
+                            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          });
+
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = fileName;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        } finally {
+                          setExporting(false);
+                        }
+                      }}
+                      disabled={exporting}
+                      aria-busy={exporting}
+                      aria-label="Export data to Excel"
+                    >
+                      <FiDownload className="h-5 w-5" />
+                      {exporting ? "Exporting..." : "Export Excel"}
+                    </button>
+
+                    <button
+                      className={ButtonStyles.primary}
+                      onClick={() => {
+                        router.push("/user/cases/receiving/add");
+                      }}
+                      aria-label="Add new receiving log entry"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Add Entry
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -560,16 +535,54 @@ const ReceiveLogsPage: React.FC<{
               className="hidden"
               onChange={handleImportExcel}
             />
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>Hover over table cells to see full details</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Search + Filter + Add */}
+        <div className="relative mb-6">
+          <div className="flex gap-3 flex-wrap items-center">
+            <div className="relative w-full sm:flex-1 sm:max-w-md">
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-lg z-10" />
+              <input
+                type="text"
+                placeholder="Search case number..."
+                className="input input-bordered input-lg w-full pl-12 text-base"
+                value={appliedFilters?.caseNumber || ""}
+                disabled={isSelecting}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    caseNumber: e.target.value,
+                  }))
+                }
+              />
+            </div>
             <button
               type="button"
-              className="btn btn-outline flex items-center gap-2"
+              className={`${ButtonStyles.secondary} ${Object.keys(appliedFilters).length > 0 ? "btn-primary" : ""}`}
               onClick={() => {
-                console.log(
-                  "ReceivingLogs Filter button clicked, current state:",
-                  filterModalOpen,
-                );
                 setFilterModalOpen((prev) => !prev);
               }}
+              aria-label={`Filter (${Object.keys(appliedFilters).length} active)`}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -586,87 +599,63 @@ const ReceiveLogsPage: React.FC<{
               Filter
             </button>
 
-            {isAdminOrAtty && (
-              <>
-                <button
-                  className={`btn btn-outline ${uploading ? "loading" : ""}`}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {" "}
-                  <FiUpload className="h-5 w-5" />
-                  {uploading ? "Importing..." : "Import Excel"}
-                </button>
-                <button
-                  className={`btn btn-outline ${exporting ? "loading" : ""}`}
-                  onClick={async () => {
-                    setExporting(true);
-                    try {
-                      const result = await adapter.exportReceiveLogsExcel();
-                      if (!result.success) {
-                        statusPopup.showError(
-                          result.error || "Failed to export receiving logs",
-                        );
-                        return;
-                      }
-
-                      if (!result.result) {
-                        statusPopup.showError("No data to export");
-                        return;
-                      }
-
-                      const { fileName, base64 } = result.result;
-                      const byteCharacters = atob(base64);
-                      const byteNumbers = new Array(byteCharacters.length);
-                      for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                      }
-                      const byteArray = new Uint8Array(byteNumbers);
-                      const blob = new Blob([byteArray], {
-                        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                      });
-
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement("a");
-                      link.href = url;
-                      link.download = fileName;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      URL.revokeObjectURL(url);
-                    } finally {
-                      setExporting(false);
-                    }
-                  }}
-                  disabled={exporting}
-                >
-                  {" "}
-                  <FiDownload className="h-5 w-5 mr-2" />
-                  {exporting ? "Exporting..." : "Export Excel"}
-                </button>
-
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    router.push("/user/cases/receiving/add");
-                  }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+            {isAdminOrAtty &&
+              (isSelecting ? (
+                <div className="flex items-center gap-2 ml-3">
+                  <span className="text-xs text-base-content/40 tabular-nums">
+                    {selectedLogIds.length} selected
+                  </span>
+                  <button
+                    type="button"
+                    className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                    onClick={() => void applySelectionMode()}
+                    disabled={selectedLogIds.length === 0 || deletingSelected}
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Add Entry
-                </button>
-              </>
-            )}
+                    <FiCheck className="h-4 w-4" />
+                    <span>
+                      {selectionMode === "edit"
+                        ? "Edit Selected"
+                        : "Delete Selected"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-md btn-ghost text-base-content/50"
+                    onClick={cancelSelectionMode}
+                  >
+                    <FiX className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 ml-3">
+                  <button
+                    type="button"
+                    className="btn btn-md btn-outline gap-2"
+                    onClick={() => {
+                      if (totalCount > 0) {
+                        setSelectionMode("edit");
+                        setSelectedLogIds([]);
+                      }
+                    }}
+                  >
+                    <FiEdit2 className="h-4 w-4" />
+                    Edit rows
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
+                    onClick={() => {
+                      if (totalCount > 0) {
+                        setSelectionMode("delete");
+                        setSelectedLogIds([]);
+                      }
+                    }}
+                  >
+                    <FiTrash2 className="h-4 w-4" />
+                    Delete rows
+                  </button>
+                </div>
+              ))}
           </div>
 
           <FilterDropdown
@@ -679,7 +668,7 @@ const ReceiveLogsPage: React.FC<{
           />
         </div>
 
-        {isAdminOrAtty && (
+        {isAdminOrAtty && isSelecting && (
           <AnimatePresence>
             {selectedLogIds.length > 0 && (
               <motion.div
@@ -690,35 +679,27 @@ const ReceiveLogsPage: React.FC<{
                 className="mb-4 overflow-hidden"
               >
                 <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
+                  <div className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                     {selectedLogIds.length} entr
                     {selectedLogIds.length > 1 ? "ies" : "y"} selected
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/receiving/edit?ids=${selectedLogIds.join(",")}`,
-                        )
-                      }
-                    >
-                      Edit Selected
-                    </button>
-                    <button
-                      className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                      onClick={handleDeleteSelectedLogs}
-                      disabled={deletingSelected}
-                    >
-                      Delete Selected
-                    </button>
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setSelectedLogIds([])}
-                    >
-                      Clear
-                    </button>
-                  </div>
+                  <button
+                    className="btn btn-ghost btn-md"
+                    onClick={() => setSelectedLogIds([])}
+                  >
+                    Clear
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -727,88 +708,58 @@ const ReceiveLogsPage: React.FC<{
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "Total Entries",
-              value: (stats.total ?? 0).toLocaleString(),
-              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
-              icon: FiBarChart2,
-              delay: 0,
-            },
-            {
-              label: "Today",
-              value: (stats.today ?? 0).toLocaleString(),
-              subtitle: `Today`,
-              icon: FiFileText,
-              delay: 100,
-            },
-            {
-              label: "This Month",
-              value: (stats.thisMonth ?? 0).toLocaleString(),
-              subtitle: `Last 30 days`,
-              icon: FiLock,
-              delay: 200,
-            },
-            {
-              label: "Doc Types",
-              value: (stats.docTypes ?? 0).toLocaleString(),
-              subtitle: `Distinct types`,
-              icon: FiUsers,
-              delay: 300,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className={`transform hover:scale-105 card surface-card-hover group`}
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
-              >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                    <Icon className="h-full w-full" />
-                  </div>
-                  <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value}
-                    </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
-                      {card.subtitle}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <StatsCard
+            label="Total Entries"
+            value={(stats.total ?? 0).toLocaleString()}
+            subtitle={`${(stats.thisMonth ?? 0).toLocaleString()} this month`}
+            icon={FiBarChart2}
+            delay={0}
+          />
+          <StatsCard
+            label="Today"
+            value={(stats.today ?? 0).toLocaleString()}
+            subtitle="Received today"
+            icon={FiFileText}
+            delay={100}
+          />
+          <StatsCard
+            label="This Month"
+            value={(stats.thisMonth ?? 0).toLocaleString()}
+            subtitle="Last 30 days"
+            icon={FiLock}
+            delay={200}
+          />
+          <StatsCard
+            label="Doc Types"
+            value={(stats.docTypes ?? 0).toLocaleString()}
+            subtitle="Distinct types"
+            icon={FiUsers}
+            delay={300}
+          />
         </div>
 
         {/* Table */}
         <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <Table
             headers={[
-              {
-                key: "select",
-                label: "Select",
-                align: "center" as const,
-              },
-              {
-                key: "actions",
-                label: "Actions",
-                align: "center" as const,
-              },
+              ...(isAdminOrAtty && isSelecting
+                ? [
+                    {
+                      key: "select",
+                      label: "Select",
+                      align: "center" as const,
+                    },
+                  ]
+                : []),
+              ...(isAdminOrAtty && !isSelecting
+                ? [
+                    {
+                      key: "actions",
+                      label: "Actions",
+                      align: "center" as const,
+                    },
+                  ]
+                : []),
               {
                 key: "bookAndPage",
                 label: "Book And Pages",
@@ -870,12 +821,16 @@ const ReceiveLogsPage: React.FC<{
                 isSelected={selectedLogIds.includes(
                   (log as unknown as ReceiveLog).id,
                 )}
-                onToggleSelect={(id) =>
-                  setSelectedLogIds((prev) =>
-                    prev.includes(id)
-                      ? prev.filter((entryId) => entryId !== id)
-                      : [...prev, id],
-                  )
+                isSelecting={isSelecting}
+                onToggleSelect={
+                  isSelecting
+                    ? (id) =>
+                        setSelectedLogIds((prev) =>
+                          prev.includes(id)
+                            ? prev.filter((entryId) => entryId !== id)
+                            : [...prev, id],
+                        )
+                    : undefined
                 }
               />
             )}

@@ -1,7 +1,6 @@
 "use client";
 
-import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import { ActionDropdown, TipCell } from "../../index";
+import { TipCell } from "../../index";
 import type { CivilCaseData } from "./CivilCaseSchema";
 
 const formatDate = (date: string | Date | null | undefined) => {
@@ -15,42 +14,36 @@ const formatDate = (date: string | Date | null | undefined) => {
 
 const CivilCaseRow = ({
   caseItem,
-  onEdit,
-  onDelete,
   onView,
   selected = false,
+  isSelecting = false,
   onToggleSelect,
-  canManage,
 }: {
   caseItem: CivilCaseData;
-  onEdit: (c: CivilCaseData) => void;
-  onDelete: (id: number) => void;
   onView: (c: CivilCaseData) => void;
   selected?: boolean;
+  isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
-  canManage: boolean;
 }) => {
-  const popoverId = `civil-actions-popover-${caseItem.id}`;
-  const anchorName = `--civil-actions-anchor-${caseItem.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
-
   return (
     <tr
-      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm"
-      onClick={() => onView(caseItem)}
+      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm ${
+        isSelecting && selected ? "bg-primary/10" : ""
+      }`}
+      onClick={() => {
+        if (isSelecting) {
+          onToggleSelect?.(caseItem.id, !selected);
+          return;
+        }
+        onView(caseItem);
+      }}
     >
-      {canManage && (
+      {isSelecting && (
         <td
           onClick={(e) => e.stopPropagation()}
           className="px-4 py-3.5 text-center"
         >
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center">
             <input
               type="checkbox"
               className="checkbox checkbox-sm"
@@ -59,47 +52,6 @@ const CivilCaseRow = ({
               aria-label={`Select case ${caseItem.caseNumber}`}
               onClick={(e) => e.stopPropagation()}
             />
-            <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-info"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    onView(caseItem);
-                  }}
-                >
-                  <FiEye size={16} />
-                  <span>View</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-warning"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    onEdit(caseItem);
-                  }}
-                >
-                  <FiEdit size={16} />
-                  <span>Edit</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  className="flex items-center gap-3 text-error"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeActionsPopover();
-                    onDelete(caseItem.id);
-                  }}
-                >
-                  <FiTrash2 size={16} />
-                  <span>Delete</span>
-                </button>
-              </li>
-            </ActionDropdown>
           </div>
         </td>
       )}

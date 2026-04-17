@@ -35,6 +35,7 @@ import {
   FiTrash2,
 } from "react-icons/fi";
 import { createTempId } from "../../utils";
+import CaseEntryToolbar from "../CaseEntryToolbar";
 
 type SherriffColKey =
   | "caseNumber"
@@ -452,8 +453,13 @@ export const SherriffCaseUpdatePage = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptySherriffEntry()]);
+  const handleAddEntry = useCallback((count: number = 1) => {
+    const normalizedCount = Math.max(1, Math.floor(count));
+    const nextRows = Array.from({ length: normalizedCount }, () =>
+      createEmptySherriffEntry(),
+    );
+
+    setEntries((prev) => [...prev, ...nextRows]);
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -996,23 +1002,21 @@ export const SherriffCaseUpdatePage = ({
               </div>
             )}
 
+            {!isEdit && (
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
+                }}
+              />
+            )}
+
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 <button className="xls-tab active">
                   <FiFileText size={13} />
                   Sheriff Case Info
                 </button>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
@@ -1223,7 +1227,7 @@ export const SherriffCaseUpdatePage = ({
                 <button
                   type="button"
                   className="xls-add-row"
-                  onClick={handleAddEntry}
+                  onClick={() => handleAddEntry()}
                 >
                   <FiPlus size={14} strokeWidth={2.5} />
                   Add Row

@@ -20,14 +20,21 @@ import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FiBarChart2,
+  FiCalendar,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
+  FiTrash2,
   FiUpload,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import StatsCard from "../../Stats/StatsCard";
+import { ButtonStyles } from "../../Utils/ButtonStyles";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 
 type SPFilterValues = {
@@ -114,11 +121,15 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   const [appliedFilters, setAppliedFilters] = useState<SPFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
   const [selectedCaseIds, setSelectedCaseIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
   const [deletingSelected, setDeletingSelected] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const isSelecting = selectionMode !== null;
   const [stats, setStats] = useState<SpecialProceedingStats>({
     totalCases: 0,
     thisMonth: 0,
@@ -307,6 +318,38 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
     }
   };
 
+  const handleEditSelected = () => {
+    if (selectedCaseIds.length === 0) {
+      popup.showError("Select at least one row to edit.");
+      return;
+    }
+
+    router.push(
+      `/user/cases/proceedings/edit?ids=${selectedCaseIds.join(",")}`,
+    );
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedCaseIds([]);
+  };
+
+  const applySelectionMode = async () => {
+    if (selectedCaseIds.length === 0) {
+      popup.showError("Select at least one case first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelected();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelected();
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -393,44 +436,130 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
         {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-4xl lg:text-5xl font-bold text-base-content mb-2">
-            Special Proceedings Cases
-          </h2>
-          <p className="text-xl text-base-content/50 mt-2">
-            Manage all special proceedings
-          </p>
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="shrink-0"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span>Hover over table cells to see full details</span>
+        <header className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
+                  <span>Cases</span>
+                  <span className="text-base-content/30">/</span>
+                  <span className="text-base-content/70 font-medium">
+                    Special Proceedings
+                  </span>
+                </div>
+                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
+                  Special Proceedings Cases
+                </h2>
+                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
+                  <FiCalendar className="shrink-0 w-4 h-4" />
+                  <span>Manage all special proceedings and case filings</span>
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-3">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <button
+                    className={ButtonStyles.info}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    aria-busy={uploading}
+                    aria-label="Import Excel file"
+                  >
+                    {uploading ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <FiUpload className="h-5 w-5" />
+                        Import Excel
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className={ButtonStyles.info}
+                    onClick={handleExportExcel}
+                    disabled={exporting || cases.length === 0}
+                    aria-busy={exporting}
+                    aria-label="Export data to Excel"
+                  >
+                    {exporting ? (
+                      <>
+                        <span className="loading loading-spinner loading-sm" />
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <FiDownload className="h-5 w-5" />
+                        Export Excel
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className={ButtonStyles.primary}
+                    onClick={() => {
+                      router.push("/user/cases/proceedings/add");
+                    }}
+                    aria-label="Add new special proceedings case"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Add Case
+                  </button>
+                </div>
+              </div>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportExcel}
+              className="hidden"
+              aria-label="Import excel file input"
+            />
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>Hover over table cells to see full details</span>
+            </div>
           </div>
-        </div>
+        </header>
 
         {/* Search and Actions */}
         <div className="relative mb-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+          <div className="flex gap-3 flex-wrap items-center">
+            <div className="relative w-full sm:flex-1 sm:max-w-md">
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-lg z-10" />
               <input
                 type="text"
                 placeholder="Search cases..."
                 className="input input-bordered input-lg w-full pl-12 text-base"
                 value={appliedFilters?.caseNumber || ""}
+                disabled={isSelecting}
                 onChange={(e) =>
                   setAppliedFilters((prev) => ({
                     ...prev,
@@ -442,14 +571,11 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
 
             <button
               type="button"
-              className={`btn btn-outline ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+              className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
               onClick={() => {
-                console.log(
-                  "SpecialProceedings Filter button clicked, current state:",
-                  filterModalOpen,
-                );
                 setFilterModalOpen((prev) => !prev);
               }}
+              aria-label={`Filter (${activeFilterCount} active)`}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -471,68 +597,62 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
               )}
             </button>
 
-            <button
-              className="btn btn-outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? (
-                <>
-                  <span className="loading loading-spinner loading-sm" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <FiUpload className="h-5 w-5 mr-2" />
-                  Import Excel
-                </>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportExcel}
-              className="hidden"
-            />
-
-            <button
-              className="btn btn-outline"
-              onClick={handleExportExcel}
-              disabled={exporting || cases.length === 0}
-            >
-              {exporting ? (
-                <>
-                  <span className="loading loading-spinner loading-sm" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <FiDownload className="h-5 w-5 mr-2" />
-                  Export Excel
-                </>
-              )}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                router.push("/user/cases/proceedings/add");
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Add Case
-            </button>
+            {isSelecting ? (
+              <div className="flex items-center gap-2 ml-3">
+                <span className="text-xs text-base-content/40 tabular-nums">
+                  {selectedCaseIds.length} selected
+                </span>
+                <button
+                  type="button"
+                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                  onClick={() => void applySelectionMode()}
+                  disabled={selectedCaseIds.length === 0 || deletingSelected}
+                >
+                  <FiCheck className="h-4 w-4" />
+                  <span>
+                    {selectionMode === "edit"
+                      ? "Edit Selected"
+                      : "Delete Selected"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-md btn-ghost text-base-content/50"
+                  onClick={cancelSelectionMode}
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 ml-3">
+                <button
+                  type="button"
+                  className="btn btn-md btn-outline gap-2"
+                  onClick={() => {
+                    if (totalCount > 0) {
+                      setSelectionMode("edit");
+                      setSelectedCaseIds([]);
+                    }
+                  }}
+                >
+                  <FiEdit2 className="h-4 w-4" />
+                  Edit rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
+                  onClick={() => {
+                    if (totalCount > 0) {
+                      setSelectionMode("delete");
+                      setSelectedCaseIds([]);
+                    }
+                  }}
+                >
+                  <FiTrash2 className="h-4 w-4" />
+                  Delete rows
+                </button>
+              </div>
+            )}
           </div>
 
           <FilterDropdown
@@ -546,7 +666,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         </div>
 
         <AnimatePresence>
-          {selectedCaseIds.length > 0 && (
+          {isSelecting && selectedCaseIds.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -10, height: 0 }}
               animate={{ opacity: 1, y: 0, height: "auto" }}
@@ -555,35 +675,27 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
               className="mb-4 overflow-hidden"
             >
               <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-primary">
+                <div className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                   {selectedCaseIds.length} case
                   {selectedCaseIds.length > 1 ? "s" : ""} selected
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() =>
-                      router.push(
-                        `/user/cases/proceedings/edit?ids=${selectedCaseIds.join(",")}`,
-                      )
-                    }
-                  >
-                    Edit Selected
-                  </button>
-                  <button
-                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                    onClick={handleDeleteSelected}
-                    disabled={deletingSelected}
-                  >
-                    Delete Selected
-                  </button>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setSelectedCaseIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
+                <button
+                  className="btn btn-ghost btn-md"
+                  onClick={() => setSelectedCaseIds([])}
+                >
+                  Clear
+                </button>
               </div>
             </motion.div>
           )}
@@ -591,72 +703,35 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "Total Cases",
-              value: stats.totalCases ?? 0,
-              subtitle: `${(stats.thisMonth ?? 0).toLocaleString()} this month`,
-              icon: FiBarChart2,
-              delay: 0,
-            },
-            {
-              label: "This Month",
-              value: stats.thisMonth ?? 0,
-              subtitle: "Last 30 days",
-              icon: FiFileText,
-              delay: 100,
-            },
-            {
-              label: "Case Types",
-              value: stats.caseTypes ?? 0,
-              subtitle: "Distinct types",
-              icon: FiUsers,
-              delay: 200,
-            },
-            {
-              label: "Branches",
-              value: stats.branches ?? 0,
-              subtitle: "Active branches",
-              icon: FiLock,
-              delay: 300,
-            },
-          ].map((card, idx) => {
-            const Icon = card.icon as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >;
-            return (
-              <div
-                key={idx}
-                className="transform hover:scale-105 card surface-card-hover group"
-                style={{
-                  transitionDelay: `${card.delay}ms`,
-                  transition: "all 400ms cubic-bezier(0.4,0,0.2,1)",
-                }}
-              >
-                <div
-                  className="card-body relative overflow-hidden"
-                  style={{ padding: "var(--space-card-padding)" }}
-                >
-                  <div className="absolute right-0 top-0 h-28 w-28 -translate-y-6 translate-x-6 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                    <Icon className="h-full w-full" />
-                  </div>
-                  <div className="relative text-center">
-                    <div className="mb-3">
-                      <span className="text-sm font-semibold text-muted">
-                        {card.label}
-                      </span>
-                    </div>
-                    <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                      {card.value.toLocaleString()}
-                    </p>
-                    <p className="text-sm sm:text-base font-semibold text-muted">
-                      {card.subtitle}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <StatsCard
+            label="Total Cases"
+            value={stats.totalCases ?? 0}
+            subtitle={`${(stats.thisMonth ?? 0).toLocaleString()} this month`}
+            icon={FiBarChart2}
+            delay={0}
+            isHighlight={false}
+          />
+          <StatsCard
+            label="This Month"
+            value={stats.thisMonth ?? 0}
+            subtitle="Last 30 days"
+            icon={FiFileText}
+            delay={100}
+          />
+          <StatsCard
+            label="Case Types"
+            value={stats.caseTypes ?? 0}
+            subtitle="Distinct types"
+            icon={FiUsers}
+            delay={200}
+          />
+          <StatsCard
+            label="Branches"
+            value={stats.branches ?? 0}
+            subtitle="Active branches"
+            icon={FiLock}
+            delay={300}
+          />
         </div>
 
         {/* Table */}
@@ -664,8 +739,8 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
           <table className="table table-zebra w-full text-center">
             <thead className=" bg-base-300">
               <tr className="text-center">
-                <th>SELECT</th>
-                <th>ACTIONS</th>
+                {isSelecting && <th>Select</th>}
+                {!isSelecting && <th>Actions</th>}
                 <SortTh
                   label="SPC. NO."
                   colKey="caseNumber"
@@ -707,7 +782,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={isSelecting ? 7 : 8}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
                       <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
@@ -734,12 +809,16 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                       router.push(`/user/cases/proceedings/${item.id}`)
                     }
                     isSelected={selectedCaseIds.includes(c.id)}
-                    onToggleSelect={(id) =>
-                      setSelectedCaseIds((prev) =>
-                        prev.includes(id)
-                          ? prev.filter((entryId) => entryId !== id)
-                          : [...prev, id],
-                      )
+                    isSelecting={isSelecting}
+                    onToggleSelect={
+                      isSelecting
+                        ? (id) =>
+                            setSelectedCaseIds((prev) =>
+                              prev.includes(id)
+                                ? prev.filter((entryId) => entryId !== id)
+                                : [...prev, id],
+                            )
+                        : undefined
                     }
                   />
                 ))
