@@ -22,17 +22,19 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   socket.on("message", (msg, rinfo) => {
     try {
       const payload = UdpData.parse(JSON.parse(msg.toString()));
+      const address =
+        import.meta.env.MODE === "development" ? "localhost" : rinfo.address;
 
       const backend: BackendInfo = {
-        url: `http://${rinfo.address}:${payload.port}`,
-        ip: rinfo.address,
+        url: `http://${address}:${payload.port}`,
+        ip: address,
         port: payload.port,
         lastSeen: Date.now(),
       };
 
       // 🔁 Forward to renderer
       console.log(
-        `📨 Received UDP from ${rinfo.address}:${payload.port} - forwarding to renderer`,
+        `📨 Received UDP from ${address}:${payload.port} - forwarding to renderer`,
       );
       mainWindow.webContents.send("udp:backend", backend);
     } catch (err) {

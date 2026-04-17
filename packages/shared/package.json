@@ -5,8 +5,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts",
-    "./prisma/client": "./src/generated/prisma/client.ts",
+    "./schema": "./schema/schema.prisma",
     "./prisma/*": "./src/generated/prisma/*.ts",
     "./prisma/internal/*": "./src/generated/prisma/internal/*.ts",
     "./prisma/models/*": "./src/generated/prisma/models/*.ts",
@@ -18,11 +17,15 @@
     "build:watch": "tsc --watch"
   },
   "devDependencies": {
+    "@prisma/client": "^7.3.0",
     "typescript": "^5.9.3",
     "zod": "^4.3.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^7.3.0"
   },
   "dependencies": {
     "zod": "^4.3.6",
@@ -31,8 +34,6 @@
     "ws": "^8.19.0",
     "lucide-react": "^0.563.0",
     "react-icons": "^5.5.0",
-    "react-dom": "19.2.3",
-    "@prisma/client": "^7.3.0",
-    "better-auth": "^1.4.18"
+    "react-dom": "19.2.3"
   }
 }
