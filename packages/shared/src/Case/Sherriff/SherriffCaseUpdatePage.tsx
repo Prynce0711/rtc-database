@@ -399,6 +399,7 @@ export const SherriffCaseUpdatePage = ({
 
       const rowBuckets = autoRows.map((entry) => {
         const parsed = parseSheriffCaseNumberParts(entry.caseNumber);
+
         return {
           entryId: entry.id,
           year: getAutoYearFromDate(entry.dateFiled),
