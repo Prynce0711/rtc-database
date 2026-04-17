@@ -63,8 +63,6 @@ const normalizeAreaCode = (value: string) =>
     .toUpperCase()
     .replace(/[^A-Z]/g, "")
     .slice(0, 8);
-const resolveAreaCode = (value: string) =>
-  normalizeAreaCode(value) || AUTO_DEFAULT_AREA;
 
 const parseCaseNumberParts = (
   value: string,

@@ -97,28 +97,6 @@ const SortTh = ({
   );
 };
 
-function PageButton({
-  isActive,
-  children,
-  onClick,
-  disabled = false,
-}: {
-  isActive?: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      className={`join-item btn btn-sm btn-ghost ${isActive ? "btn-active" : ""}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-}
-
 const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   adapter,
 }) => {
