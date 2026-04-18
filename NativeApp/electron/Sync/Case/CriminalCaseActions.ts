@@ -2,7 +2,7 @@ import type {
   UpsertSingleCriminalCaseResponse,
   UpsertSingleCriminalCaseResult,
 } from "@rtc-database/shared/src/lib/sync";
-import { prisma } from "../prisma";
+import { prisma } from "../../prisma";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

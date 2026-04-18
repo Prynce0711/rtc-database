@@ -2,7 +2,7 @@
 
 import { getCriminalCases } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
-  SYNC_CHANNELS,
+  IPC_CHANNELS,
   type UpsertSingleCriminalCasePayload,
   type UpsertSingleCriminalCaseResponse,
 } from "@rtc-database/shared";
@@ -83,13 +83,13 @@ const SyncProvider = ({ children }: SyncProviderProps) => {
       };
 
       console.log("[sync-provider] Sending case to Electron over IPC.", {
-        channel: SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+        channel: IPC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
         id: caseData.id,
         caseNumber: caseData.caseNumber,
       });
 
       const response = (await ipc.invoke(
-        SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+        IPC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
         payload,
       )) as UpsertSingleCriminalCaseResponse;
 

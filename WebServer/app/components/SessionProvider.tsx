@@ -1,5 +1,6 @@
 "use client";
 
+import { IPC_CHANNELS } from "@rtc-database/shared";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { useSession } from "../lib/authClient";
 
@@ -15,8 +16,6 @@ type ElectronSessionUser = {
   branch?: string;
   darkMode?: boolean;
 };
-
-const ELECTRON_SESSION_SYNC_CHANNEL = "session:sync-user-minimal";
 
 const SessionProvider = ({ children }: SessionProviderProps) => {
   const { data: session } = useSession();
@@ -79,7 +78,9 @@ const SessionProvider = ({ children }: SessionProviderProps) => {
     lastSyncedPayloadRef.current = serializedPayload;
 
     void ipc
-      .invoke(ELECTRON_SESSION_SYNC_CHANNEL, { user: minimalSessionUser })
+      .invoke(IPC_CHANNELS.SESSION_SYNC_USER_MINIMAL, {
+        user: minimalSessionUser,
+      })
       .catch((error: unknown) => {
         console.warn(
           "[session-sync] Failed to sync session user to Electron.",

@@ -1,6 +1,11 @@
 "use client";
 
-import { Collapse, ModalBase, usePopup } from "@rtc-database/shared";
+import {
+  Collapse,
+  IPC_CHANNELS,
+  ModalBase,
+  usePopup,
+} from "@rtc-database/shared";
 import {
   useCallback,
   useEffect,
@@ -731,7 +736,7 @@ const BackupTab = () => {
       return null;
     }
 
-    const response = (await ipc.invoke("rclone:authorize-provider", {
+    const response = (await ipc.invoke(IPC_CHANNELS.RCLONE_AUTHORIZE_PROVIDER, {
       provider: normalizedProvider,
     })) as ElectronAuthorizeProviderResult;
 
