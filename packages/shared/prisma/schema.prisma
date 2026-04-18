@@ -285,6 +285,7 @@ model User {
 
   sessions Session[]
   accounts Account[]
+  syncStates SyncState[]
 
   status       Status        @default(PENDING)
   chatMessages ChatMessage[]
@@ -660,4 +661,15 @@ model TwoFactor {
   @@index([secret])
   @@index([userId])
   @@map("twoFactor")
+}
+
+model SyncState {
+  id        Int       @id @default(autoincrement())
+  deviceId  String    @unique
+  userId    String
+  lastSyncedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
