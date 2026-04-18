@@ -6,7 +6,6 @@ import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
 import "./globals.css";
 import SocketProvider from "./lib/socket/SocketProvider";
 import SessionProvider from "./lib/sync/SessionProvider";
-import SyncProvider from "./lib/sync/SyncProvider";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -37,9 +36,7 @@ export default async function RootLayout({
         <PopupProvider>
           <ToastProvider>
             <SessionProvider>
-              <SocketProvider>
-                <SyncProvider>{children}</SyncProvider>
-              </SocketProvider>
+              <SocketProvider>{children}</SocketProvider>
             </SessionProvider>
           </ToastProvider>
         </PopupProvider>

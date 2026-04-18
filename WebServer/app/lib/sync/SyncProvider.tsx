@@ -16,6 +16,7 @@ import {
   useRef,
 } from "react";
 import { useSession } from "../authClient";
+import { upsertSyncStateForDevice } from "./SyncActions";
 
 type SyncProviderProps = {
   children: ReactNode;
@@ -26,6 +27,21 @@ type SyncContextType = {
 };
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const extractDeviceId = (value: unknown): string | null => {
+  if (!isRecord(value) || value.success !== true) {
+    return null;
+  }
+
+  if (!isRecord(value.result) || typeof value.result.deviceId !== "string") {
+    return null;
+  }
+
+  return value.result.deviceId;
+};
 
 export const useSync = (): SyncContextType => {
   const context = useContext(SyncContext);
@@ -51,11 +67,29 @@ const SyncProvider = ({ children }: SyncProviderProps) => {
       return;
     }
 
-    console.log(
-      "[sync-provider] Electron detected. Starting one-case sync test.",
-    );
-
     try {
+      const deviceIdResponse = await ipc.invoke(
+        IPC_CHANNELS.SESSION_GET_DEVICE_ID,
+      );
+      const deviceId = extractDeviceId(deviceIdResponse);
+      if (!deviceId) {
+        console.warn("[sync-provider] Failed to get device ID from Electron.");
+        return;
+      }
+
+      const syncStateResult = await upsertSyncStateForDevice(deviceId);
+      if (!syncStateResult.success) {
+        console.warn(
+          "[sync-provider] Failed to upsert sync state for device:",
+          syncStateResult.error,
+        );
+        return;
+      }
+
+      console.log(
+        "[sync-provider] Electron detected. Starting one-case sync test.",
+      );
+
       const result = await getCriminalCases({ page: 1, pageSize: 1 });
       if (!result.success) {
         console.warn(

@@ -5,11 +5,12 @@ import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
 import { upsertSingleCriminalCase } from "./Sync/Case/CriminalCasesActions";
 import {
+  getOrCreateDeviceId,
   isRecord,
   sanitizeSessionUser,
   saveSessionUserSnapshot,
   sessionUserSnapshotPath,
-} from "./Sync/session";
+} from "./Sync/SessionManager";
 import { formatError, resolveSafePath } from "./utils";
 
 ipcMain.handle(IPC_CHANNELS.FILES_SELECT_BASE_FOLDER, async () => {
@@ -101,6 +102,22 @@ ipcMain.handle(
     }
   },
 );
+
+ipcMain.handle(IPC_CHANNELS.SESSION_GET_DEVICE_ID, async () => {
+  try {
+    const deviceId = await getOrCreateDeviceId();
+
+    return {
+      success: true,
+      result: { deviceId },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
+});
 
 ipcMain.handle(
   IPC_CHANNELS.SESSION_SYNC_USER_MINIMAL,

@@ -1,10 +1,15 @@
 "use server";
 
-import { ActionResult, SyncState } from "@rtc-database/shared";
+import {
+  ActionResult,
+  deviceID,
+  SyncState,
+  UpdateSyncStatePayload,
+  type DeviceID,
+} from "@rtc-database/shared";
 import { prettifyError } from "zod/v4/core";
 import { validateSession } from "../authActions";
 import { prisma } from "../prisma";
-import { deviceID, UpdateSyncStatePayload, type DeviceID } from "./SyncSchema";
 
 export async function getSyncStatesForUser(): Promise<
   ActionResult<SyncState[]>
@@ -34,7 +39,8 @@ export async function getSyncStatesForUser(): Promise<
   }
 }
 
-export async function createSyncStateForDevice(
+// Only one user can use device id so we just do upsert instead of create and update
+export async function upsertSyncStateForDevice(
   deviceId: DeviceID,
 ): Promise<ActionResult<SyncState>> {
   try {
@@ -43,9 +49,26 @@ export async function createSyncStateForDevice(
       return sessionResult;
     }
 
-    const newSyncState = await prisma.syncState.create({
-      data: {
-        deviceId,
+    const validation = deviceID.safeParse(deviceId);
+    if (!validation.success) {
+      return {
+        success: false,
+        error: "Invalid device ID: " + prettifyError(validation.error),
+      };
+    }
+
+    const validatedDeviceId = validation.data;
+
+    const newSyncState = await prisma.syncState.upsert({
+      where: {
+        deviceId: validatedDeviceId,
+      },
+      create: {
+        deviceId: validatedDeviceId,
+        userId: sessionResult.result.id,
+      },
+      update: {
+        deviceId: validatedDeviceId,
         userId: sessionResult.result.id,
       },
     });
@@ -55,10 +78,10 @@ export async function createSyncStateForDevice(
       result: newSyncState,
     };
   } catch (error) {
-    console.error("Error creating sync state:", error);
+    console.error("Error upserting sync state:", error);
     return {
       success: false,
-      error: (error as Error).message || "Failed to create sync state.",
+      error: (error as Error).message || "Failed to upsert sync state.",
     };
   }
 }
