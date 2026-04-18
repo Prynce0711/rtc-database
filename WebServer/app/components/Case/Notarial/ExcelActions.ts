@@ -2,7 +2,7 @@
 
 import { NotarialSchema } from "@/app/components/Case/Notarial/schema";
 import { validateSession } from "@/app/lib/authActions";
-import { ExportExcelData, getExcelHeaderMap } from "@/app/lib/excel";
+import { ExportExcelData, getExcelHeaderMap } from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";

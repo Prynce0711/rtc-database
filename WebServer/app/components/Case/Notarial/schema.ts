@@ -1,5 +1,5 @@
 import { Prisma } from "@rtc-database/shared/prisma/browser";
-import { excelHeaders } from "@/app/lib/excel";
+import { excelHeaders } from "@rtc-database/shared";
 import z from "zod";
 
 const NotarialData = {

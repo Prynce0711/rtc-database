@@ -3,7 +3,7 @@ import { dialog, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
-import { upsertSingleCriminalCase } from "./Sync/Case/CriminalCaseActions";
+import { upsertSingleCriminalCase } from "./Sync/Case/CriminalCasesActions";
 import {
   isRecord,
   sanitizeSessionUser,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
+import { loadSystemSettings } from "@/app/lib/systemSettings";
 import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
 import { access, mkdir, readdir, rm } from "node:fs/promises";
@@ -130,19 +130,19 @@ let accountSetupStartedAt = 0;
 const pendingIdentityRefreshRemotes = new Set<string>();
 const lastIdentityRefreshAttemptAt = new Map<string, number>();
 const NOTARIAL_RESTIC_SOURCE_CACHE_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "data",
   "backup",
   "notarial-restic-source-cache",
 );
 const NOTARIAL_RESTIC_CACHE_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "data",
   "backup",
   "restic-cache",
 );
 const RCLONE_EXECUTABLE_FOR_RESTIC = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "node_modules",
   "rclone.js",
   "bin",
@@ -1334,14 +1334,8 @@ async function runBackup(
     }
 
     if (activeNotarialSelectedRemoteNames.length > 0) {
-      const settingsResult = await getSystemSettings();
-      if (!settingsResult.success) {
-        throw new Error(
-          `Failed to load system settings for notarial sync: ${settingsResult.error}`,
-        );
-      }
-
-      const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+      const settings = await loadSystemSettings();
+      const garageBucket = (settings.garageBucket ?? "").trim();
       if (!garageBucket) {
         throw new Error(
           "Garage bucket is not configured. Set Garage bucket in System Settings to run notarial sync.",
@@ -2062,14 +2056,7 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
 export async function syncNotarialRemote(): Promise<void> {
   await ensureBackupArtifacts();
 
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error(
-      `Failed to load system settings for notarial sync: ${settingsResult.error}`,
-    );
-  }
-
-  const settings = settingsResult.result;
+  const settings = await loadSystemSettings();
 
   // Check if Garage is fully configured
   if (
@@ -2369,13 +2356,12 @@ export async function restoreNotarialSnapshot(
 
   await ensureBackupArtifacts();
 
-  const [current, configMap, settingsResult, availableSnapshots] =
-    await Promise.all([
-      readBackupConfigFile(),
-      getRemoteConfigMap(),
-      getSystemSettings(),
-      listNotarialSnapshots(normalizedName),
-    ]);
+  const [current, configMap, settings, availableSnapshots] = await Promise.all([
+    readBackupConfigFile(),
+    getRemoteConfigMap(),
+    loadSystemSettings(),
+    listNotarialSnapshots(normalizedName),
+  ]);
 
   if (!configMap.has(normalizedName)) {
     throw new Error(`Remote ${normalizedName} was not found.`);
@@ -2387,13 +2373,7 @@ export async function restoreNotarialSnapshot(
     );
   }
 
-  if (!settingsResult.success) {
-    throw new Error(
-      `Failed to load system settings for notarial restore: ${settingsResult.error}`,
-    );
-  }
-
-  const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+  const garageBucket = (settings.garageBucket ?? "").trim();
   if (!garageBucket) {
     throw new Error(
       "Garage bucket is not configured. Set Garage bucket in System Settings before restoring notarial snapshots.",
@@ -2428,7 +2408,7 @@ export async function restoreNotarialSnapshot(
   );
   const resticEnv = buildResticCommandEnv();
   const restoreTargetPath = path.join(
-    process.cwd(),
+    /*turbopackIgnore: true*/ process.cwd(),
     "data",
     "backup",
     "notarial-restore",

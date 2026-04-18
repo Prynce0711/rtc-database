@@ -1,7 +1,7 @@
-import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
 import { S3Client } from "@aws-sdk/client-s3";
 import { createHash } from "crypto";
 import "server-only";
+import { loadSystemSettings } from "./systemSettings";
 
 export type UploadResult = {
   key: string;
@@ -45,12 +45,7 @@ function hashSettings(settings: {
 }
 
 export async function getGarageClient(): Promise<S3Client> {
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error(`Failed to load garage settings: ${settingsResult.error}`);
-  }
-
-  const settings = settingsResult.result;
+  const settings = await loadSystemSettings();
 
   if (
     !settings.garageHost ||
@@ -190,12 +185,8 @@ async function getBucketConsumedBytes(
   bucket: string,
   adminBaseUrl: string,
 ): Promise<number> {
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error(`Failed to load garage settings: ${settingsResult.error}`);
-  }
-
-  const adminToken = settingsResult.result.garageAdminToken?.trim() || "";
+  const settings = await loadSystemSettings();
+  const adminToken = settings.garageAdminToken?.trim() || "";
   const adminHeaders = adminToken
     ? { Authorization: `Bearer ${adminToken}` }
     : undefined;
@@ -267,12 +258,7 @@ async function getBucketConsumedBytes(
 }
 
 export async function getInfo(): Promise<GarageInfo> {
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error(`Failed to load garage settings: ${settingsResult.error}`);
-  }
-
-  const settings = settingsResult.result;
+  const settings = await loadSystemSettings();
   const garageBucket = settings.garageBucket;
   const adminBaseUrl = getGarageAdminBaseUrl(settings);
   const metricsUrl = `${adminBaseUrl}/metrics`;

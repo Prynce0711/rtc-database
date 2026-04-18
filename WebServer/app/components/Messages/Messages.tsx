@@ -1767,7 +1767,9 @@ const Messages: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+                e.stopPropagation()
+              }
               className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-base-200"
             >
               <div className="px-6 pt-6 pb-4 text-center">
@@ -1817,7 +1819,9 @@ const Messages: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+                e.stopPropagation()
+              }
               className="relative max-w-3xl max-h-[80vh] w-full"
             >
               <button
@@ -1900,7 +1904,9 @@ const Messages: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: React.MouseEvent<HTMLDivElement>) =>
+                e.stopPropagation()
+              }
               className="bg-base-100 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-base-200"
             >
               {/* Header */}

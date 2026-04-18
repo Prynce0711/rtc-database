@@ -14,18 +14,15 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ActionResult } from "@rtc-database/shared";
 import { createHash } from "crypto";
-import { getSystemSettings } from "../components/Settings/SettingsActions";
 import { FileData } from "@rtc-database/shared/prisma/browser";
 import { GetFileOptions, getGarageClient } from "../lib/garage";
 import { validateSession } from "./authActions";
 import { prisma } from "./prisma";
+import { loadSystemSettings } from "./systemSettings";
 
 async function getGarageBucket(): Promise<string> {
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error("Failed to load garage bucket configuration");
-  }
-  return settingsResult.result.garageBucket || "uploads";
+  const settings = await loadSystemSettings();
+  return settings.garageBucket?.trim() || "uploads";
 }
 
 export async function getFileHash(file: File): Promise<string> {

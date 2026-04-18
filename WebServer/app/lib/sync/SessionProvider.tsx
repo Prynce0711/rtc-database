@@ -2,7 +2,7 @@
 
 import { IPC_CHANNELS } from "@rtc-database/shared";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
-import { useSession } from "../lib/authClient";
+import { useSession } from "../authClient";
 
 type SessionProviderProps = {
   children: ReactNode;

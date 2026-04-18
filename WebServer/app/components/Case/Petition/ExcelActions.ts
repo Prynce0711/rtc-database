@@ -15,9 +15,8 @@ import {
   QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
-} from "@/app/lib/excel";
+} from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
-import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
@@ -29,6 +28,7 @@ import {
   Petition,
   PetitionCaseSchema,
   Prisma,
+  splitCaseDataBySchema,
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";

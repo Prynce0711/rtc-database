@@ -49,7 +49,7 @@ interface BackupIntervalDefinitionLike {
 }
 
 const DEFAULT_PRISMA_SCHEMA_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "prisma",
   "schema.prisma",
 );
@@ -494,7 +494,7 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       throw new Error("Local backup file path is required.");
     }
 
-    const resolvedPath = path.resolve(trimmedPath);
+    const resolvedPath = path.resolve(/*turbopackIgnore: true*/ trimmedPath);
     if (resolvedPath === deps.fixedBackupSourcePath) {
       throw new Error("Selected file is already the active database.");
     }
