@@ -1,45 +1,23 @@
-import type {
-  UpsertSingleCriminalCaseResponse,
-  UpsertSingleCriminalCaseResult,
-} from "@rtc-database/shared/src/lib/sync";
+import {
+  CriminalCaseSchema,
+  type UpsertSingleCriminalCaseResponse,
+  type UpsertSingleCriminalCaseResult,
+} from "@rtc-database/shared";
+import { prettifyError, z } from "zod";
 import { prisma } from "../../prisma";
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const sanitizeOptionalString = (value: unknown): string | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const sanitizeOptionalInteger = (value: unknown): number | null => {
-  if (typeof value !== "number" || !Number.isInteger(value)) {
-    return null;
-  }
-
-  return value;
-};
-
-const sanitizeOptionalDate = (value: unknown): Date | null => {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
-};
+const UpsertSingleCriminalCasePayloadSchema = z.object({
+  source: z.string().optional(),
+  sentAt: z.string().optional(),
+  caseData: CriminalCaseSchema.extend({
+    id: z.number().int().positive(),
+    caseType: z.literal("CRIMINAL"),
+    number: z.number().int().nullable().optional(),
+    area: z.string().nullable().optional(),
+    year: z.number().int().nullable().optional(),
+    isManual: z.boolean().optional(),
+  }),
+});
 
 const payloadError = (error: string): UpsertSingleCriminalCaseResponse => ({
   success: false,
@@ -50,90 +28,75 @@ export const upsertSingleCriminalCase = async (
   payload: unknown,
 ): Promise<UpsertSingleCriminalCaseResponse> => {
   try {
-    if (!isRecord(payload)) {
-      return payloadError("Payload must be an object.");
-    }
+    const parsedPayload =
+      UpsertSingleCriminalCasePayloadSchema.safeParse(payload);
 
-    const source =
-      typeof payload.source === "string" && payload.source.length > 0
-        ? payload.source
-        : "unknown";
-    const sentAt =
-      typeof payload.sentAt === "string" && payload.sentAt.length > 0
-        ? payload.sentAt
-        : null;
-
-    if (!isRecord(payload.caseData)) {
-      return payloadError("Payload.caseData must be an object.");
-    }
-
-    const rawCaseData = payload.caseData;
-    const caseId = Number(rawCaseData.id);
-
-    if (!Number.isInteger(caseId) || caseId <= 0) {
-      return payloadError("Payload.caseData.id must be a positive integer.");
-    }
-
-    const caseType = sanitizeOptionalString(rawCaseData.caseType);
-    if (caseType !== "CRIMINAL") {
+    if (!parsedPayload.success) {
       return payloadError(
-        "Only CRIMINAL cases can be synced through this test channel.",
+        `Invalid sync payload: ${prettifyError(parsedPayload.error)}`,
       );
     }
 
-    const caseNumber = sanitizeOptionalString(rawCaseData.caseNumber);
+    const payloadData = parsedPayload.data;
+    const source =
+      payloadData.source && payloadData.source.trim().length > 0
+        ? payloadData.source.trim()
+        : "unknown";
+    const sentAt =
+      payloadData.sentAt && payloadData.sentAt.trim().length > 0
+        ? payloadData.sentAt.trim()
+        : null;
+
+    const {
+      id: caseId,
+      number,
+      area,
+      year,
+      isManual = false,
+      ...validatedCaseData
+    } = payloadData.caseData;
+
+    const {
+      caseType: _caseType,
+      branch,
+      assistantBranch,
+      caseNumber: rawCaseNumber,
+      dateFiled,
+      ...criminalCaseUpsertData
+    } = validatedCaseData;
+
+    const caseNumber = rawCaseNumber.trim();
     if (!caseNumber) {
       return payloadError("Payload.caseData.caseNumber is required.");
     }
 
-    const name = sanitizeOptionalString(rawCaseData.name);
+    const name = criminalCaseUpsertData.name.trim();
     if (!name) {
       return payloadError("Payload.caseData.name is required.");
     }
+    criminalCaseUpsertData.name = name;
 
-    const normalizedCaseData = {
-      branch: sanitizeOptionalString(rawCaseData.branch),
-      assistantBranch: sanitizeOptionalString(rawCaseData.assistantBranch),
-      dateFiled: sanitizeOptionalDate(rawCaseData.dateFiled),
-      name,
-      charge: sanitizeOptionalString(rawCaseData.charge),
-      infoSheet: sanitizeOptionalString(rawCaseData.infoSheet),
-      court: sanitizeOptionalString(rawCaseData.court),
-      detained: sanitizeOptionalString(rawCaseData.detained),
-      consolidation: sanitizeOptionalString(rawCaseData.consolidation),
-      eqcNumber: sanitizeOptionalString(rawCaseData.eqcNumber),
-      bond: sanitizeOptionalString(rawCaseData.bond),
-      raffleDate: sanitizeOptionalDate(rawCaseData.raffleDate),
-      committee1: sanitizeOptionalString(rawCaseData.committee1),
-      committee2: sanitizeOptionalString(rawCaseData.committee2),
-      judge: sanitizeOptionalString(rawCaseData.judge),
-      ao: sanitizeOptionalString(rawCaseData.ao),
-      complainant: sanitizeOptionalString(rawCaseData.complainant),
-      houseNo: sanitizeOptionalString(rawCaseData.houseNo),
-      street: sanitizeOptionalString(rawCaseData.street),
-      barangay: sanitizeOptionalString(rawCaseData.barangay),
-      municipality: sanitizeOptionalString(rawCaseData.municipality),
-      province: sanitizeOptionalString(rawCaseData.province),
-      counts: sanitizeOptionalString(rawCaseData.counts),
-      jdf: sanitizeOptionalString(rawCaseData.jdf),
-      sajj: sanitizeOptionalString(rawCaseData.sajj),
-      sajj2: sanitizeOptionalString(rawCaseData.sajj2),
-      mf: sanitizeOptionalString(rawCaseData.mf),
-      stf: sanitizeOptionalString(rawCaseData.stf),
-      lrf: sanitizeOptionalString(rawCaseData.lrf),
-      vcf: sanitizeOptionalString(rawCaseData.vcf),
-      total: sanitizeOptionalString(rawCaseData.total),
-      amountInvolved: sanitizeOptionalString(rawCaseData.amountInvolved),
-    };
+    const normalizedBranch =
+      typeof branch === "string" && branch.trim().length > 0
+        ? branch.trim()
+        : null;
+    const normalizedAssistantBranch =
+      typeof assistantBranch === "string" && assistantBranch.trim().length > 0
+        ? assistantBranch.trim()
+        : null;
+    const normalizedArea =
+      typeof area === "string" && area.trim().length > 0 ? area.trim() : null;
 
-    const caseNumberParts = {
-      number: sanitizeOptionalInteger(rawCaseData.number),
-      area: sanitizeOptionalString(rawCaseData.area),
-      year: sanitizeOptionalInteger(rawCaseData.year),
-      isManual:
-        typeof rawCaseData.isManual === "boolean"
-          ? rawCaseData.isManual
-          : false,
+    const caseUpsertData = {
+      caseType: "CRIMINAL" as const,
+      branch: normalizedBranch,
+      assistantBranch: normalizedAssistantBranch,
+      caseNumber,
+      number: number ?? null,
+      area: normalizedArea,
+      year: year ?? null,
+      isManual,
+      dateFiled: dateFiled ?? null,
     };
 
     console.log("[sync:criminal] Electron received one-case sync payload.", {
@@ -148,94 +111,18 @@ export const upsertSingleCriminalCase = async (
         where: { id: caseId },
         create: {
           id: caseId,
-          caseType: "CRIMINAL",
-          branch: normalizedCaseData.branch,
-          assistantBranch: normalizedCaseData.assistantBranch,
-          caseNumber,
-          number: caseNumberParts.number,
-          area: caseNumberParts.area,
-          year: caseNumberParts.year,
-          isManual: caseNumberParts.isManual,
-          dateFiled: normalizedCaseData.dateFiled,
+          ...caseUpsertData,
         },
-        update: {
-          caseType: "CRIMINAL",
-          branch: normalizedCaseData.branch,
-          assistantBranch: normalizedCaseData.assistantBranch,
-          caseNumber,
-          number: caseNumberParts.number,
-          area: caseNumberParts.area,
-          year: caseNumberParts.year,
-          isManual: caseNumberParts.isManual,
-          dateFiled: normalizedCaseData.dateFiled,
-        },
+        update: caseUpsertData,
       });
 
       await tx.criminalCase.upsert({
         where: { baseCaseID: caseId },
         create: {
           baseCaseID: caseId,
-          name: normalizedCaseData.name,
-          charge: normalizedCaseData.charge,
-          infoSheet: normalizedCaseData.infoSheet,
-          court: normalizedCaseData.court,
-          detained: normalizedCaseData.detained,
-          consolidation: normalizedCaseData.consolidation,
-          eqcNumber: normalizedCaseData.eqcNumber,
-          bond: normalizedCaseData.bond,
-          raffleDate: normalizedCaseData.raffleDate,
-          committee1: normalizedCaseData.committee1,
-          committee2: normalizedCaseData.committee2,
-          judge: normalizedCaseData.judge,
-          ao: normalizedCaseData.ao,
-          complainant: normalizedCaseData.complainant,
-          houseNo: normalizedCaseData.houseNo,
-          street: normalizedCaseData.street,
-          barangay: normalizedCaseData.barangay,
-          municipality: normalizedCaseData.municipality,
-          province: normalizedCaseData.province,
-          counts: normalizedCaseData.counts,
-          jdf: normalizedCaseData.jdf,
-          sajj: normalizedCaseData.sajj,
-          sajj2: normalizedCaseData.sajj2,
-          mf: normalizedCaseData.mf,
-          stf: normalizedCaseData.stf,
-          lrf: normalizedCaseData.lrf,
-          vcf: normalizedCaseData.vcf,
-          total: normalizedCaseData.total,
-          amountInvolved: normalizedCaseData.amountInvolved,
+          ...criminalCaseUpsertData,
         },
-        update: {
-          name: normalizedCaseData.name,
-          charge: normalizedCaseData.charge,
-          infoSheet: normalizedCaseData.infoSheet,
-          court: normalizedCaseData.court,
-          detained: normalizedCaseData.detained,
-          consolidation: normalizedCaseData.consolidation,
-          eqcNumber: normalizedCaseData.eqcNumber,
-          bond: normalizedCaseData.bond,
-          raffleDate: normalizedCaseData.raffleDate,
-          committee1: normalizedCaseData.committee1,
-          committee2: normalizedCaseData.committee2,
-          judge: normalizedCaseData.judge,
-          ao: normalizedCaseData.ao,
-          complainant: normalizedCaseData.complainant,
-          houseNo: normalizedCaseData.houseNo,
-          street: normalizedCaseData.street,
-          barangay: normalizedCaseData.barangay,
-          municipality: normalizedCaseData.municipality,
-          province: normalizedCaseData.province,
-          counts: normalizedCaseData.counts,
-          jdf: normalizedCaseData.jdf,
-          sajj: normalizedCaseData.sajj,
-          sajj2: normalizedCaseData.sajj2,
-          mf: normalizedCaseData.mf,
-          stf: normalizedCaseData.stf,
-          lrf: normalizedCaseData.lrf,
-          vcf: normalizedCaseData.vcf,
-          total: normalizedCaseData.total,
-          amountInvolved: normalizedCaseData.amountInvolved,
-        },
+        update: criminalCaseUpsertData,
       });
 
       return syncedCase;
