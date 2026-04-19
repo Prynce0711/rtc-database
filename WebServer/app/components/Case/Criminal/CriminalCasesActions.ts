@@ -8,23 +8,25 @@ import {
   syncCaseCounterToAtLeast,
 } from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
+  BATCH_SIZE,
+  buildCaseFind,
   Case,
   CaseType,
   CriminalCase,
-  buildCaseFind,
   CriminalCaseData,
   CriminalCaseSchema,
   CriminalCasesFilterOptions,
   CriminalCaseStats,
+  CursorData,
   DEFAULT_PAGE_SIZE,
   LogAction,
   PaginatedResult,
   Prisma,
   splitCaseDataBySchema,
 } from "@rtc-database/shared";
-import Roles from "@/app/lib/Roles";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 
@@ -86,6 +88,65 @@ export async function getCriminalCases(
   } catch (error) {
     console.error("Error fetching cases:", error);
     return { success: false, error: "Error fetching cases" };
+  }
+}
+
+export async function syncCriminalCases(
+  payload: CursorData,
+): Promise<ActionResult<{ case: Case; criminalCase: CriminalCase }[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const validation = CursorData.safeParse(payload);
+    if (!validation.success) {
+      throw new Error(
+        `Invalid cursor data: ${prettifyError(validation.error)}`,
+      );
+    }
+    const { syncStart, fromUpdatedAt, cursor } = validation.data;
+
+    const updatedAtWhere: Prisma.DateTimeNullableFilter = {
+      not: null,
+      lte: syncStart,
+      ...(fromUpdatedAt ? { gt: fromUpdatedAt } : {}),
+    };
+
+    const cases = await prisma.criminalCase.findMany({
+      where: {
+        updatedAt: updatedAtWhere,
+      },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: BATCH_SIZE,
+      include: {
+        case: true,
+      },
+      ...(cursor
+        ? {
+            cursor: {
+              updatedAt_id: {
+                updatedAt: cursor.updatedAt,
+                id: cursor.id,
+              },
+            },
+            skip: 1,
+          }
+        : {}),
+    });
+
+    const result: { case: Case; criminalCase: CriminalCase }[] = cases.map(
+      ({ case: baseCase, ...criminalCase }) => ({
+        case: baseCase,
+        criminalCase,
+      }),
+    );
+
+    return { success: true, result: result };
+  } catch (error) {
+    console.error("Error syncing cases:", error);
+    return { success: false, error: "Error syncing cases" };
   }
 }
 

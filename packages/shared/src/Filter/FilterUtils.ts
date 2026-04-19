@@ -14,4 +14,5 @@ export type FilterOptions<T> = {
   sortKey?: keyof T;
   sortOrder?: "asc" | "desc";
   exactMatchMap?: Record<string, boolean>;
+  cursor?: string;
 };

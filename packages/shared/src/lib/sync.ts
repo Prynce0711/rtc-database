@@ -1,6 +1,8 @@
 import z from "zod";
 import type ActionResult from "../ActionResult";
-import type { CriminalCaseData } from "../Case/Criminal/CriminalCaseSchema";
+import type { Case, CriminalCase } from "../generated/prisma/browser";
+
+export const BATCH_SIZE = 100000;
 
 export const deviceID = z.uuidv4();
 export type DeviceID = z.infer<typeof deviceID>;
@@ -15,17 +17,28 @@ export const UpdateSyncStatePayload = z.object({
 
 export type UpdateSyncStatePayload = z.infer<typeof UpdateSyncStatePayload>;
 
-export type UpsertSingleCriminalCasePayload = {
+export type UpsertCriminalCasesPayload = {
   source: "webserver";
   sentAt: string;
-  caseData: CriminalCaseData;
+  casesData: { case: Case; criminalCase: CriminalCase }[];
 };
 
-export type UpsertSingleCriminalCaseResult = {
-  caseId: number;
-  caseNumber: string;
+export type UpsertCriminalCasesResult = {
+  syncedCount: number;
   syncedAt: string;
 };
 
-export type UpsertSingleCriminalCaseResponse =
-  ActionResult<UpsertSingleCriminalCaseResult>;
+export type UpsertCriminalCasesResponse =
+  ActionResult<UpsertCriminalCasesResult>;
+
+export const CursorData = z.object({
+  syncStart: z.coerce.date(),
+  fromUpdatedAt: z.coerce.date().optional(),
+  cursor: z
+    .object({
+      updatedAt: z.coerce.date(),
+      id: z.number().int().positive(),
+    })
+    .optional(),
+});
+export type CursorData = z.infer<typeof CursorData>;

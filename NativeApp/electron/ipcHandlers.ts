@@ -1,9 +1,12 @@
 import { IPC_CHANNELS } from "@rtc-database/shared";
-import { dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
-import { upsertSingleCriminalCase } from "./Sync/Case/CriminalCasesActions";
+import {
+  disposeCriminalCasesWorker,
+  upsertCriminalCasesInWorker,
+} from "./Sync/Case/CriminalCasesWorkerManager";
 import {
   getOrCreateDeviceId,
   isRecord,
@@ -159,13 +162,13 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  IPC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+  IPC_CHANNELS.UPSERT_CRIMINAL_CASES,
   async (_event, payload: unknown) => {
     console.log("[sync:criminal] IPC request received from renderer.", {
-      channel: IPC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
+      channel: IPC_CHANNELS.UPSERT_CRIMINAL_CASES,
     });
 
-    const response = await upsertSingleCriminalCase(payload);
+    const response = await upsertCriminalCasesInWorker(payload);
 
     if (!response.success) {
       console.warn("[sync:criminal] IPC request failed.", response.error);
@@ -180,3 +183,7 @@ ipcMain.handle(
     return response;
   },
 );
+
+app.on("before-quit", () => {
+  void disposeCriminalCasesWorker();
+});

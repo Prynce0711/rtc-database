@@ -5,6 +5,8 @@ import {
   parseCaseNumber,
   syncCaseCounterToAtLeast,
 } from "@/app/lib/caseNumbering";
+import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
   ExportExcelData,
   getExcelHeaderMap,
@@ -16,8 +18,6 @@ import {
   UploadExcelResult,
   valuesAreEqual,
 } from "@rtc-database/shared";
-import { prisma } from "@/app/lib/prisma";
-import Roles from "@/app/lib/Roles";
 
 import {
   ActionResult,
@@ -134,7 +134,7 @@ export async function uploadExcel(
       requiredHeaders: { Branch: branchHeaders },
       schema: CriminalCaseSchema,
       getCells: getMappedCells,
-      skipRowsWithoutCell: ["caseNumber"],
+      skipRowsWithoutCell: ["caseNumber", "name"],
       checkExactMatch: async (_cells, mappedRow) => {
         const mappedEntries = Object.entries(mappedRow);
 
