@@ -250,6 +250,28 @@ const CriminalCasePage: React.FC<{
 
   const totalItems = totalCount;
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const visibleCaseIds = cases.map((caseItem) => caseItem.id);
+  const allVisibleCasesSelected =
+    visibleCaseIds.length > 0 &&
+    visibleCaseIds.every((caseId) => selectedCaseIds.includes(caseId));
+
+  const handleToggleSelectAllVisibleCases = (checked: boolean) => {
+    if (!isSelecting) return;
+
+    setSelectedCaseIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleCaseIds.forEach((caseId) => {
+          if (!next.includes(caseId)) {
+            next.push(caseId);
+          }
+        });
+        return next;
+      }
+
+      return prev.filter((caseId) => !visibleCaseIds.includes(caseId));
+    });
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
@@ -779,7 +801,22 @@ const CriminalCasePage: React.FC<{
               ? [
                   {
                     key: "select",
-                    label: "Select",
+                    label: (
+                      <label className="inline-flex items-center justify-center gap-2">
+                        <span>Select</span>
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={allVisibleCasesSelected}
+                          onChange={(e) =>
+                            handleToggleSelectAllVisibleCases(e.target.checked)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Select all visible criminal cases"
+                          disabled={visibleCaseIds.length === 0}
+                        />
+                      </label>
+                    ),
                     align: "center" as const,
                   },
                 ]

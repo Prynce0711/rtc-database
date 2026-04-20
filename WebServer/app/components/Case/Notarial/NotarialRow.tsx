@@ -1,8 +1,7 @@
 "use client";
 
-import { formatDate } from "@rtc-database/shared";
-import { ActionDropdown, TipCell } from "@rtc-database/shared";
-import { FiDownload, FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
+import { formatDate, TipCell } from "@rtc-database/shared";
+import { FiDownload, FiEye } from "react-icons/fi";
 
 export type NotarialRecord = {
   id: number;
@@ -17,100 +16,54 @@ export type NotarialRecord = {
 
 const NotarialRow = ({
   record,
-  onEdit,
-  onDelete,
   onRowClick,
   onViewFile,
   onDownloadFile,
   canPreview,
+  isSelecting,
   isSelected,
   onToggleSelect,
 }: {
   record: NotarialRecord;
-  onEdit: (r: NotarialRecord) => void;
-  onDelete: (id: number) => void;
   onRowClick: (r: NotarialRecord) => void;
   onViewFile: (r: NotarialRecord) => void;
   onDownloadFile: (r: NotarialRecord) => void;
   canPreview: boolean;
+  isSelecting?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: (id: number) => void;
+  onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
-  const popoverId = `notarial-actions-popover-${record.id}`;
-  const anchorName = `--notarial-actions-anchor-${record.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
-
   return (
     <tr
-      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm"
-      onClick={() => onRowClick(record)}
+      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm ${
+        isSelecting && isSelected ? "bg-primary/10" : ""
+      }`}
+      onClick={() => {
+        if (isSelecting && onToggleSelect) {
+          onToggleSelect(record.id, !Boolean(isSelected));
+          return;
+        }
+        onRowClick(record);
+      }}
     >
-      {onToggleSelect && (
+      {isSelecting && onToggleSelect && (
         <td
-          className="text-center px-4 py-3.5"
           onClick={(e) => e.stopPropagation()}
+          className="relative text-center px-4 py-3.5"
         >
-          <input
-            type="checkbox"
-            className="checkbox checkbox-sm"
-            checked={Boolean(isSelected)}
-            onChange={() => onToggleSelect(record.id)}
-            aria-label={`Select notarial record ${record.id}`}
-          />
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={Boolean(isSelected)}
+              onChange={(e) => onToggleSelect(record.id, e.target.checked)}
+              aria-label={`Select notarial record ${record.title || record.id}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </td>
       )}
-      <td
-        onClick={(e) => e.stopPropagation()}
-        className="text-center px-4 py-3.5"
-      >
-        <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-          <li>
-            <button
-              className="flex items-center gap-3 text-info"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onRowClick(record);
-              }}
-            >
-              <FiEye size={16} />
-              <span>View</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-warning"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onEdit(record);
-              }}
-            >
-              <FiEdit size={16} />
-              <span>Edit</span>
-            </button>
-          </li>
-          <li>
-            <button
-              className="flex items-center gap-3 text-error"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeActionsPopover();
-                onDelete(record.id);
-              }}
-            >
-              <FiTrash2 size={16} />
-              <span>Delete</span>
-            </button>
-          </li>
-        </ActionDropdown>
-      </td>
+
       <TipCell
         label="Title"
         value={record.title}

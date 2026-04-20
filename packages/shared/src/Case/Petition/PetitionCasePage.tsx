@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
   useEffect,
@@ -239,24 +238,38 @@ const PetitionCasePage: React.FC<{
   };
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const visibleCaseIds = cases.map((caseItem) => caseItem.id);
+  const allVisibleCasesSelected =
+    visibleCaseIds.length > 0 &&
+    visibleCaseIds.every((caseId) => selectedCaseIds.includes(caseId));
 
-  const handleDeleteCase = async (caseId: number) => {
-    if (
-      !(await statusPopup.showConfirm(
-        "Are you sure you want to delete this petition?",
-      ))
-    ) {
-      return;
-    }
+  const handleToggleSelectAllVisibleCases = (checked: boolean) => {
+    if (!isSelecting) return;
 
-    const result = await adapter.deletePetition(caseId);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete petition");
-      return;
-    }
+    setSelectedCaseIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleCaseIds.forEach((caseId) => {
+          if (!next.includes(caseId)) {
+            next.push(caseId);
+          }
+        });
+        return next;
+      }
 
-    await fetchCases();
-    setSelectedCaseIds((prev) => prev.filter((id) => id !== caseId));
+      return prev.filter((caseId) => !visibleCaseIds.includes(caseId));
+    });
+  };
+
+  const handleToggleCaseSelection = (caseId: number, checked: boolean) => {
+    setSelectedCaseIds((prev) => {
+      if (!isSelecting) return prev;
+      if (checked) {
+        if (prev.includes(caseId)) return prev;
+        return [...prev, caseId];
+      }
+      return prev.filter((id) => id !== caseId);
+    });
   };
 
   const handleDeleteSelectedCases = async () => {
@@ -289,6 +302,7 @@ const PetitionCasePage: React.FC<{
         );
       }
 
+      setSelectionMode(null);
       setSelectedCaseIds([]);
       await fetchCases();
     } finally {
@@ -573,33 +587,6 @@ const PetitionCasePage: React.FC<{
         />
       </div>
 
-      {canManage && isSelecting && (
-        <AnimatePresence>
-          {selectedCaseIds.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-primary">
-                  {selectedCaseIds.length} petition
-                  {selectedCaseIds.length > 1 ? "s" : ""} selected
-                </div>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => setSelectedCaseIds([])}
-                >
-                  Clear
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatsCard
           label="TOTAL ENTRIES"
@@ -654,12 +641,20 @@ const PetitionCasePage: React.FC<{
               <tr className="bg-base-200/50 border-b border-base-200">
                 {canManage && isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Select
-                  </th>
-                )}
-                {canManage && !isSelecting && (
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Actions
+                    <label className="inline-flex items-center justify-center gap-2">
+                      <span>Select</span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allVisibleCasesSelected}
+                        onChange={(e) =>
+                          handleToggleSelectAllVisibleCases(e.target.checked)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select all visible petition cases"
+                        disabled={visibleCaseIds.length === 0}
+                      />
+                    </label>
                   </th>
                 )}
                 <SortTh
@@ -697,7 +692,10 @@ const PetitionCasePage: React.FC<{
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="py-16">
+                  <td
+                    colSpan={5 + (canManage && isSelecting ? 1 : 0)}
+                    className="py-16"
+                  >
                     <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
                       <FiFileText className="w-16 h-16 opacity-20 mb-4" />
                       <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
@@ -711,26 +709,13 @@ const PetitionCasePage: React.FC<{
                   <PetitionCaseRow
                     key={caseItem.id}
                     caseItem={caseItem}
-                    onEdit={(item) =>
-                      router.push(`/user/cases/petition/edit?id=${item.id}`)
-                    }
-                    onDelete={handleDeleteCase}
                     onView={(item) =>
                       router.push(`/user/cases/petition/${item.id}`)
                     }
                     selected={selectedCaseIds.includes(caseItem.id)}
                     isSelecting={isSelecting}
                     onToggleSelect={
-                      isSelecting
-                        ? (id, checked) =>
-                            setSelectedCaseIds((prev) => {
-                              if (checked) {
-                                if (prev.includes(id)) return prev;
-                                return [...prev, id];
-                              }
-                              return prev.filter((entryId) => entryId !== id);
-                            })
-                        : undefined
+                      isSelecting ? handleToggleCaseSelection : undefined
                     }
                     canManage={canManage}
                   />

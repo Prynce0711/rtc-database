@@ -1,7 +1,6 @@
 "use client";
 
-import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
-import { ActionDropdown, SpecialProceedingData, TipCell } from "../../index";
+import { SpecialProceedingData, TipCell } from "../../index";
 
 const formatDate = (value: Date | string | null | undefined) => {
   if (!value) return "—";
@@ -16,31 +15,17 @@ const formatDate = (value: Date | string | null | undefined) => {
 
 const SpecialProceedingRow = ({
   caseItem,
-  onEdit,
-  onDelete,
   onRowClick,
   isSelected,
   isSelecting = false,
   onToggleSelect,
 }: {
   caseItem: SpecialProceedingData;
-  onEdit: (c: SpecialProceedingData) => void;
-  onDelete: (id: number) => void;
   onRowClick: (c: SpecialProceedingData) => void;
   isSelected?: boolean;
   isSelecting?: boolean;
-  onToggleSelect?: (id: number) => void;
+  onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
-  const popoverId = `special-proceeding-actions-popover-${caseItem.id}`;
-  const anchorName = `--special-proceeding-actions-anchor-${caseItem.id}`;
-
-  const closeActionsPopover = () => {
-    const popoverEl = document.getElementById(popoverId) as
-      | (HTMLElement & { hidePopover?: () => void })
-      | null;
-    popoverEl?.hidePopover?.();
-  };
-
   return (
     <tr
       className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs ${
@@ -48,71 +33,30 @@ const SpecialProceedingRow = ({
       }`}
       onClick={() => {
         if (isSelecting && onToggleSelect) {
-          onToggleSelect(caseItem.id);
+          onToggleSelect(caseItem.id, !Boolean(isSelected));
           return;
         }
         onRowClick(caseItem);
       }}
     >
-      {isSelecting && onToggleSelect && (
-        <td className="text-center" onClick={(e) => e.stopPropagation()}>
-          <input
-            type="checkbox"
-            className="checkbox checkbox-sm"
-            checked={Boolean(isSelected)}
-            onChange={() => onToggleSelect(caseItem.id)}
-            aria-label={`Select special proceeding ${caseItem.id}`}
-          />
-        </td>
-      )}
-      {!isSelecting && (
+      {isSelecting && (
         <td
           onClick={(e) => e.stopPropagation()}
-          className="relative text-center"
+          className="relative text-center px-4 py-3.5"
         >
-          <ActionDropdown popoverId={popoverId} anchorName={anchorName}>
-            <li>
-              <button
-                className="flex items-center gap-3 text-info"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onRowClick(caseItem);
-                }}
-              >
-                <FiEye size={16} />
-                <span>View</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-warning"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onEdit(caseItem);
-                }}
-              >
-                <FiEdit size={16} />
-                <span>Edit</span>
-              </button>
-            </li>
-            <li>
-              <button
-                className="flex items-center gap-3 text-error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeActionsPopover();
-                  onDelete(caseItem.id);
-                }}
-              >
-                <FiTrash2 size={16} />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ActionDropdown>
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={Boolean(isSelected)}
+              onChange={(e) => onToggleSelect?.(caseItem.id, e.target.checked)}
+              aria-label={`Select special proceeding case ${caseItem.caseNumber}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </td>
       )}
+
       <TipCell
         label="SPC. No."
         value={caseItem.caseNumber}
