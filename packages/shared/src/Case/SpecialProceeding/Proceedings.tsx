@@ -58,7 +58,7 @@ const SP_FILTER_OPTIONS: FilterOption[] = [
   { key: "date", label: "Date Filed", type: "daterange" },
 ];
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 const SortTh = ({
   label,

@@ -171,7 +171,7 @@ const CriminalCasePage: React.FC<{
   ];
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 15;
+  const pageSize = 10;
 
   useEffect(() => {
     setCurrentPage(1);

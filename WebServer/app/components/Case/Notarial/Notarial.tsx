@@ -68,7 +68,7 @@ export type NotarialFormEntry = {
   saved: boolean;
 };
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 // ─── Sort TH ─────────────────────────────────────────────────────────────────
 

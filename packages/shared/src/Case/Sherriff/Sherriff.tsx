@@ -50,7 +50,7 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
   { key: "dateFiled", label: "Date Filed", type: "daterange" },
   { key: "remarks", label: "Remarks", type: "text" },
 ];
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 type SortConfig = { key: SortKey; order: "asc" | "desc" };
 

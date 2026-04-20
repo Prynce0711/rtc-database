@@ -104,7 +104,7 @@ const ReceiveLogsPage: React.FC<{
   });
   const isSelecting = selectionMode !== null;
 
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
 
   const receiveFilterOptions: FilterOption[] = [
