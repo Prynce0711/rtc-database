@@ -56,7 +56,7 @@ const PETITION_FILTER_OPTIONS: FilterOption[] = [
   { key: "date", label: "Date", type: "daterange" },
 ];
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 const SortTh = ({
   label,

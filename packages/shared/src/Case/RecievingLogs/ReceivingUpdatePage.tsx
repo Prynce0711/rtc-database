@@ -358,6 +358,7 @@ const ReceiveUpdatePage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
+  const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
@@ -395,6 +396,7 @@ const ReceiveUpdatePage = ({
     }
     setStep("entry");
     setActiveTab(0);
+    setEntryPage(1);
   }, [type, selectedLog, selectedLogs]);
 
   const handleChange = (id: number, field: EntryFieldKey, value: string) => {
@@ -454,7 +456,11 @@ const ReceiveUpdatePage = ({
       emptyEntry(nextTempIdRef.current--),
     );
 
-    setEntries((prev) => [...prev, ...nextRows]);
+    setEntries((prev) => {
+      const next = [...prev, ...nextRows];
+      setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+      return next;
+    });
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -472,6 +478,7 @@ const ReceiveUpdatePage = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([emptyEntry(nextTempIdRef.current--)]);
+    setEntryPage(1);
   }, [entries.length, statusPopup]);
 
   const handleRemove = (id: number) =>
@@ -689,6 +696,20 @@ const ReceiveUpdatePage = ({
     entries.some((e) => TAB_GROUPS[tabIdx].cols.some((c) => e.errors[c.key]));
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <div className="xls-root">
@@ -891,7 +912,7 @@ const ReceiveUpdatePage = ({
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
+                      {pagedEntries.map((entry, rowIdx) => {
                         const lastColIdx = currentTabCols.length - 1;
                         return (
                           <motion.tr
@@ -905,7 +926,9 @@ const ReceiveUpdatePage = ({
                             className="xls-row"
                           >
                             <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
+                              <span className="xls-rownum">
+                                {entryPageStart + rowIdx + 1}
+                              </span>
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
@@ -967,6 +990,40 @@ const ReceiveUpdatePage = ({
                   </tbody>
                 </table>
               </div>
+
+              {entryPageCount > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                  <span className="text-xs text-base-content/60">
+                    Page {entryPage} of {entryPageCount}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={entryPage === 1}
+                      aria-label="Previous entry page"
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) =>
+                          Math.min(entryPageCount, prev + 1),
+                        )
+                      }
+                      disabled={entryPage === entryPageCount}
+                      aria-label="Next entry page"
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {!isEdit && (
                 <button

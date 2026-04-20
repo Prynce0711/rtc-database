@@ -342,6 +342,7 @@ export const SherriffCaseUpdatePage = ({
         : [];
   const isEdit = type === "EDIT" && editRecords.length > 0;
   const [step, setStep] = useState<Step>("entry");
+  const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
@@ -360,6 +361,7 @@ export const SherriffCaseUpdatePage = ({
 
   useEffect(() => {
     setStep("entry");
+    setEntryPage(1);
 
     if (isEdit) {
       setEntries(editRecords.map(sherriffCaseToEntry));
@@ -459,7 +461,11 @@ export const SherriffCaseUpdatePage = ({
       createEmptySherriffEntry(),
     );
 
-    setEntries((prev) => [...prev, ...nextRows]);
+    setEntries((prev) => {
+      const next = [...prev, ...nextRows];
+      setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+      return next;
+    });
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -477,6 +483,7 @@ export const SherriffCaseUpdatePage = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([createEmptySherriffEntry()]);
+    setEntryPage(1);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [entries.length, statusPopup]);
@@ -836,6 +843,20 @@ export const SherriffCaseUpdatePage = ({
 
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <div className="xls-root">
@@ -1065,7 +1086,7 @@ export const SherriffCaseUpdatePage = ({
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
+                      {pagedEntries.map((entry, rowIdx) => {
                         const lastColIdx = DETAIL_COLS.length - 1;
                         const displayCaseNumber = getDisplayCaseNumber(entry);
                         const rowHasExistingCase =
@@ -1093,7 +1114,9 @@ export const SherriffCaseUpdatePage = ({
                             }
                           >
                             <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
+                              <span className="xls-rownum">
+                                {entryPageStart + rowIdx + 1}
+                              </span>
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
@@ -1222,6 +1245,40 @@ export const SherriffCaseUpdatePage = ({
                   </tbody>
                 </table>
               </div>
+
+              {entryPageCount > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                  <span className="text-xs text-base-content/60">
+                    Page {entryPage} of {entryPageCount}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={entryPage === 1}
+                      aria-label="Previous entry page"
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) =>
+                          Math.min(entryPageCount, prev + 1),
+                        )
+                      }
+                      disabled={entryPage === entryPageCount}
+                      aria-label="Next entry page"
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {!isEdit && (
                 <button

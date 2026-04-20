@@ -61,7 +61,7 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
   { key: "nature", label: "Nature", type: "text" },
 ];
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 const SortTh = ({
   label,
