@@ -15,6 +15,7 @@ import {
 } from "@rtc-database/shared";
 import { formatAutoCaseNumber } from "@rtc-database/shared/lib/caseNumbering";
 import { prisma } from "../../prisma";
+import { logError } from "../../utils";
 
 export async function getCriminalCases(
   options?: CriminalCasesFilterOptions,
@@ -67,8 +68,10 @@ export async function getCriminalCases(
       },
     };
   } catch (error) {
-    console.error("Error fetching cases:", error);
-    return { success: false, error: "Error fetching cases" };
+    return {
+      success: false,
+      error: logError("[criminal-cases] Failed to fetch cases", error),
+    };
   }
 }
 
@@ -134,8 +137,10 @@ export async function getCriminalCaseStats(
       },
     };
   } catch (error) {
-    console.error("Error fetching case stats:", error);
-    return { success: false, error: "Error fetching case stats" };
+    return {
+      success: false,
+      error: logError("[criminal-cases] Failed to fetch case stats", error),
+    };
   }
 }
 
@@ -170,8 +175,10 @@ export async function getCriminalCaseNumberPreview(
       },
     };
   } catch (error) {
-    console.error("Error getting criminal case number preview:", error);
-    return { success: false, error: "Failed to get next case number" };
+    return {
+      success: false,
+      error: logError("[criminal-cases] Failed to get next case number", error),
+    };
   }
 }
 
@@ -215,8 +222,10 @@ export async function getCriminalCaseById(
 
     return { success: true, result: caseCombined };
   } catch (error) {
-    console.error(error);
-    return { success: false, error: "Failed to fetch case" };
+    return {
+      success: false,
+      error: logError("[criminal-cases] Failed to fetch case by id", error),
+    };
   }
 }
 
@@ -257,7 +266,9 @@ export async function getCriminalCasesByIds(
 
     return { success: true, result: caseCombined };
   } catch (error) {
-    console.error(error);
-    return { success: false, error: "Failed to fetch cases" };
+    return {
+      success: false,
+      error: logError("[criminal-cases] Failed to fetch cases by ids", error),
+    };
   }
 }

@@ -9,6 +9,7 @@ import type {
 import { ActionResult, DEFAULT_PAGE_SIZE } from "@rtc-database/shared";
 import { CaseType, Prisma } from "@rtc-database/shared/prisma/client";
 import { prisma } from "../prisma";
+import { logError } from "../utils";
 
 const toUnifiedCase = (
   c: Prisma.CaseGetPayload<{
@@ -100,8 +101,10 @@ export async function doesCaseExist(
     const existingCaseNumbers = cases.map((c) => c.caseNumber);
     return { success: true, result: existingCaseNumbers };
   } catch (error) {
-    console.error("Error fetching cases:", error);
-    return { success: false, error: "Error fetching cases" };
+    return {
+      success: false,
+      error: logError("[cases] Failed to fetch existing case numbers", error),
+    };
   }
 }
 
@@ -151,8 +154,10 @@ export async function getCases(
       },
     };
   } catch (error) {
-    console.error("Error fetching cases:", error);
-    return { success: false, error: "Error fetching cases" };
+    return {
+      success: false,
+      error: logError("[cases] Failed to fetch cases", error),
+    };
   }
 }
 
@@ -231,7 +236,9 @@ export async function getCaseStats(
       },
     };
   } catch (error) {
-    console.error("Error fetching case stats:", error);
-    return { success: false, error: "Error fetching case stats" };
+    return {
+      success: false,
+      error: logError("[cases] Failed to fetch case stats", error),
+    };
   }
 }

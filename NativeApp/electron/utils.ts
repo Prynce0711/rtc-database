@@ -26,3 +26,16 @@ export const formatError = (error: unknown) => {
 
   return "Unknown error";
 };
+
+export const logError = (context: string, error: unknown): string => {
+  if (error instanceof Error) {
+    console.error(context, {
+      message: error.message,
+      stack: error.stack,
+    });
+  } else {
+    console.error(context, error);
+  }
+
+  return formatError(error);
+};

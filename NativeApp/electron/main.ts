@@ -3,6 +3,7 @@ import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startDevDisconnectMonitor } from "./BackendMonitor";
+import { ensureNativeDatabaseReady } from "./databaseBootstrap";
 import "./ipcHandlers";
 import { startUdpListener } from "./udpListener";
 
@@ -77,6 +78,12 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await ensureNativeDatabaseReady();
+  } catch (error) {
+    console.error("[db] Failed to initialize native database:", error);
+  }
+
   void createWindow();
 });
