@@ -17,6 +17,24 @@ importers:
       '@prisma/client':
         specifier: ^7.3.0
         version: 7.7.0(prisma@7.7.0(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(better-sqlite3@12.8.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3))(typescript@5.9.3)
+      '@prisma/client-runtime-utils':
+        specifier: ^7.7.0
+        version: 7.7.0
+      '@prisma/debug':
+        specifier: ^7.7.0
+        version: 7.7.0
+      '@prisma/driver-adapter-utils':
+        specifier: ^7.7.0
+        version: 7.7.0
+      '@prisma/engines':
+        specifier: ^7.7.0
+        version: 7.7.0
+      '@prisma/fetch-engine':
+        specifier: ^7.7.0
+        version: 7.7.0
+      '@prisma/get-platform':
+        specifier: ^7.7.0
+        version: 7.7.0
       '@rtc-database/shared':
         specifier: workspace:*
         version: link:../packages/shared

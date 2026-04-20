@@ -1,6 +1,6 @@
 import type { UpsertCriminalCasesResponse } from "@rtc-database/shared";
 import { parentPort } from "node:worker_threads";
-import { upsertCriminalCases } from "./CriminalCasesActions";
+import { upsertCriminalCases } from "./CriminalCasesSyncActions";
 
 type WorkerRequest = {
   requestId: string;

@@ -1,13 +1,8 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  formatAutoCaseNumber,
-  getNextCaseNumber,
-  parseCaseNumber,
-  syncCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
   buildCaseFind,
@@ -19,7 +14,12 @@ import {
   PaginatedResult,
   splitCaseDataBySchema,
 } from "@rtc-database/shared";
-import Roles from "@/app/lib/Roles";
+import {
+  formatAutoCaseNumber,
+  getNextCaseNumber,
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 import {
   Case,
   CaseType,

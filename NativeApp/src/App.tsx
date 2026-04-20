@@ -1,6 +1,6 @@
 "use client";
 
-import { Sidebar } from "@rtc-database/shared";
+import { CriminalCasePage, Roles, Sidebar } from "@rtc-database/shared";
 import { useEffect, useRef, useState } from "react";
 import {
   HashRouter,
@@ -10,6 +10,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import "./App.css";
+import criminalCaseAdapter from "./criminalCaseAdapter";
 import SpeederLoader from "./SpeederLoader";
 
 interface BackendInfo {
@@ -43,7 +44,7 @@ const parseInitialOfflineReason = (): AutoOfflineReason => {
   return reason === "disconnect" ? "disconnected" : null;
 };
 
-const NativeSidebarShell = () => {
+const NativeSidebarShell = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
 
   return (
@@ -66,10 +67,16 @@ const NativeSidebarShell = () => {
         }
       }}
     >
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Native App</h1>
-        <p className="text-sm opacity-70">Current route: {location.pathname}</p>
-      </div>
+      {children ? (
+        children
+      ) : (
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">Native App</h1>
+          <p className="text-sm opacity-70">
+            Current route: {location.pathname}
+          </p>
+        </div>
+      )}
     </Sidebar>
   );
 };
@@ -103,6 +110,17 @@ const LocalModeApp = ({ availableBackend, onReconnect }: LocalModeAppProps) => (
     <HashRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/user/dashboard" replace />} />
+        <Route
+          path="/user/cases/criminal"
+          element={
+            <NativeSidebarShell>
+              <CriminalCasePage
+                role={Roles.USER}
+                adapter={criminalCaseAdapter}
+              />
+            </NativeSidebarShell>
+          }
+        />
         <Route
           path="/login"
           element={<Navigate to="/user/dashboard" replace />}

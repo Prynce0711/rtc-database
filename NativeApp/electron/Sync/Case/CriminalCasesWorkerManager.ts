@@ -2,7 +2,7 @@ import type { UpsertCriminalCasesResponse } from "@rtc-database/shared";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
-import { upsertCriminalCases } from "./CriminalCasesActions";
+import { upsertCriminalCases } from "./CriminalCasesSyncActions";
 
 type WorkerRequest = {
   requestId: string;

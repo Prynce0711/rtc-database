@@ -8,12 +8,18 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "postinstall": "node ./scripts/cleanupBrokenNodeModulesLinks.cjs && electron-rebuild -f -w better-sqlite3"
+    "postinstall": "node ./scripts/cleanupBrokenNodeModulesLinks.cjs && electron-rebuild -f -w better-sqlite3 && electron-builder install-app-deps && pnpm rebuild electron"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",
     "@prisma/adapter-better-sqlite3": "^7.3.0",
+    "@prisma/client-runtime-utils": "^7.7.0",
     "@prisma/client": "^7.3.0",
+    "@prisma/debug": "^7.7.0",
+    "@prisma/driver-adapter-utils": "^7.7.0",
+    "@prisma/engines": "^7.7.0",
+    "@prisma/fetch-engine": "^7.7.0",
+    "@prisma/get-platform": "^7.7.0",
     "@rtc-database/shared": "workspace:*",
     "@tailwindcss/vite": "^4.2.2",
     "better-sqlite3": "12.8.0",
@@ -31,14 +37,10 @@
     "files": [
       "dist-electron/**/*",
       "dist/**/*",
+      "node_modules/.pnpm/**/*",
       "node_modules/**/*",
       "package.json"
     ],
-    "win": {
-      "target": [
-        "portable"
-      ]
-    },
     "directories": {
       "buildResources": "dist",
       "output": "release-builds"

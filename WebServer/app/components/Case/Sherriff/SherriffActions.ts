@@ -1,13 +1,8 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  formatSheriffCaseNumber,
-  getNextSheriffCaseNumber,
-  parseSheriffCaseNumber,
-  syncSheriffCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
   buildCaseFind,
@@ -24,7 +19,12 @@ import {
   SheriffCaseStats,
   splitCaseDataBySchema,
 } from "@rtc-database/shared";
-import Roles from "@/app/lib/Roles";
+import {
+  formatSheriffCaseNumber,
+  getNextSheriffCaseNumber,
+  parseSheriffCaseNumber,
+  syncSheriffCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";

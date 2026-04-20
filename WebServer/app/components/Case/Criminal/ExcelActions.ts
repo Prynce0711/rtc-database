@@ -1,10 +1,6 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  parseCaseNumber,
-  syncCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import {
@@ -18,6 +14,10 @@ import {
   UploadExcelResult,
   valuesAreEqual,
 } from "@rtc-database/shared";
+import {
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 
 import {
   ActionResult,

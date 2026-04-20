@@ -3,6 +3,14 @@ import { app, dialog, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
+import { doesCaseExist, getCases, getCaseStats } from "./Sync/BaseCaseActions";
+import {
+  getCriminalCaseById,
+  getCriminalCaseNumberPreview,
+  getCriminalCases,
+  getCriminalCasesByIds,
+  getCriminalCaseStats,
+} from "./Sync/Case/CriminalCasesActions";
 import {
   disposeCriminalCasesWorker,
   upsertCriminalCasesInWorker,
@@ -15,6 +23,41 @@ import {
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
 import { formatError, resolveSafePath } from "./utils";
+
+ipcMain.handle(IPC_CHANNELS.CASE_DOES_EXIST, async (_event, args) => {
+  return doesCaseExist(args.caseNumbers, args.caseType);
+});
+
+ipcMain.handle(IPC_CHANNELS.CASE_GETS, async (_event, options) => {
+  return getCases(options);
+});
+
+ipcMain.handle(IPC_CHANNELS.CASE_STATS, async (_event, options) => {
+  return getCaseStats(options);
+});
+
+ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASES_GET, async (_event, options) => {
+  return getCriminalCases(options);
+});
+
+ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASES_STATS, async (_event, options) => {
+  return getCriminalCaseStats(options);
+});
+
+ipcMain.handle(
+  IPC_CHANNELS.CRIMINAL_CASE_NUMBER_PREVIEW,
+  async (_event, args) => {
+    return getCriminalCaseNumberPreview(args.area, args.year);
+  },
+);
+
+ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASE_GET_BY_ID, async (_event, id) => {
+  return getCriminalCaseById(id);
+});
+
+ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASE_GET_BY_IDS, async (_event, ids) => {
+  return getCriminalCasesByIds(ids);
+});
 
 ipcMain.handle(IPC_CHANNELS.FILES_SELECT_BASE_FOLDER, async () => {
   const result = await dialog.showOpenDialog({
