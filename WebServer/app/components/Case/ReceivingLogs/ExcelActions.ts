@@ -12,7 +12,7 @@ import {
   QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
-} from "@/app/lib/excel";
+} from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult, ReceivingLogSchema } from "@rtc-database/shared";

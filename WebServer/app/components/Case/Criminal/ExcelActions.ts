@@ -1,10 +1,8 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  parseCaseNumber,
-  syncCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
+import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
   ExportExcelData,
   getExcelHeaderMap,
@@ -15,10 +13,11 @@ import {
   QUERY_CHUNK_SIZE,
   UploadExcelResult,
   valuesAreEqual,
-} from "@/app/lib/excel";
-import { prisma } from "@/app/lib/prisma";
-import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
-import Roles from "@/app/lib/Roles";
+} from "@rtc-database/shared";
+import {
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 
 import {
   ActionResult,
@@ -31,6 +30,7 @@ import {
   getSchemaFieldKeys,
   LogAction,
   Prisma,
+  splitCaseDataBySchema,
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
@@ -134,7 +134,7 @@ export async function uploadExcel(
       requiredHeaders: { Branch: branchHeaders },
       schema: CriminalCaseSchema,
       getCells: getMappedCells,
-      skipRowsWithoutCell: ["caseNumber"],
+      skipRowsWithoutCell: ["caseNumber", "name"],
       checkExactMatch: async (_cells, mappedRow) => {
         const mappedEntries = Object.entries(mappedRow);
 

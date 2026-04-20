@@ -1,24 +1,15 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  formatAutoCaseNumber,
-  getNextCaseNumber,
-  parseCaseNumber,
-  syncCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
 import { prisma } from "@/app/lib/prisma";
-import {
-  buildCaseFind,
-  DEFAULT_PAGE_SIZE,
-  splitCaseDataBySchema,
-} from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
+  buildCaseFind,
   calculatePetitionCaseStats,
   Case,
   CaseType,
+  DEFAULT_PAGE_SIZE,
   LogAction,
   PaginatedResult,
   Petition,
@@ -27,7 +18,14 @@ import {
   PetitionCasesFilterOptions,
   PetitionCaseStats,
   Prisma,
+  splitCaseDataBySchema,
 } from "@rtc-database/shared";
+import {
+  formatAutoCaseNumber,
+  getNextCaseNumber,
+  parseCaseNumber,
+  syncCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
 

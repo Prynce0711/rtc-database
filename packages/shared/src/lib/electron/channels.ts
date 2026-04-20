@@ -1,0 +1,17 @@
+export const IPC_CHANNELS = {
+  FILES_SELECT_BASE_FOLDER: "files:select-base-folder",
+  FILES_CHECK_EXISTS: "files:check-exists",
+  FILES_READ: "files:read",
+  RCLONE_AUTHORIZE_PROVIDER: "rclone:authorize-provider",
+  SESSION_SYNC_USER_MINIMAL: "session:sync-user-minimal",
+  SESSION_GET_DEVICE_ID: "session:get-device-id",
+  CASE_DOES_EXIST: "case:does-exist",
+  CASE_GETS: "case:get-all",
+  CASE_STATS: "case:stats",
+  CRIMINAL_CASES_GET: "case:criminal:get-all",
+  CRIMINAL_CASES_STATS: "case:criminal:stats",
+  CRIMINAL_CASE_NUMBER_PREVIEW: "case:criminal:number-preview",
+  CRIMINAL_CASE_GET_BY_ID: "case:criminal:get-by-id",
+  CRIMINAL_CASE_GET_BY_IDS: "case:criminal:get-by-ids",
+  UPSERT_CRIMINAL_CASES: "sync:criminal:upsert-batch",
+} as const;

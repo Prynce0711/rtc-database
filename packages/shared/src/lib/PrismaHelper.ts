@@ -1,11 +1,9 @@
-import type { BaseCaseSchema as BaseCaseSchemaType } from "@rtc-database/shared";
-import {
-  BaseCaseSchema,
-  FilterOptions,
-  getSchemaFieldKeys,
-} from "@rtc-database/shared";
-import { Prisma } from "@rtc-database/shared/prisma/client";
 import z from "zod";
+import type { BaseCaseSchema as BaseCaseSchemaType } from "../Case/BaseCaseSchema";
+import { BaseCaseSchema } from "../Case/BaseCaseSchema";
+import type { FilterOptions } from "../Filter/FilterUtils";
+import type { Prisma } from "../generated/prisma/client";
+import { getSchemaFieldKeys } from "./utils";
 
 export const DEFAULT_PAGE_SIZE = 25;
 
@@ -28,6 +26,7 @@ export const buildCaseFind = <T extends z.ZodType>(
   const sortBy: Prisma.CaseOrderByWithRelationInput = {};
   const filters = options?.filters;
   const exactMatchMap = options?.exactMatchMap ?? {};
+  const cursor = options?.cursor;
 
   const getSearchTokens = (value: string): string[] =>
     value
@@ -226,7 +225,3 @@ export const splitCaseDataBySchema = <T extends Record<string, unknown>>(
     detailData,
   };
 };
-
-export function test() {
-  return "Prisma helper function is working!";
-}

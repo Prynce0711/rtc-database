@@ -2,8 +2,8 @@
 
 import { createNotarial } from "@/app/components/Case/Notarial/NotarialActions";
 import { NotarialSchema as NotarialExcelSchema } from "@/app/components/Case/Notarial/schema";
-import { isMappedRowEmpty, normalizeRowBySchema } from "@/app/lib/excel";
-import { ModalBase } from "@rtc-database/shared";
+import { isMappedRowEmpty, normalizeRowBySchema } from "@rtc-database/shared";
+import { IPC_CHANNELS, ModalBase } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
@@ -257,7 +257,7 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
       new Set(rowCandidates.flat().filter((pathValue) => pathValue)),
     );
 
-    const existsMap = (await ipc.invoke("files:check-exists", {
+    const existsMap = (await ipc.invoke(IPC_CHANNELS.FILES_CHECK_EXISTS, {
       baseFolder: folderToUse,
       relativePaths,
     })) as Record<string, boolean>;
@@ -376,9 +376,9 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
 
   const handleSelectBaseFolder = async () => {
     if (!ipc?.invoke) return;
-    const selected = (await ipc.invoke("files:select-base-folder")) as
-      | string
-      | null;
+    const selected = (await ipc.invoke(
+      IPC_CHANNELS.FILES_SELECT_BASE_FOLDER,
+    )) as string | null;
     setBaseFolder(selected ?? null);
     setExcelMessage(null);
     if (!selected || excelRows.length === 0) return;
@@ -468,7 +468,7 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
         let resolvedPath: string | null = null;
 
         for (const candidate of candidates) {
-          const attempt = (await ipc.invoke("files:read", {
+          const attempt = (await ipc.invoke(IPC_CHANNELS.FILES_READ, {
             baseFolder,
             relativePath: candidate,
           })) as {

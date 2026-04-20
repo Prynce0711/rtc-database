@@ -16,7 +16,11 @@ export interface ParsedRemoteConfig {
   options: Record<string, string>;
 }
 
-export const BACKUP_DATA_DIR = path.join(process.cwd(), "data", "backup");
+export const BACKUP_DATA_DIR = path.join(
+  /*turbopackIgnore: true*/ process.cwd(),
+  "data",
+  "backup",
+);
 export const BACKUP_CONFIG_PATH = path.join(
   BACKUP_DATA_DIR,
   "backup-config.json",

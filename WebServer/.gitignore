@@ -15,7 +15,7 @@ dist
 # testing
 /coverage
 
-# next.js
+# next.jsS
 /.next/
 /out/
 
@@ -42,7 +42,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-app/generated/prisma
 dev.db
 
 certificates/

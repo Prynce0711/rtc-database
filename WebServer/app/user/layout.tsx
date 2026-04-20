@@ -6,6 +6,7 @@ import { hasPassword } from "../components/AccountManagement/AccountActions";
 import { updateDarkMode } from "../components/Sidebar/DarkModeActions";
 import { auth } from "../lib/auth";
 import { signOut } from "../lib/authActions";
+import SyncProvider from "../lib/sync/SyncProvider";
 
 const layout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth.api.getSession({
@@ -22,13 +23,15 @@ const layout = async ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <Sidebar
-      session={session}
-      updateDarkMode={updateDarkMode}
-      onSignOut={signOut}
-    >
-      {children}
-    </Sidebar>
+    <SyncProvider>
+      <Sidebar
+        session={session}
+        updateDarkMode={updateDarkMode}
+        onSignOut={signOut}
+      >
+        {children}
+      </Sidebar>
+    </SyncProvider>
   );
 };
 

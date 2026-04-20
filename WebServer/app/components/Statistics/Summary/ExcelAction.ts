@@ -2,7 +2,7 @@
 
 import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
-import { ExportExcelData, UploadExcelResult } from "@/app/lib/excel";
+import { ExportExcelData, UploadExcelResult } from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";

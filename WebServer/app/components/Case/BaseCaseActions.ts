@@ -2,14 +2,13 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import { DEFAULT_PAGE_SIZE } from "@/app/lib/PrismaHelper";
 import type {
   PaginatedResult,
   UnifiedCaseData,
   UnifiedCasesOptions,
   UnifiedCaseStats,
 } from "@rtc-database/shared";
-import { ActionResult } from "@rtc-database/shared";
+import { ActionResult, DEFAULT_PAGE_SIZE } from "@rtc-database/shared";
 import { CaseType, Prisma } from "@rtc-database/shared/prisma/client";
 
 const toUnifiedCase = (

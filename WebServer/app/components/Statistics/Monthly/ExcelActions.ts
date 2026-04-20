@@ -8,7 +8,7 @@ import {
   processExcelUpload,
   UploadExcelResult,
   valuesAreEqual,
-} from "@/app/lib/excel";
+} from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";

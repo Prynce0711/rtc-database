@@ -1,10 +1,11 @@
 "use client";
 
-import { getCriminalCases } from "@/app/components/Case/Criminal/CriminalCasesActions";
+import { syncCriminalCases } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
-  SYNC_CHANNELS,
-  type UpsertSingleCriminalCasePayload,
-  type UpsertSingleCriminalCaseResponse,
+  BATCH_SIZE,
+  IPC_CHANNELS,
+  type UpsertCriminalCasesPayload,
+  type UpsertCriminalCasesResponse,
 } from "@rtc-database/shared";
 import {
   createContext,
@@ -16,16 +17,35 @@ import {
   useRef,
 } from "react";
 import { useSession } from "../authClient";
+import {
+  updateLastSyncedAtForDevice,
+  upsertSyncStateForDevice,
+} from "./SyncActions";
 
 type SyncProviderProps = {
   children: ReactNode;
 };
 
 type SyncContextType = {
-  syncSingleCriminalCase: () => Promise<void>;
+  syncCriminalCases: () => Promise<void>;
 };
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const extractDeviceId = (value: unknown): string | null => {
+  if (!isRecord(value) || value.success !== true) {
+    return null;
+  }
+
+  if (!isRecord(value.result) || typeof value.result.deviceId !== "string") {
+    return null;
+  }
+
+  return value.result.deviceId;
+};
 
 export const useSync = (): SyncContextType => {
   const context = useContext(SyncContext);
@@ -36,11 +56,179 @@ export const useSync = (): SyncContextType => {
   return context;
 };
 
+type IpcInvokeBridge = {
+  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+};
+
+const IPC_UPSERT_CHUNK_SIZE = 250;
+
+const yieldToUiThread = async (): Promise<void> => {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+};
+
+async function runCriminalSyncPhase(
+  ipc: IpcInvokeBridge,
+  phase: "full" | "catchup",
+  fromUpdatedAt: Date | undefined,
+  syncStart: Date,
+): Promise<{ success: boolean; phaseSyncedCount: number }> {
+  let cursor: { updatedAt: Date; id: number } | undefined;
+  let phaseSyncedCount = 0;
+
+  console.log("[sync-provider] Starting criminal sync phase.", {
+    phase,
+    batchSize: BATCH_SIZE,
+    fromUpdatedAt: fromUpdatedAt?.toISOString() ?? null,
+    syncStart: syncStart.toISOString(),
+  });
+
+  while (true) {
+    const batchResult = await syncCriminalCases({
+      syncStart,
+      fromUpdatedAt,
+      cursor,
+    });
+
+    if (!batchResult.success) {
+      console.warn(
+        "[sync-provider] Failed to fetch criminal case batch for sync:",
+        batchResult.error,
+      );
+      return { success: false, phaseSyncedCount };
+    }
+
+    const batch = batchResult.result;
+    if (batch.length === 0) {
+      break;
+    }
+
+    for (
+      let startIndex = 0;
+      startIndex < batch.length;
+      startIndex += IPC_UPSERT_CHUNK_SIZE
+    ) {
+      const ipcChunk = batch.slice(
+        startIndex,
+        startIndex + IPC_UPSERT_CHUNK_SIZE,
+      );
+      const casesData: UpsertCriminalCasesPayload["casesData"] = ipcChunk;
+
+      const payload: UpsertCriminalCasesPayload = {
+        source: "webserver",
+        sentAt: new Date().toISOString(),
+        casesData,
+      };
+
+      const response = (await ipc.invoke(
+        IPC_CHANNELS.UPSERT_CRIMINAL_CASES,
+        payload,
+      )) as UpsertCriminalCasesResponse;
+
+      if (!response?.success) {
+        console.warn(
+          "[sync-provider] Electron batch sync returned failure.",
+          response?.error,
+        );
+        return { success: false, phaseSyncedCount };
+      }
+
+      phaseSyncedCount += response.result?.syncedCount ?? ipcChunk.length;
+
+      const hasMoreIpcChunks =
+        startIndex + IPC_UPSERT_CHUNK_SIZE < batch.length;
+      if (hasMoreIpcChunks) {
+        await yieldToUiThread();
+      }
+    }
+
+    const last = batch[batch.length - 1];
+    if (!last.criminalCase.updatedAt) {
+      console.warn(
+        "[sync-provider] Last synced record is missing updatedAt; stopping sync to avoid unsafe pagination.",
+      );
+      return { success: false, phaseSyncedCount };
+    }
+
+    cursor = {
+      updatedAt: last.criminalCase.updatedAt,
+      id: last.criminalCase.id,
+    };
+
+    console.log("[sync-provider] Synced criminal case batch.", {
+      phase,
+      batchCount: batch.length,
+      phaseSyncedCount,
+      cursorId: cursor.id,
+      cursorUpdatedAt: cursor.updatedAt.toISOString(),
+    });
+
+    if (batch.length < BATCH_SIZE) {
+      break;
+    }
+  }
+
+  return { success: true, phaseSyncedCount };
+}
+
+async function syncCriminalCasesForDevice(
+  ipc: IpcInvokeBridge,
+  deviceId: string,
+  previousLastSyncedAt: Date | null | undefined,
+): Promise<void> {
+  const fullSyncStart = new Date();
+
+  const fullPhaseResult = await runCriminalSyncPhase(
+    ipc,
+    "full",
+    previousLastSyncedAt ?? undefined,
+    fullSyncStart,
+  );
+  if (!fullPhaseResult.success) {
+    return;
+  }
+
+  const catchupSyncStart = new Date();
+  const catchupPhaseResult = await runCriminalSyncPhase(
+    ipc,
+    "catchup",
+    fullSyncStart,
+    catchupSyncStart,
+  );
+  if (!catchupPhaseResult.success) {
+    return;
+  }
+
+  const syncedCount =
+    fullPhaseResult.phaseSyncedCount + catchupPhaseResult.phaseSyncedCount;
+
+  const updateSyncResult = await updateLastSyncedAtForDevice({
+    deviceId,
+    lastSyncedAt: catchupSyncStart,
+  });
+
+  if (!updateSyncResult.success) {
+    console.warn(
+      "[sync-provider] Synced records but failed to update lastSyncedAt:",
+      updateSyncResult.error,
+    );
+    return;
+  }
+
+  console.log("[sync-provider] Criminal sync completed.", {
+    syncedCount,
+    fullPhaseSyncedCount: fullPhaseResult.phaseSyncedCount,
+    catchupPhaseSyncedCount: catchupPhaseResult.phaseSyncedCount,
+    lastSyncedAt: catchupSyncStart.toISOString(),
+  });
+}
+
 const SyncProvider = ({ children }: SyncProviderProps) => {
   const { data: session } = useSession();
   const syncedUserIdRef = useRef<string | null>(null);
 
-  const syncSingleCriminalCase = useCallback(async () => {
+  const syncCriminalCasesForCurrentDevice = useCallback(async () => {
     if (typeof window === "undefined") {
       return;
     }
@@ -51,57 +239,30 @@ const SyncProvider = ({ children }: SyncProviderProps) => {
       return;
     }
 
-    console.log(
-      "[sync-provider] Electron detected. Starting one-case sync test.",
-    );
-
     try {
-      const result = await getCriminalCases({ page: 1, pageSize: 1 });
-      if (!result.success) {
+      const deviceIdResponse = await ipc.invoke(
+        IPC_CHANNELS.SESSION_GET_DEVICE_ID,
+      );
+      const deviceId = extractDeviceId(deviceIdResponse);
+      if (!deviceId) {
+        console.warn("[sync-provider] Failed to get device ID from Electron.");
+        return;
+      }
+
+      const syncStateResult = await upsertSyncStateForDevice(deviceId);
+      if (!syncStateResult.success) {
         console.warn(
-          "[sync-provider] Failed to fetch criminal case for sync:",
-          result.error,
+          "[sync-provider] Failed to upsert sync state for device:",
+          syncStateResult.error,
         );
         return;
       }
 
-      const caseData = result.result.items[0];
-      if (!caseData) {
-        console.warn("[sync-provider] No criminal case available to sync.");
-        return;
-      }
-
-      console.log("[sync-provider] Pulled one case from webserver actions.", {
-        id: caseData.id,
-        caseNumber: caseData.caseNumber,
-      });
-
-      const payload: UpsertSingleCriminalCasePayload = {
-        source: "webserver",
-        sentAt: new Date().toISOString(),
-        caseData,
-      };
-
-      console.log("[sync-provider] Sending case to Electron over IPC.", {
-        channel: SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
-        id: caseData.id,
-        caseNumber: caseData.caseNumber,
-      });
-
-      const response = (await ipc.invoke(
-        SYNC_CHANNELS.UPSERT_SINGLE_CRIMINAL_CASE,
-        payload,
-      )) as UpsertSingleCriminalCaseResponse;
-
-      if (!response?.success) {
-        console.warn(
-          "[sync-provider] Electron sync returned failure.",
-          response?.error,
-        );
-        return;
-      }
-
-      console.log("[sync-provider] Electron sync completed.", response.result);
+      await syncCriminalCasesForDevice(
+        ipc,
+        deviceId,
+        syncStateResult.result.lastSyncedAt,
+      );
     } catch (error) {
       console.error("[sync-provider] Unexpected sync error.", error);
     }
@@ -128,14 +289,14 @@ const SyncProvider = ({ children }: SyncProviderProps) => {
       },
     );
 
-    void syncSingleCriminalCase();
-  }, [session?.user?.id, syncSingleCriminalCase]);
+    void syncCriminalCasesForCurrentDevice();
+  }, [session?.user?.id, syncCriminalCasesForCurrentDevice]);
 
   const contextValue = useMemo<SyncContextType>(
     () => ({
-      syncSingleCriminalCase,
+      syncCriminalCases: syncCriminalCasesForCurrentDevice,
     }),
-    [syncSingleCriminalCase],
+    [syncCriminalCasesForCurrentDevice],
   );
 
   return (
