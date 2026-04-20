@@ -104,7 +104,7 @@ export async function getRecievingLogs(): Promise<
 }
 
 export async function getRecievingLogById(
-  logId: number,
+  logId: string | number,
 ): Promise<ActionResult<RecievingLog>> {
   try {
     const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -112,7 +112,14 @@ export async function getRecievingLogById(
       return sessionValidation;
     }
 
-    const log = await prisma.recievingLog.findUnique({ where: { id: logId } });
+    const parsedLogId = Number(logId);
+    if (!Number.isInteger(parsedLogId) || parsedLogId <= 0) {
+      return { success: false, error: "Invalid log ID" };
+    }
+
+    const log = await prisma.recievingLog.findUnique({
+      where: { id: parsedLogId },
+    });
 
     if (!log) {
       return { success: false, error: "Receiving log not found" };

@@ -16,7 +16,7 @@ export const recievingLogsAdapter: RecievingLogsAdapter = {
   createRecievingLog,
   updateRecievingLog,
   deleteRecievingLog,
-  getRecievingLogById: (id) => getRecievingLogById(Number(id)),
+  getRecievingLogById,
   getRecievingLogsByIds,
   uploadReceiveExcel,
   exportReceiveLogsExcel,

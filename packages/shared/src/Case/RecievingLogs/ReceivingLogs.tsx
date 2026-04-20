@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -227,20 +226,15 @@ const ReceiveLogsPage: React.FC<{
     );
   };
 
-  const handleDeleteLog = async (logId: number) => {
-    if (
-      !(await statusPopup.showConfirm(
-        "Are you sure you want to delete this entry?",
-      ))
-    )
-      return;
-    const result = await adapter.deleteRecievingLog(logId);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete");
-      return;
-    }
-    await refreshFromBackend();
-    statusPopup.showSuccess("Entry deleted successfully");
+  const handleToggleLogSelection = (logId: number, checked: boolean) => {
+    setSelectedLogIds((prev) => {
+      if (!isSelecting) return prev;
+      if (checked) {
+        if (prev.includes(logId)) return prev;
+        return [...prev, logId];
+      }
+      return prev.filter((id) => id !== logId);
+    });
   };
 
   const handleDeleteSelectedLogs = async () => {
@@ -274,10 +268,6 @@ const ReceiveLogsPage: React.FC<{
         failedIds.push(id);
       });
 
-      setSelectedLogIds((prev) =>
-        prev.filter((id) => !deletedIds.includes(id)),
-      );
-
       if (failedIds.length > 0) {
         statusPopup.showError(
           `Deleted ${deletedIds.length} entr${deletedIds.length > 1 ? "ies" : "y"}, but failed to delete ${failedIds.length}.`,
@@ -288,6 +278,8 @@ const ReceiveLogsPage: React.FC<{
         );
       }
 
+      setSelectionMode(null);
+      setSelectedLogIds([]);
       await refreshFromBackend();
     } finally {
       setDeletingSelected(false);
@@ -405,6 +397,28 @@ const ReceiveLogsPage: React.FC<{
   };
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const visibleLogIds = logs.map((log) => log.id);
+  const allVisibleLogsSelected =
+    visibleLogIds.length > 0 &&
+    visibleLogIds.every((logId) => selectedLogIds.includes(logId));
+
+  const handleToggleSelectAllVisibleLogs = (checked: boolean) => {
+    if (!isSelecting) return;
+
+    setSelectedLogIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleLogIds.forEach((logId) => {
+          if (!next.includes(logId)) {
+            next.push(logId);
+          }
+        });
+        return next;
+      }
+
+      return prev.filter((logId) => !visibleLogIds.includes(logId));
+    });
+  };
 
   if (loading) {
     return <PageListSkeleton statCards={4} tableColumns={8} tableRows={8} />;
@@ -601,15 +615,18 @@ const ReceiveLogsPage: React.FC<{
 
             {isAdminOrAtty &&
               (isSelecting ? (
-                <div className="flex items-center gap-2 ml-3">
-                  <span className="text-xs text-base-content/40 tabular-nums">
+                <div className="flex items-center gap-2 sm:ml-3">
+                  <span className="text-sm text-base-content/60 whitespace-nowrap">
                     {selectedLogIds.length} selected
                   </span>
                   <button
                     type="button"
                     className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
                     onClick={() => void applySelectionMode()}
-                    disabled={selectedLogIds.length === 0 || deletingSelected}
+                    disabled={
+                      selectedLogIds.length === 0 ||
+                      (selectionMode === "delete" && deletingSelected)
+                    }
                   >
                     <FiCheck className="h-4 w-4" />
                     <span>
@@ -627,32 +644,30 @@ const ReceiveLogsPage: React.FC<{
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 ml-3">
+                <div className="flex items-center gap-2 sm:ml-3">
                   <button
                     type="button"
                     className="btn btn-md btn-outline gap-2"
                     onClick={() => {
-                      if (totalCount > 0) {
-                        setSelectionMode("edit");
-                        setSelectedLogIds([]);
-                      }
+                      setSelectionMode("edit");
+                      setSelectedLogIds([]);
                     }}
+                    disabled={totalCount === 0}
                   >
                     <FiEdit2 className="h-4 w-4" />
-                    Edit rows
+                    Edit Rows
                   </button>
                   <button
                     type="button"
-                    className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
+                    className="btn btn-md btn-outline btn-error gap-2"
                     onClick={() => {
-                      if (totalCount > 0) {
-                        setSelectionMode("delete");
-                        setSelectedLogIds([]);
-                      }
+                      setSelectionMode("delete");
+                      setSelectedLogIds([]);
                     }}
+                    disabled={totalCount === 0}
                   >
                     <FiTrash2 className="h-4 w-4" />
-                    Delete rows
+                    Delete Rows
                   </button>
                 </div>
               ))}
@@ -667,44 +682,6 @@ const ReceiveLogsPage: React.FC<{
             getSuggestions={getSuggestions}
           />
         </div>
-
-        {isAdminOrAtty && isSelecting && (
-          <AnimatePresence>
-            {selectedLogIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    {selectedLogIds.length} entr
-                    {selectedLogIds.length > 1 ? "ies" : "y"} selected
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-md"
-                    onClick={() => setSelectedLogIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
 
         {/* Stats (KPI cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -746,16 +723,22 @@ const ReceiveLogsPage: React.FC<{
                 ? [
                     {
                       key: "select",
-                      label: "Select",
-                      align: "center" as const,
-                    },
-                  ]
-                : []),
-              ...(isAdminOrAtty && !isSelecting
-                ? [
-                    {
-                      key: "actions",
-                      label: "Actions",
+                      label: (
+                        <label className="inline-flex items-center justify-center gap-2">
+                          <span>Select</span>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={allVisibleLogsSelected}
+                            onChange={(e) =>
+                              handleToggleSelectAllVisibleLogs(e.target.checked)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Select all visible receiving logs"
+                            disabled={visibleLogIds.length === 0}
+                          />
+                        </label>
+                      ),
                       align: "center" as const,
                     },
                   ]
@@ -814,23 +797,12 @@ const ReceiveLogsPage: React.FC<{
                 log={log as unknown as ReceiveLog}
                 onView={(l) => router.push(`/user/cases/receiving/${l.id}`)}
                 isAdminOrAtty={isAdminOrAtty}
-                onEdit={(l) =>
-                  router.push(`/user/cases/receiving/edit?id=${l.id}`)
-                }
-                onDelete={(l) => handleDeleteLog(l.id)}
                 isSelected={selectedLogIds.includes(
                   (log as unknown as ReceiveLog).id,
                 )}
                 isSelecting={isSelecting}
                 onToggleSelect={
-                  isSelecting
-                    ? (id) =>
-                        setSelectedLogIds((prev) =>
-                          prev.includes(id)
-                            ? prev.filter((entryId) => entryId !== id)
-                            : [...prev, id],
-                        )
-                    : undefined
+                  isSelecting ? handleToggleLogSelection : undefined
                 }
               />
             )}

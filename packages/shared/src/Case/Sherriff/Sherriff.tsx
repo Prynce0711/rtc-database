@@ -18,7 +18,6 @@ import {
   usePopup,
 } from "@rtc-database/shared";
 
-import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
@@ -123,6 +122,7 @@ const Sherriff: React.FC<{
 
   const handleToggleRecordSelection = (id: number, checked: boolean) => {
     setSelectedRecordIds((prev) => {
+      if (!isSelecting) return prev;
       if (checked) {
         if (prev.includes(id)) return prev;
         return [...prev, id];
@@ -280,23 +280,27 @@ const Sherriff: React.FC<{
 
   const totalItems = totalCount;
   const pageCount = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const visibleRecordIds = records.map((record) => record.id);
+  const allVisibleRecordsSelected =
+    visibleRecordIds.length > 0 &&
+    visibleRecordIds.every((recordId) => selectedRecordIds.includes(recordId));
 
-  const handleDelete = async (id: number) => {
-    if (
-      !(await statusPopup.showConfirm(
-        "Are you sure you want to delete this case?",
-      ))
-    )
-      return;
+  const handleToggleSelectAllVisibleRecords = (checked: boolean) => {
+    if (!isSelecting) return;
 
-    const result = await adapter.deleteSheriffCase(id);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete case");
-      return;
-    }
+    setSelectedRecordIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleRecordIds.forEach((recordId) => {
+          if (!next.includes(recordId)) {
+            next.push(recordId);
+          }
+        });
+        return next;
+      }
 
-    statusPopup.showSuccess("Case deleted successfully");
-    await fetchCases();
+      return prev.filter((recordId) => !visibleRecordIds.includes(recordId));
+    });
   };
 
   const handleDeleteSelectedRecords = async () => {
@@ -340,9 +344,8 @@ const Sherriff: React.FC<{
         );
       }
 
-      setSelectedRecordIds((prev) =>
-        prev.filter((id) => !deletedIds.includes(id)),
-      );
+      setSelectionMode(null);
+      setSelectedRecordIds([]);
       await fetchCases();
     } finally {
       setDeletingSelected(false);
@@ -713,39 +716,28 @@ const Sherriff: React.FC<{
         </div>
 
         {/* Table */}
-        {isAdminOrAtty && isSelecting && (
-          <AnimatePresence>
-            {selectedRecordIds.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: "auto" }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mb-4 overflow-hidden"
-              >
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-primary">
-                    {selectedRecordIds.length} case
-                    {selectedRecordIds.length > 1 ? "s" : ""} selected
-                  </div>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setSelectedRecordIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        )}
-
         <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <table className="table table-zebra w-full text-center">
             <thead className="bg-base-300">
               <tr className="text-center">
-                {isAdminOrAtty && isSelecting && <th>Select</th>}
-                {isAdminOrAtty && !isSelecting && <th>Actions</th>}
+                {isAdminOrAtty && isSelecting && (
+                  <th className="text-center">
+                    <label className="inline-flex items-center justify-center gap-2">
+                      <span>SELECT</span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allVisibleRecordsSelected}
+                        onChange={(e) =>
+                          handleToggleSelectAllVisibleRecords(e.target.checked)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select all visible sheriff cases"
+                        disabled={visibleRecordIds.length === 0}
+                      />
+                    </label>
+                  </th>
+                )}
                 <SortTh
                   label="CASE NUMBER"
                   colKey="caseNumber"
@@ -782,7 +774,7 @@ const Sherriff: React.FC<{
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminOrAtty ? 7 : 6}>
+                  <td colSpan={6 + (isAdminOrAtty && isSelecting ? 1 : 0)}>
                     <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-55">
                       <div className="flex items-center justify-center mb-4">
                         <FiFileText className="w-15 h-15 opacity-50" />
@@ -801,10 +793,6 @@ const Sherriff: React.FC<{
                   <SherriffCaseRow
                     key={r.id}
                     record={r}
-                    onEdit={(item) => {
-                      router.push(`/user/cases/sheriff/edit?id=${item.id}`);
-                    }}
-                    onDelete={handleDelete}
                     onRowClick={(item) => {
                       try {
                         localStorage.setItem(
