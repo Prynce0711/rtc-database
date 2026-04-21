@@ -30,6 +30,7 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import CaseEntryToolbar from "../CaseEntryToolbar";
@@ -395,6 +396,7 @@ const SpecialProceedingUpdatePage = ({
   const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
     Record<number, string>
@@ -402,6 +404,7 @@ const SpecialProceedingUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
   const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
@@ -654,6 +657,63 @@ const SpecialProceedingUpdatePage = ({
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [defaultArea, entries.length, popup]);
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const result = await adapter.uploadSpecialProceedingExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        popup.showError(result.error || "Failed to import cases");
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        popup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        return;
+      }
+
+      popup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Cases imported successfully",
+      );
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1217,7 +1277,24 @@ const SpecialProceedingUpdatePage = ({
                 onClearAll={() => {
                   void handleClearTable();
                 }}
-              />
+              >
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImportExcel}
+                />
+                <button
+                  type="button"
+                  className={`btn btn-info btn-outline gap-2 ${uploading ? "loading" : ""}`}
+                  onClick={() => importFileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <FiUpload size={15} />
+                  {uploading ? "Importing..." : "Import Excel"}
+                </button>
+              </CaseEntryToolbar>
             )}
 
             <div className="xls-sheet-wrap">

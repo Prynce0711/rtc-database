@@ -142,6 +142,7 @@ const NotarialEdit = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const [entryPage, setEntryPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rowsToAddInput, setRowsToAddInput] = useState("1");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const handleFileChange = (id: string, file: File | null) => {
     setEntries((prev) =>
@@ -187,9 +188,14 @@ const NotarialEdit = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
+  const handleAddEntry = useCallback((count: number = 1) => {
+    const normalizedCount = Math.max(1, Math.floor(count));
+    const nextRows = Array.from({ length: normalizedCount }, () =>
+      createEmptyEntry(uid()),
+    );
+
     setEntries((prev) => {
-      const next = [...prev, createEmptyEntry(uid())];
+      const next = [...prev, ...nextRows];
       setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
       return next;
     });
@@ -200,6 +206,15 @@ const NotarialEdit = ({
       });
     }, 60);
   }, []);
+
+  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
+  const canAddRowsFromInput =
+    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
+
+  const handleAddRowsFromInput = useCallback(() => {
+    if (!canAddRowsFromInput) return;
+    handleAddEntry(parsedRowsToAdd);
+  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -462,23 +477,103 @@ const NotarialEdit = ({
               </div>
             )}
 
+            {/* ── Row Controls Toolbar (outside tab bar, like Criminal Cases) ── */}
+            {!isEdit && (
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                <button
+                  type="button"
+                  className="btn btn-success btn-md gap-1"
+                  onClick={() => handleAddEntry(1)}
+                >
+                  <FiPlus size={14} strokeWidth={2.5} />
+                  Add Row
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => handleAddEntry(5)}
+                >
+                  <FiPlus size={13} />
+                  +5 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => handleAddEntry(10)}
+                >
+                  <FiPlus size={13} />
+                  +10 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-warning btn-md"
+                  onClick={() => void handleClearTable()}
+                >
+                  Clear All
+                </button>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  id="notarial-edit-import-input"
+                  onChange={(e) => {
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => {
+                    const el = document.getElementById(
+                      "notarial-edit-import-input",
+                    ) as HTMLInputElement | null;
+                    el?.click();
+                  }}
+                >
+                  <FiPlus size={13} />
+                  Import Excel
+                </button>
+                <span className="text-xs text-base-content/60 ml-1">
+                  Enter Rows
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={rowsToAddInput}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    if (/^\d*$/.test(nextValue)) {
+                      setRowsToAddInput(nextValue);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddRowsFromInput();
+                    }
+                  }}
+                  className="input input-bordered input-sm w-20"
+                  aria-label="Enter number of rows to add"
+                />
+                <button
+                  type="button"
+                  className="btn btn-success btn-md gap-1"
+                  onClick={handleAddRowsFromInput}
+                  disabled={!canAddRowsFromInput}
+                >
+                  <FiPlus size={13} />
+                  Add
+                </button>
+              </div>
+            )}
+
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 <button className="xls-tab active">
                   <FiFileText size={13} />
                   Notarial Info
                 </button>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
@@ -669,17 +764,6 @@ const NotarialEdit = ({
                     </button>
                   </div>
                 </div>
-              )}
-
-              {!isEdit && (
-                <button
-                  type="button"
-                  className="xls-add-row"
-                  onClick={handleAddEntry}
-                >
-                  <FiPlus size={14} strokeWidth={2.5} />
-                  Add Row
-                </button>
               )}
             </div>
 

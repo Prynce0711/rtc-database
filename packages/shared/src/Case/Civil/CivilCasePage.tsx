@@ -18,7 +18,6 @@ import {
   FiLock,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -436,32 +435,6 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {canManage && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        void handleUpload(file);
-                      }
-                      if (e.target) e.target.value = "";
-                    }}
-                  />
-                  <button
-                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import Excel"}
-                  </button>
-                </>
-              )}
-
               <button
                 className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                 onClick={() => void handleExport()}

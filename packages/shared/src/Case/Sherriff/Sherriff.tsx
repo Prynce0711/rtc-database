@@ -29,7 +29,6 @@ import {
   FiFileText,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -486,14 +485,6 @@ const Sherriff: React.FC<{
                 <div className="flex flex-col items-end gap-3">
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <button
-                      className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      <FiUpload className="h-5 w-5" />
-                      {uploading ? "Importing..." : "Import Excel"}
-                    </button>
-                    <button
                       className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                       onClick={handleExport}
                       disabled={exporting}
@@ -523,13 +514,6 @@ const Sherriff: React.FC<{
                 </div>
               )}
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleImport}
-            />
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
