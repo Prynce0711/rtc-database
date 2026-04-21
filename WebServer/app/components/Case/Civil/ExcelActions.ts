@@ -341,6 +341,8 @@ export async function uploadExcel(
       console.error("ERROR Import failed:", result.error);
     }
 
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
     return result;
   } catch (error) {
     console.error("Upload error:", error);

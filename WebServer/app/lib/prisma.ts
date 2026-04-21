@@ -12,4 +12,10 @@ const adapter = new PrismaBetterSqlite3({ url: connectionString });
 
 const prisma = new PrismaClient({ adapter });
 
+async function init() {
+  await prisma.$executeRawUnsafe(`PRAGMA journal_mode = WAL;`);
+}
+
+init();
+
 export { prisma };

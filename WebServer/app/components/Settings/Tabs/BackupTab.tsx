@@ -603,7 +603,9 @@ const BackupTab = () => {
 
   const handleRunBackupNow = async () => {
     setRunningBackup(true);
-    popup.showLoading("Running backup now...");
+    popup.showSuccess(
+      "Started backup. This may take a while depending on the size of your database and the speed of your backup destination. You can monitor the progress in the backup logs below.",
+    );
 
     const result = await runBackupNowAction();
     setRunningBackup(false);
@@ -614,7 +616,6 @@ const BackupTab = () => {
     }
 
     applyDashboardData(result.result);
-    popup.showSuccess("Backup completed.");
   };
 
   const handleCancelBackup = async () => {
