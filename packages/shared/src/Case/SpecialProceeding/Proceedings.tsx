@@ -27,7 +27,6 @@ import {
   FiLock,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -478,25 +477,6 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     className={ButtonStyles.info}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    aria-busy={uploading}
-                    aria-label="Import Excel file"
-                  >
-                    {uploading ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm" />
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <FiUpload className="h-5 w-5" />
-                        Import Excel
-                      </>
-                    )}
-                  </button>
-                  <button
-                    className={ButtonStyles.info}
                     onClick={handleExportExcel}
                     disabled={exporting || cases.length === 0}
                     aria-busy={exporting}
@@ -538,14 +518,6 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                 </div>
               </div>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportExcel}
-              className="hidden"
-              aria-label="Import excel file input"
-            />
             <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
               <svg
                 xmlns="http://www.w3.org/2000/svg"

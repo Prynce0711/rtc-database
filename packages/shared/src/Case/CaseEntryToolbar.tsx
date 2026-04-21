@@ -21,6 +21,17 @@ const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
   onClearAll,
   children,
 }) => {
+  const [customRows, setCustomRows] = React.useState("1");
+
+  const parsedCustomRows = Number.parseInt(customRows, 10);
+  const canAddCustomRows =
+    Number.isFinite(parsedCustomRows) && parsedCustomRows > 0;
+
+  const handleAddCustomRows = React.useCallback(() => {
+    if (!canAddCustomRows) return;
+    onAddRows(parsedCustomRows);
+  }, [canAddCustomRows, onAddRows, parsedCustomRows]);
+
   return (
     <div
       style={{
@@ -65,6 +76,47 @@ const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
       >
         Clear All
       </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--color-subtle)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Enter Rows
+        </span>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={customRows}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            if (/^\d*$/.test(nextValue)) {
+              setCustomRows(nextValue);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleAddCustomRows();
+            }
+          }}
+          className="input input-bordered input-sm w-20"
+          aria-label="Enter number of rows to add"
+        />
+        <button
+          type="button"
+          className="btn btn-success btn-outline gap-2"
+          onClick={handleAddCustomRows}
+          disabled={!canAddCustomRows}
+        >
+          <FiPlus size={15} />
+          Add
+        </button>
+      </div>
 
       {children ? (
         <>

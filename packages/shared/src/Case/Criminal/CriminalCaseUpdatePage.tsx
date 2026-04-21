@@ -34,6 +34,7 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
@@ -819,7 +820,10 @@ const CriminalCaseUpdatePage = ({
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
+  const [rowsToAddInput, setRowsToAddInput] = useState("1");
+  const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const router = useAdaptiveNavigation();
 
   const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
@@ -1028,6 +1032,15 @@ const CriminalCaseUpdatePage = ({
     [defaultArea],
   );
 
+  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
+  const canAddRowsFromInput =
+    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
+
+  const handleAddRowsFromInput = useCallback(() => {
+    if (!canAddRowsFromInput) return;
+    handleAddEntry(parsedRowsToAdd);
+  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
+
   const handleClearTable = useCallback(async () => {
     const label =
       entries.length === 1
@@ -1051,6 +1064,63 @@ const CriminalCaseUpdatePage = ({
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [defaultArea, entries.length, statusPopup]);
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const result = await adapter.uploadExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        return;
+      }
+
+      statusPopup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Cases imported successfully",
+      );
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1736,6 +1806,56 @@ const CriminalCaseUpdatePage = ({
                   >
                     Clear All
                   </button>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImportExcel}
+                  />
+                  <button
+                    type="button"
+                    className={`btn btn-info btn-outline gap-2 ${uploading ? "loading" : ""}`}
+                    onClick={() => importFileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <FiUpload size={15} />
+                    {uploading ? "Importing..." : "Import Excel"}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-base-content/70">
+                      Enter Rows
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={rowsToAddInput}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        if (/^\d*$/.test(nextValue)) {
+                          setRowsToAddInput(nextValue);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleAddRowsFromInput();
+                        }
+                      }}
+                      className="input input-bordered input-sm w-20"
+                      aria-label="Enter number of rows to add"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-success btn-outline gap-2"
+                      onClick={handleAddRowsFromInput}
+                      disabled={!canAddRowsFromInput}
+                    >
+                      <FiPlus size={15} />
+                      Add
+                    </button>
+                  </div>
                 </div>
               )}
 

@@ -37,7 +37,6 @@ import {
   FiLock,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -48,9 +47,6 @@ import {
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
 import CriminalCaseRow from "./CriminalCaseRow";
-
-// TODO: Move import excel here instead of server action and just call createCase
-// TODO: Maybe add a reusable CasePage component that you put schema and it will make the filter and table?
 
 type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
@@ -557,26 +553,6 @@ const CriminalCasePage: React.FC<{
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {isAdminOrAtty && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={handleImportExcel}
-                  />
-                  <button
-                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import Excel"}
-                  </button>
-                </>
-              )}
-
               <button
                 className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                 onClick={handleExportExcel}
