@@ -2,9 +2,12 @@
 
 import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
-import { ExportExcelData, UploadExcelResult } from "@rtc-database/shared";
 import { prisma } from "@/app/lib/prisma";
-import { ActionResult } from "@rtc-database/shared";
+import {
+  ActionResult,
+  ExportExcelData,
+  UploadExcelResult,
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { SUMMARY_COURT_TYPES, type SummaryCourtType } from "./SummaryConstants";
 import { parseSummaryWorkbook } from "./SummaryImportUtils";
@@ -114,6 +117,8 @@ export async function uploadSummaryExcel(
 
       importedIds.push(saved.id);
     }
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
 
     return {
       success: true,

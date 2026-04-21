@@ -313,6 +313,8 @@ export async function uploadSpecialProceedingExcel(
       console.error("FAILED Import failed:", result.error);
     }
 
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
     return result;
   } catch (error) {
     console.error("Special proceeding upload error:", error);

@@ -296,6 +296,8 @@ export async function uploadSheriffExcel(
       console.error("ERROR Import failed:", result.error);
     }
 
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
     return result;
   } catch (error) {
     console.error("Sheriff upload error:", error);

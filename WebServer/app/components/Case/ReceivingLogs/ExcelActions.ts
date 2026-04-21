@@ -1,7 +1,10 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
+  ActionResult,
   ExportExcelData,
   findColumnValue,
   getExcelHeaderMap,
@@ -10,12 +13,10 @@ import {
   ProcessExcelMeta,
   processExcelUpload,
   QUERY_CHUNK_SIZE,
+  ReceivingLogSchema,
   UploadExcelResult,
   valuesAreEqual,
 } from "@rtc-database/shared";
-import { prisma } from "@/app/lib/prisma";
-import Roles from "@/app/lib/Roles";
-import { ActionResult, ReceivingLogSchema } from "@rtc-database/shared";
 import { LogAction, Prisma } from "@rtc-database/shared/prisma/client";
 import { CaseType } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
@@ -282,6 +283,8 @@ export async function uploadReceiveExcel(
         return { ids: created.map((log) => log.id), count: created.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
 
     if (!result.success) {
       return {

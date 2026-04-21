@@ -1,7 +1,9 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
 import {
+  ActionResult,
   ExportExcelData,
   findColumnValue,
   isMappedRowEmpty,
@@ -9,8 +11,6 @@ import {
   UploadExcelResult,
   valuesAreEqual,
 } from "@rtc-database/shared";
-import { prisma } from "@/app/lib/prisma";
-import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { MonthlyRow, MonthlyRowSchema } from "./Schema";
 
@@ -134,6 +134,8 @@ export async function uploadMonthlyExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
 
     return result;
   } catch (error) {

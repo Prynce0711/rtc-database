@@ -2,7 +2,10 @@
 
 import { EmployeeSchema } from "@/app/components/Employee/schema";
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
 import {
+  ActionResult,
   ExportExcelData,
   getExcelHeaderMap,
   isMappedRowEmpty,
@@ -11,9 +14,6 @@ import {
   processExcelUpload,
   UploadExcelResult,
 } from "@rtc-database/shared";
-import { prisma } from "@/app/lib/prisma";
-import Roles from "@/app/lib/Roles";
-import { ActionResult } from "@rtc-database/shared";
 import { LogAction } from "@rtc-database/shared/prisma/client";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
@@ -173,6 +173,8 @@ export async function uploadEmployeeExcel(
     } else {
       console.error("✗ Import failed:", result.error);
     }
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
 
     return result;
   } catch (error) {

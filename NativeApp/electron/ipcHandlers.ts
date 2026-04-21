@@ -1,5 +1,5 @@
 import { IPC_CHANNELS } from "@rtc-database/shared";
-import { app, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
@@ -23,6 +23,25 @@ import {
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
 import { formatError, resolveSafePath } from "./utils";
+
+const bringWindowToFront = (window: BrowserWindow | null): void => {
+  if (!window || window.isDestroyed()) {
+    return;
+  }
+
+  if (window.isMinimized()) {
+    window.restore();
+  }
+
+  if (!window.isVisible()) {
+    window.show();
+  }
+
+  // Toggle top-most briefly so focus changes are respected on Windows.
+  window.setAlwaysOnTop(true);
+  window.focus();
+  window.setAlwaysOnTop(false);
+};
 
 ipcMain.handle(IPC_CHANNELS.CASE_DOES_EXIST, async (_event, args) => {
   return doesCaseExist(args.caseNumbers, args.caseType);
@@ -125,7 +144,7 @@ ipcMain.handle(
 
 ipcMain.handle(
   IPC_CHANNELS.RCLONE_AUTHORIZE_PROVIDER,
-  async (_event, args: { provider: string }) => {
+  async (event, args: { provider: string }) => {
     try {
       if (!args || typeof args.provider !== "string") {
         return {
@@ -135,6 +154,10 @@ ipcMain.handle(
       }
 
       const result = await authorizeBackupProviderWithRclone(args.provider);
+
+      const requestingWindow = BrowserWindow.fromWebContents(event.sender);
+      const fallbackWindow = BrowserWindow.getAllWindows()[0] ?? null;
+      bringWindowToFront(requestingWindow ?? fallbackWindow);
 
       return {
         success: true,

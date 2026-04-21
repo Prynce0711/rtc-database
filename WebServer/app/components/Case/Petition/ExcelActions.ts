@@ -314,6 +314,8 @@ export async function uploadPetitionExcel(
       console.error("FAILED Import failed:", result.error);
     }
 
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
     return result;
   } catch (error) {
     console.error("Petition upload error:", error);

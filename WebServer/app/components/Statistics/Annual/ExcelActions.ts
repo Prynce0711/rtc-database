@@ -1,7 +1,9 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
 import {
+  ActionResult,
   excelDateToJSDate,
   ExportExcelData,
   findColumnValue,
@@ -11,8 +13,6 @@ import {
   UploadExcelResult,
   valuesAreEqual,
 } from "@rtc-database/shared";
-import { prisma } from "@/app/lib/prisma";
-import { ActionResult } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { CaseSchema, InventoryDocumentSchema } from "./Schema";
 
@@ -201,7 +201,7 @@ export async function uploadMunicipalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return await processExcelUpload<
+    const result = await processExcelUpload<
       CaseSchema,
       ReturnType<typeof getCourtCells>
     >({
@@ -265,6 +265,10 @@ export async function uploadMunicipalTrialCourtExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
+    return result;
   } catch (error) {
     console.error("Municipal Trial Court Excel upload failed:", error);
     return {
@@ -323,7 +327,7 @@ export async function uploadRegionalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return await processExcelUpload<
+    const result = await processExcelUpload<
       CaseSchema,
       ReturnType<typeof getCourtCells>
     >({
@@ -387,6 +391,10 @@ export async function uploadRegionalTrialCourtExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
+    return result;
   } catch (error) {
     console.error("Regional Trial Court Excel upload failed:", error);
     return {
@@ -445,7 +453,7 @@ export async function uploadInventoryDocumentExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return await processExcelUpload<
+    const result = await processExcelUpload<
       InventoryDocumentSchema,
       ReturnType<typeof getInventoryCells>
     >({
@@ -537,6 +545,10 @@ export async function uploadInventoryDocumentExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
+    return result;
   } catch (error) {
     console.error("Inventory Excel upload failed:", error);
     return { success: false, error: "Inventory Excel upload failed" };
