@@ -1,16 +1,11 @@
 "use client";
 
-import { CriminalCasePage, Roles, Sidebar } from "@rtc-database/shared";
+import { CriminalCasePage, Roles } from "@rtc-database/shared";
 import { useEffect, useRef, useState } from "react";
-import {
-  HashRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import criminalCaseAdapter from "./Adapters/CriminalCaseAdapter";
 import "./App.css";
-import criminalCaseAdapter from "./criminalCaseAdapter";
+import NativeSidebar from "./NativeSidebar";
 import SpeederLoader from "./SpeederLoader";
 
 interface BackendInfo {
@@ -42,43 +37,6 @@ const parseInitialOfflineReason = (): AutoOfflineReason => {
   );
 
   return reason === "disconnect" ? "disconnected" : null;
-};
-
-const NativeSidebarShell = ({ children }: { children?: React.ReactNode }) => {
-  const location = useLocation();
-
-  return (
-    <Sidebar
-      session={{
-        user: {
-          name: "Native User",
-          role: "admin",
-        },
-      }}
-      updateDarkMode={(newTheme) => {
-        if (typeof document !== "undefined") {
-          document.documentElement.setAttribute("data-theme", newTheme);
-        }
-        return { success: true };
-      }}
-      onSignOut={() => {
-        if (typeof window !== "undefined") {
-          window.location.hash = "#/login";
-        }
-      }}
-    >
-      {children ? (
-        children
-      ) : (
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Native App</h1>
-          <p className="text-sm opacity-70">
-            Current route: {location.pathname}
-          </p>
-        </div>
-      )}
-    </Sidebar>
-  );
 };
 
 type LocalModeAppProps = {
@@ -113,19 +71,19 @@ const LocalModeApp = ({ availableBackend, onReconnect }: LocalModeAppProps) => (
         <Route
           path="/user/cases/criminal"
           element={
-            <NativeSidebarShell>
+            <NativeSidebar>
               <CriminalCasePage
                 role={Roles.USER}
                 adapter={criminalCaseAdapter}
               />
-            </NativeSidebarShell>
+            </NativeSidebar>
           }
         />
         <Route
           path="/login"
           element={<Navigate to="/user/dashboard" replace />}
         />
-        <Route path="/user/*" element={<NativeSidebarShell />} />
+        <Route path="/user/*" element={<NativeSidebar />} />
         <Route path="*" element={<Navigate to="/user/dashboard" replace />} />
       </Routes>
     </HashRouter>

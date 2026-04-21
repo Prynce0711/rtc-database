@@ -8,7 +8,7 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "postinstall": "node ./scripts/cleanupBrokenNodeModulesLinks.cjs && electron-rebuild -f -w better-sqlite3 && electron-builder install-app-deps && pnpm rebuild electron"
+    "postinstall": "node ./scripts/cleanupBrokenNodeModulesLinks.cjs && electron-rebuild -f -w better-sqlite3 && electron-builder install-app-deps && pnpm rebuild electron rclone.js"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",

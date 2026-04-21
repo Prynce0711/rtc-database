@@ -22,11 +22,16 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   socket.on("message", (msg, rinfo) => {
     try {
       const payload = UdpData.parse(JSON.parse(msg.toString()));
+
+      const devURL =
+        import.meta.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:3000";
       const address =
-        import.meta.env.MODE === "development" ? "localhost" : rinfo.address;
+        import.meta.env.MODE === "development"
+          ? devURL
+          : `http://${rinfo.address}`;
 
       const backend: BackendInfo = {
-        url: `http://${address}:${payload.port}`,
+        url: `${address}:${payload.port}`,
         ip: address,
         port: payload.port,
         lastSeen: Date.now(),
