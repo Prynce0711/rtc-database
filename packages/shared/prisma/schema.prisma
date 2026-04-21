@@ -653,15 +653,13 @@ model SystemSettings {
 }
 
 model TwoFactor {
-  id          String @id
-  secret      String
-  backupCodes String
-  userId      String
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([secret])
-  @@index([userId])
-  @@map("twoFactor")
+	id String @id
+	user User @relation(fields: [userId], references: [id])
+	userId String
+	secret String
+	backupCodes String
+	verified Boolean
+	@@map("twoFactor")
 }
 
 model SyncState {

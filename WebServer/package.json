@@ -11,7 +11,7 @@
     "start:sidecar": "node dist/server.js",
     "start": "cross-env NODE_ENV=production concurrently -k -n next,sidecar \"next start\" \"pnpm start:sidecar\"",
     "lint": "eslint",
-    "postinstall": "pnpm rebuild better-sqlite3",
+    "postinstall": "pnpm rebuild better-sqlite3 rclone.js",
     "prepare": "next-ws patch"
   },
   "dependencies": {
@@ -31,6 +31,7 @@
     "next-runtime-env": "^3.3.0",
     "next-ws": "^2.2.4",
     "nodemailer": "^8.0.5",
+    "qrcode.react": "^4.2.0",
     "rclone.js": "^0.6.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",

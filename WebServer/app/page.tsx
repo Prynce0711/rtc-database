@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasPassword } from "./components/AccountManagement/AccountActions";
-import Login from "./components/Login";
+import Login from "./components/Login/Login";
 import { auth } from "./lib/auth";
 
 export default async function Home() {

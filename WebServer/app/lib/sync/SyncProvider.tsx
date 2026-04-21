@@ -233,6 +233,10 @@ const SyncProvider = ({ children }: SyncProviderProps) => {
       return;
     }
 
+    console.log(
+      "[sync-provider] Starting criminal cases sync for current device.",
+    );
+
     const ipc = window.ipcRenderer;
     if (!ipc || typeof ipc.invoke !== "function") {
       console.log("[sync-provider] Electron bridge not found. Skipping sync.");
