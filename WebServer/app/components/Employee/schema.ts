@@ -1,5 +1,5 @@
 import { EmploymentType } from "@rtc-database/shared/prisma/enums";
-import { excelHeaders } from "@/app/lib/excel";
+import { excelHeaders } from "@rtc-database/shared";
 import { z } from "zod";
 
 export const EmployeeSchema = z.object({

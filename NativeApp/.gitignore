@@ -29,5 +29,3 @@ dist-electron
 dist
 release-builds
 electron/fingerprint.txt
-
-src/generated

@@ -11,7 +11,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import { signIn } from "../lib/authClient";
+import { signIn } from "../../lib/authClient";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -20,6 +20,7 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [darkMode, setDarkMode] = useState(isDarkMode());
   const cardVariants = {
@@ -53,28 +54,6 @@ const Login: React.FC = () => {
     };
   }, []);
 
-  const [rememberMe, setRememberMe] = useState<boolean>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        return localStorage.getItem("rememberMe") === "true";
-      }
-    } catch {
-      /* ignore */
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined" && rememberMe) {
-        const remembered = localStorage.getItem("rememberedEmail") || "";
-        if (remembered) setEmail(remembered);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [rememberMe]);
-
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
 
@@ -103,6 +82,7 @@ const Login: React.FC = () => {
         const { data, error: signInError } = await signIn.email({
           email,
           password,
+          rememberMe,
         });
 
         if (signInError) {
@@ -135,17 +115,6 @@ const Login: React.FC = () => {
       // small delay to let overlay settle
       await new Promise((r) => setTimeout(r, 120));
 
-      // reset attempts on successful sign in
-
-      if (typeof window !== "undefined") {
-        if (rememberMe) {
-          localStorage.setItem("rememberMe", "true");
-          localStorage.setItem("rememberedEmail", email);
-        } else {
-          localStorage.removeItem("rememberMe");
-          localStorage.removeItem("rememberedEmail");
-        }
-      }
       router.push("/user/dashboard");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -405,17 +374,7 @@ shadow-xl
                 type="checkbox"
                 className="checkbox"
                 checked={rememberMe}
-                onChange={(e) => {
-                  const v = e.target.checked;
-                  setRememberMe(v);
-                  try {
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem("rememberMe", String(v));
-                      if (v) localStorage.setItem("rememberedEmail", email);
-                      else localStorage.removeItem("rememberedEmail");
-                    }
-                  } catch {}
-                }}
+                onChange={(e) => setRememberMe(e.target.checked)}
               />
               <label htmlFor="remember" className="text-sm cursor-pointer">
                 Remember me

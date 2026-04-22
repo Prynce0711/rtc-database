@@ -2,11 +2,10 @@ import { PopupProvider, ToastProvider } from "@rtc-database/shared";
 import type { Metadata } from "next";
 import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
-import SessionProvider from "./components/SessionProvider";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
 import "./globals.css";
 import SocketProvider from "./lib/socket/SocketProvider";
-import SyncProvider from "./lib/sync/SyncProvider";
+import SessionProvider from "./lib/sync/SessionProvider";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -37,9 +36,7 @@ export default async function RootLayout({
         <PopupProvider>
           <ToastProvider>
             <SessionProvider>
-              <SocketProvider>
-                <SyncProvider>{children}</SyncProvider>
-              </SocketProvider>
+              <SocketProvider>{children}</SocketProvider>
             </SessionProvider>
           </ToastProvider>
         </PopupProvider>

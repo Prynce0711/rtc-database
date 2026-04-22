@@ -1,6 +1,7 @@
 import "server-only";
 
-import { getSystemSettings } from "@/app/components/Settings/SettingsActions";
+import { prisma } from "@/app/lib/prisma";
+import { loadSystemSettings } from "@/app/lib/systemSettings";
 import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
 import { access, mkdir, readdir, rm } from "node:fs/promises";
@@ -130,19 +131,19 @@ let accountSetupStartedAt = 0;
 const pendingIdentityRefreshRemotes = new Set<string>();
 const lastIdentityRefreshAttemptAt = new Map<string, number>();
 const NOTARIAL_RESTIC_SOURCE_CACHE_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "data",
   "backup",
   "notarial-restic-source-cache",
 );
 const NOTARIAL_RESTIC_CACHE_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "data",
   "backup",
   "restic-cache",
 );
 const RCLONE_EXECUTABLE_FOR_RESTIC = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "node_modules",
   "rclone.js",
   "bin",
@@ -1267,6 +1268,24 @@ async function runBackup(
     throw new Error(`Database file not found: ${sourcePath}`);
   }
 
+  try {
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+  } catch (error) {
+    throw new Error(
+      `Failed to run SQLite WAL checkpoint before backup: ${formatBackupError(error)}`,
+    );
+  }
+
+  const sourcePaths = [sourcePath];
+
+  for (const suffix of ["-wal", "-shm"]) {
+    const sidecarPath = `${sourcePath}${suffix}`;
+
+    if (await pathExists(sidecarPath)) {
+      sourcePaths.push(sidecarPath);
+    }
+  }
+
   backupRunning = true;
   cancelBackupRequested = false;
 
@@ -1282,7 +1301,6 @@ async function runBackup(
     trigger === "manual" || !intervalDefinition
       ? MANUAL_BACKUP_FOLDER
       : intervalDefinition.folderName;
-  const backupFileName = path.basename(sourcePath);
 
   current = await writeBackupConfigFile({
     ...current,
@@ -1300,48 +1318,45 @@ async function runBackup(
 
     for (const remoteName of activeCaseSelectedRemoteNames) {
       const remoteBasePath = getRemoteBasePath(current, remoteName);
-      const destinationRelativePath = joinRemotePath(
-        remoteBasePath,
-        current.remotePath,
-        targetFolder,
-        backupFileName,
-      );
-      const destination = buildRcloneDestination(
-        remoteName,
-        destinationRelativePath,
-      );
+      for (const sourceFilePath of sourcePaths) {
+        const backupFileName = path.basename(sourceFilePath);
+        const destinationRelativePath = joinRemotePath(
+          remoteBasePath,
+          current.remotePath,
+          targetFolder,
+          backupFileName,
+        );
+        const destination = buildRcloneDestination(
+          remoteName,
+          destinationRelativePath,
+        );
 
-      appendBackupLog(
-        "info",
-        `Syncing ${runLabel.toLowerCase()} to remote ${remoteName}: ${destination}`,
-      );
+        appendBackupLog(
+          "info",
+          `Syncing ${runLabel.toLowerCase()} file ${backupFileName} to remote ${remoteName}: ${destination}`,
+        );
 
-      const output = await runRcloneCommand(
-        ["copyto", sourcePath, destination],
-        {
-          "check-first": true,
-        },
-        {
-          trackAsActiveBackup: true,
-        },
-      );
+        const output = await runRcloneCommand(
+          ["copyto", sourceFilePath, destination],
+          {
+            "check-first": true,
+          },
+          {
+            trackAsActiveBackup: true,
+          },
+        );
 
-      if (output) {
-        remoteOutputs.push(`${remoteName}: ${output}`);
+        if (output) {
+          remoteOutputs.push(`${remoteName}/${backupFileName}: ${output}`);
+        }
       }
 
       appendBackupLog("info", `Completed sync to remote ${remoteName}.`);
     }
 
     if (activeNotarialSelectedRemoteNames.length > 0) {
-      const settingsResult = await getSystemSettings();
-      if (!settingsResult.success) {
-        throw new Error(
-          `Failed to load system settings for notarial sync: ${settingsResult.error}`,
-        );
-      }
-
-      const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+      const settings = await loadSystemSettings();
+      const garageBucket = (settings.garageBucket ?? "").trim();
       if (!garageBucket) {
         throw new Error(
           "Garage bucket is not configured. Set Garage bucket in System Settings to run notarial sync.",
@@ -2062,14 +2077,7 @@ export async function listBackupRemotes(): Promise<BackupRemote[]> {
 export async function syncNotarialRemote(): Promise<void> {
   await ensureBackupArtifacts();
 
-  const settingsResult = await getSystemSettings();
-  if (!settingsResult.success) {
-    throw new Error(
-      `Failed to load system settings for notarial sync: ${settingsResult.error}`,
-    );
-  }
-
-  const settings = settingsResult.result;
+  const settings = await loadSystemSettings();
 
   // Check if Garage is fully configured
   if (
@@ -2369,13 +2377,12 @@ export async function restoreNotarialSnapshot(
 
   await ensureBackupArtifacts();
 
-  const [current, configMap, settingsResult, availableSnapshots] =
-    await Promise.all([
-      readBackupConfigFile(),
-      getRemoteConfigMap(),
-      getSystemSettings(),
-      listNotarialSnapshots(normalizedName),
-    ]);
+  const [current, configMap, settings, availableSnapshots] = await Promise.all([
+    readBackupConfigFile(),
+    getRemoteConfigMap(),
+    loadSystemSettings(),
+    listNotarialSnapshots(normalizedName),
+  ]);
 
   if (!configMap.has(normalizedName)) {
     throw new Error(`Remote ${normalizedName} was not found.`);
@@ -2387,13 +2394,7 @@ export async function restoreNotarialSnapshot(
     );
   }
 
-  if (!settingsResult.success) {
-    throw new Error(
-      `Failed to load system settings for notarial restore: ${settingsResult.error}`,
-    );
-  }
-
-  const garageBucket = (settingsResult.result.garageBucket ?? "").trim();
+  const garageBucket = (settings.garageBucket ?? "").trim();
   if (!garageBucket) {
     throw new Error(
       "Garage bucket is not configured. Set Garage bucket in System Settings before restoring notarial snapshots.",
@@ -2428,7 +2429,7 @@ export async function restoreNotarialSnapshot(
   );
   const resticEnv = buildResticCommandEnv();
   const restoreTargetPath = path.join(
-    process.cwd(),
+    /*turbopackIgnore: true*/ process.cwd(),
     "data",
     "backup",
     "notarial-restore",

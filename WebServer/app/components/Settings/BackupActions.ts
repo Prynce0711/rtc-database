@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { validateSession } from "@/app/lib/authActions";
 import {
@@ -16,14 +16,14 @@ import {
   startBackupScheduler,
   updateBackupConfig,
   updateBackupRemote,
-  type BackupConfig,
-  type BackupImportSourceOption,
-  type BackupIntervalOption,
-  type BackupLogEntry,
-  type BackupProviderOption,
-  type BackupRemote,
-  type BackupRemoteStorageUsage,
-  type NotarialSnapshot,
+  BackupConfig,
+  BackupImportSourceOption,
+  BackupIntervalOption,
+  BackupLogEntry,
+  BackupProviderOption,
+  BackupRemote,
+  BackupRemoteStorageUsage,
+  NotarialSnapshot,
 } from "@/app/lib/backup/backupScheduler";
 import {
   ONEDRIVE_CLEAR_DRIVE_ID_SENTINEL,

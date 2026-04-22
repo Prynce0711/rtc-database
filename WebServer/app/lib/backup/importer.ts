@@ -49,7 +49,7 @@ interface BackupIntervalDefinitionLike {
 }
 
 const DEFAULT_PRISMA_SCHEMA_PATH = path.join(
-  process.cwd(),
+  /*turbopackIgnore: true*/ process.cwd(),
   "prisma",
   "schema.prisma",
 );
@@ -61,6 +61,50 @@ const DEFAULT_PRE_IMPORT_BACKUP_PATH = path.join(
   BACKUP_DATA_DIR,
   "dev.db.pre-import.bak",
 );
+const SQLITE_DATABASE_SIDECAR_SUFFIXES = ["-wal", "-shm"] as const;
+
+function buildSqliteSidecarPath(basePath: string, suffix: string): string {
+  return `${basePath}${suffix}`;
+}
+
+async function removeFileIfExists(filePath: string): Promise<void> {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function removeSqliteSidecarFiles(basePath: string): Promise<void> {
+  for (const suffix of SQLITE_DATABASE_SIDECAR_SUFFIXES) {
+    await removeFileIfExists(buildSqliteSidecarPath(basePath, suffix));
+  }
+}
+
+async function copyOptionalSqliteSidecarFiles(
+  sourceBasePath: string,
+  destinationBasePath: string,
+): Promise<void> {
+  for (const suffix of SQLITE_DATABASE_SIDECAR_SUFFIXES) {
+    const sourcePath = buildSqliteSidecarPath(sourceBasePath, suffix);
+    const destinationPath = buildSqliteSidecarPath(destinationBasePath, suffix);
+
+    try {
+      await copyFile(sourcePath, destinationPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+        await removeFileIfExists(destinationPath);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+}
 
 export interface BackupImporterDeps {
   fixedBackupSourcePath: string;
@@ -296,11 +340,10 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
     return deps.getIntervalDefinition(source).folderName;
   };
 
-  const doesRemoteBackupExist = async (
+  const listRemoteBackupFiles = async (
     remoteName: string,
     remoteFolderRelativePath: string,
-    backupFileName: string,
-  ): Promise<boolean> => {
+  ): Promise<Set<string>> => {
     const remoteFolder = deps.buildRcloneDestination(
       remoteName,
       remoteFolderRelativePath,
@@ -322,12 +365,12 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
         .map((line) => line.trim().replace(/\/+$/g, ""))
         .filter((line) => !!line);
 
-      return files.includes(backupFileName);
+      return new Set(files);
     } catch (error) {
       const message = deps.formatBackupError(error);
 
       if (deps.isRemotePathNotFoundError(message)) {
-        return false;
+        return new Set<string>();
       }
 
       throw new Error(message);
@@ -348,6 +391,10 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
 
     try {
       await copyFile(tempFilePath, deps.fixedBackupSourcePath);
+      await copyOptionalSqliteSidecarFiles(
+        tempFilePath,
+        deps.fixedBackupSourcePath,
+      );
     } catch (error) {
       const message = deps.formatBackupError(error);
       const lowered = message.toLowerCase();
@@ -403,13 +450,12 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       remoteSourceRelativePath,
     );
 
-    const backupExists = await doesRemoteBackupExist(
+    const remoteBackupFileNames = await listRemoteBackupFiles(
       normalizedRemoteName,
       remoteSourceFolderRelativePath,
-      backupFileName,
     );
 
-    if (!backupExists) {
+    if (!remoteBackupFileNames.has(backupFileName)) {
       throw new Error(
         `Backup does not exist in ${normalizedRemoteName}:${remoteSourceRelativePath}.`,
       );
@@ -440,6 +486,38 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
           trackAsActiveBackup: true,
         },
       );
+
+      for (const sidecarSuffix of SQLITE_DATABASE_SIDECAR_SUFFIXES) {
+        const sidecarFileName = `${backupFileName}${sidecarSuffix}`;
+        const tempSidecarPath = buildSqliteSidecarPath(
+          importTempDbPath,
+          sidecarSuffix,
+        );
+
+        if (!remoteBackupFileNames.has(sidecarFileName)) {
+          await removeFileIfExists(tempSidecarPath);
+          continue;
+        }
+
+        const remoteSidecarRelativePath = deps.joinRemotePath(
+          remoteSourceFolderRelativePath,
+          sidecarFileName,
+        );
+        const remoteSidecarSource = deps.buildRcloneDestination(
+          normalizedRemoteName,
+          remoteSidecarRelativePath,
+        );
+
+        await deps.runRcloneCommand(
+          ["copyto", remoteSidecarSource, tempSidecarPath],
+          {
+            "check-first": true,
+          },
+          {
+            trackAsActiveBackup: true,
+          },
+        );
+      }
 
       await applyImportedDatabaseFromTempFile(importTempDbPath);
 
@@ -479,7 +557,8 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       deps.setBackupRunning(false);
 
       try {
-        await unlink(importTempDbPath);
+        await removeFileIfExists(importTempDbPath);
+        await removeSqliteSidecarFiles(importTempDbPath);
       } catch {
         // Ignore temp cleanup failures.
       }
@@ -494,7 +573,7 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       throw new Error("Local backup file path is required.");
     }
 
-    const resolvedPath = path.resolve(trimmedPath);
+    const resolvedPath = path.resolve(/*turbopackIgnore: true*/ trimmedPath);
     if (resolvedPath === deps.fixedBackupSourcePath) {
       throw new Error("Selected file is already the active database.");
     }
@@ -531,6 +610,7 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
 
     try {
       await copyFile(resolvedPath, importTempDbPath);
+      await copyOptionalSqliteSidecarFiles(resolvedPath, importTempDbPath);
       await applyImportedDatabaseFromTempFile(importTempDbPath);
 
       const nowIso = new Date().toISOString();
@@ -566,7 +646,8 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       deps.setBackupRunning(false);
 
       try {
-        await unlink(importTempDbPath);
+        await removeFileIfExists(importTempDbPath);
+        await removeSqliteSidecarFiles(importTempDbPath);
       } catch {
         // Ignore temp cleanup failures.
       }
@@ -604,6 +685,7 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
     );
 
     try {
+      await removeSqliteSidecarFiles(importTempDbPath);
       await writeFile(importTempDbPath, fileBytes);
       await applyImportedDatabaseFromTempFile(importTempDbPath);
 
@@ -640,7 +722,8 @@ export function createBackupImporter(deps: BackupImporterDeps): BackupImporter {
       deps.setBackupRunning(false);
 
       try {
-        await unlink(importTempDbPath);
+        await removeFileIfExists(importTempDbPath);
+        await removeSqliteSidecarFiles(importTempDbPath);
       } catch {
         // Ignore temp cleanup failures.
       }

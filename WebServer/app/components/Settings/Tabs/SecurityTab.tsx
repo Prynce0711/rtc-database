@@ -1,10 +1,11 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { usePopup } from "@rtc-database/shared";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { FiEye, FiEyeOff, FiInfo, FiShield } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
+import { FiEye, FiEyeOff, FiRefreshCcw } from "react-icons/fi";
 import { getSystemSettings, updateSystemSettings } from "../SettingsActions";
 import {
   InputField,
@@ -14,17 +15,52 @@ import {
   SettingsRow,
   Toggle,
 } from "../SettingsPrimitives";
+import Disable2FAPopup from "./Security/Disable2FAPopup";
+import Enable2FAPopup from "./Security/Enable2FAPopup";
+import RegenerateBackupCodesPopup from "./Security/RegenerateBackupCodesPopup";
 
 const SecurityTab = ({ role }: { role: string }) => {
   const popup = usePopup();
+  const session = useSession();
   const [loadingPolicy, setLoadingPolicy] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
-  const [twoFA, setTwoFA] = useState(false);
+  const [twoFA, setTwoFA] = useState(
+    session?.data?.user?.twoFactorEnabled || false,
+  );
+  const [showEnable2FAPopup, setShowEnable2FAPopup] = useState(false);
+  const [showDisable2FAPopup, setShowDisable2FAPopup] = useState(false);
+  const [showRegenerateBackupCodesPopup, setShowRegenerateBackupCodesPopup] =
+    useState(false);
   const [sessionTimeout, setSessionTimeout] = useState("THIRTY_MINUTES");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordExpiry, setPasswordExpiry] = useState("NEVER");
   const [lockoutThreshold, setLockoutThreshold] = useState("NONE");
   const isAdmin = role === Roles.ADMIN;
+
+  const handleTwoFAToggle = (value: boolean) => {
+    if (value) {
+      setShowEnable2FAPopup(true);
+      return;
+    }
+
+    if (twoFA) {
+      setShowDisable2FAPopup(true);
+    }
+  };
+
+  const handle2FAEnabled = () => {
+    setTwoFA(true);
+    popup.showSuccess("Two-Factor Authentication enabled.");
+  };
+
+  const handle2FADisabled = () => {
+    setTwoFA(false);
+    popup.showSuccess("Two-Factor Authentication disabled.");
+  };
+
+  const handleBackupCodesRegenerated = () => {
+    popup.showSuccess("Backup codes regenerated successfully.");
+  };
 
   useEffect(() => {
     if (!isAdmin) {
@@ -119,33 +155,55 @@ const SecurityTab = ({ role }: { role: string }) => {
           label="Enable 2FA"
           description="Require a code from your authenticator app on login."
         >
-          <Toggle checked={twoFA} onChange={setTwoFA} />
+          <Toggle checked={twoFA} onChange={handleTwoFAToggle} />
         </SettingsRow>
-        {twoFA && (
+        {twoFA && !showEnable2FAPopup && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="px-7 pb-5"
           >
-            <div className="flex items-start gap-4 rounded-xl bg-info/6 border border-info/12 p-5">
-              <FiInfo size={18} className="text-info shrink-0 mt-0.5" />
+            <div className="rounded-xl bg-success/8 border border-success/20 p-5">
               <div>
-                <p className="text-[13px] font-semibold text-info">
-                  Setup Required
+                <p className="text-[13px] font-semibold text-success">
+                  2FA is enabled
                 </p>
                 <p className="text-[12px] text-base-content/45 mt-1 leading-relaxed">
-                  Scan the QR code with Google Authenticator or Authy to
-                  complete setup.
+                  Your account now requires a one-time code from your
+                  authenticator app when signing in.
                 </p>
-                <button className="btn btn-sm btn-outline btn-info mt-3 gap-1.5 rounded-lg">
-                  <FiShield size={13} /> Generate QR Code
+                <button
+                  type="button"
+                  onClick={() => setShowRegenerateBackupCodesPopup(true)}
+                  className="btn btn-xs btn-outline rounded-lg mt-3 gap-1.5"
+                >
+                  <FiRefreshCcw size={12} />
+                  Regenerate Backup Codes
                 </button>
               </div>
             </div>
           </motion.div>
         )}
       </SettingsCard>
+
+      <Enable2FAPopup
+        open={showEnable2FAPopup}
+        onClose={() => setShowEnable2FAPopup(false)}
+        onEnabled={handle2FAEnabled}
+      />
+
+      <Disable2FAPopup
+        open={showDisable2FAPopup}
+        onClose={() => setShowDisable2FAPopup(false)}
+        onDisabled={handle2FADisabled}
+      />
+
+      <RegenerateBackupCodesPopup
+        open={showRegenerateBackupCodesPopup}
+        onClose={() => setShowRegenerateBackupCodesPopup(false)}
+        onRegenerated={handleBackupCodesRegenerated}
+      />
 
       {isAdmin && (
         <SettingsCard
@@ -218,4 +276,3 @@ const SecurityTab = ({ role }: { role: string }) => {
 };
 
 export default SecurityTab;
-

@@ -129,6 +129,24 @@ export type AdaptiveImageProps = Omit<
 
 type ImageComponent = React.ComponentType<AdaptiveImageProps>;
 
+const resolveAdaptiveImageSrc = (src: string): string => {
+  if (typeof window === "undefined") {
+    return src;
+  }
+
+  // In packaged Electron (file://), root-relative paths like /logo.webp resolve
+  // to the filesystem root and 404. Convert to dist-relative URLs instead.
+  if (
+    window.location.protocol === "file:" &&
+    src.startsWith("/") &&
+    !src.startsWith("//")
+  ) {
+    return `.${src}`;
+  }
+
+  return src;
+};
+
 const FallbackImage: ImageComponent = ({
   src,
   alt,
@@ -152,7 +170,7 @@ const FallbackImage: ImageComponent = ({
 
   return (
     <img
-      src={src}
+      src={resolveAdaptiveImageSrc(src)}
       alt={alt}
       width={fill ? undefined : width}
       height={fill ? undefined : height}

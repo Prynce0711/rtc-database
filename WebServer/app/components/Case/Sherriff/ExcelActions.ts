@@ -1,36 +1,34 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
-import {
-  parseSheriffCaseNumber,
-  syncSheriffCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
-import {
-  ExportExcelData,
-  getExcelHeaderMap,
-  isMappedRowEmpty,
-  normalizeRowBySchema,
-  ProcessExcelMeta,
-  processExcelUpload,
-  QUERY_CHUNK_SIZE,
-  UploadExcelResult,
-  valuesAreEqual,
-} from "@/app/lib/excel";
 import { prisma } from "@/app/lib/prisma";
-import { splitCaseDataBySchema } from "@/app/lib/PrismaHelper";
 import Roles from "@/app/lib/Roles";
 import {
   ActionResult,
   BaseCaseSchema,
   Case,
   CaseType,
+  ExportExcelData,
+  getExcelHeaderMap,
   getSchemaFieldKeys,
+  isMappedRowEmpty,
   LogAction,
+  normalizeRowBySchema,
   Prisma,
+  ProcessExcelMeta,
+  processExcelUpload,
+  QUERY_CHUNK_SIZE,
   SheriffCase,
   SheriffCaseData,
   SheriffCaseSchema,
+  splitCaseDataBySchema,
+  UploadExcelResult,
+  valuesAreEqual,
 } from "@rtc-database/shared";
+import {
+  parseSheriffCaseNumber,
+  syncSheriffCaseCounterToAtLeast,
+} from "@rtc-database/shared/lib/caseNumbering";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
@@ -297,6 +295,8 @@ export async function uploadSheriffExcel(
     } else {
       console.error("ERROR Import failed:", result.error);
     }
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
 
     return result;
   } catch (error) {

@@ -9,6 +9,7 @@
     "./prisma/*": "./src/generated/prisma/*.ts",
     "./prisma/internal/*": "./src/generated/prisma/internal/*.ts",
     "./prisma/models/*": "./src/generated/prisma/models/*.ts",
+    "./lib/caseNumbering": "./src/lib/caseNumbering.ts",
     "./src": "./src/index.ts",
     "./src/*": "./src/*.ts"
   },

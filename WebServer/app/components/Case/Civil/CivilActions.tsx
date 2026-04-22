@@ -1,27 +1,25 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
+import Roles from "@/app/lib/Roles";
+import {
+  ActionResult,
+  buildCaseFind,
+  CivilCaseData,
+  CivilCaseSchema,
+  CivilCasesFilterOptions,
+  CivilCaseStats,
+  DEFAULT_PAGE_SIZE,
+  PaginatedResult,
+  splitCaseDataBySchema,
+} from "@rtc-database/shared";
 import {
   formatAutoCaseNumber,
   getNextCaseNumber,
   parseCaseNumber,
   syncCaseCounterToAtLeast,
-} from "@/app/lib/caseNumbering";
-import { prisma } from "@/app/lib/prisma";
-import {
-  buildCaseFind,
-  DEFAULT_PAGE_SIZE,
-  splitCaseDataBySchema,
-} from "@/app/lib/PrismaHelper";
-import Roles from "@/app/lib/Roles";
-import {
-  ActionResult,
-  CivilCaseData,
-  CivilCaseSchema,
-  CivilCasesFilterOptions,
-  CivilCaseStats,
-  PaginatedResult,
-} from "@rtc-database/shared";
+} from "@rtc-database/shared/lib/caseNumbering";
 import {
   Case,
   CaseType,

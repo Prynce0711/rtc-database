@@ -1,15 +1,11 @@
 "use client";
 
-import { Sidebar } from "@rtc-database/shared";
+import { CriminalCasePage, Roles } from "@rtc-database/shared";
 import { useEffect, useRef, useState } from "react";
-import {
-  HashRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import criminalCaseAdapter from "./Adapters/CriminalCaseAdapter";
 import "./App.css";
+import NativeSidebar from "./NativeSidebar";
 import SpeederLoader from "./SpeederLoader";
 
 interface BackendInfo {
@@ -43,37 +39,6 @@ const parseInitialOfflineReason = (): AutoOfflineReason => {
   return reason === "disconnect" ? "disconnected" : null;
 };
 
-const NativeSidebarShell = () => {
-  const location = useLocation();
-
-  return (
-    <Sidebar
-      session={{
-        user: {
-          name: "Native User",
-          role: "admin",
-        },
-      }}
-      updateDarkMode={(newTheme) => {
-        if (typeof document !== "undefined") {
-          document.documentElement.setAttribute("data-theme", newTheme);
-        }
-        return { success: true };
-      }}
-      onSignOut={() => {
-        if (typeof window !== "undefined") {
-          window.location.hash = "#/login";
-        }
-      }}
-    >
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Native App</h1>
-        <p className="text-sm opacity-70">Current route: {location.pathname}</p>
-      </div>
-    </Sidebar>
-  );
-};
-
 type LocalModeAppProps = {
   availableBackend: BackendInfo | null;
   onReconnect: () => void;
@@ -104,10 +69,21 @@ const LocalModeApp = ({ availableBackend, onReconnect }: LocalModeAppProps) => (
       <Routes>
         <Route path="/" element={<Navigate to="/user/dashboard" replace />} />
         <Route
+          path="/user/cases/criminal"
+          element={
+            <NativeSidebar>
+              <CriminalCasePage
+                role={Roles.USER}
+                adapter={criminalCaseAdapter}
+              />
+            </NativeSidebar>
+          }
+        />
+        <Route
           path="/login"
           element={<Navigate to="/user/dashboard" replace />}
         />
-        <Route path="/user/*" element={<NativeSidebarShell />} />
+        <Route path="/user/*" element={<NativeSidebar />} />
         <Route path="*" element={<Navigate to="/user/dashboard" replace />} />
       </Routes>
     </HashRouter>

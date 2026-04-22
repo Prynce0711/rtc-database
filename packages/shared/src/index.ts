@@ -107,8 +107,10 @@ export { default as ToastProvider } from "./Toast/ToastProvider";
 export * from "./generated/prisma/browser";
 export * from "./generated/prisma/enums";
 
+export * from "./lib/electron/channels";
 export * from "./lib/excel";
 export * from "./lib/nextCompat";
+export * from "./lib/PrismaHelper";
 export { default as Roles } from "./lib/Roles";
 export * from "./lib/sync";
 

@@ -1,15 +1,15 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { prisma } from "@/app/lib/prisma";
 import {
+  ActionResult,
   ExportExcelData,
   isMappedRowEmpty,
   processExcelUpload,
   UploadExcelResult,
   valuesAreEqual,
-} from "@/app/lib/excel";
-import { prisma } from "@/app/lib/prisma";
-import { ActionResult } from "@rtc-database/shared";
+} from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import {
   MTCJudgementRow,
@@ -272,7 +272,7 @@ export async function uploadMunicipalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return await processExcelUpload<
+    const result = await processExcelUpload<
       MTCJudgementRow,
       ReturnType<typeof getMtcCells>
     >({
@@ -368,6 +368,10 @@ export async function uploadMunicipalJudgementExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
+    return result;
   } catch (error) {
     console.error("Municipal judgement Excel upload failed:", error);
     return { success: false, error: "Municipal judgement Excel upload failed" };
@@ -437,7 +441,7 @@ export async function uploadRegionalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return await processExcelUpload<
+    const result = await processExcelUpload<
       RTCJudgementRow,
       ReturnType<typeof getRtcCells>
     >({
@@ -547,6 +551,10 @@ export async function uploadRegionalJudgementExcel(
         return { ids: inserted.map((item) => item.id), count: inserted.length };
       },
     });
+
+    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
+
+    return result;
   } catch (error) {
     console.error("Regional judgement Excel upload failed:", error);
     return { success: false, error: "Regional judgement Excel upload failed" };

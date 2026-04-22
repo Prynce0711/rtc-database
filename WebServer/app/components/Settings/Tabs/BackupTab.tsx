@@ -1,6 +1,11 @@
 "use client";
 
-import { Collapse, ModalBase, usePopup } from "@rtc-database/shared";
+import {
+  Collapse,
+  IPC_CHANNELS,
+  ModalBase,
+  usePopup,
+} from "@rtc-database/shared";
 import {
   useCallback,
   useEffect,
@@ -598,7 +603,9 @@ const BackupTab = () => {
 
   const handleRunBackupNow = async () => {
     setRunningBackup(true);
-    popup.showLoading("Running backup now...");
+    popup.showSuccess(
+      "Started backup. This may take a while depending on the size of your database and the speed of your backup destination. You can monitor the progress in the backup logs below.",
+    );
 
     const result = await runBackupNowAction();
     setRunningBackup(false);
@@ -609,7 +616,6 @@ const BackupTab = () => {
     }
 
     applyDashboardData(result.result);
-    popup.showSuccess("Backup completed.");
   };
 
   const handleCancelBackup = async () => {
@@ -731,7 +737,7 @@ const BackupTab = () => {
       return null;
     }
 
-    const response = (await ipc.invoke("rclone:authorize-provider", {
+    const response = (await ipc.invoke(IPC_CHANNELS.RCLONE_AUTHORIZE_PROVIDER, {
       provider: normalizedProvider,
     })) as ElectronAuthorizeProviderResult;
 

@@ -72,3 +72,6 @@ RAFFLE:
 TBA
 
 on update table check for exact match and unchanged
+
+
+dont load all mesasges at once do lazy loading

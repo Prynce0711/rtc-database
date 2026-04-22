@@ -1,7 +1,7 @@
 "use server";
 
 import nodemailer from "nodemailer";
-import { getSystemSettings } from "../components/Settings/SettingsActions";
+import { loadSystemSettings } from "@/app/lib/systemSettings";
 
 function escapeHtml(input: string): string {
   return input
@@ -18,13 +18,7 @@ export async function sendEmail(
   text: string,
 ): Promise<boolean> {
   try {
-    const result = await getSystemSettings();
-    if (!result.success) {
-      console.error("Failed to retrieve system settings:", result.error);
-      return false;
-    }
-
-    const systemSettings = result.result;
+    const systemSettings = await loadSystemSettings();
 
     if (
       !systemSettings.smtpHost ||

@@ -1,6 +1,6 @@
 "use client";
 
-import { getHeaderRowInfo } from "@/app/lib/excel";
+import { getHeaderRowInfo } from "@rtc-database/shared";
 import React, {
   useCallback,
   useEffect,
