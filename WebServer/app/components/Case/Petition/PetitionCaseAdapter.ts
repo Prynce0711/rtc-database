@@ -1,3 +1,5 @@
+"use client";
+
 import type { PetitionCaseAdapter } from "@rtc-database/shared";
 import { doesCaseExist, getCases, getCaseStats } from "../BaseCaseActions";
 import { exportPetitionsExcel, uploadPetitionExcel } from "./ExcelActions";

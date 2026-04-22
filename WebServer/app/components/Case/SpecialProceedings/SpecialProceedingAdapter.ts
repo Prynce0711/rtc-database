@@ -1,3 +1,5 @@
+"use client";
+
 import type { SpecialProceedingAdapter } from "@rtc-database/shared";
 import { doesCaseExist, getCases, getCaseStats } from "../BaseCaseActions";
 import {

@@ -1,6 +1,6 @@
 "use client";
 
-import { civilCaseAdapter } from "@/app/components/Case/Civil/CivilCaseAdapter";
+import civilCaseAdapter from "@/app/components/Case/Civil/CivilCaseAdapter";
 import { useSession } from "@/app/lib/authClient";
 import { CivilCasePage, Roles } from "@rtc-database/shared";
 import { redirect } from "next/navigation";
