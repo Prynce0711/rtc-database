@@ -6,8 +6,6 @@ import { getEmployees } from "@/app/components/Employee/EmployeeActions";
 import type { Employee, User } from "@rtc-database/shared/prisma/browser";
 import {
   AlertTriangle,
-  BarChart3,
-  Download,
   FileText,
   Info,
   Lock,
@@ -63,7 +61,6 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
   const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [accounts, setAccounts] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview">("overview");
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const getCssVar = (name: string) =>
@@ -111,7 +108,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
     const detained = base.detainedCases;
     const pendingRaffle = base.pendingCases;
     const casesThisMonth = base.recentlyFiled;
-    const caseGrowth = 0; // Not available from aggregated stats; keeping neutral.
+    const caseGrowth = 0;
 
     const activeAccounts = accounts.filter((a) => a.status === "ACTIVE").length;
     const inactiveAccounts = accounts.filter(
@@ -224,6 +221,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
       ...data,
     }));
   }, [cases]);
+
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
@@ -347,82 +345,19 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                         Last sync: {new Date().toLocaleTimeString()}
                       </span>
                     </p>
-
-                    {/* Hover instruction note */}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <div
-                      className="relative flex p-1 bg-base-200 border border-base-300 w-full sm:w-auto"
-                      style={{ borderRadius: "var(--radius-pill)" }}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      className="btn btn-primary gap-2 flex-1 sm:flex-initial"
+                      style={{
+                        borderRadius: "var(--radius-field)",
+                        transition: "var(--transition-base)",
+                      }}
                     >
-                      {/* Sliding indicator */}
-                      <div
-                        className="absolute top-1 bottom-1 bg-base-100 transition-all"
-                        style={{
-                          borderRadius: "var(--radius-pill)",
-                          boxShadow: "var(--shadow-soft)",
-                          transitionDuration: "var(--transition-base)",
-                          width: "calc(100% - 4px)",
-                          left: "4px",
-                        }}
-                      />
-
-                      {[
-                        { id: "overview", label: "Overview", icon: BarChart3 },
-                      ].map((tab) => {
-                        const Icon = tab.icon;
-
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`
-          relative z-10 flex items-center gap-2 px-4 py-1.5 flex-1
-          font-semibold text-sm
-          ${
-            activeTab === tab.id
-              ? "text-primary"
-              : "text-muted hover:text-base-content"
-          }
-        `}
-                          >
-                            <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-
-                            <span className="hidden sm:inline">
-                              {tab.label}
-                            </span>
-
-                            <span className="sm:hidden text-xs">
-                              {tab.label.slice(0, 4)}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <button
-                        className="btn btn-outline btn-primary gap-2 flex-1 sm:flex-initial"
-                        style={{
-                          borderRadius: "var(--radius-field)",
-                          transition: "var(--transition-base)",
-                        }}
-                      >
-                        <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Export</span>
-                      </button>
-                      <button
-                        className="btn btn-primary gap-2 flex-1 sm:flex-initial"
-                        style={{
-                          borderRadius: "var(--radius-field)",
-                          transition: "var(--transition-base)",
-                        }}
-                      >
-                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Refresh</span>
-                      </button>
-                    </div>
+                      <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">Refresh</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -430,7 +365,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
 
             {/* ALERTS */}
             {alerts.length > 0 && (
-              <section className={`space-y-3`}>
+              <section className="space-y-3">
                 {alerts.map((alert, idx) => (
                   <div
                     key={alert.id}
@@ -470,274 +405,251 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
               </section>
             )}
 
-            {/* OVERVIEW TAB */}
-            {activeTab === "overview" && (
-              <div
-                className="animate-fade-in"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "var(--space-section-gap)",
-                }}
-              >
-                {/* PRIMARY KPI CARDS */}
-                <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
-                  {[
-                    {
-                      label: "Total Cases",
-                      value: stats.totalCases.toLocaleString(),
-                      subtitle: `${stats.casesThisMonth.toLocaleString()} filed this month`,
-                      icon: Scale,
-                      color: "primary",
-                      trend: stats.caseGrowth,
-                      delay: 0,
-                    },
-                    {
-                      label: "Active Cases",
-                      value: stats.activeCases.toLocaleString(),
-                      subtitle: `${stats.pendingRaffle.toLocaleString()} pending raffle`,
-                      icon: FileText,
-                      color: "primary",
-                      delay: 100,
-                    },
-                    {
-                      label: "In Detention",
-                      value: stats.detained.toLocaleString(),
-                      subtitle: `${stats.detainedPercentage.toFixed(1)}% of total`,
-                      icon: Lock,
-                      color: "primary",
-                      delay: 200,
-                    },
-                    {
-                      label: "Active Users",
-                      value: stats.activeAccounts.toLocaleString(),
-                      subtitle: `${stats.inactiveAccounts.toLocaleString()} inactive`,
-                      icon: Shield,
-                      color: "primary",
-                      delay: 300,
-                    },
-                  ].map((card, idx) => (
+            {/* DASHBOARD CONTENT */}
+            <div
+              className="animate-fade-in"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-section-gap)",
+              }}
+            >
+              {/* PRIMARY KPI CARDS */}
+              <section className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 text-center">
+                {[
+                  {
+                    label: "Total Cases",
+                    value: stats.totalCases.toLocaleString(),
+                    subtitle: `${stats.casesThisMonth.toLocaleString()} filed this month`,
+                    icon: Scale,
+                    color: "primary",
+                    trend: stats.caseGrowth,
+                    delay: 0,
+                  },
+                  {
+                    label: "Active Cases",
+                    value: stats.activeCases.toLocaleString(),
+                    subtitle: `${stats.pendingRaffle.toLocaleString()} pending raffle`,
+                    icon: FileText,
+                    color: "primary",
+                    delay: 100,
+                  },
+                  {
+                    label: "In Detention",
+                    value: stats.detained.toLocaleString(),
+                    subtitle: `${stats.detainedPercentage.toFixed(1)}% of total`,
+                    icon: Lock,
+                    color: "primary",
+                    delay: 200,
+                  },
+                  {
+                    label: "Active Users",
+                    value: stats.activeAccounts.toLocaleString(),
+                    subtitle: `${stats.inactiveAccounts.toLocaleString()} inactive`,
+                    icon: Shield,
+                    color: "primary",
+                    delay: 300,
+                  },
+                ].map((card, idx) => (
+                  <div
+                    key={idx}
+                    className={`transform hover:scale-105 ${
+                      isVisible
+                        ? "translate-y-0 opacity-100"
+                        : "translate-y-4 opacity-0"
+                    } card surface-card-hover group`}
+                    style={{
+                      transitionDelay: `${card.delay}ms`,
+                      transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
                     <div
-                      key={idx}
-                      className={`transform hover:scale-105 ${
-                        isVisible
-                          ? "translate-y-0 opacity-100"
-                          : "translate-y-4 opacity-0"
-                      } card surface-card-hover group`}
-                      style={{
-                        transitionDelay: `${card.delay}ms`,
-                        transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
-                      }}
+                      className="card-body relative overflow-hidden"
+                      style={{ padding: "var(--space-card-padding)" }}
                     >
-                      <div
-                        className="card-body relative overflow-hidden"
-                        style={{ padding: "var(--space-card-padding)" }}
-                      >
-                        <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
-                          <card.icon className="h-full w-full" />
-                        </div>
-                        <div className="relative">
-                          <div className={` badge-primary gap-2 mb-3`}>
-                            <span className="font-bold uppercase text-lg">
-                              {card.label}
-                            </span>
-                          </div>
-                          <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
-                            {card.value}
-                          </p>
-                          <p className="text-sm sm:text-base font-semibold text-muted">
-                            {card.subtitle}
-                          </p>
-                          {card.trend !== undefined && card.trend !== 0 && (
-                            <div
-                              className={`mt-3 inline-flex items-center gap-2 px-3 py-1 text-xs font-bold ${
-                                card.trend >= 0
-                                  ? "badge-success-soft"
-                                  : "badge-error-soft"
-                              }`}
-                              style={{ borderRadius: "var(--radius-pill)" }}
-                            >
-                              {card.trend >= 0 ? (
-                                <TrendingUp className="h-3 w-3" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3" />
-                              )}
-                              <span className="font-bold text-xs">
-                                {card.trend >= 0 ? "+" : ""}
-                                {card.trend.toFixed(1)}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                      <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
+                        <card.icon className="h-full w-full" />
                       </div>
-                    </div>
-                  ))}
-                </section>
-
-                {/* CHARTS */}
-
-                {/* 🏛 RTC COMMAND CENTER */}
-                <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
-                  {/* LEFT COLUMN */}
-                  <div className="space-y-6">
-                    {/* REAL CALENDAR */}
-                    <div className="card surface-card-hover">
-                      <div
-                        className="card-body"
-                        style={{ padding: "var(--space-card-padding)" }}
-                      >
-                        <div className="flex justify-between items-center mb-4">
-                          <h2 className="card-title font-black">Calendar</h2>
-
-                          <span className="text-sm font-semibold text-primary">
-                            {currentDate.toLocaleString("default", {
-                              month: "long",
-                              year: "numeric",
-                            })}
+                      <div className="relative">
+                        <div className="badge-primary gap-2 mb-3">
+                          <span className="font-bold uppercase text-lg">
+                            {card.label}
                           </span>
                         </div>
-
-                        {/* WEEK DAYS */}
-                        <div className="grid grid-cols-7 text-xs font-bold text-center mb-3 text-muted">
-                          {[
-                            "Sun",
-                            "Mon",
-                            "Tue",
-                            "Wed",
-                            "Thu",
-                            "Fri",
-                            "Sat",
-                          ].map((d) => (
-                            <div key={d}>{d}</div>
-                          ))}
-                        </div>
-
-                        {/* DAYS GRID */}
-                        <div className="grid grid-cols-7 gap-2 text-center">
-                          {calendarDays.map((day, i) => {
-                            const isToday = day === currentDate.getDate();
-
-                            return (
-                              <div
-                                key={i}
-                                className={`
-                  aspect-square flex items-center justify-center
-                  rounded-xl text-sm font-semibold transition-all
-
-                  ${day ? "cursor-pointer hover:bg-base-200" : "opacity-0"}
-
-                  ${isToday ? "bg-primary text-primary-content shadow-md scale-105" : ""}
-                `}
-                              >
-                                {day}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* EMPLOYEE ANALYTICS */}
-                    <div className="card surface-card-hover">
-                      <div className="card-body">
-                        <h2 className="card-title font-black">
-                          Employee Compliance
-                        </h2>
-
-                        <ResponsiveContainer width="100%" height={220}>
-                          <BarChart
-                            data={[
-                              { name: "Total", value: employees.length },
-                              {
-                                name: "Incomplete",
-                                value: stats.employeesMissing,
-                              },
-                            ]}
+                        <p className="text-4xl sm:text-5xl font-black text-base-content mb-2">
+                          {card.value}
+                        </p>
+                        <p className="text-sm sm:text-base font-semibold text-muted">
+                          {card.subtitle}
+                        </p>
+                        {card.trend !== undefined && card.trend !== 0 && (
+                          <div
+                            className={`mt-3 inline-flex items-center gap-2 px-3 py-1 text-xs font-bold ${
+                              card.trend >= 0
+                                ? "badge-success-soft"
+                                : "badge-error-soft"
+                            }`}
+                            style={{ borderRadius: "var(--radius-pill)" }}
                           >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip content={<CustomTooltip />} />
-
-                            <Bar
-                              dataKey="value"
-                              radius={[8, 8, 0, 0]}
-                              fill={getCssVar("--color-primary")}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
+                            {card.trend >= 0 ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            <span className="font-bold text-xs">
+                              {card.trend >= 0 ? "+" : ""}
+                              {card.trend.toFixed(1)}%
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
+                ))}
+              </section>
 
-                  {/* RECENT ACTIVITY — IMPROVED */}
-                  <div className="lg:col-span-2 card surface-card-hover">
+              {/* 🏛 RTC COMMAND CENTER */}
+              <section className="grid gap-6 sm:gap-8 lg:grid-cols-3">
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
+                  {/* REAL CALENDAR */}
+                  <div className="card surface-card-hover">
                     <div
                       className="card-body"
                       style={{ padding: "var(--space-card-padding)" }}
                     >
-                      <div className="flex justify-between items-center">
-                        <h2 className="card-title text-xl sm:text-2xl font-black">
-                          Recent Activity
-                        </h2>
-
-                        <span className="text-xs text-subtle">
-                          Last 5 system logs
+                      <div className="flex justify-between items-center mb-4">
+                        <h2 className="card-title font-black">Calendar</h2>
+                        <span className="text-sm font-semibold text-primary">
+                          {currentDate.toLocaleString("default", {
+                            month: "long",
+                            year: "numeric",
+                          })}
                         </span>
                       </div>
 
-                      {/* ⭐ 2 COLUMN ACTIVITY GRID */}
-                      <div className="grid md:grid-cols-2 gap-4 mt-5">
-                        {auditLogs.slice(0, 4).map((log) => (
-                          <div
-                            key={log.id}
-                            className="card hover:scale-[1.02]"
-                            style={{
-                              background: "var(--surface-inset)",
-                              transition: "var(--transition-base)",
-                              borderRadius: "var(--radius-sm)",
-                            }}
-                          >
-                            <div className="card-body p-4 flex-row items-start gap-4">
-                              <div className="avatar placeholder bg-primary">
-                                <div className="w-10 h-10 rounded-lg text-primary-content">
-                                  <RefreshCw className="h-5 w-5" />
-                                </div>
-                              </div>
+                      {/* WEEK DAYS */}
+                      <div className="grid grid-cols-7 text-xs font-bold text-center mb-3 text-muted">
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                          (d) => (
+                            <div key={d}>{d}</div>
+                          ),
+                        )}
+                      </div>
 
-                              <div className="flex-1">
-                                <p className="font-bold text-base">
-                                  {log.action}
-                                </p>
-
-                                <p className="text-sm text-muted">
-                                  {log.details}
-                                </p>
-
-                                <p className="text-xs text-subtle mt-1">
-                                  {log.timestamp.toLocaleString()}
-                                </p>
-                              </div>
+                      {/* DAYS GRID */}
+                      <div className="grid grid-cols-7 gap-2 text-center">
+                        {calendarDays.map((day, i) => {
+                          const isToday = day === currentDate.getDate();
+                          return (
+                            <div
+                              key={i}
+                              className={`
+                                aspect-square flex items-center justify-center
+                                rounded-xl text-sm font-semibold transition-all
+                                ${day ? "cursor-pointer hover:bg-base-200" : "opacity-0"}
+                                ${isToday ? "bg-primary text-primary-content shadow-md scale-105" : ""}
+                              `}
+                            >
+                              {day}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
-                </section>
 
-                {/* RECENT CASES */}
-                <section className="card surface-card-hover">
-                  <RecentCases
-                    cases={cases.slice(0, 10)}
-                    view="table"
-                    onViewAll={() => router.push("/user/cases/criminal")}
-                  />
-                </section>
-              </div>
-            )}
+                  {/* EMPLOYEE ANALYTICS */}
+                  <div className="card surface-card-hover">
+                    <div className="card-body">
+                      <h2 className="card-title font-black">
+                        Employee Compliance
+                      </h2>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart
+                          data={[
+                            { name: "Total", value: employees.length },
+                            {
+                              name: "Incomplete",
+                              value: stats.employeesMissing,
+                            },
+                          ]}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar
+                            dataKey="value"
+                            radius={[8, 8, 0, 0]}
+                            fill={getCssVar("--color-primary")}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Analytics removed from Admin Dashboard */}
+                {/* RECENT ACTIVITY */}
+                <div className="lg:col-span-2 card surface-card-hover">
+                  <div
+                    className="card-body"
+                    style={{ padding: "var(--space-card-padding)" }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <h2 className="card-title text-xl sm:text-2xl font-black">
+                        Recent Activity
+                      </h2>
+                      <span className="text-xs text-subtle">
+                        Last 5 system logs
+                      </span>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4 mt-5">
+                      {auditLogs.slice(0, 4).map((log) => (
+                        <div
+                          key={log.id}
+                          className="card hover:scale-[1.02]"
+                          style={{
+                            background: "var(--surface-inset)",
+                            transition: "var(--transition-base)",
+                            borderRadius: "var(--radius-sm)",
+                          }}
+                        >
+                          <div className="card-body p-4 flex-row items-start gap-4">
+                            <div className="avatar placeholder bg-primary">
+                              <div className="w-10 h-10 rounded-lg text-primary-content">
+                                <RefreshCw className="h-5 w-5" />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-bold text-base">
+                                {log.action}
+                              </p>
+                              <p className="text-sm text-muted">
+                                {log.details}
+                              </p>
+                              <p className="text-xs text-subtle mt-1">
+                                {log.timestamp.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* RECENT CASES */}
+              <section className="card surface-card-hover">
+                <RecentCases
+                  cases={cases.slice(0, 10)}
+                  view="table"
+                  onViewAll={() => router.push("/user/cases/criminal")}
+                />
+              </section>
+            </div>
           </div>
         </div>
       </div>
