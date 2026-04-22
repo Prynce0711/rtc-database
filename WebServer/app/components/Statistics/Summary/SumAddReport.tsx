@@ -5,11 +5,11 @@ import {
   FiArrowLeft,
   FiChevronRight,
   FiEye,
-  FiPlus,
   FiSave,
   FiTrash2,
   FiUpload,
 } from "react-icons/fi";
+import AddRowsToolbar from "../Shared/AddRowsToolbar";
 import type { SummaryRow } from "./Schema";
 import {
   SUMMARY_COURT_TYPES,
@@ -673,21 +673,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
 
       {step === "edit" ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <button
-              className="btn btn-success gap-2"
-              onClick={() => addRows(1)}
-            >
-              <FiPlus size={15} />
-              Add Row
-            </button>
-            <button
-              className="btn btn-success btn-outline gap-2"
-              onClick={() => addRows(5)}
-            >
-              <FiPlus size={15} />
-              +5 Rows
-            </button>
+          <AddRowsToolbar onAddRows={addRows}>
 
             <input
               ref={fileInputRef}
@@ -752,7 +738,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                 ))}
               </datalist>
             </div>
-          </div>
+          </AddRowsToolbar>
 
           {importFeedback && (
             <div

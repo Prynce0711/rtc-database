@@ -3,9 +3,8 @@
 import React from "react";
 import { FiPlus } from "react-icons/fi";
 
-type CaseEntryToolbarProps = {
+type AddRowsToolbarProps = {
   onAddRows: (count: number) => void;
-  onClearAll: () => void;
   children?: React.ReactNode;
 };
 
@@ -16,9 +15,8 @@ const separatorStyle: React.CSSProperties = {
   margin: "0 4px",
 };
 
-const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
+const AddRowsToolbar: React.FC<AddRowsToolbarProps> = ({
   onAddRows,
-  onClearAll,
   children,
 }) => {
   const [customRows, setCustomRows] = React.useState("1");
@@ -39,7 +37,6 @@ const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
         alignItems: "center",
         gap: 8,
         flexWrap: "wrap",
-        marginBottom: 12,
       }}
     >
       <button
@@ -49,16 +46,6 @@ const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
       >
         <FiPlus size={15} />
         Add Row
-      </button>
-
-      <div style={separatorStyle} />
-
-      <button
-        type="button"
-        className="btn btn-warning btn-outline"
-        onClick={onClearAll}
-      >
-        Clear All
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -112,4 +99,4 @@ const CaseEntryToolbar: React.FC<CaseEntryToolbarProps> = ({
   );
 };
 
-export default CaseEntryToolbar;
+export default AddRowsToolbar;
