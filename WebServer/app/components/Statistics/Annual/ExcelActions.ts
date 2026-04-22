@@ -2,19 +2,17 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
+import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
 import {
   ActionResult,
   excelDateToJSDate,
   ExportExcelData,
   findColumnValue,
-  isMappedRowEmpty,
   isValidDate,
-  processExcelUpload,
   UploadExcelResult,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
-import { CaseSchema, InventoryDocumentSchema } from "./Schema";
 
 const toText = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim();
@@ -201,74 +199,10 @@ export async function uploadMunicipalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const result = await processExcelUpload<
-      CaseSchema,
-      ReturnType<typeof getCourtCells>
-    >({
+    return startExcelUpload({
+      type: ExcelTypes.MUNICIPAL_TRIAL_COURT,
       file,
-      requiredHeaders: {
-        Branch: ["Branch", "Branches", "Branch No"],
-      },
-      getCells: getCourtCells,
-      schema: CaseSchema,
-      skipRowsWithoutCell: ["branchCell"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const existingRows = await prisma.municipalTrialCourt.findMany({
-          where: {
-            branch: mappedRow.branch,
-          },
-        });
-
-        const mappedEntries = Object.entries(mappedRow);
-        const hasExactMatch = existingRows.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRow as Record<string, unknown>)[key],
-            ),
-          ),
-        );
-
-        return { exists: hasExactMatch };
-      },
-      mapRow: (row) => {
-        const cells = getCourtCells(row);
-        if (isMappedRowEmpty(cells)) {
-          return { skip: true };
-        }
-
-        return {
-          mapped: {
-            reportYear: toReportYear(cells.reportYearCell),
-            branch: toText(cells.branchCell) ?? "",
-            pendingLastYear: toText(cells.pendingLastYearCell),
-            RaffledOrAdded: toText(cells.raffledOrAddedCell),
-            Disposed: toText(cells.disposedCell),
-            pendingThisYear: toText(cells.pendingThisYearCell),
-            percentageOfDisposition: toText(cells.percentageOfDispositionCell),
-          },
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const inserted = await prisma.municipalTrialCourt.createManyAndReturn({
-          data: rows.map((row) => ({
-            reportYear: row.reportYear,
-            branch: row.branch,
-            pendingLastYear: row.pendingLastYear?.toString(),
-            RaffledOrAdded: row.RaffledOrAdded?.toString(),
-            Disposed: row.Disposed?.toString(),
-            pendingThisYear: row.pendingThisYear?.toString(),
-            percentageOfDisposition: row.percentageOfDisposition?.toString(),
-          })),
-        });
-
-        return { ids: inserted.map((item) => item.id), count: inserted.length };
-      },
     });
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
-    return result;
   } catch (error) {
     console.error("Municipal Trial Court Excel upload failed:", error);
     return {
@@ -327,74 +261,10 @@ export async function uploadRegionalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const result = await processExcelUpload<
-      CaseSchema,
-      ReturnType<typeof getCourtCells>
-    >({
+    return startExcelUpload({
+      type: ExcelTypes.REGIONAL_TRIAL_COURT,
       file,
-      requiredHeaders: {
-        Branch: ["Branch", "Branches", "Branch No"],
-      },
-      getCells: getCourtCells,
-      schema: CaseSchema,
-      skipRowsWithoutCell: ["branchCell"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const existingRows = await prisma.regionalTrialCourt.findMany({
-          where: {
-            branch: mappedRow.branch,
-          },
-        });
-
-        const mappedEntries = Object.entries(mappedRow);
-        const hasExactMatch = existingRows.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRow as Record<string, unknown>)[key],
-            ),
-          ),
-        );
-
-        return { exists: hasExactMatch };
-      },
-      mapRow: (row) => {
-        const cells = getCourtCells(row);
-        if (isMappedRowEmpty(cells)) {
-          return { skip: true };
-        }
-
-        return {
-          mapped: {
-            reportYear: toReportYear(cells.reportYearCell),
-            branch: toText(cells.branchCell) ?? "",
-            pendingLastYear: toText(cells.pendingLastYearCell),
-            RaffledOrAdded: toText(cells.raffledOrAddedCell),
-            Disposed: toText(cells.disposedCell),
-            pendingThisYear: toText(cells.pendingThisYearCell),
-            percentageOfDisposition: toText(cells.percentageOfDispositionCell),
-          },
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const inserted = await prisma.regionalTrialCourt.createManyAndReturn({
-          data: rows.map((row) => ({
-            reportYear: row.reportYear,
-            branch: row.branch,
-            pendingLastYear: row.pendingLastYear?.toString(),
-            RaffledOrAdded: row.RaffledOrAdded?.toString(),
-            Disposed: row.Disposed?.toString(),
-            pendingThisYear: row.pendingThisYear?.toString(),
-            percentageOfDisposition: row.percentageOfDisposition?.toString(),
-          })),
-        });
-
-        return { ids: inserted.map((item) => item.id), count: inserted.length };
-      },
     });
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
-    return result;
   } catch (error) {
     console.error("Regional Trial Court Excel upload failed:", error);
     return {
@@ -453,102 +323,10 @@ export async function uploadInventoryDocumentExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const result = await processExcelUpload<
-      InventoryDocumentSchema,
-      ReturnType<typeof getInventoryCells>
-    >({
+    return startExcelUpload({
+      type: ExcelTypes.INVENTORY_DOCUMENT,
       file,
-      requiredHeaders: {
-        Region: ["Region"],
-        Province: ["Province"],
-        Court: ["Court"],
-        CityMunicipality: [
-          "City Municipality",
-          "City/Municipality",
-          "cityMunicipality",
-        ],
-        Branch: ["Branch", "Branch No"],
-      },
-      getCells: getInventoryCells,
-      schema: InventoryDocumentSchema,
-      skipRowsWithoutCell: [
-        "regionCell",
-        "provinceCell",
-        "courtCell",
-        "cityMunicipalityCell",
-        "branchCell",
-      ],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const existingRows = await prisma.inventoryDocument.findMany({
-          where: {
-            region: mappedRow.region,
-            province: mappedRow.province,
-            court: mappedRow.court,
-            cityMunicipality: mappedRow.cityMunicipality,
-            branch: mappedRow.branch,
-          },
-        });
-
-        const mappedEntries = Object.entries(mappedRow);
-        const hasExactMatch = existingRows.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRow as Record<string, unknown>)[key],
-            ),
-          ),
-        );
-
-        return { exists: hasExactMatch };
-      },
-      mapRow: (row) => {
-        const cells = getInventoryCells(row);
-        if (isMappedRowEmpty(cells)) {
-          return { skip: true };
-        }
-
-        return {
-          mapped: {
-            region: toText(cells.regionCell) ?? "",
-            province: toText(cells.provinceCell) ?? "",
-            court: toText(cells.courtCell) ?? "",
-            cityMunicipality: toText(cells.cityMunicipalityCell) ?? "",
-            branch: toText(cells.branchCell) ?? "",
-            civilSmallClaimsFiled: toText(cells.civilSmallClaimsFiledCell),
-            criminalCasesFiled: toText(cells.criminalCasesFiledCell),
-            civilSmallClaimsDisposed: toText(
-              cells.civilSmallClaimsDisposedCell,
-            ),
-            criminalCasesDisposed: toText(cells.criminalCasesDisposedCell),
-            dateRecorded: toIsoDateString(cells.dateRecordedCell),
-          },
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const inserted = await prisma.inventoryDocument.createManyAndReturn({
-          data: rows.map((row) => ({
-            region: row.region,
-            province: row.province,
-            court: row.court,
-            cityMunicipality: row.cityMunicipality,
-            branch: row.branch,
-            civilSmallClaimsFiled: row.civilSmallClaimsFiled?.toString(),
-            criminalCasesFiled: row.criminalCasesFiled?.toString(),
-            civilSmallClaimsDisposed: row.civilSmallClaimsDisposed?.toString(),
-            criminalCasesDisposed: row.criminalCasesDisposed?.toString(),
-            dateRecorded: row.dateRecorded
-              ? new Date(row.dateRecorded)
-              : undefined,
-          })),
-        });
-
-        return { ids: inserted.map((item) => item.id), count: inserted.length };
-      },
     });
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
-    return result;
   } catch (error) {
     console.error("Inventory Excel upload failed:", error);
     return { success: false, error: "Inventory Excel upload failed" };

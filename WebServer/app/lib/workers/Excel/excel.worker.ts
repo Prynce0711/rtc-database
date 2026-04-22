@@ -1,23 +1,36 @@
 import { Queue, QueueEvents, Worker } from "bullmq";
 import { redisConnection } from "../../redis";
-import { uploadCriminalCaseExcel } from "./CriminalCaseExcel";
+import { uploadCivilCaseExcel } from "./Case/CivilCaseExcel";
+import { uploadCriminalCaseExcel } from "./Case/CriminalCaseExcel";
+import { uploadPetitionCaseExcel } from "./Case/PetitionCaseExcel";
+import { uploadReceivingLogExcel } from "./Case/ReceivingLogExcel";
+import { uploadSheriffCaseExcel } from "./Case/SheriffCaseExcel";
+import { uploadSpecialProceedingCaseExcel } from "./Case/SpecialProceedingCaseExcel";
+import { uploadEmployeeExcel } from "./Employee/EmployeeExcel";
 import {
-  ExcelQueueData,
-  ExcelUploadActionResult,
-  QUEUE_NAME,
-  ExcelJobData,
-  isFile,
-  invalidJobResult,
-  serializeExcelJobData,
-  ExcelJob,
-  isSerializedExcelFile,
   deserializeExcelFile,
+  ExcelJob,
+  ExcelJobData,
+  ExcelQueueData,
   ExcelTypes,
+  ExcelUploadActionResult,
+  invalidJobResult,
+  isFile,
+  isSerializedExcelFile,
+  QUEUE_NAME,
+  serializeExcelJobData,
 } from "./ExcelWorkerUtils";
+import { uploadInventoryDocumentExcel } from "./Statistics/InventoryDocumentExcel";
+import { uploadMonthlyStatisticsExcel } from "./Statistics/MonthlyStatisticsExcel";
+import { uploadMunicipalJudgementExcel } from "./Statistics/MunicipalJudgementExcel";
+import { uploadMunicipalTrialCourtExcel } from "./Statistics/MunicipalTrialCourtExcel";
+import { uploadRegionalJudgementExcel } from "./Statistics/RegionalJudgementExcel";
+import { uploadRegionalTrialCourtExcel } from "./Statistics/RegionalTrialCourtExcel";
+import { uploadSummaryStatisticsExcel } from "./Statistics/SummaryStatisticsExcel";
 
 const JOB_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 const WORKER_LOCK_DURATION_MS = 10 * 60 * 1000;
-const ENABLE_WORKER = process.env.ENABLE_WORKER === "true";
+const IS_WORKER = process.env.IS_WORKER === "true";
 
 const excelQueue = new Queue<
   ExcelQueueData,
@@ -59,7 +72,7 @@ export const startExcelUpload = async (
   }
 };
 
-const worker = ENABLE_WORKER
+const worker = IS_WORKER
   ? new Worker<ExcelQueueData, ExcelUploadActionResult, typeof QUEUE_NAME>(
       QUEUE_NAME,
       async (job: ExcelJob): Promise<ExcelUploadActionResult> => {
@@ -96,11 +109,36 @@ const worker = ENABLE_WORKER
 
         switch (jobType) {
           case ExcelTypes.CRIMINAL_CASE:
-            // Delegate to the existing function for processing criminal case Excel files.
             return uploadCriminalCaseExcel(file);
           case ExcelTypes.CIVIL_CASE:
-            return invalidJobResult(
-              "Civil case Excel upload not implemented yet",
+            return uploadCivilCaseExcel(file);
+          case ExcelTypes.PETITION_CASE:
+            return uploadPetitionCaseExcel(file);
+          case ExcelTypes.RECEIVING_LOG:
+            return uploadReceivingLogExcel(file);
+          case ExcelTypes.SHERIFF_CASE:
+            return uploadSheriffCaseExcel(file);
+          case ExcelTypes.SPECIAL_PROCEEDING_CASE:
+            return uploadSpecialProceedingCaseExcel(file);
+          case ExcelTypes.EMPLOYEE:
+            return uploadEmployeeExcel(file);
+          case ExcelTypes.MUNICIPAL_TRIAL_COURT:
+            return uploadMunicipalTrialCourtExcel(file);
+          case ExcelTypes.REGIONAL_TRIAL_COURT:
+            return uploadRegionalTrialCourtExcel(file);
+          case ExcelTypes.INVENTORY_DOCUMENT:
+            return uploadInventoryDocumentExcel(file);
+          case ExcelTypes.MUNICIPAL_JUDGEMENT:
+            return uploadMunicipalJudgementExcel(file);
+          case ExcelTypes.REGIONAL_JUDGEMENT:
+            return uploadRegionalJudgementExcel(file);
+          case ExcelTypes.MONTHLY_STATISTICS:
+            return uploadMonthlyStatisticsExcel(file, job.data.fallbackMonth);
+          case ExcelTypes.SUMMARY_STATISTICS:
+            return uploadSummaryStatisticsExcel(
+              file,
+              job.data.fallbackMonth,
+              job.data.fallbackYear,
             );
           default:
             return invalidJobResult(
@@ -118,9 +156,9 @@ const worker = ENABLE_WORKER
     )
   : null;
 
-if (!ENABLE_WORKER) {
+if (!IS_WORKER) {
   console.log(
-    "Excel worker not started in this process (set ENABLE_WORKER=true in worker runtime).",
+    "This process is not configured to run the Excel upload worker. Set IS_WORKER=true to enable it.",
   );
 }
 

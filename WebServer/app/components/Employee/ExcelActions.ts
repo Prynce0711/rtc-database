@@ -1,22 +1,17 @@
 "use server";
 
-import { EmployeeSchema } from "@/app/components/Employee/schema";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
+import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
+import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
 import {
   ActionResult,
   ExportExcelData,
-  getExcelHeaderMap,
-  isMappedRowEmpty,
-  normalizeRowBySchema,
-  ProcessExcelMeta,
-  processExcelUpload,
   UploadExcelResult,
 } from "@rtc-database/shared";
 import { LogAction } from "@rtc-database/shared/prisma/client";
 import * as XLSX from "xlsx";
-import { prettifyError } from "zod";
 import { createLog } from "../ActivityLogs/LogActions";
 
 export async function uploadEmployeeExcel(
@@ -28,157 +23,25 @@ export async function uploadEmployeeExcel(
       return sessionResult;
     }
 
-    console.log(
-      `✓ Employee Excel file received: ${file.name} (${file.size} bytes)`,
-    );
-    // Peek workbook to log sheet names (processExcelUpload will parse again for validation)
-    try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      console.log(
-        `✓ Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
-      );
-    } catch (peekError) {
-      console.warn("⚠ Unable to preview workbook for logging:", peekError);
+    const result = await startExcelUpload({
+      type: ExcelTypes.EMPLOYEE,
+      file,
+    });
+
+    if (!result.success) {
+      return result;
     }
 
-    const headerMap = getExcelHeaderMap(EmployeeSchema);
-    const employeeNameHeaders = headerMap.employeeName ?? ["Employee Name"];
-    const employeeNumberHeaders = headerMap.employeeNumber ?? [
-      "Employee Number",
-    ];
-
-    const getMappedCells = (row: Record<string, unknown>) => {
-      const values = normalizeRowBySchema(EmployeeSchema, row);
-
-      return {
-        ...values,
-      };
-    };
-
-    const result = await processExcelUpload<EmployeeSchema>({
-      file,
-      requiredHeaders: {
-        "Employee Name": employeeNameHeaders,
-        "Employee Number": employeeNumberHeaders,
-      },
-      getCells: getMappedCells,
-      schema: EmployeeSchema,
-      skipRowsWithoutCell: ["employeeNumber"], // Don't skip rows just because employee number is missing - we'll catch that in validation and report it as an error, but we want to attempt to process the row in case other data is present that can be used for error reporting
-      uniqueKeys: ["employeeNumber", "email", "contactNumber"],
-      checkExistingUniqueKeys: async (keys) => {
-        const normalizedKeys = Array.from(
-          new Set(
-            keys.map((key) => key.trim()).filter((key) => key.length > 0),
-          ),
-        );
-
-        if (normalizedKeys.length === 0) {
-          return new Set<string>();
-        }
-
-        const existing = await prisma.employee.findMany({
-          where: {
-            OR: [
-              { employeeNumber: { in: normalizedKeys } },
-              { email: { in: normalizedKeys } },
-              { contactNumber: { in: normalizedKeys } },
-            ],
-          },
-          select: {
-            employeeNumber: true,
-            email: true,
-            contactNumber: true,
-          },
-        });
-
-        return new Set(
-          existing
-            .flatMap((employee) => [
-              employee.employeeNumber,
-              employee.email,
-              employee.contactNumber,
-            ])
-            .map((value) => value?.trim())
-            .filter((value): value is string => !!value),
-        );
-      },
-      mapRow: (row) => {
-        const cells = getMappedCells(row);
-        if (isMappedRowEmpty(cells, ["employeeNumber"])) {
-          return { skip: true };
-        }
-
-        const validation = EmployeeSchema.safeParse(cells);
-        if (!validation.success) {
-          // console.warn(
-          //   "Employee row validation failed:",
-          //   prettifyError(validation.error),
-          //   { row: cells },
-          // );
-          return {
-            errorMessage: prettifyError(validation.error),
-          };
-        }
-
-        return {
-          mapped: validation.data,
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const created = await prisma.employee.createManyAndReturn({
-          data: rows,
-        });
-        return { ids: created.map((e) => e.id), count: created.length };
+    await createLog({
+      action: LogAction.IMPORT_EMPLOYEES,
+      details: {
+        ids: result.result?.meta.importedIds ?? [],
       },
     });
 
-    if (result.success) {
-      const meta: ProcessExcelMeta = result.result?.meta;
-      const imported = meta.importedCount;
-      const errors = meta.errorCount;
-      const sheets = meta.sheetSummary;
-
-      console.log(
-        `✓ Import completed: ${imported} employees imported, ${errors} row(s) failed validation`,
-      );
-      if (sheets.length > 0) {
-        sheets.forEach(
-          (s: {
-            sheet: string;
-            valid: number;
-            rows: number;
-            failed: number;
-          }) => {
-            console.log(
-              `  📋 "${s.sheet}": ${s.valid}/${s.rows} valid, ${s.failed} failed`,
-            );
-          },
-        );
-      }
-
-      if (result.result?.failedExcel) {
-        console.log(
-          "⚠ Failed rows file generated:",
-          result.result.failedExcel.fileName,
-        );
-      }
-
-      await createLog({
-        action: LogAction.IMPORT_EMPLOYEES,
-        details: {
-          ids: meta.importedIds ?? [],
-        },
-      });
-    } else {
-      console.error("✗ Import failed:", result.error);
-    }
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
     return result;
   } catch (error) {
-    console.error("Employee upload error:", error);
+    console.error("Upload error:", error);
     return { success: false, error: "Upload failed" };
   }
 }
