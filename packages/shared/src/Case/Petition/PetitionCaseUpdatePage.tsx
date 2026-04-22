@@ -21,6 +21,7 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
@@ -424,7 +425,9 @@ const PetitionCaseUpdatePage = ({
   const statusPopup = usePopup();
   const router = useAdaptiveNavigation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<Step>("entry");
+  const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
@@ -433,6 +436,7 @@ const PetitionCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const tableRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
     if (isEdit && editCases.length > 0) {
@@ -454,6 +458,7 @@ const PetitionCaseUpdatePage = ({
 
   useEffect(() => {
     setStep("entry");
+    setEntryPage(1);
 
     if (isEdit) {
       if (editCases.length > 0) {
@@ -619,7 +624,11 @@ const PetitionCaseUpdatePage = ({
       const nextRows = Array.from({ length: normalizedCount }, () =>
         emptyEntry(uid(), defaultArea),
       );
-      setEntries((prev) => [...prev, ...nextRows]);
+      setEntries((prev) => {
+        const next = [...prev, ...nextRows];
+        setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+        return next;
+      });
       setTimeout(() => {
         tableRef.current?.scrollTo({
           top: tableRef.current.scrollHeight,
@@ -639,9 +648,67 @@ const PetitionCaseUpdatePage = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([emptyEntry(uid(), defaultArea)]);
+    setEntryPage(1);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [defaultArea, entries.length, statusPopup]);
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const result = await adapter.uploadPetitionExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import petitions");
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        return;
+      }
+
+      statusPopup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Petitions imported successfully",
+      );
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
 
   const handleRemove = (id: string) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -928,8 +995,9 @@ const PetitionCaseUpdatePage = ({
             );
             return;
           }
-          onUpdate?.();
         }
+
+        onUpdate?.();
 
         statusPopup.showSuccess(
           entries.length === 1
@@ -958,8 +1026,10 @@ const PetitionCaseUpdatePage = ({
           if (result.result?.id) {
             createdIds.push(result.result.id);
           }
-          onCreate?.();
         }
+
+        onCreate?.();
+
         statusPopup.showSuccess(
           entries.length === 1
             ? "Petition entry created successfully"
@@ -984,6 +1054,20 @@ const PetitionCaseUpdatePage = ({
 
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <div className="xls-root">
@@ -1209,7 +1293,24 @@ const PetitionCaseUpdatePage = ({
                 onClearAll={() => {
                   void handleClearTable();
                 }}
-              />
+              >
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImportExcel}
+                />
+                <button
+                  type="button"
+                  className={`btn btn-info btn-outline gap-2 ${uploading ? "loading" : ""}`}
+                  onClick={() => importFileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <FiUpload size={15} />
+                  {uploading ? "Importing..." : "Import Excel"}
+                </button>
+              </CaseEntryToolbar>
             )}
 
             {/* Spreadsheet */}
@@ -1266,7 +1367,7 @@ const PetitionCaseUpdatePage = ({
 
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
+                      {pagedEntries.map((entry, rowIdx) => {
                         const lastColIdx = TAB_COLS.length - 1;
                         const displayCaseNumber = getDisplayCaseNumber(entry);
                         const autoCasePreview =
@@ -1314,7 +1415,9 @@ const PetitionCaseUpdatePage = ({
                             }
                           >
                             <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
+                              <span className="xls-rownum">
+                                {entryPageStart + rowIdx + 1}
+                              </span>
                             </td>
 
                             {/* Frozen cols */}
@@ -1487,6 +1590,40 @@ const PetitionCaseUpdatePage = ({
                   </tbody>
                 </table>
               </div>
+
+              {entryPageCount > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                  <span className="text-xs text-base-content/60">
+                    Page {entryPage} of {entryPageCount}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={entryPage === 1}
+                      aria-label="Previous entry page"
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) =>
+                          Math.min(entryPageCount, prev + 1),
+                        )
+                      }
+                      disabled={entryPage === entryPageCount}
+                      aria-label="Next entry page"
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {!isEdit && (
                 <button

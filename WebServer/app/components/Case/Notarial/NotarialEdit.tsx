@@ -140,7 +140,9 @@ const NotarialEdit = ({
         : [];
   const [step, setStep] = useState<Step>("entry");
   const [reviewIdx, setReviewIdx] = useState(0);
+  const [entryPage, setEntryPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rowsToAddInput, setRowsToAddInput] = useState("1");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const handleFileChange = (id: string, file: File | null) => {
     setEntries((prev) =>
@@ -164,6 +166,7 @@ const NotarialEdit = ({
 
   useEffect(() => {
     setStep("entry");
+    setEntryPage(1);
 
     if (isEdit) {
       if (editRecords.length > 0) {
@@ -185,8 +188,17 @@ const NotarialEdit = ({
     );
   };
 
-  const handleAddEntry = useCallback(() => {
-    setEntries((prev) => [...prev, createEmptyEntry(uid())]);
+  const handleAddEntry = useCallback((count: number = 1) => {
+    const normalizedCount = Math.max(1, Math.floor(count));
+    const nextRows = Array.from({ length: normalizedCount }, () =>
+      createEmptyEntry(uid()),
+    );
+
+    setEntries((prev) => {
+      const next = [...prev, ...nextRows];
+      setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+      return next;
+    });
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -194,6 +206,15 @@ const NotarialEdit = ({
       });
     }, 60);
   }, []);
+
+  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
+  const canAddRowsFromInput =
+    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
+
+  const handleAddRowsFromInput = useCallback(() => {
+    if (!canAddRowsFromInput) return;
+    handleAddEntry(parsedRowsToAdd);
+  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -204,6 +225,7 @@ const NotarialEdit = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([createEmptyEntry(uid())]);
+    setEntryPage(1);
   }, [entries.length, statusPopup]);
 
   const handleRemove = (id: string) =>
@@ -313,6 +335,20 @@ const NotarialEdit = ({
 
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <div className="xls-root">
@@ -441,23 +477,103 @@ const NotarialEdit = ({
               </div>
             )}
 
+            {/* ── Row Controls Toolbar (outside tab bar, like Criminal Cases) ── */}
+            {!isEdit && (
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                <button
+                  type="button"
+                  className="btn btn-success btn-md gap-1"
+                  onClick={() => handleAddEntry(1)}
+                >
+                  <FiPlus size={14} strokeWidth={2.5} />
+                  Add Row
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => handleAddEntry(5)}
+                >
+                  <FiPlus size={13} />
+                  +5 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => handleAddEntry(10)}
+                >
+                  <FiPlus size={13} />
+                  +10 Rows
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-warning btn-md"
+                  onClick={() => void handleClearTable()}
+                >
+                  Clear All
+                </button>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  id="notarial-edit-import-input"
+                  onChange={(e) => {
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-md gap-1"
+                  onClick={() => {
+                    const el = document.getElementById(
+                      "notarial-edit-import-input",
+                    ) as HTMLInputElement | null;
+                    el?.click();
+                  }}
+                >
+                  <FiPlus size={13} />
+                  Import Excel
+                </button>
+                <span className="text-xs text-base-content/60 ml-1">
+                  Enter Rows
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={rowsToAddInput}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    if (/^\d*$/.test(nextValue)) {
+                      setRowsToAddInput(nextValue);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddRowsFromInput();
+                    }
+                  }}
+                  className="input input-bordered input-sm w-20"
+                  aria-label="Enter number of rows to add"
+                />
+                <button
+                  type="button"
+                  className="btn btn-success btn-md gap-1"
+                  onClick={handleAddRowsFromInput}
+                  disabled={!canAddRowsFromInput}
+                >
+                  <FiPlus size={13} />
+                  Add
+                </button>
+              </div>
+            )}
+
             <div className="xls-sheet-wrap">
               <div className="xls-tab-bar">
                 <button className="xls-tab active">
                   <FiFileText size={13} />
                   Notarial Info
                 </button>
-                {!isEdit && (
-                  <button
-                    type="button"
-                    className="xls-btn xls-btn-ghost"
-                    onClick={() => void handleClearTable()}
-                    style={{ marginLeft: "auto" }}
-                  >
-                    <FiTrash2 size={14} />
-                    Clear Table
-                  </button>
-                )}
               </div>
 
               <div className="xls-table-outer" ref={scrollAreaRef}>
@@ -506,7 +622,7 @@ const NotarialEdit = ({
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
+                      {pagedEntries.map((entry, rowIdx) => {
                         const lastColIdx = DETAIL_COLS.length - 1;
                         return (
                           <motion.tr
@@ -520,7 +636,9 @@ const NotarialEdit = ({
                             className="xls-row"
                           >
                             <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
+                              <span className="xls-rownum">
+                                {entryPageStart + rowIdx + 1}
+                              </span>
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
@@ -614,15 +732,38 @@ const NotarialEdit = ({
                 </table>
               </div>
 
-              {!isEdit && (
-                <button
-                  type="button"
-                  className="xls-add-row"
-                  onClick={handleAddEntry}
-                >
-                  <FiPlus size={14} strokeWidth={2.5} />
-                  Add Row
-                </button>
+              {entryPageCount > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                  <span className="text-xs text-base-content/60">
+                    Page {entryPage} of {entryPageCount}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={entryPage === 1}
+                      aria-label="Previous entry page"
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) =>
+                          Math.min(entryPageCount, prev + 1),
+                        )
+                      }
+                      disabled={entryPage === entryPageCount}
+                      aria-label="Next entry page"
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

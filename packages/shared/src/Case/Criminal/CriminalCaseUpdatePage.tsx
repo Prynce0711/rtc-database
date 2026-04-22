@@ -34,6 +34,7 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUsers,
 } from "react-icons/fi";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
@@ -811,6 +812,7 @@ const CriminalCaseUpdatePage = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
+  const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
@@ -818,7 +820,10 @@ const CriminalCaseUpdatePage = ({
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
+  const [rowsToAddInput, setRowsToAddInput] = useState("1");
+  const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const router = useAdaptiveNavigation();
 
   const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
@@ -842,6 +847,7 @@ const CriminalCaseUpdatePage = ({
   useEffect(() => {
     setStep("entry");
     setActiveTab(0);
+    setEntryPage(1);
 
     if (isEdit) {
       setEntries(editCases.map(makeFromCase));
@@ -997,20 +1003,25 @@ const CriminalCaseUpdatePage = ({
 
   const handleAddEntry = useCallback(
     (count: number = 1) => {
-      setEntries((prev) => [
-        ...prev,
-        ...Array.from({ length: count }, () => {
-          const newEntry = createEmptyCriminalEntry();
-          return {
-            ...newEntry,
-            caseNumber: formatCaseNumber(
-              normalizeAreaCode(defaultArea),
-              1,
-              getAutoYearFromDate(newEntry.dateFiled),
-            ),
-          };
-        }),
-      ]);
+      const normalizedCount = Math.max(1, Math.floor(count));
+      setEntries((prev) => {
+        const next = [
+          ...prev,
+          ...Array.from({ length: normalizedCount }, () => {
+            const newEntry = createEmptyCriminalEntry();
+            return {
+              ...newEntry,
+              caseNumber: formatCaseNumber(
+                normalizeAreaCode(defaultArea),
+                1,
+                getAutoYearFromDate(newEntry.dateFiled),
+              ),
+            };
+          }),
+        ];
+        setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+        return next;
+      });
       setTimeout(() => {
         scrollAreaRef.current?.scrollTo({
           top: scrollAreaRef.current.scrollHeight,
@@ -1020,6 +1031,15 @@ const CriminalCaseUpdatePage = ({
     },
     [defaultArea],
   );
+
+  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
+  const canAddRowsFromInput =
+    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
+
+  const handleAddRowsFromInput = useCallback(() => {
+    if (!canAddRowsFromInput) return;
+    handleAddEntry(parsedRowsToAdd);
+  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1040,9 +1060,67 @@ const CriminalCaseUpdatePage = ({
         ),
       },
     ]);
+    setEntryPage(1);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
   }, [defaultArea, entries.length, statusPopup]);
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const result = await adapter.uploadExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        return;
+      }
+
+      statusPopup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Cases imported successfully",
+      );
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1456,6 +1534,20 @@ const CriminalCaseUpdatePage = ({
 
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <>
@@ -1714,6 +1806,56 @@ const CriminalCaseUpdatePage = ({
                   >
                     Clear All
                   </button>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImportExcel}
+                  />
+                  <button
+                    type="button"
+                    className={`btn btn-info btn-outline gap-2 ${uploading ? "loading" : ""}`}
+                    onClick={() => importFileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <FiUpload size={15} />
+                    {uploading ? "Importing..." : "Import Excel"}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-base-content/70">
+                      Enter Rows
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={rowsToAddInput}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        if (/^\d*$/.test(nextValue)) {
+                          setRowsToAddInput(nextValue);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          handleAddRowsFromInput();
+                        }
+                      }}
+                      className="input input-bordered input-sm w-20"
+                      aria-label="Enter number of rows to add"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-success btn-outline gap-2"
+                      onClick={handleAddRowsFromInput}
+                      disabled={!canAddRowsFromInput}
+                    >
+                      <FiPlus size={15} />
+                      Add
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1781,7 +1923,7 @@ const CriminalCaseUpdatePage = ({
                     </thead>
                     <tbody>
                       <AnimatePresence initial={false}>
-                        {entries.map((entry, rowIdx) => {
+                        {pagedEntries.map((entry, rowIdx) => {
                           const lastColIdx = currentTabCols.length - 1;
                           const displayCaseNumber = getDisplayCaseNumber(entry);
                           const autoCasePreview =
@@ -1830,7 +1972,9 @@ const CriminalCaseUpdatePage = ({
                               }
                             >
                               <td className="td-num">
-                                <span className="xls-rownum">{rowIdx + 1}</span>
+                                <span className="xls-rownum">
+                                  {entryPageStart + rowIdx + 1}
+                                </span>
                               </td>
                               {FROZEN_COLS.map((col) => (
                                 <td key={col.key}>
@@ -1989,6 +2133,40 @@ const CriminalCaseUpdatePage = ({
                     </tbody>
                   </table>
                 </div>
+
+                {entryPageCount > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                    <span className="text-xs text-base-content/60">
+                      Page {entryPage} of {entryPageCount}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="xls-btn-icon"
+                        onClick={() =>
+                          setEntryPage((prev) => Math.max(1, prev - 1))
+                        }
+                        disabled={entryPage === 1}
+                        aria-label="Previous entry page"
+                      >
+                        <FiChevronLeft size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="xls-btn-icon"
+                        onClick={() =>
+                          setEntryPage((prev) =>
+                            Math.min(entryPageCount, prev + 1),
+                          )
+                        }
+                        disabled={entryPage === entryPageCount}
+                        aria-label="Next entry page"
+                      >
+                        <FiChevronRight size={15} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="xls-footer">

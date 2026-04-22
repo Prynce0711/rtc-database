@@ -16,6 +16,7 @@ import {
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import type { RecievingLog } from "../../generated/prisma/browser";
 import { CaseType } from "../../generated/prisma/enums";
@@ -356,10 +357,13 @@ const ReceiveUpdatePage = ({
         : [];
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
+  const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
 
   const makeFromLog = (log: RecievingLog): ReceivingLogEntry => ({
@@ -395,6 +399,7 @@ const ReceiveUpdatePage = ({
     }
     setStep("entry");
     setActiveTab(0);
+    setEntryPage(1);
   }, [type, selectedLog, selectedLogs]);
 
   const handleChange = (id: number, field: EntryFieldKey, value: string) => {
@@ -454,7 +459,11 @@ const ReceiveUpdatePage = ({
       emptyEntry(nextTempIdRef.current--),
     );
 
-    setEntries((prev) => [...prev, ...nextRows]);
+    setEntries((prev) => {
+      const next = [...prev, ...nextRows];
+      setEntryPage(Math.max(1, Math.ceil(next.length / ENTRY_ROWS_PER_PAGE)));
+      return next;
+    });
     setTimeout(() => {
       scrollAreaRef.current?.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -472,7 +481,67 @@ const ReceiveUpdatePage = ({
     if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([emptyEntry(nextTempIdRef.current--)]);
+    setEntryPage(1);
   }, [entries.length, statusPopup]);
+
+  const handleImportExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const result = await adapter.uploadReceiveExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(
+          result.error || "Failed to import receiving logs",
+        );
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+        statusPopup.showError(
+          "No valid rows to import. Failed rows have been downloaded for review.",
+        );
+        return;
+      }
+
+      statusPopup.showSuccess(
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Receiving logs imported successfully",
+      );
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -606,6 +675,8 @@ const ReceiveUpdatePage = ({
           return;
         }
 
+        let latestUpdatedLog: RecievingLog | null = null;
+
         for (let index = 0; index < entries.length; index++) {
           const target = editLogs[index];
           if (!target?.id) {
@@ -621,7 +692,11 @@ const ReceiveUpdatePage = ({
             statusPopup.showError(`Update failed for row ${index + 1}`);
             return;
           }
-          onUpdate?.(result.result);
+          latestUpdatedLog = result.result;
+        }
+
+        if (latestUpdatedLog) {
+          onUpdate?.(latestUpdatedLog);
         }
 
         statusPopup.showSuccess(
@@ -631,6 +706,7 @@ const ReceiveUpdatePage = ({
         );
       } else {
         const createdIds: number[] = [];
+        let latestCreatedLog: RecievingLog | null = null;
 
         for (let index = 0; index < entries.length; index++) {
           const entry = entries[index];
@@ -663,7 +739,11 @@ const ReceiveUpdatePage = ({
           }
 
           createdIds.push(result.result.id);
-          onCreate?.(result.result);
+          latestCreatedLog = result.result;
+        }
+
+        if (latestCreatedLog) {
+          onCreate?.(latestCreatedLog);
         }
 
         statusPopup.showSuccess(
@@ -689,6 +769,20 @@ const ReceiveUpdatePage = ({
     entries.some((e) => TAB_GROUPS[tabIdx].cols.some((c) => e.errors[c.key]));
   const ROW_NUM_W = 48;
   const ACTION_W = 72;
+  const ENTRY_ROWS_PER_PAGE = 10;
+  const entryPageCount = Math.max(
+    1,
+    Math.ceil(entries.length / ENTRY_ROWS_PER_PAGE),
+  );
+  const entryPageStart = (entryPage - 1) * ENTRY_ROWS_PER_PAGE;
+  const pagedEntries = entries.slice(
+    entryPageStart,
+    entryPageStart + ENTRY_ROWS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setEntryPage((prev) => Math.min(prev, entryPageCount));
+  }, [entryPageCount]);
 
   return (
     <div className="xls-root">
@@ -824,7 +918,24 @@ const ReceiveUpdatePage = ({
                 onClearAll={() => {
                   void handleClearTable();
                 }}
-              />
+              >
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImportExcel}
+                />
+                <button
+                  type="button"
+                  className={`btn btn-info btn-outline gap-2 ${uploading ? "loading" : ""}`}
+                  onClick={() => importFileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  <FiUpload size={15} />
+                  {uploading ? "Importing..." : "Import Excel"}
+                </button>
+              </CaseEntryToolbar>
             )}
 
             <div className="xls-sheet-wrap">
@@ -891,7 +1002,7 @@ const ReceiveUpdatePage = ({
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {entries.map((entry, rowIdx) => {
+                      {pagedEntries.map((entry, rowIdx) => {
                         const lastColIdx = currentTabCols.length - 1;
                         return (
                           <motion.tr
@@ -905,7 +1016,9 @@ const ReceiveUpdatePage = ({
                             className="xls-row"
                           >
                             <td className="td-num">
-                              <span className="xls-rownum">{rowIdx + 1}</span>
+                              <span className="xls-rownum">
+                                {entryPageStart + rowIdx + 1}
+                              </span>
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
@@ -967,6 +1080,40 @@ const ReceiveUpdatePage = ({
                   </tbody>
                 </table>
               </div>
+
+              {entryPageCount > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-base-200/70 bg-base-100">
+                  <span className="text-xs text-base-content/60">
+                    Page {entryPage} of {entryPageCount}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={entryPage === 1}
+                      aria-label="Previous entry page"
+                    >
+                      <FiChevronLeft size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="xls-btn-icon"
+                      onClick={() =>
+                        setEntryPage((prev) =>
+                          Math.min(entryPageCount, prev + 1),
+                        )
+                      }
+                      disabled={entryPage === entryPageCount}
+                      aria-label="Next entry page"
+                    >
+                      <FiChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {!isEdit && (
                 <button

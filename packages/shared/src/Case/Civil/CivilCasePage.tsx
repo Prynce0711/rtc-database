@@ -18,7 +18,6 @@ import {
   FiLock,
   FiSearch,
   FiTrash2,
-  FiUpload,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -61,7 +60,7 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
   { key: "nature", label: "Nature", type: "text" },
 ];
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 const SortTh = ({
   label,
@@ -240,6 +239,28 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   };
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const visibleCaseIds = cases.map((caseItem) => caseItem.id);
+  const allVisibleCasesSelected =
+    visibleCaseIds.length > 0 &&
+    visibleCaseIds.every((caseId) => selectedCaseIds.includes(caseId));
+
+  const handleToggleSelectAllVisibleCases = (checked: boolean) => {
+    if (!isSelecting) return;
+
+    setSelectedCaseIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleCaseIds.forEach((caseId) => {
+          if (!next.includes(caseId)) {
+            next.push(caseId);
+          }
+        });
+        return next;
+      }
+
+      return prev.filter((caseId) => !visibleCaseIds.includes(caseId));
+    });
+  };
 
   const handleToggleCaseSelection = useCallback(
     (id: number, checked: boolean) => {
@@ -414,32 +435,6 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {canManage && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        void handleUpload(file);
-                      }
-                      if (e.target) e.target.value = "";
-                    }}
-                  />
-                  <button
-                    className={`${ButtonStyles.info} ${uploading ? "loading" : ""}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <FiUpload className="h-5 w-5" />
-                    {uploading ? "Importing..." : "Import Excel"}
-                  </button>
-                </>
-              )}
-
               <button
                 className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
                 onClick={() => void handleExport()}
@@ -662,7 +657,20 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
               <tr className="bg-base-200/50 border-b border-base-200">
                 {isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Select
+                    <label className="inline-flex items-center justify-center gap-2">
+                      <span>Select</span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allVisibleCasesSelected}
+                        onChange={(e) =>
+                          handleToggleSelectAllVisibleCases(e.target.checked)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select all visible civil cases"
+                        disabled={visibleCaseIds.length === 0}
+                      />
+                    </label>
                   </th>
                 )}
                 <SortTh

@@ -20,16 +20,19 @@ import {
   useToast,
 } from "@rtc-database/shared";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FiBarChart2,
+  FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
+  FiTrash2,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
 import NotarialRow, { NotarialRecord } from "./NotarialRow";
 
@@ -65,7 +68,7 @@ export type NotarialFormEntry = {
   saved: boolean;
 };
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 // ─── Sort TH ─────────────────────────────────────────────────────────────────
 
@@ -117,6 +120,9 @@ const NotarialPage: React.FC = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
+    null,
+  );
   const [deletingSelected, setDeletingSelected] = useState(false);
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
@@ -126,6 +132,7 @@ const NotarialPage: React.FC = () => {
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const isAdminOrAtty = true;
+  const isSelecting = selectionMode !== null;
   const [exporting, setExporting] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
@@ -328,6 +335,22 @@ const NotarialPage: React.FC = () => {
     }));
   };
 
+  const handleToggleRecordSelection = (recordId: number, checked: boolean) => {
+    setSelectedRecordIds((prev) => {
+      if (!isSelecting) return prev;
+      if (checked) {
+        if (prev.includes(recordId)) return prev;
+        return [...prev, recordId];
+      }
+      return prev.filter((id) => id !== recordId);
+    });
+  };
+
+  const cancelSelectionMode = () => {
+    setSelectionMode(null);
+    setSelectedRecordIds([]);
+  };
+
   const getSuggestions = async (
     key: string,
     inputValue: string,
@@ -370,21 +393,54 @@ const NotarialPage: React.FC = () => {
   };
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const visibleRecordIds = records.map((record) => record.id);
+  const allVisibleRecordsSelected =
+    visibleRecordIds.length > 0 &&
+    visibleRecordIds.every((recordId) => selectedRecordIds.includes(recordId));
+
+  const handleToggleSelectAllVisibleRecords = (checked: boolean) => {
+    if (!isSelecting) return;
+
+    setSelectedRecordIds((prev) => {
+      if (checked) {
+        const next = [...prev];
+        visibleRecordIds.forEach((recordId) => {
+          if (!next.includes(recordId)) {
+            next.push(recordId);
+          }
+        });
+        return next;
+      }
+
+      return prev.filter((recordId) => !visibleRecordIds.includes(recordId));
+    });
+  };
 
   const activeFilterCount = Object.keys(appliedFilters).length;
 
-  const handleDelete = async (id: number) => {
-    const isConfirmed = await statusPopup.showConfirm(
-      "Are you sure you want to delete this record?",
-    );
-    if (!isConfirmed) return;
-    const result = await deleteNotarial(id);
-    if (!result.success) {
-      statusPopup.showError(result.error || "Failed to delete record");
+  const handleEditSelectedRecords = () => {
+    if (selectedRecordIds.length === 0) {
+      statusPopup.showError("Select at least one row to edit.");
       return;
     }
-    await refreshFromBackend();
-    toast.success("Notarial entry deleted.");
+
+    router.push(`/user/cases/notarial/edit?ids=${selectedRecordIds.join(",")}`);
+  };
+
+  const handleApplySelectionMode = async () => {
+    if (selectedRecordIds.length === 0) {
+      statusPopup.showError("Select at least one record first.");
+      return;
+    }
+
+    if (selectionMode === "edit") {
+      handleEditSelectedRecords();
+      return;
+    }
+
+    if (selectionMode === "delete") {
+      await handleDeleteSelectedRecords();
+    }
   };
 
   const handleDeleteSelectedRecords = async () => {
@@ -428,9 +484,8 @@ const NotarialPage: React.FC = () => {
         );
       }
 
-      setSelectedRecordIds((prev) =>
-        prev.filter((id) => !deletedIds.includes(id)),
-      );
+      setSelectionMode(null);
+      setSelectedRecordIds([]);
       await refreshFromBackend();
     } finally {
       setDeletingSelected(false);
@@ -556,13 +611,7 @@ const NotarialPage: React.FC = () => {
           <button
             type="button"
             className={`btn btn-md btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-            onClick={() => {
-              console.log(
-                "Notarial Filter button clicked, current state:",
-                filterModalOpen,
-              );
-              setFilterModalOpen((prev) => !prev);
-            }}
+            onClick={() => setFilterModalOpen((prev) => !prev)}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -584,7 +633,63 @@ const NotarialPage: React.FC = () => {
             )}
           </button>
 
-          <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {isAdminOrAtty &&
+            (isSelecting ? (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <span className="text-sm text-base-content/60 whitespace-nowrap">
+                  {selectedRecordIds.length} selected
+                </span>
+                <button
+                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                  onClick={() => void handleApplySelectionMode()}
+                  disabled={
+                    selectedRecordIds.length === 0 ||
+                    (selectionMode === "delete" && deletingSelected)
+                  }
+                >
+                  <FiCheck className="h-4 w-4" />
+                  <span>
+                    {selectionMode === "edit"
+                      ? "Edit Selected"
+                      : "Delete Selected"}
+                  </span>
+                </button>
+                <button
+                  className="btn btn-md btn-ghost text-base-content/50"
+                  onClick={cancelSelectionMode}
+                  title="Cancel selection"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 sm:ml-3">
+                <button
+                  className="btn btn-md btn-outline gap-2"
+                  onClick={() => {
+                    setSelectionMode("edit");
+                    setSelectedRecordIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiEdit2 className="h-4 w-4" />
+                  <span>Edit Rows</span>
+                </button>
+                <button
+                  className="btn btn-md btn-outline btn-error gap-2"
+                  onClick={() => {
+                    setSelectionMode("delete");
+                    setSelectedRecordIds([]);
+                  }}
+                  disabled={totalCount === 0}
+                >
+                  <FiTrash2 className="h-4 w-4" />
+                  <span>Delete Rows</span>
+                </button>
+              </div>
+            ))}
+
+          <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
             {totalCount} record{totalCount !== 1 && "s"}
           </span>
         </div>
@@ -598,52 +703,6 @@ const NotarialPage: React.FC = () => {
           getSuggestions={getSuggestions}
         />
       </div>
-
-      {isAdminOrAtty && (
-        <AnimatePresence>
-          {selectedRecordIds.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-primary">
-                  {selectedRecordIds.length} record
-                  {selectedRecordIds.length > 1 ? "s" : ""} selected
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() =>
-                      router.push(
-                        `/user/cases/notarial/edit?ids=${selectedRecordIds.join(",")}`,
-                      )
-                    }
-                  >
-                    Edit Selected
-                  </button>
-                  <button
-                    className={`btn btn-sm btn-error btn-outline ${deletingSelected ? "loading" : ""}`}
-                    onClick={handleDeleteSelectedRecords}
-                    disabled={deletingSelected}
-                  >
-                    Delete Selected
-                  </button>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => setSelectedRecordIds([])}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -710,14 +769,22 @@ const NotarialPage: React.FC = () => {
           <table className="table table-sm w-full text-center">
             <thead>
               <tr className="bg-base-200/50 border-b border-base-200">
-                {isAdminOrAtty && (
+                {isAdminOrAtty && isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Select
-                  </th>
-                )}
-                {isAdminOrAtty && (
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    Actions
+                    <label className="inline-flex items-center justify-center gap-2">
+                      <span>Select</span>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allVisibleRecordsSelected}
+                        onChange={(e) =>
+                          handleToggleSelectAllVisibleRecords(e.target.checked)
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select all visible notarial records"
+                        disabled={visibleRecordIds.length === 0}
+                      />
+                    </label>
                   </th>
                 )}
                 <SortTh
@@ -752,7 +819,10 @@ const NotarialPage: React.FC = () => {
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdminOrAtty ? 7 : 6} className="py-16">
+                  <td
+                    colSpan={5 + (isAdminOrAtty && isSelecting ? 1 : 0)}
+                    className="py-16"
+                  >
                     <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
                       <FiFileText className="w-16 h-16 opacity-20 mb-4" />
                       <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
@@ -769,23 +839,16 @@ const NotarialPage: React.FC = () => {
                   <NotarialRow
                     key={r.id}
                     record={r}
-                    onEdit={(item) =>
-                      router.push(`/user/cases/notarial/edit?id=${item.id}`)
-                    }
-                    onDelete={handleDelete}
                     onViewFile={(item) => void handleViewFile(item)}
                     onDownloadFile={(item) => void handleDownloadFile(item)}
                     canPreview={isPreviewable(r)}
                     onRowClick={(item) =>
                       router.push(`/user/cases/notarial/${item.id}`)
                     }
+                    isSelecting={isSelecting}
                     isSelected={selectedRecordIds.includes(r.id)}
-                    onToggleSelect={(id) =>
-                      setSelectedRecordIds((prev) =>
-                        prev.includes(id)
-                          ? prev.filter((entryId) => entryId !== id)
-                          : [...prev, id],
-                      )
+                    onToggleSelect={
+                      isSelecting ? handleToggleRecordSelection : undefined
                     }
                   />
                 ))

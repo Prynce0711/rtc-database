@@ -866,8 +866,8 @@
 
   .xls-table-outer {
     overflow-x: auto;
-    overflow-y: auto;
-    max-height: calc(100vh - 360px);
+    overflow-y: visible;
+    max-height: none;
     position: relative;
   }
   .xls-table {
