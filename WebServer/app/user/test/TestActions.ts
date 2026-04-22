@@ -1,6 +1,6 @@
 "use server";
 
-import { excelQueue } from "@/app/lib/workers/excel.worker";
+import { testQueue } from "@/app/lib/workers/test.worker";
 import { ActionResult } from "@rtc-database/shared";
 import { CaseType } from "@rtc-database/shared/prisma/client";
 import { validateSession } from "../../lib/authActions";
@@ -127,6 +127,16 @@ type QueueWorkerBatchResult = {
   batchId: string;
   total: number;
   jobIds: string[];
+  payloadSizeBytes: number;
+  mainThreadWrites: number;
+  mainThreadInsertedIds: number[];
+};
+
+type CreateWorkerBatchOptions = {
+  payloadSizeBytes?: number;
+  workerExtraDelayMs?: number;
+  mainThreadWrites?: number;
+  mainThreadWriteDelayMs?: number;
 };
 
 type QueueJobProgressSnapshot = {
@@ -159,25 +169,98 @@ type QueueBatchProgressSnapshot = {
   };
 };
 
+const MB_1 = 1024 * 1024;
+const MAX_PAYLOAD_SIZE_BYTES = 10 * MB_1;
+const MAX_MAIN_THREAD_WRITES = 20;
+const MAX_EXTRA_DELAY_MS = 60000;
+
+const clampInt = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(Math.floor(value), min), max);
+
+const buildPayload = (sizeBytes: number): string => {
+  if (sizeBytes <= 0) {
+    return "";
+  }
+
+  const block =
+    "RTC_DB_STRESS_BLOCK_0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz|";
+  const repeats = Math.ceil(sizeBytes / block.length);
+  return block.repeat(repeats).slice(0, sizeBytes);
+};
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
 export async function createWorkerBatch(
   count: number,
   message = "Queue test task",
+  options: CreateWorkerBatchOptions = {},
 ): Promise<ActionResult<QueueWorkerBatchResult>> {
   try {
     const safeCount = Math.min(Math.max(Math.floor(count), 1), 50);
     const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const jobs = await Promise.all(
+    const payloadSizeBytes = clampInt(
+      options.payloadSizeBytes ?? 0,
+      0,
+      MAX_PAYLOAD_SIZE_BYTES,
+    );
+    const workerExtraDelayMs = clampInt(
+      options.workerExtraDelayMs ?? 0,
+      0,
+      MAX_EXTRA_DELAY_MS,
+    );
+    const mainThreadWrites = clampInt(
+      options.mainThreadWrites ?? 0,
+      0,
+      MAX_MAIN_THREAD_WRITES,
+    );
+    const mainThreadWriteDelayMs = clampInt(
+      options.mainThreadWriteDelayMs ?? 0,
+      0,
+      MAX_EXTRA_DELAY_MS,
+    );
+
+    const payload = buildPayload(payloadSizeBytes);
+
+    const jobsPromise = Promise.all(
       Array.from({ length: safeCount }, (_, index) => {
         const data = {
           batchId,
           index: index + 1,
           total: safeCount,
           message: `${message} #${index + 1}`,
+          persistToDb: true,
+          payload,
+          workerExtraDelayMs,
         };
-        return excelQueue.add("sampleJob", data);
+        return testQueue.add("sampleJob", data);
       }),
     );
+
+    let mainThreadInsertedIds: number[] = [];
+    if (mainThreadWrites > 0) {
+      if (mainThreadWriteDelayMs > 0) {
+        await sleep(mainThreadWriteDelayMs);
+      }
+
+      const inserted = await Promise.all(
+        Array.from({ length: mainThreadWrites }, (_, index) =>
+          prisma.test.create({
+            data: {
+              test:
+                `[MAIN] ${message} #${index + 1} | batch=${batchId} | payloadBytes=${payloadSizeBytes}\n` +
+                payload,
+            },
+          }),
+        ),
+      );
+      mainThreadInsertedIds = inserted.map((entry) => entry.id);
+    }
+
+    const jobs = await jobsPromise;
 
     return {
       success: true,
@@ -185,6 +268,9 @@ export async function createWorkerBatch(
         batchId,
         total: safeCount,
         jobIds: jobs.map((job) => String(job.id)),
+        payloadSizeBytes,
+        mainThreadWrites,
+        mainThreadInsertedIds,
       },
     };
   } catch (error) {
@@ -237,7 +323,7 @@ export async function getWorkerBatchProgress(
 
     const jobs = await Promise.all(
       jobIds.map(async (jobId): Promise<QueueJobProgressSnapshot> => {
-        const job = await excelQueue.getJob(jobId);
+        const job = await testQueue.getJob(jobId);
         if (!job) {
           return {
             id: jobId,
@@ -286,7 +372,7 @@ export async function getWorkerBatchProgress(
             }, 0) / jobs.length,
           );
 
-    const counts = await excelQueue.getJobCounts(
+    const counts = await testQueue.getJobCounts(
       "waiting",
       "active",
       "completed",

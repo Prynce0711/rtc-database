@@ -8,7 +8,7 @@ import {
 } from "@/app/components/Case/Criminal/CriminalCasesActions";
 import {
   exportCasesExcel,
-  uploadExcel,
+  uploadCriminalCaseExcel,
 } from "@/app/components/Case/Criminal/ExcelActions";
 import {
   createEmptyCriminalEntry,
@@ -191,7 +191,7 @@ export default function CriminalCaseTester() {
     if (!file) return;
 
     setLoading(true);
-    const result = await uploadExcel(file);
+    const result = await uploadCriminalCaseExcel(file);
     if (result.success) {
       setMessage({
         type: "success",

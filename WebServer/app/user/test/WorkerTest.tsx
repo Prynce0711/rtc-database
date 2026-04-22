@@ -7,6 +7,29 @@ type BatchMeta = {
   batchId: string;
   total: number;
   jobIds: string[];
+  payloadSizeBytes: number;
+  mainThreadWrites: number;
+  mainThreadInsertedIds: number[];
+};
+
+type CreateWorkerBatchOptions = {
+  payloadSizeBytes?: number;
+  workerExtraDelayMs?: number;
+  mainThreadWrites?: number;
+  mainThreadWriteDelayMs?: number;
+};
+
+const MB_1 = 1024 * 1024;
+const MB_10 = 10 * MB_1;
+
+const formatBytes = (bytes: number): string => {
+  if (bytes >= MB_1) {
+    return `${(bytes / MB_1).toFixed(2)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(2)} KB`;
+  }
+  return `${bytes} B`;
 };
 
 type QueueJobProgressSnapshot = {
@@ -101,7 +124,10 @@ const WorkerTest = () => {
     }
   };
 
-  const startBatch = async (count: number) => {
+  const startBatch = async (
+    count: number,
+    options: CreateWorkerBatchOptions = {},
+  ) => {
     setLoading(true);
     setMessage(null);
 
@@ -109,6 +135,7 @@ const WorkerTest = () => {
       const createResult = await createWorkerBatch(
         count,
         taskMessage.trim() || "Queue test task",
+        options,
       );
 
       if (!createResult.success) {
@@ -122,7 +149,10 @@ const WorkerTest = () => {
       setBatchMeta(createResult.result);
       setMessage({
         type: "success",
-        text: `Queued ${createResult.result.total} task(s).`,
+        text:
+          `Queued ${createResult.result.total} worker task(s). ` +
+          `Main-thread inserts: ${createResult.result.mainThreadWrites}. ` +
+          `Payload per write: ${formatBytes(createResult.result.payloadSizeBytes)}.`,
       });
 
       await refreshProgress(createResult.result, false);
@@ -165,7 +195,9 @@ const WorkerTest = () => {
         <div className="rounded-lg bg-white p-6 shadow">
           <h2 className="text-xl font-bold">Queue Controls</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Add 1, 5, or 10 tasks. Each task takes around 3 seconds.
+            Run worker writes only, or run a collision test where the same
+            server action also writes on the main thread while worker tasks
+            write.
           </p>
 
           <div className="mt-4 space-y-3">
@@ -189,6 +221,29 @@ const WorkerTest = () => {
                 onClick={() => void startBatch(1)}
               >
                 Add 1 Task
+              </button>
+              <button
+                className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                type="button"
+                disabled={loading}
+                onClick={() => void startBatch(2)}
+              >
+                Add 2 Tasks (Same Time)
+              </button>
+              <button
+                className="rounded bg-amber-600 px-4 py-2 text-white disabled:opacity-50"
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  void startBatch(2, {
+                    payloadSizeBytes: MB_10,
+                    mainThreadWrites: 2,
+                    mainThreadWriteDelayMs: 5200,
+                    workerExtraDelayMs: 4000,
+                  })
+                }
+              >
+                Collision Test (Main + Worker, 10MB)
               </button>
               <button
                 className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
@@ -230,6 +285,14 @@ const WorkerTest = () => {
               <p className="mt-3 text-sm text-gray-600">
                 Batch ID: {progress.batchId}
               </p>
+              {batchMeta && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Payload: {formatBytes(batchMeta.payloadSizeBytes)} per write,
+                  main-thread inserts: {batchMeta.mainThreadWrites}
+                  {batchMeta.mainThreadInsertedIds.length > 0 &&
+                    ` (row ids: ${batchMeta.mainThreadInsertedIds.join(", ")})`}
+                </p>
+              )}
 
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <div className="rounded border p-3 text-sm">
@@ -269,8 +332,9 @@ const WorkerTest = () => {
               <p className="mt-3 text-xs text-gray-500">
                 Queue totals: waiting {progress.queueCounts.waiting}, active{" "}
                 {progress.queueCounts.active}, completed{" "}
-                {progress.queueCounts.completed}, failed {progress.queueCounts.failed},
-                delayed {progress.queueCounts.delayed}
+                {progress.queueCounts.completed}, failed{" "}
+                {progress.queueCounts.failed}, delayed{" "}
+                {progress.queueCounts.delayed}
               </p>
             </>
           )}
