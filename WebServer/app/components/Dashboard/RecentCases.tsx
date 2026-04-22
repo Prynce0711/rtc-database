@@ -1,4 +1,4 @@
-import { UnifiedCaseData } from "@rtc-database/shared";
+import { Table, UnifiedCaseData } from "@rtc-database/shared";
 import React from "react";
 
 interface RecentCasesProps {
@@ -95,60 +95,45 @@ const RecentCases: React.FC<RecentCasesProps> = ({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="table table-zebra text-center">
-            <thead>
-              <tr className="text-sm font-semibold text-base-content/60">
-                <th>Case</th>
-                <th>Party</th>
-                <th>Detail</th>
-                <th>Branch</th>
-                <th>Filed</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {cases.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-base-content/50">
-                    No recent cases
-                  </td>
-                </tr>
-              ) : (
-                cases.map((caseItem) => (
-                  <tr
-                    key={caseItem.id}
-                    className="hover:bg-base-200 transition"
+          <Table<UnifiedCaseData>
+            headers={[
+              { key: "case", label: "Case", align: "left" },
+              { key: "party", label: "Party", align: "left" },
+              { key: "detail", label: "Detail", align: "left" },
+              { key: "branch", label: "Branch", align: "left" },
+              { key: "filed", label: "Filed", align: "left" },
+              { key: "status", label: "Status", align: "center" },
+            ]}
+            data={cases}
+            rowsPerPage={10}
+            showPagination={false}
+            renderRow={(caseItem) => (
+              <tr key={caseItem.id} className="hover:bg-base-200 transition">
+                <td className="font-semibold py-4">{caseItem.caseNumber}</td>
+                <td className="font-medium text-base-content/80">
+                  {caseItem.displayParty}
+                </td>
+                <td className="text-base-content/70">
+                  {caseItem.displayDetail}
+                </td>
+                <td className="text-base-content/70">
+                  {caseItem.branch || "Unassigned"}
+                </td>
+                <td className="text-sm text-base-content/60">
+                  {caseItem.dateFiled
+                    ? new Date(caseItem.dateFiled).toLocaleDateString()
+                    : "No date"}
+                </td>
+                <td>
+                  <span
+                    className={`badge badge-md font-semibold ${caseItem.isDetained ? "badge-warning" : "badge-success"}`}
                   >
-                    <td className="font-semibold py-4">
-                      {caseItem.caseNumber}
-                    </td>
-                    <td className="font-medium text-base-content/80">
-                      {caseItem.displayParty}
-                    </td>
-                    <td className="text-base-content/70">
-                      {caseItem.displayDetail}
-                    </td>
-                    <td className="text-base-content/70">
-                      {caseItem.branch || "Unassigned"}
-                    </td>
-                    <td className="text-sm text-base-content/60">
-                      {caseItem.dateFiled
-                        ? new Date(caseItem.dateFiled).toLocaleDateString()
-                        : "No date"}
-                    </td>
-                    <td>
-                      <span
-                        className={`badge badge-md font-semibold ${caseItem.isDetained ? "badge-warning" : "badge-success"}`}
-                      >
-                        {caseItem.statusText}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    {caseItem.statusText}
+                  </span>
+                </td>
+              </tr>
+            )}
+          />
         </div>
       </div>
     </div>

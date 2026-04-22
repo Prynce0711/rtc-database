@@ -1,13 +1,14 @@
 "use client";
 
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import { FiInbox } from "react-icons/fi";
+import Pagination from "./Pagination";
 import { TableInteractionContext } from "./TableContext";
 
 type Header<T extends Record<string, unknown>> = {
@@ -55,7 +56,7 @@ function Table<T extends Record<string, unknown>>({
   sortConfig,
   onSort,
   className,
-  resizableColumns = false,
+  resizableColumns = true,
   minColumnWidth = 120,
   disableCellTooltips,
 }: TableProps<T>) {
@@ -197,26 +198,6 @@ function Table<T extends Record<string, unknown>>({
     setPage(p);
   };
 
-  const visiblePages = useMemo(() => {
-    const pages: (number | string)[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-    pages.push(1);
-    pages.push(2);
-    let left = page - 1;
-    let right = page + 1;
-    if (left <= 2) left = 3;
-    if (right >= totalPages - 1) right = totalPages - 2;
-    if (left > 3) pages.push("...");
-    for (let p = left; p <= right; p++) pages.push(p);
-    if (right < totalPages - 2) pages.push("...");
-    pages.push(totalPages - 1);
-    pages.push(totalPages);
-    return pages;
-  }, [page, totalPages]);
-
   return (
     <TableInteractionContext.Provider
       value={{ disableCellTooltips: effectiveDisableCellTooltips }}
@@ -224,7 +205,8 @@ function Table<T extends Record<string, unknown>>({
       <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
         <div className="overflow-x-auto overflow-y-visible">
           <table
-            className="table table-compact table-sm uppercase w-full text-center"
+            data-rtc-system-table="true"
+            className="table table-compact table-sm uppercase w-full text-center rtc-unified-table"
             style={resizableColumns ? { tableLayout: "fixed" } : undefined}
           >
             {resizableColumns && (
@@ -370,41 +352,11 @@ function Table<T extends Record<string, unknown>>({
             </div>
 
             {/* Controls */}
-            <nav className="flex items-center gap-1">
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={() => gotoPage(page - 1)}
-                disabled={page === 1}
-              >
-                Prev
-              </button>
-
-              {visiblePages.map((p, idx) =>
-                p === "..." ? (
-                  <span key={`dots-${idx}`} className="px-2 text-sm opacity-50">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={`page-${p}`}
-                    onClick={() => gotoPage(Number(p))}
-                    className={`btn btn-xs ${
-                      page === Number(p) ? "btn-primary" : "btn-ghost"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
-
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={() => gotoPage(page + 1)}
-                disabled={page === totalPages}
-              >
-                Next
-              </button>
-            </nav>
+            <Pagination
+              pageCount={totalPages}
+              currentPage={page}
+              onPageChange={gotoPage}
+            />
           </div>
         )}
       </div>
