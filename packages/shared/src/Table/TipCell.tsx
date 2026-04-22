@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useId, useRef } from "react";
+import React, { useContext, useId, useRef } from "react";
+import { TableInteractionContext } from "./TableContext";
 
 /**
  * TipCell — a `<td>` wrapper that shows a DaisyUI hover tooltip
@@ -20,6 +21,7 @@ const TipCell = ({
   truncate = false,
   children,
   clickHint = true,
+  showTooltip = true,
   onClick,
 }: {
   label: string;
@@ -28,8 +30,10 @@ const TipCell = ({
   truncate?: boolean;
   children?: React.ReactNode;
   clickHint?: boolean;
+  showTooltip?: boolean;
   onClick?: () => void;
 }) => {
+  const { disableCellTooltips } = useContext(TableInteractionContext);
   const rawId = useId();
   const safeId = rawId.replace(/[:]/g, "");
   const popoverId = `tip-popover-${safeId}`;
@@ -47,7 +51,13 @@ const TipCell = ({
           })
         : String(value)
       : "";
-  const showTip = tipText.length > 0 && tipText !== "—";
+  const showTip =
+    showTooltip &&
+    !disableCellTooltips &&
+    tipText.length > 0 &&
+    tipText !== "—";
+  // Always clip text like Excel — overflow hidden + ellipsis regardless of truncate prop
+  const shouldClipText = true;
 
   const openPopover = () => {
     if (!showTip) return;
@@ -97,14 +107,20 @@ const TipCell = ({
       onMouseLeave={closePopover}
       onFocus={openPopover}
       onBlur={closePopover}
-      className={`relative text-center whitespace-nowrap ${truncate ? "max-w-40" : ""} ${onClick ? "cursor-pointer select-none" : ""} ${className}`}
+      className={`relative text-center whitespace-nowrap overflow-hidden max-w-0 ${onClick ? "cursor-pointer select-none" : ""} ${className}`}
     >
       <span
         className="block"
         style={{ anchorName } as React.CSSProperties}
         aria-describedby={showTip ? popoverId : undefined}
       >
-        {truncate ? <span className="block truncate">{display}</span> : display}
+        {shouldClipText ? (
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">
+            {display}
+          </span>
+        ) : (
+          display
+        )}
       </span>
 
       {showTip && (

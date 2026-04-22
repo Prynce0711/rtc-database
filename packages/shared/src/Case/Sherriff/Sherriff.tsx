@@ -15,6 +15,7 @@ import {
   SheriffCasesFilterOptions,
   SheriffCaseStats,
   SherriffCaseAdapter,
+  Table,
   usePopup,
 } from "@rtc-database/shared";
 
@@ -52,32 +53,6 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
 const PAGE_SIZE = 10;
 
 type SortConfig = { key: SortKey; order: "asc" | "desc" };
-
-const SortTh = ({
-  label,
-  colKey,
-  sortConfig,
-  onSort,
-}: {
-  label: string;
-  colKey: SortKey;
-  sortConfig: SortConfig;
-  onSort: (k: SortKey) => void;
-}) => (
-  <th
-    className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
-    onClick={() => onSort(colKey)}
-  >
-    {label}
-    {sortConfig.key === colKey ? (
-      <span className="ml-1 text-primary">
-        {sortConfig.order === "asc" ? "↑" : "↓"}
-      </span>
-    ) : (
-      <span className="opacity-30 ml-1">↕</span>
-    )}
-  </th>
-);
 
 const Sherriff: React.FC<{
   role: Roles;
@@ -700,108 +675,73 @@ const Sherriff: React.FC<{
         </div>
 
         {/* Table */}
-        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
-          <table className="table table-zebra w-full text-center">
-            <thead className="bg-base-300">
-              <tr className="text-center">
-                {isAdminOrAtty && isSelecting && (
-                  <th className="text-center">
-                    <label className="inline-flex items-center justify-center gap-2">
-                      <span>SELECT</span>
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={allVisibleRecordsSelected}
-                        onChange={(e) =>
-                          handleToggleSelectAllVisibleRecords(e.target.checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label="Select all visible sheriff cases"
-                        disabled={visibleRecordIds.length === 0}
-                      />
-                    </label>
-                  </th>
-                )}
-                <SortTh
-                  label="CASE NUMBER"
-                  colKey="caseNumber"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="SHERIFF NAME"
-                  colKey="sheriffName"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="MORTGAGEE"
-                  colKey="mortgagee"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="MORTGAGOR"
-                  colKey="mortgagor"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="DATE FILED"
-                  colKey="dateFiled"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <th>REMARKS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={6 + (isAdminOrAtty && isSelecting ? 1 : 0)}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40 min-h-55">
-                      <div className="flex items-center justify-center mb-4">
-                        <FiFileText className="w-15 h-15 opacity-50" />
-                      </div>
-                      <p className="text-lg uppercase font-semibold text-base-content/50">
-                        No records found
-                      </p>
-                      <p className="text-sm mt-1 uppercase text-base-content/35">
-                        No sheriff cases match your current filters.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                records.map((r) => (
-                  <SherriffCaseRow
-                    key={r.id}
-                    record={r}
-                    onRowClick={(item) => {
-                      try {
-                        localStorage.setItem(
-                          "__temp_case",
-                          JSON.stringify(item),
-                        );
-                        localStorage.setItem(
-                          "__temp_cases",
-                          JSON.stringify(records || []),
-                        );
-                      } catch (e) {
-                        // ignore
-                      }
-                      router.push(`/user/cases/sheriff/${item.id}`);
-                    }}
-                    selected={selectedRecordIds.includes(r.id)}
-                    isSelecting={isSelecting}
-                    onToggleSelect={
-                      isSelecting ? handleToggleRecordSelection : undefined
-                    }
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="bg-base-100 rounded-lg shadow overflow-hidden">
+          <Table
+            headers={[
+              ...(isAdminOrAtty && isSelecting
+                ? [
+                    {
+                      key: "select",
+                      label: (
+                        <label className="inline-flex items-center justify-center gap-2">
+                          <span>SELECT</span>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={allVisibleRecordsSelected}
+                            onChange={(e) =>
+                              handleToggleSelectAllVisibleRecords(
+                                e.target.checked,
+                              )
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Select all visible sheriff cases"
+                            disabled={visibleRecordIds.length === 0}
+                          />
+                        </label>
+                      ),
+                      align: "center" as const,
+                    },
+                  ]
+                : []),
+              { key: "caseNumber", label: "CASE NUMBER", sortable: true },
+              { key: "sheriffName", label: "SHERIFF NAME", sortable: true },
+              { key: "mortgagee", label: "MORTGAGEE", sortable: true },
+              { key: "mortgagor", label: "MORTGAGOR", sortable: true },
+              { key: "dateFiled", label: "DATE FILED", sortable: true },
+              { key: "remarks", label: "REMARKS" },
+            ]}
+            data={records}
+            rowsPerPage={PAGE_SIZE}
+            showPagination={false}
+            resizableColumns
+            minColumnWidth={110}
+            sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
+            onSort={(k) => handleSort(k as SortKey)}
+            renderRow={(r) => (
+              <SherriffCaseRow
+                key={r.id}
+                record={r}
+                onRowClick={(item) => {
+                  try {
+                    localStorage.setItem("__temp_case", JSON.stringify(item));
+                    localStorage.setItem(
+                      "__temp_cases",
+                      JSON.stringify(records || []),
+                    );
+                  } catch (e) {
+                    // ignore
+                  }
+                  router.push(`/user/cases/sheriff/${item.id}`);
+                }}
+                selected={selectedRecordIds.includes(r.id)}
+                isSelecting={isSelecting}
+                onToggleSelect={
+                  isSelecting ? handleToggleRecordSelection : undefined
+                }
+              />
+            )}
+          />
         </div>
 
         {/* Pagination */}

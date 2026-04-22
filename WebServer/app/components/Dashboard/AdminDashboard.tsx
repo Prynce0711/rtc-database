@@ -729,7 +729,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                 {/* RECENT CASES */}
                 <section className="card surface-card-hover">
                   <RecentCases
-                    cases={cases}
+                    cases={cases.slice(0, 10)}
                     view="table"
                     onViewAll={() => router.push("/user/cases/criminal")}
                   />

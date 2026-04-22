@@ -30,6 +30,7 @@ import {
   PageListSkeleton,
   Pagination,
   Roles,
+  Table,
   usePopup,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
@@ -61,32 +62,6 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
 ];
 
 const PAGE_SIZE = 10;
-
-const SortTh = ({
-  label,
-  colKey,
-  sortConfig,
-  onSort,
-}: {
-  label: string;
-  colKey: SortKey;
-  sortConfig: SortConfig;
-  onSort: (k: SortKey) => void;
-}) => (
-  <th
-    className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 cursor-pointer select-none hover:bg-base-200/50 transition-colors"
-    onClick={() => onSort(colKey)}
-  >
-    {label}
-    {sortConfig.key === colKey ? (
-      <span className="ml-1 text-primary">
-        {sortConfig.order === "asc" ? "↑" : "↓"}
-      </span>
-    ) : (
-      <span className="opacity-30 ml-1">↕</span>
-    )}
-  </th>
-);
 
 const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   role,
@@ -651,103 +626,60 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
       </div>
 
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="table table-sm w-full text-center">
-            <thead>
-              <tr className="bg-base-200/50 border-b border-base-200">
-                {isSelecting && (
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    <label className="inline-flex items-center justify-center gap-2">
-                      <span>Select</span>
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={allVisibleCasesSelected}
-                        onChange={(e) =>
-                          handleToggleSelectAllVisibleCases(e.target.checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label="Select all visible civil cases"
-                        disabled={visibleCaseIds.length === 0}
-                      />
-                    </label>
-                  </th>
-                )}
-                <SortTh
-                  label="Case Number"
-                  colKey="caseNumber"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Branch"
-                  colKey="branch"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Petitioner/s"
-                  colKey="petitioners"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Defendant/s"
-                  colKey="defendants"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Date Filed"
-                  colKey="dateFiled"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Notes/Appealed"
-                  colKey="notes"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Nature"
-                  colKey="nature"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {cases.length === 0 ? (
-                <tr>
-                  <td colSpan={isSelecting ? 8 : 7} className="py-16">
-                    <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
-                      <FiFileText className="w-16 h-16 opacity-20 mb-4" />
-                      <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
-                        No records found
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                cases.map((caseItem) => (
-                  <CivilCaseRow
-                    key={caseItem.id}
-                    caseItem={caseItem}
-                    onView={(item) =>
-                      router.push(`/user/cases/civil/${item.id}`)
-                    }
-                    selected={selectedCaseIds.includes(caseItem.id)}
-                    isSelecting={isSelecting}
-                    onToggleSelect={
-                      isSelecting ? handleToggleCaseSelection : undefined
-                    }
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          headers={[
+            ...(isSelecting
+              ? [
+                  {
+                    key: "select",
+                    label: (
+                      <label className="inline-flex items-center justify-center gap-2">
+                        <span>Select</span>
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={allVisibleCasesSelected}
+                          onChange={(e) =>
+                            handleToggleSelectAllVisibleCases(e.target.checked)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Select all visible civil cases"
+                          disabled={visibleCaseIds.length === 0}
+                        />
+                      </label>
+                    ),
+                    align: "center" as const,
+                  },
+                ]
+              : []),
+            { key: "caseNumber", label: "Case Number", sortable: true },
+            { key: "branch", label: "Branch", sortable: true },
+            { key: "petitioners", label: "Petitioner/s", sortable: true },
+            { key: "defendants", label: "Defendant/s", sortable: true },
+            { key: "dateFiled", label: "Date Filed", sortable: true },
+            { key: "notes", label: "Notes/Appealed", sortable: true },
+            { key: "nature", label: "Nature", sortable: true },
+          ]}
+          data={cases}
+          rowsPerPage={PAGE_SIZE}
+          showPagination={false}
+          resizableColumns
+          minColumnWidth={110}
+          sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
+          onSort={(k) => handleSort(k as SortKey)}
+          renderRow={(caseItem) => (
+            <CivilCaseRow
+              key={caseItem.id}
+              caseItem={caseItem}
+              onView={(item) => router.push(`/user/cases/civil/${item.id}`)}
+              selected={selectedCaseIds.includes(caseItem.id)}
+              isSelecting={isSelecting}
+              onToggleSelect={
+                isSelecting ? handleToggleCaseSelection : undefined
+              }
+            />
+          )}
+        />
       </div>
 
       <div className="flex items-center justify-between">

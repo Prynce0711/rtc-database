@@ -29,6 +29,7 @@ import {
   PageListSkeleton,
   Pagination,
   Roles,
+  Table,
   usePopup,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
@@ -56,32 +57,6 @@ const PETITION_FILTER_OPTIONS: FilterOption[] = [
 ];
 
 const PAGE_SIZE = 10;
-
-const SortTh = ({
-  label,
-  colKey,
-  sortConfig,
-  onSort,
-}: {
-  label: string;
-  colKey: SortKey;
-  sortConfig: SortConfig;
-  onSort: (key: SortKey) => void;
-}) => (
-  <th
-    className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 cursor-pointer select-none hover:bg-base-200/50 transition-colors"
-    onClick={() => onSort(colKey)}
-  >
-    {label}
-    {sortConfig.key === colKey ? (
-      <span className="ml-1 text-primary">
-        {sortConfig.order === "asc" ? "↑" : "↓"}
-      </span>
-    ) : (
-      <span className="opacity-30 ml-1">↕</span>
-    )}
-  </th>
-);
 
 const PetitionCasePage: React.FC<{
   role: Roles;
@@ -608,95 +583,59 @@ const PetitionCasePage: React.FC<{
       </div>
 
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="table table-sm w-full text-center">
-            <thead>
-              <tr className="bg-base-200/50 border-b border-base-200">
-                {canManage && isSelecting && (
-                  <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                    <label className="inline-flex items-center justify-center gap-2">
-                      <span>Select</span>
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={allVisibleCasesSelected}
-                        onChange={(e) =>
-                          handleToggleSelectAllVisibleCases(e.target.checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label="Select all visible petition cases"
-                        disabled={visibleCaseIds.length === 0}
-                      />
-                    </label>
-                  </th>
-                )}
-                <SortTh
-                  label="Case Number"
-                  colKey="caseNumber"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Raffled To"
-                  colKey="raffledTo"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Date"
-                  colKey="date"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Petitioner"
-                  colKey="petitioner"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="Nature"
-                  colKey="nature"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {cases.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5 + (canManage && isSelecting ? 1 : 0)}
-                    className="py-16"
-                  >
-                    <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
-                      <FiFileText className="w-16 h-16 opacity-20 mb-4" />
-                      <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
-                        No records found
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                cases.map((caseItem) => (
-                  <PetitionCaseRow
-                    key={caseItem.id}
-                    caseItem={caseItem}
-                    onView={(item) =>
-                      router.push(`/user/cases/petition/${item.id}`)
-                    }
-                    selected={selectedCaseIds.includes(caseItem.id)}
-                    isSelecting={isSelecting}
-                    onToggleSelect={
-                      isSelecting ? handleToggleCaseSelection : undefined
-                    }
-                    canManage={canManage}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          headers={[
+            ...(canManage && isSelecting
+              ? [
+                  {
+                    key: "select",
+                    label: (
+                      <label className="inline-flex items-center justify-center gap-2">
+                        <span>Select</span>
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={allVisibleCasesSelected}
+                          onChange={(e) =>
+                            handleToggleSelectAllVisibleCases(e.target.checked)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Select all visible petition cases"
+                          disabled={visibleCaseIds.length === 0}
+                        />
+                      </label>
+                    ),
+                    align: "center" as const,
+                  },
+                ]
+              : []),
+            { key: "caseNumber", label: "Case Number", sortable: true },
+            { key: "raffledTo", label: "Raffled To", sortable: true },
+            { key: "date", label: "Date", sortable: true },
+            { key: "petitioner", label: "Petitioner", sortable: true },
+            { key: "nature", label: "Nature", sortable: true },
+          ]}
+          data={cases}
+          rowsPerPage={PAGE_SIZE}
+          showPagination={false}
+          resizableColumns
+          minColumnWidth={110}
+          sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
+          onSort={(k) => handleSort(k as SortKey)}
+          renderRow={(caseItem) => (
+            <PetitionCaseRow
+              key={caseItem.id}
+              caseItem={caseItem}
+              onView={(item) => router.push(`/user/cases/petition/${item.id}`)}
+              selected={selectedCaseIds.includes(caseItem.id)}
+              isSelecting={isSelecting}
+              onToggleSelect={
+                isSelecting ? handleToggleCaseSelection : undefined
+              }
+              canManage={canManage}
+            />
+          )}
+        />
       </div>
 
       <div className="flex items-center justify-between">
