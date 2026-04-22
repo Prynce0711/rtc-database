@@ -1,3 +1,5 @@
+"use client";
+
 import type { RecievingLogsAdapter } from "@rtc-database/shared";
 import { exportReceiveLogsExcel, uploadReceiveExcel } from "./ExcelActions";
 import {

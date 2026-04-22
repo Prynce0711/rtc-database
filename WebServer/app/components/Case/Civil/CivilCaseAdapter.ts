@@ -1,3 +1,5 @@
+"use client";
+
 import type { CivilCaseAdapter } from "@rtc-database/shared";
 import { CaseType } from "@rtc-database/shared";
 import { doesCaseExist, getCases, getCaseStats } from "../BaseCaseActions";
