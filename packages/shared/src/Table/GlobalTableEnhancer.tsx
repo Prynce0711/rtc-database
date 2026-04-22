@@ -5,6 +5,9 @@ import { useEffect } from "react";
 const STYLE_ELEMENT_ID = "rtc-unified-table-style";
 const TABLE_SELECTOR = "table:not([data-rtc-table-ignore='true'])";
 const MIN_COLUMN_WIDTH = 96;
+const HYDRATION_RETRY_MS = 250;
+const HYDRATION_RETRY_DURATION_MS = 8000;
+const REACT_INTERNAL_PREFIXES = ["__reactFiber$", "__reactProps$"] as const;
 
 const UNIFIED_TABLE_CSS = `
 .rtc-table-surface {
@@ -99,6 +102,18 @@ type ResizeBinding = {
 };
 
 const resizeBindingMap = new WeakMap<HTMLTableCellElement, ResizeBinding>();
+
+const hasReactInternals = (node: Element | null): boolean => {
+  if (!node) return false;
+
+  const ownPropertyNames = Object.getOwnPropertyNames(node);
+  return ownPropertyNames.some((prop) =>
+    REACT_INTERNAL_PREFIXES.some((prefix) => prop.startsWith(prefix)),
+  );
+};
+
+const isTableHydrated = (table: HTMLTableElement): boolean =>
+  hasReactInternals(table) || hasReactInternals(table.parentElement);
 
 const ensureStyleElement = (): void => {
   if (typeof document === "undefined") return;
@@ -273,6 +288,8 @@ const refreshAllTables = (): void => {
   const tables = document.querySelectorAll(TABLE_SELECTOR);
   for (const table of Array.from(tables)) {
     if (table instanceof HTMLTableElement) {
+      // Avoid mutating streamed SSR markup before React hydrates it.
+      if (!isTableHydrated(table)) continue;
       applyTableEnhancements(table);
     }
   }
@@ -284,6 +301,14 @@ export default function GlobalTableEnhancer() {
 
     ensureStyleElement();
     refreshAllTables();
+
+    const hydrationRetryInterval = window.setInterval(
+      refreshAllTables,
+      HYDRATION_RETRY_MS,
+    );
+    const hydrationRetryTimeout = window.setTimeout(() => {
+      window.clearInterval(hydrationRetryInterval);
+    }, HYDRATION_RETRY_DURATION_MS);
 
     let rafId = 0;
     const queueRefresh = () => {
@@ -305,6 +330,8 @@ export default function GlobalTableEnhancer() {
       if (rafId !== 0) {
         window.cancelAnimationFrame(rafId);
       }
+      window.clearTimeout(hydrationRetryTimeout);
+      window.clearInterval(hydrationRetryInterval);
       observer.disconnect();
     };
   }, []);
