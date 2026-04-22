@@ -1,4 +1,8 @@
-import { PopupProvider, ToastProvider } from "@rtc-database/shared";
+import {
+  GlobalTableEnhancer,
+  PopupProvider,
+  ToastProvider,
+} from "@rtc-database/shared";
 import type { Metadata } from "next";
 import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
@@ -33,6 +37,7 @@ export default async function RootLayout({
         <PublicEnvScript />
       </head>
       <body className={`${montserrat.variable} font-sans antialiased`}>
+        <GlobalTableEnhancer />
         <PopupProvider>
           <ToastProvider>
             <SessionProvider>

@@ -1,22 +1,21 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
+import { formatDate, Table, usePopup } from "@rtc-database/shared";
 import { User } from "@rtc-database/shared/prisma/browser";
 import { Status } from "@rtc-database/shared/prisma/enums";
-import Roles from "@/app/lib/Roles";
-import { formatDate } from "@rtc-database/shared";
-import { Pagination, usePopup } from "@rtc-database/shared";
 import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
 } from "react";
 import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { getAccounts, updateRole } from "./AccountActions";
 import AccountActionsButton from "./AccountActionsButton";
 import AddAccountDrawer from "./AddAccountDrawer";
-import { useSession } from "@/app/lib/authClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RoleFilterType = Roles | "ALL";
@@ -100,40 +99,6 @@ const StatusBadge = ({ status }: { status: Status }) => {
   );
 };
 
-// ─── Sort Header ──────────────────────────────────────────────────────────────
-const SortTh = ({
-  label,
-  colKey,
-  sortKey,
-  sortOrder,
-  onSort,
-}: {
-  label: string;
-  colKey: SortKey;
-  sortKey: SortKey;
-  sortOrder: SortOrder;
-  onSort: (k: SortKey) => void;
-}) => {
-  const isActive = sortKey === colKey;
-  return (
-    <th
-      onClick={() => onSort(colKey)}
-      className="py-5 px-6 text-[14px] font-black uppercase tracking-[0.14em] text-base-content/70 text-center cursor-pointer select-none hover:text-base-content transition-colors whitespace-nowrap"
-    >
-      <span className="inline-flex items-center justify-center gap-1">
-        {label}
-        {isActive ? (
-          <span className="text-primary text-xs">
-            {sortOrder === "asc" ? "↑" : "↓"}
-          </span>
-        ) : (
-          <span className="opacity-25 text-xs">↕</span>
-        )}
-      </span>
-    </th>
-  );
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 const AccountDashboard = () => {
   const statusPopup = usePopup();
@@ -145,15 +110,12 @@ const AccountDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showDrawer, setShowDrawer] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
   const [statusTab, setStatusTab] = useState<TabType>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilterType>("ALL");
   const [indicatorStyle, setIndicatorStyle] = useState<CSSProperties>({});
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
-
-  const pageSize = 10;
 
   // ── Tab indicator ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -183,7 +145,6 @@ const AccountDashboard = () => {
       setSortKey(key);
       setSortOrder("asc");
     }
-    setCurrentPage(1);
   };
 
   // ── Role change ────────────────────────────────────────────────────────────
@@ -217,6 +178,12 @@ const AccountDashboard = () => {
     });
 
     return [...filtered].sort((a, b) => {
+      if (sortKey === "createdAt" || sortKey === "updatedAt") {
+        const aVal = a[sortKey] ? new Date(a[sortKey]).getTime() : 0;
+        const bVal = b[sortKey] ? new Date(b[sortKey]).getTime() : 0;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
       const aVal = String(a[sortKey] ?? "");
       const bVal = String(b[sortKey] ?? "");
       return sortOrder === "asc"
@@ -224,11 +191,6 @@ const AccountDashboard = () => {
         : bVal.localeCompare(aVal);
     });
   }, [users, searchQuery, statusTab, roleFilter, sortKey, sortOrder]);
-
-  const paginated = processedUsers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -304,7 +266,6 @@ const AccountDashboard = () => {
                 }}
                 onClick={() => {
                   setStatusTab(tab);
-                  setCurrentPage(1);
                 }}
                 className={[
                   "relative z-10 px-6 py-2.5 rounded-full text-[14px] font-bold transition-colors duration-150 flex uppercase items-center gap-2",
@@ -338,7 +299,6 @@ const AccountDashboard = () => {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setCurrentPage(1);
               }}
             />
           </div>
@@ -347,7 +307,6 @@ const AccountDashboard = () => {
             value={roleFilter}
             onChange={(e) => {
               setRoleFilter(e.target.value as RoleFilterType);
-              setCurrentPage(1);
             }}
           >
             <option value="ALL">All Roles</option>
@@ -360,7 +319,7 @@ const AccountDashboard = () => {
         </div>
         {/* ── TABLE ────────────────────────────────────────── */}
         <div className="bg-base-100 rounded-xl border border-base-200 overflow-visible">
-          {paginated.length === 0 ? (
+          {processedUsers.length === 0 ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center py-24 gap-3">
               <div className="flex items-center justify-center mb-1">
@@ -382,156 +341,136 @@ const AccountDashboard = () => {
               )}
             </div>
           ) : (
-            <>
-              <div className="overflow-x-auto overflow-y-visible text-xl">
-                <table className="w-full text-xl">
-                  {/* HEADER */}
-                  <thead className="text-xl">
-                    <tr className="text-xl border-b border-base-200 bg-[#e6eef5] ">
-                      <SortTh
-                        label="Name"
-                        colKey="name"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortTh
-                        label="Email"
-                        colKey="email"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortTh
-                        label="Role"
-                        colKey="role"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortTh
-                        label="Status"
-                        colKey="status"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortTh
-                        label="Created"
-                        colKey="createdAt"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      <SortTh
-                        label="Updated"
-                        colKey="updatedAt"
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        onSort={handleSort}
-                      />
-                      {canManage && (
-                        <th className="py-4 px-5 text-[11px] font-bold uppercase tracking-widest text-base-content/50 text-center whitespace-nowrap">
-                          Actions
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
+            <Table<User>
+              className="border-0 rounded-none"
+              headers={[
+                {
+                  key: "name",
+                  label: "Name",
+                  sortable: true,
+                  sortKey: "name",
+                  align: "center",
+                },
+                {
+                  key: "email",
+                  label: "Email",
+                  sortable: true,
+                  sortKey: "email",
+                  align: "center",
+                },
+                {
+                  key: "role",
+                  label: "Role",
+                  sortable: true,
+                  sortKey: "role",
+                  align: "center",
+                },
+                {
+                  key: "status",
+                  label: "Status",
+                  sortable: true,
+                  sortKey: "status",
+                  align: "center",
+                },
+                {
+                  key: "createdAt",
+                  label: "Created",
+                  sortable: true,
+                  sortKey: "createdAt",
+                  align: "center",
+                },
+                {
+                  key: "updatedAt",
+                  label: "Updated",
+                  sortable: true,
+                  sortKey: "updatedAt",
+                  align: "center",
+                },
+                ...(canManage
+                  ? [
+                      {
+                        key: "actions",
+                        label: "Actions",
+                        align: "center" as const,
+                      },
+                    ]
+                  : []),
+              ]}
+              data={processedUsers}
+              rowsPerPage={10}
+              sortConfig={{ key: sortKey, order: sortOrder }}
+              onSort={(key) => handleSort(key as SortKey)}
+              renderRow={(user) => (
+                <tr
+                  key={user.id}
+                  className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100"
+                >
+                  <td className="py-4 px-5 text-center font-semibold text-base-content text-[13px]">
+                    {user.name}
+                  </td>
 
-                  {/* BODY */}
-                  <tbody>
-                    {paginated.map((user) => (
-                      <tr
-                        key={user.id}
-                        className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100"
+                  <td className="py-4 px-5 text-center text-base-content/55 text-[13px]">
+                    {user.email}
+                  </td>
+
+                  <td className="py-4 px-5 text-center">
+                    {user.role === Roles.ADMIN ||
+                    user.status === Status.PENDING ? (
+                      <span className="text-[13px] font-semibold text-base-content/50">
+                        {roleToText(user.role)}
+                      </span>
+                    ) : (
+                      <select
+                        className="h-8 px-3 rounded-lg border border-base-200 bg-base-100 text-[13px] font-semibold text-base-content/70 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        value={user.role}
+                        onChange={(e) =>
+                          handleRoleChange(user, e.target.value as Roles)
+                        }
                       >
-                        {/* Name */}
-                        <td className="py-4 px-5 text-center font-semibold text-base-content text-[13px]">
-                          {user.name}
-                        </td>
+                        <option value={Roles.USER}>Staff</option>
+                        <option value={Roles.ATTY}>Attorney</option>
+                        <option value={Roles.STATISTICS}>Statistics</option>
+                        <option value={Roles.NOTARIAL}>Notarial</option>
+                        <option value={Roles.ARCHIVE}>Archive</option>
+                      </select>
+                    )}
+                  </td>
 
-                        {/* Email */}
-                        <td className="py-4 px-5 text-center text-base-content/55 text-[13px]">
-                          {user.email}
-                        </td>
+                  <td className="py-4 px-5 text-center">
+                    <StatusBadge status={user.status} />
+                  </td>
 
-                        {/* Role */}
-                        <td className="py-4 px-5 text-center">
-                          {user.role === Roles.ADMIN ||
-                          user.status === Status.PENDING ? (
-                            <span className="text-[13px] font-semibold text-base-content/50">
-                              {roleToText(user.role)}
-                            </span>
-                          ) : (
-                            <select
-                              className="h-8 px-3 rounded-lg border border-base-200 bg-base-100 text-[13px] font-semibold text-base-content/70 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                              value={user.role}
-                              onChange={(e) =>
-                                handleRoleChange(user, e.target.value as Roles)
-                              }
-                            >
-                              <option value={Roles.USER}>Staff</option>
-                              <option value={Roles.ATTY}>Attorney</option>
-                              <option value={Roles.STATISTICS}>
-                                Statistics
-                              </option>
-                              <option value={Roles.NOTARIAL}>Notarial</option>
-                              <option value={Roles.ARCHIVE}>Archive</option>
-                            </select>
-                          )}
-                        </td>
+                  <td className="py-4 px-5 text-center text-[13px] text-base-content/45 tabular-nums">
+                    {formatDate(user.createdAt)}
+                  </td>
 
-                        {/* Status */}
-                        <td className="py-4 px-5 text-center">
-                          <StatusBadge status={user.status} />
-                        </td>
+                  <td className="py-4 px-5 text-center text-[13px] text-base-content/45 tabular-nums">
+                    {formatDate(user.updatedAt)}
+                  </td>
 
-                        {/* Created */}
-                        <td className="py-4 px-5 text-center text-[13px] text-base-content/45 tabular-nums">
-                          {formatDate(user.createdAt)}
-                        </td>
-
-                        {/* Updated */}
-                        <td className="py-4 px-5 text-center text-[13px] text-base-content/45 tabular-nums">
-                          {formatDate(user.updatedAt)}
-                        </td>
-
-                        {/* Actions */}
-                        {canManage && (
-                          <td className="py-4 px-5 text-center">
-                            <AccountActionsButton
-                              user={user}
-                              updateUser={(updated) =>
-                                setUsers((prev) =>
-                                  prev.map((u) =>
-                                    u.id === updated.id ? updated : u,
-                                  ),
-                                )
-                              }
-                              onRemove={(userId) =>
-                                setUsers((prev) =>
-                                  prev.filter((u) => u.id !== userId),
-                                )
-                              }
-                            />
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ── Pagination ──────────────────────────────── */}
-            </>
-          )}{" "}
-        </div>{" "}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-base-200">
-          <Pagination
-            currentPage={currentPage}
-            pageCount={Math.ceil(processedUsers.length / pageSize)}
-            onPageChange={setCurrentPage}
-          />
+                  {canManage && (
+                    <td className="py-4 px-5 text-center">
+                      <AccountActionsButton
+                        user={user}
+                        updateUser={(updated) =>
+                          setUsers((prev) =>
+                            prev.map((u) =>
+                              u.id === updated.id ? updated : u,
+                            ),
+                          )
+                        }
+                        onRemove={(userId) =>
+                          setUsers((prev) =>
+                            prev.filter((u) => u.id !== userId),
+                          )
+                        }
+                      />
+                    </td>
+                  )}
+                </tr>
+              )}
+            />
+          )}
         </div>
       </main>
     </div>

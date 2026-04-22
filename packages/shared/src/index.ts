@@ -11,36 +11,36 @@ export * from "./Case/Civil/CivilCaseAdapter";
 export { default as CivilCasePage } from "./Case/Civil/CivilCasePage";
 export { default as CivilCaseRow } from "./Case/Civil/CivilCaseRow";
 export {
-  calculateCivilCaseStats,
-  CivilCaseSchema,
-  civilCaseToEntry as civilCaseToEntry,
-  createEmptyCivilEntry as createEmptyCivilCaseEntry,
+    calculateCivilCaseStats,
+    CivilCaseSchema,
+    civilCaseToEntry as civilCaseToEntry,
+    createEmptyCivilEntry as createEmptyCivilCaseEntry
 } from "./Case/Civil/CivilCaseSchema";
 export type {
-  CivilCaseData,
-  CivilCaseEntry,
-  CivilCaseFilters,
-  CivilCasesFilterOptions,
-  CivilCaseStats,
+    CivilCaseData,
+    CivilCaseEntry,
+    CivilCaseFilters,
+    CivilCasesFilterOptions,
+    CivilCaseStats
 } from "./Case/Civil/CivilCaseSchema";
 export {
-  CivilCaseUpdatePage,
-  default as CivilCaseUpdatePageDefault,
-  NotarialUpdatePage,
+    CivilCaseUpdatePage,
+    default as CivilCaseUpdatePageDefault,
+    NotarialUpdatePage
 } from "./Case/Civil/CivilCaseUpdatePage";
 export { default as CivilDetailsPage } from "./Case/Civil/CivilDetailsPage";
 export * from "./Case/Criminal/CriminalCaseAdapter";
 export { default as CriminalCaseDetailsPage } from "./Case/Criminal/CriminalCaseDetailsPage";
 export { default as CriminalCasePage } from "./Case/Criminal/CriminalCasePage";
 export {
-  CaseTable,
-  default as CriminalCaseRow,
+    CaseTable,
+    default as CriminalCaseRow
 } from "./Case/Criminal/CriminalCaseRow";
 export type { CaseSortConfig } from "./Case/Criminal/CriminalCaseRow";
 export * from "./Case/Criminal/CriminalCaseSchema";
 export {
-  default as CriminalCaseUpdatePage,
-  CriminalCaseUpdateType,
+    default as CriminalCaseUpdatePage,
+    CriminalCaseUpdateType
 } from "./Case/Criminal/CriminalCaseUpdatePage";
 export { default as NavButton } from "./Case/NavButton";
 export * from "./Case/Petition/PetitionCaseAdapter";
@@ -48,19 +48,19 @@ export { default as PetitionCaseDetailsPage } from "./Case/Petition/PetitionCase
 export { default as PetitionCasePage } from "./Case/Petition/PetitionCasePage";
 export { default as PetitionCaseRow } from "./Case/Petition/PetitionCaseRow";
 export {
-  calculatePetitionCaseStats,
-  PetitionCaseSchema,
+    calculatePetitionCaseStats,
+    PetitionCaseSchema
 } from "./Case/Petition/PetitionCaseSchema";
 export type {
-  PetitionCaseData,
-  PetitionCaseEntry,
-  PetitionCaseFilters,
-  PetitionCasesFilterOptions,
-  PetitionCaseStats,
+    PetitionCaseData,
+    PetitionCaseEntry,
+    PetitionCaseFilters,
+    PetitionCasesFilterOptions,
+    PetitionCaseStats
 } from "./Case/Petition/PetitionCaseSchema";
 export {
-  default as PetitionCaseUpdatePage,
-  PetitionCaseUpdateType,
+    default as PetitionCaseUpdatePage,
+    PetitionCaseUpdateType
 } from "./Case/Petition/PetitionCaseUpdatePage";
 export * from "./Case/RecievingLogs";
 export * from "./Case/Sherriff";
@@ -95,6 +95,7 @@ export { default as SkeletonTable } from "./Skeleton/SkeletonTable";
 
 export { default as ActionDropdown } from "./Table/ActionDropdown";
 export { default as CellInput } from "./Table/CellInput";
+export { default as GlobalTableEnhancer } from "./Table/GlobalTableEnhancer";
 export { default as Pagination } from "./Table/Pagination";
 export { default as Table } from "./Table/Table";
 export * from "./Table/TableUtils";
@@ -122,3 +123,4 @@ export type { BackendInfo } from "./UdpData";
 
 export type * from "./types/electron";
 export type * from "./types/network";
+

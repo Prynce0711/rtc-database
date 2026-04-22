@@ -1,41 +1,42 @@
 "use client";
 
 import {
-  getMunicipalJudgements,
-  getRegionalJudgements,
+    getMunicipalJudgements,
+    getRegionalJudgements,
 } from "@/app/components/Statistics/Judgement/judgementActions";
 import type {
-  MTCJudgementRow,
-  RTCJudgementRow,
+    MTCJudgementRow,
+    RTCJudgementRow,
 } from "@/app/components/Statistics/Judgement/Schema";
 import { getMonthlyStatistics } from "@/app/components/Statistics/Monthly/MonthlyActions";
 import type { MonthlyRow } from "@/app/components/Statistics/Monthly/Schema";
+import { Table } from "@rtc-database/shared";
 import { motion } from "framer-motion";
 import {
-  BarChart3,
-  Calendar,
-  FileText,
-  Gavel,
-  RefreshCw,
-  Scale,
-  TrendingUp,
-  Users,
+    BarChart3,
+    Calendar,
+    FileText,
+    Gavel,
+    RefreshCw,
+    Scale,
+    TrendingUp,
+    Users,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -249,7 +250,7 @@ const StatisticsDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen">
-        <main className="w-full max-w-[1600px] mx-auto p-6 lg:p-10 space-y-6">
+        <main className="w-full max-w-400 mx-auto p-6 lg:p-10 space-y-6">
           <div className="flex items-center gap-3 mb-2">
             <Skeleton className="h-10 w-64" />
           </div>
@@ -273,7 +274,7 @@ const StatisticsDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <main className="w-full max-w-[1600px] mx-auto p-6 lg:p-10 space-y-8">
+      <main className="w-full max-w-400 mx-auto p-6 lg:p-10 space-y-8">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
@@ -669,57 +670,48 @@ const StatisticsDashboard: React.FC = () => {
               Judgement Day — MTC Branches Summary
             </h3>
             <div className="overflow-x-auto">
-              <table className="table table-md w-full">
-                <thead>
-                  <tr className="text-sm text-base-content/50 uppercase font-bold">
-                    <th>Branch</th>
-                    <th className="text-right">Civil (V)</th>
-                    <th className="text-right">Criminal (V)</th>
-                    <th className="text-right">Heard</th>
-                    <th className="text-right">Disposed</th>
-                    <th className="text-right">PDL Total</th>
-                    <th className="text-right">Total</th>
+              <Table<MTCJudgementRow>
+                headers={[
+                  { key: "branch", label: "Branch", align: "left" },
+                  { key: "civilV", label: "Civil (V)", align: "right" },
+                  {
+                    key: "criminalV",
+                    label: "Criminal (V)",
+                    align: "right",
+                  },
+                  { key: "heard", label: "Heard", align: "right" },
+                  { key: "disposed", label: "Disposed", align: "right" },
+                  { key: "pdlTotal", label: "PDL Total", align: "right" },
+                  { key: "total", label: "Total", align: "right" },
+                ]}
+                data={mtc}
+                showPagination={false}
+                renderRow={(r) => (
+                  <tr key={r.id} className="hover">
+                    <td className="font-semibold">
+                      {r.branchNo ?? `Branch ${r.id}`}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.civilV))}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.criminalV))}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.totalHeard))}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.totalDisposed))}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.pdlTotal))}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {fmt(num(r.total))}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {mtc.length > 0 ? (
-                    mtc.map((r) => (
-                      <tr key={r.id} className="hover">
-                        <td className="font-semibold">
-                          {r.branchNo ?? `Branch ${r.id}`}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.civilV))}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.criminalV))}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.totalHeard))}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.totalDisposed))}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.pdlTotal))}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(num(r.total))}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="text-center text-base-content/30 py-8"
-                      >
-                        No MTC judgement data available
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                )}
+              />
             </div>
           </div>
         </motion.section>
@@ -736,50 +728,33 @@ const StatisticsDashboard: React.FC = () => {
               Recent Monthly Records
             </h3>
             <div className="overflow-x-auto">
-              <table className="table table-md w-full">
-                <thead>
-                  <tr className="text-sm text-base-content/50 uppercase font-bold">
-                    <th>Month</th>
-                    <th>Category</th>
-                    <th>Branch</th>
-                    <th className="text-right">Criminal</th>
-                    <th className="text-right">Civil</th>
-                    <th className="text-right">Total</th>
+              <Table<MonthlyRow>
+                headers={[
+                  { key: "month", label: "Month", align: "left" },
+                  { key: "category", label: "Category", align: "left" },
+                  { key: "branch", label: "Branch", align: "left" },
+                  { key: "criminal", label: "Criminal", align: "right" },
+                  { key: "civil", label: "Civil", align: "right" },
+                  { key: "total", label: "Total", align: "right" },
+                ]}
+                data={monthly.slice(0, 15)}
+                showPagination={false}
+                renderRow={(r) => (
+                  <tr
+                    key={r.id ?? `${r.month}-${r.category}-${r.branch}`}
+                    className="hover"
+                  >
+                    <td className="font-semibold">{r.month}</td>
+                    <td className="font-semibold">{r.category}</td>
+                    <td className="font-semibold">{r.branch}</td>
+                    <td className="text-right font-semibold">
+                      {fmt(r.criminal)}
+                    </td>
+                    <td className="text-right font-semibold">{fmt(r.civil)}</td>
+                    <td className="text-right font-semibold">{fmt(r.total)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {monthly.length > 0 ? (
-                    monthly.slice(0, 15).map((r) => (
-                      <tr
-                        key={r.id ?? `${r.month}-${r.category}-${r.branch}`}
-                        className="hover"
-                      >
-                        <td className="font-semibold">{r.month}</td>
-                        <td className="font-semibold">{r.category}</td>
-                        <td className="font-semibold">{r.branch}</td>
-                        <td className="text-right font-semibold">
-                          {fmt(r.criminal)}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(r.civil)}
-                        </td>
-                        <td className="text-right font-semibold">
-                          {fmt(r.total)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="text-center text-base-content/30 py-8"
-                      >
-                        No monthly records available
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                )}
+              />
             </div>
           </div>
         </motion.section>

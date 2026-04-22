@@ -1,11 +1,16 @@
+import {
+    GlobalTableEnhancer,
+    PopupProvider,
+    ToastProvider,
+} from "@rtc-database/shared";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { PopupProvider, ToastProvider } from "@rtc-database/shared";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <GlobalTableEnhancer />
     <PopupProvider>
       <ToastProvider>
         <App />
