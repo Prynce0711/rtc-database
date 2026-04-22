@@ -2,27 +2,27 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ChangeEvent,
+    type KeyboardEvent,
 } from "react";
 import {
-  FiAlertCircle,
-  FiArrowLeft,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiAlertCircle,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronLeft,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
@@ -31,11 +31,11 @@ import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import {
-  CivilCaseEntry,
-  CivilCaseSchema,
-  civilCaseToEntry,
-  createEmptyCivilEntry,
-  type CivilCaseData,
+    CivilCaseEntry,
+    CivilCaseSchema,
+    civilCaseToEntry,
+    createEmptyCivilEntry,
+    type CivilCaseData,
 } from "./CivilCaseSchema";
 
 export enum CivilCaseUpdateType {

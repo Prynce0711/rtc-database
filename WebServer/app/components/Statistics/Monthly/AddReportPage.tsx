@@ -2,23 +2,23 @@
 
 import { getHeaderRowInfo } from "@rtc-database/shared";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiPlus,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import AddRowsToolbar from "../Shared/AddRowsToolbar";
@@ -982,7 +982,6 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
           {/* ── Toolbar ── */}
           <AddRowsToolbar onAddRows={addRows}>
-
             <input
               ref={fileInputRef}
               type="file"

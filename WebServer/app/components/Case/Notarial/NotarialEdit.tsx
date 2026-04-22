@@ -1,24 +1,24 @@
 import {
-  CaseEntryToolbar,
-  CellInput,
-  usePopup,
-  useToast,
-  type ColDef,
+    CaseEntryToolbar,
+    CellInput,
+    usePopup,
+    useToast,
+    type ColDef,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronLeft,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import { NotarialFormEntry } from "./Notarial";
 import ReviewCard from "./NotarialReviewCard";

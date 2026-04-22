@@ -1,44 +1,44 @@
 "use client";
 
 import {
-  CaseType,
-  createEmptyCriminalEntry,
-  CriminalCaseAdapter,
-  CriminalCaseData,
-  CriminalCaseEntry,
-  CriminalCaseSchema,
-  criminalCaseToEntry,
-  usePopup,
-  useToast,
+    CaseType,
+    createEmptyCriminalEntry,
+    CriminalCaseAdapter,
+    CriminalCaseData,
+    CriminalCaseEntry,
+    CriminalCaseSchema,
+    criminalCaseToEntry,
+    usePopup,
+    useToast,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiAlertCircle,
-  FiArrowLeft,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
-  FiDollarSign,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiMapPin,
-  FiSave,
-  FiTrash2,
-  FiUpload,
-  FiUsers,
+    FiAlertCircle,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronLeft,
+    FiChevronRight,
+    FiCopy,
+    FiDollarSign,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiMapPin,
+    FiSave,
+    FiTrash2,
+    FiUpload,
+    FiUsers,
 } from "react-icons/fi";
-import CaseEntryToolbar from "../CaseEntryToolbar";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { createTempId } from "../../utils";
+import CaseEntryToolbar from "../CaseEntryToolbar";
 
 export enum CriminalCaseUpdateType {
   ADD = "ADD",
