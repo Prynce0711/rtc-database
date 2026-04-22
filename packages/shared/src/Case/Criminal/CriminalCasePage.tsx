@@ -18,7 +18,7 @@ import {
   type CriminalCaseData,
   type CriminalCaseFilters,
   type CriminalCasesFilterOptions,
-} from "@rtc-database/shared";
+} from "../../index";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -852,6 +852,8 @@ const CriminalCasePage: React.FC<{
           data={cases}
           rowsPerPage={pageSize}
           showPagination={false}
+          resizableColumns
+          minColumnWidth={80}
           sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
           onSort={(k) => handleSort(k as SortKey)}
           renderRow={(caseItem) => (

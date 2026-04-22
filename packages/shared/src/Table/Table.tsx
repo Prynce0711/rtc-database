@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FiInbox } from "react-icons/fi";
+import { TableInteractionContext } from "./TableContext";
 
 type Header<T extends Record<string, unknown>> = {
   key: string;
@@ -27,6 +28,15 @@ type TableProps<T extends Record<string, unknown>> = {
   sortConfig?: SortConfig<T>;
   onSort?: (key: keyof T) => void;
   className?: string;
+  resizableColumns?: boolean;
+  minColumnWidth?: number;
+  disableCellTooltips?: boolean;
+};
+
+type ActiveResizeState = {
+  key: string;
+  startX: number;
+  startWidth: number;
 };
 
 function Table<T extends Record<string, unknown>>({
@@ -39,8 +49,135 @@ function Table<T extends Record<string, unknown>>({
   sortConfig,
   onSort,
   className,
+  resizableColumns = false,
+  minColumnWidth = 120,
+  disableCellTooltips,
 }: TableProps<T>) {
   const [page, setPage] = useState(initialPage);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [resizingColumnKey, setResizingColumnKey] = useState<string | null>(
+    null,
+  );
+  const headerRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const activeResizeRef = useRef<ActiveResizeState | null>(null);
+  const liveResizeWidthRef = useRef<number | null>(null);
+  const effectiveMinColumnWidth = Math.max(72, minColumnWidth);
+  const effectiveDisableCellTooltips = disableCellTooltips ?? resizableColumns;
+  const hasAllColumnWidths = useMemo(
+    () => headers.every((h) => typeof columnWidths[h.key] === "number"),
+    [columnWidths, headers],
+  );
+
+  useEffect(() => {
+    if (!resizableColumns) return;
+
+    const missingHeaders = headers.filter(
+      (h) => typeof columnWidths[h.key] !== "number",
+    );
+    if (missingHeaders.length === 0) return;
+
+    const measuredWidths: Record<string, number> = {};
+    let hasMeasurements = false;
+
+    for (const header of missingHeaders) {
+      const headerCell = headerRefs.current[header.key];
+      if (!headerCell) continue;
+
+      measuredWidths[header.key] = Math.max(
+        effectiveMinColumnWidth,
+        Math.round(headerCell.getBoundingClientRect().width),
+      );
+      hasMeasurements = true;
+    }
+
+    if (!hasMeasurements) return;
+
+    setColumnWidths((prev) => ({
+      ...prev,
+      ...measuredWidths,
+    }));
+  }, [columnWidths, effectiveMinColumnWidth, headers, resizableColumns]);
+
+  const startResize = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>, key: string) => {
+      if (!resizableColumns) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const headerCell = headerRefs.current[key];
+      if (!headerCell) return;
+
+      activeResizeRef.current = {
+        key,
+        startX: event.clientX,
+        startWidth: headerCell.getBoundingClientRect().width,
+      };
+      liveResizeWidthRef.current = null;
+
+      setResizingColumnKey(key);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [resizableColumns],
+  );
+
+  useEffect(() => {
+    if (!resizableColumns) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const active = activeResizeRef.current;
+      if (!active) return;
+
+      const nextWidth = Math.max(
+        effectiveMinColumnWidth,
+        Math.round(active.startWidth + (event.clientX - active.startX)),
+      );
+
+      liveResizeWidthRef.current = nextWidth;
+
+      const headerCell = headerRefs.current[active.key];
+      if (headerCell) {
+        headerCell.style.width = `${nextWidth}px`;
+      }
+
+      const colCell = colRefs.current[active.key];
+      if (colCell) {
+        colCell.style.width = `${nextWidth}px`;
+      }
+    };
+
+    const endResize = () => {
+      const active = activeResizeRef.current;
+      if (!active) return;
+
+      const finalWidth = liveResizeWidthRef.current;
+      if (finalWidth != null) {
+        setColumnWidths((prev) =>
+          prev[active.key] === finalWidth
+            ? prev
+            : { ...prev, [active.key]: finalWidth },
+        );
+      }
+
+      activeResizeRef.current = null;
+      liveResizeWidthRef.current = null;
+      setResizingColumnKey(null);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", endResize);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", endResize);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [effectiveMinColumnWidth, resizableColumns]);
 
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
 
@@ -75,131 +212,201 @@ function Table<T extends Record<string, unknown>>({
   }, [page, totalPages]);
 
   return (
-    <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
-      <div className="overflow-x-auto overflow-y-visible">
-        <table className="table table-compact table-sm uppercase w-full text-center">
-          <thead className="text-sm">
-            <tr className="bg-base-200/50 border-b border-base-200">
-              {headers.map((h) => {
-                const alignClass =
-                  h.align === "center"
-                    ? "text-center"
-                    : h.align === "right"
-                      ? "text-right"
-                      : "text-left";
-                const isActive =
-                  !!sortConfig &&
-                  sortConfig.key === (h.sortKey ?? (h.key as keyof T));
-
-                return (
-                  <th
+    <TableInteractionContext.Provider
+      value={{ disableCellTooltips: effectiveDisableCellTooltips }}
+    >
+      <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
+        <div className="overflow-x-auto overflow-y-visible">
+          <table
+            className="table table-compact table-sm uppercase w-full text-center"
+            style={
+              resizableColumns
+                ? { tableLayout: "fixed" }
+                : undefined
+            }
+          >
+            {resizableColumns && (
+              <colgroup>
+                {headers.map((h) => (
+                  <col
                     key={h.key}
-                    className={`py-4 px-4 ${h.className ?? ""} ${alignClass} text-sm font-bold uppercase tracking-wider text-base-content/50 ${h.sortable ? "cursor-pointer select-none hover:bg-base-200/50 transition-colors" : ""}`}
-                    onClick={() => {
-                      if (!h.sortable || !onSort) return;
-                      const key = h.sortKey ?? (h.key as keyof T);
-                      onSort(key);
+                    ref={(node) => {
+                      colRefs.current[h.key] = node;
                     }}
-                  >
-                    <div
-                      className={`flex w-full items-center ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
+                    style={
+                      typeof columnWidths[h.key] === "number"
+                        ? {
+                            width: `${columnWidths[h.key]}px`,
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </colgroup>
+            )}
+
+            <thead className="text-sm">
+              <tr className="bg-base-200/50 border-b border-base-200">
+                {headers.map((h) => {
+                  const alignClass =
+                    h.align === "center"
+                      ? "text-center"
+                      : h.align === "right"
+                        ? "text-right"
+                        : "text-left";
+                  const isActive =
+                    !!sortConfig &&
+                    sortConfig.key === (h.sortKey ?? (h.key as keyof T));
+
+                  return (
+                    <th
+                      key={h.key}
+                      ref={(node) => {
+                        headerRefs.current[h.key] = node;
+                      }}
+                      style={
+                        resizableColumns
+                          ? {
+                              width: columnWidths[h.key]
+                                ? `${columnWidths[h.key]}px`
+                                : undefined,
+                              maxWidth: columnWidths[h.key]
+                                ? `${columnWidths[h.key]}px`
+                                : undefined,
+                              minWidth: `${effectiveMinColumnWidth}px`,
+                              overflow: "hidden",
+                            }
+                          : undefined
+                      }
+                      className={`py-4 px-4 ${resizableColumns ? "relative overflow-hidden" : ""} ${h.className ?? ""} ${alignClass} text-sm font-bold uppercase tracking-wider text-base-content/50 ${h.sortable ? "cursor-pointer select-none hover:bg-base-200/50 transition-colors" : ""}`}
+                      onClick={() => {
+                        if (!h.sortable || !onSort) return;
+                        const key = h.sortKey ?? (h.key as keyof T);
+                        onSort(key);
+                      }}
                     >
-                      <span className="font-bold text-sm">{h.label}</span>
-                      {h.sortable &&
-                        (isActive ? (
-                          <span className="ml-1 text-primary">
-                            {sortConfig?.order === "asc" ? "↑" : "↓"}
+                      <div
+                        className={`flex w-full min-w-0 items-center gap-1 ${h.align === "center" ? "justify-center" : h.align === "right" ? "justify-end" : "justify-start"}`}
+                      >
+                        {typeof h.label === "string" ? (
+                          <span className="font-bold text-sm min-w-0 overflow-hidden whitespace-nowrap text-ellipsis">
+                            {h.label}
                           </span>
                         ) : (
-                          <span className="opacity-30 ml-1">↕</span>
-                        ))}
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+                          <span className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis">
+                            {h.label}
+                          </span>
+                        )}
+                        {h.sortable &&
+                          (isActive ? (
+                            <span className="ml-1 shrink-0 text-primary">
+                              {sortConfig?.order === "asc" ? "↑" : "↓"}
+                            </span>
+                          ) : (
+                            <span className="opacity-30 ml-1 shrink-0">↕</span>
+                          ))}
+                      </div>
 
-          {/* BODY */}
-          <tbody className="text-sm [&_td]:py-2 [&_td]:text-sm">
-            {data.length === 0 ? (
-              <tr>
-                <td colSpan={headers.length} className="py-16">
-                  <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
-                    <FiInbox className="w-16 h-16 opacity-20 mb-4" />
-                    <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
-                      No records found
-                    </p>
-                    <p className="text-sm mt-2 text-base-content/35">
-                      There are no entries to display yet.
-                    </p>
-                  </div>
-                </td>
+                      {resizableColumns && (
+                        <div
+                          role="separator"
+                          aria-orientation="vertical"
+                          className={`absolute right-0 top-0 h-full w-5 cursor-col-resize select-none touch-none ${resizingColumnKey === h.key ? "bg-primary/10" : "hover:bg-primary/5"}`}
+                          onMouseDown={(event) => startResize(event, h.key)}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <span
+                            className={`absolute left-1/2 top-1/2 h-6 -translate-x-1/2 -translate-y-1/2 border-r ${resizingColumnKey === h.key ? "border-primary" : "border-base-content/25"}`}
+                          />
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
-            ) : (
-              paginated.map((d, i) =>
-                renderRow(d, (page - 1) * rowsPerPage + i),
-              )
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
 
-      {/* PAGINATION */}
-      {showPagination && totalPages > 1 && (
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
-          {/* Info */}
-          <div className="text-sm text-base-content/70">
-            Showing{" "}
-            <span className="font-semibold">
-              {(page - 1) * rowsPerPage + 1}
-            </span>{" "}
-            –{" "}
-            <span className="font-semibold">
-              {Math.min(page * rowsPerPage, data.length)}
-            </span>{" "}
-            of <span className="font-semibold">{data.length}</span>
-          </div>
-
-          {/* Controls */}
-          <nav className="flex items-center gap-1">
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => gotoPage(page - 1)}
-              disabled={page === 1}
-            >
-              Prev
-            </button>
-
-            {visiblePages.map((p, idx) =>
-              p === "..." ? (
-                <span key={`dots-${idx}`} className="px-2 text-sm opacity-50">
-                  …
-                </span>
+            {/* BODY */}
+            <tbody className="text-sm [&_td]:py-2 [&_td]:text-sm">
+              {data.length === 0 ? (
+                <tr>
+                  <td colSpan={headers.length} className="py-16">
+                    <div className="flex flex-col items-center justify-center py-12 text-base-content/40">
+                      <FiInbox className="w-16 h-16 opacity-20 mb-4" />
+                      <p className="text-lg font-semibold text-base-content/50 uppercase tracking-wide">
+                        No records found
+                      </p>
+                      <p className="text-sm mt-2 text-base-content/35">
+                        There are no entries to display yet.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               ) : (
-                <button
-                  key={`page-${p}`}
-                  onClick={() => gotoPage(Number(p))}
-                  className={`btn btn-xs ${
-                    page === Number(p) ? "btn-primary" : "btn-ghost"
-                  }`}
-                >
-                  {p}
-                </button>
-              ),
-            )}
-
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => gotoPage(page + 1)}
-              disabled={page === totalPages}
-            >
-              Next
-            </button>
-          </nav>
+                paginated.map((d, i) =>
+                  renderRow(d, (page - 1) * rowsPerPage + i),
+                )
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-    </div>
+
+        {/* PAGINATION */}
+        {showPagination && totalPages > 1 && (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 mt-6">
+            {/* Info */}
+            <div className="text-sm text-base-content/70">
+              Showing{" "}
+              <span className="font-semibold">
+                {(page - 1) * rowsPerPage + 1}
+              </span>{" "}
+              –{" "}
+              <span className="font-semibold">
+                {Math.min(page * rowsPerPage, data.length)}
+              </span>{" "}
+              of <span className="font-semibold">{data.length}</span>
+            </div>
+
+            {/* Controls */}
+            <nav className="flex items-center gap-1">
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={() => gotoPage(page - 1)}
+                disabled={page === 1}
+              >
+                Prev
+              </button>
+
+              {visiblePages.map((p, idx) =>
+                p === "..." ? (
+                  <span key={`dots-${idx}`} className="px-2 text-sm opacity-50">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={`page-${p}`}
+                    onClick={() => gotoPage(Number(p))}
+                    className={`btn btn-xs ${
+                      page === Number(p) ? "btn-primary" : "btn-ghost"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={() => gotoPage(page + 1)}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </nav>
+          </div>
+        )}
+      </div>
+    </TableInteractionContext.Provider>
   );
 }
 

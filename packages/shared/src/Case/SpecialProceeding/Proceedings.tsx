@@ -11,6 +11,7 @@ import {
   SpecialProceedingData,
   SpecialProceedingStats,
   SpecialProceedingsFilterOptions,
+  Table,
   calculateSpecialProceedingStats,
   isTextFieldKey,
   usePopup,
@@ -58,49 +59,6 @@ const SP_FILTER_OPTIONS: FilterOption[] = [
 ];
 
 const PAGE_SIZE = 10;
-
-const SortTh = ({
-  label,
-  colKey,
-  sortConfig,
-  onSort,
-}: {
-  label: string;
-  colKey: SortableSPKey;
-  sortConfig: SortConfig;
-  onSort: (k: SortableSPKey) => void;
-}) => {
-  const active = sortConfig.key === colKey;
-  const ariaLabel = active
-    ? `Sorted ${sortConfig.order === "asc" ? "ascending" : "descending"}`
-    : "Not sorted";
-
-  return (
-    <th
-      className="text-center cursor-pointer select-none hover:bg-base-200 transition-colors"
-      onClick={() => onSort(colKey)}
-      aria-sort={
-        active
-          ? sortConfig.order === "asc"
-            ? "ascending"
-            : "descending"
-          : "none"
-      }
-      aria-label={`${label}: ${ariaLabel}`}
-    >
-      {label}
-      {active ? (
-        <span className="ml-1 text-primary" aria-hidden>
-          {sortConfig.order === "asc" ? "?" : "?"}
-        </span>
-      ) : (
-        <span className="opacity-30 ml-1" aria-hidden>
-          ?
-        </span>
-      )}
-    </th>
-  );
-};
 
 const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   adapter,
@@ -690,101 +648,68 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         </div>
 
         {/* Table */}
-        <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
-          <table className="table table-zebra w-full text-center">
-            <thead className=" bg-base-300">
-              <tr className="text-center">
-                {isSelecting && (
-                  <th className="text-center">
-                    <label className="inline-flex items-center justify-center gap-2">
-                      <span>SELECT</span>
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={allVisibleCasesSelected}
-                        onChange={(e) =>
-                          handleToggleSelectAllVisibleCases(e.target.checked)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label="Select all visible special proceeding cases"
-                        disabled={visibleCaseIds.length === 0}
-                      />
-                    </label>
-                  </th>
-                )}
-                <SortTh
-                  label="SPC. NO."
-                  colKey="caseNumber"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="RAFFLED TO BRANCH"
-                  colKey="raffledTo"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="DATE FILED"
-                  colKey="date"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="PETITIONERS"
-                  colKey="petitioner"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="NATURE"
-                  colKey="nature"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-                <SortTh
-                  label="RESPONDENT"
-                  colKey="respondent"
-                  sortConfig={sortConfig}
-                  onSort={handleSort}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {cases.length === 0 ? (
-                <tr>
-                  <td colSpan={6 + (isSelecting ? 1 : 0)}>
-                    <div className="flex flex-col items-center justify-center py-20 text-base-content/40">
-                      <div className="flex items-center justify-center mb-4">
-                        <FiFileText className="w-15 h-15 opacity-50" />
-                      </div>
-                      <p className="text-lg font-semibold text-base-content/50">
-                        NO CASES FOUND
-                      </p>
-                      <p className="text-sm uppercase mt-1 text-base-content/35">
-                        No special proceedings match your current filters.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                cases.map((c) => (
-                  <SpecialProceedingRow
-                    key={c.id}
-                    caseItem={c}
-                    onRowClick={(item) =>
-                      router.push(`/user/cases/proceedings/${item.id}`)
-                    }
-                    isSelected={selectedCaseIds.includes(c.id)}
-                    isSelecting={isSelecting}
-                    onToggleSelect={
-                      isSelecting ? handleToggleCaseSelection : undefined
-                    }
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="bg-base-100 rounded-lg shadow overflow-hidden">
+          <Table
+            headers={[
+              ...(isSelecting
+                ? [
+                    {
+                      key: "select",
+                      label: (
+                        <label className="inline-flex items-center justify-center gap-2">
+                          <span>SELECT</span>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={allVisibleCasesSelected}
+                            onChange={(e) =>
+                              handleToggleSelectAllVisibleCases(
+                                e.target.checked,
+                              )
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Select all visible special proceeding cases"
+                            disabled={visibleCaseIds.length === 0}
+                          />
+                        </label>
+                      ),
+                      align: "center" as const,
+                    },
+                  ]
+                : []),
+              { key: "caseNumber", label: "SPC. NO.", sortable: true },
+              {
+                key: "raffledTo",
+                label: "RAFFLED TO BRANCH",
+                sortable: true,
+              },
+              { key: "date", label: "DATE FILED", sortable: true },
+              { key: "petitioner", label: "PETITIONERS", sortable: true },
+              { key: "nature", label: "NATURE", sortable: true },
+              { key: "respondent", label: "RESPONDENT", sortable: true },
+            ]}
+            data={cases}
+            rowsPerPage={PAGE_SIZE}
+            showPagination={false}
+            resizableColumns
+            minColumnWidth={110}
+            sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
+            onSort={(k) => handleSort(k as SortableSPKey)}
+            renderRow={(c) => (
+              <SpecialProceedingRow
+                key={c.id}
+                caseItem={c}
+                onRowClick={(item) =>
+                  router.push(`/user/cases/proceedings/${item.id}`)
+                }
+                isSelected={selectedCaseIds.includes(c.id)}
+                isSelecting={isSelecting}
+                onToggleSelect={
+                  isSelecting ? handleToggleCaseSelection : undefined
+                }
+              />
+            )}
+          />
         </div>
 
         {/* Pagination */}
