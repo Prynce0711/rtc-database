@@ -12,7 +12,6 @@ import PetitionTester from "./PetitionTester";
 import SpecialProceedingTester from "./SpecialProceedingTester";
 import StatisticsTester from "./StatisticsTester";
 import ToastTester from "./ToastTester";
-import WorkerTest from "./WorkerTest";
 
 type TesterItem = {
   id: string;
@@ -87,12 +86,6 @@ const TESTERS: TesterItem[] = [
     label: "Statistics Tester",
     description: "Validate statistics calculations and UI output.",
     Component: StatisticsTester,
-  },
-  {
-    id: "worker",
-    label: "Worker Queue Test",
-    description: "Queue 1/5/10 tasks and monitor worker progress live.",
-    Component: WorkerTest,
   },
 ];
 

@@ -1,106 +1,23 @@
-import type { ActionResult, UploadExcelResult } from "@rtc-database/shared";
-import { Job, Queue, QueueEvents, Worker } from "bullmq";
+import { Queue, QueueEvents, Worker } from "bullmq";
 import { redisConnection } from "../../redis";
 import { uploadCriminalCaseExcel } from "./CriminalCaseExcel";
+import {
+  ExcelQueueData,
+  ExcelUploadActionResult,
+  QUEUE_NAME,
+  ExcelJobData,
+  isFile,
+  invalidJobResult,
+  serializeExcelJobData,
+  ExcelJob,
+  isSerializedExcelFile,
+  deserializeExcelFile,
+  ExcelTypes,
+} from "./ExcelWorkerUtils";
 
-const QUEUE_NAME = "excelQueue";
 const JOB_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 const WORKER_LOCK_DURATION_MS = 10 * 60 * 1000;
 const ENABLE_WORKER = process.env.ENABLE_WORKER === "true";
-
-type ExcelUploadActionResult = ActionResult<
-  UploadExcelResult,
-  UploadExcelResult
->;
-
-export enum ExcelTypes {
-  CRIMINAL_CASE = "CRIMINAL_CASE",
-  CIVIL_CASE = "CIVIL_CASE",
-}
-
-type CriminalCaseExcelJobData = {
-  type: ExcelTypes.CRIMINAL_CASE;
-  file: File;
-};
-
-type CivilCaseExcelJobData = {
-  type: ExcelTypes.CIVIL_CASE;
-  file: File;
-};
-
-export type ExcelJobData = CriminalCaseExcelJobData | CivilCaseExcelJobData;
-
-type SerializedExcelFile = {
-  name: string;
-  type: string;
-  lastModified: number;
-  size: number;
-  bytesBase64: string;
-};
-
-type CriminalCaseExcelQueueData = {
-  type: ExcelTypes.CRIMINAL_CASE;
-  file: SerializedExcelFile;
-};
-
-type CivilCaseExcelQueueData = {
-  type: ExcelTypes.CIVIL_CASE;
-  file: SerializedExcelFile;
-};
-
-type ExcelQueueData = CriminalCaseExcelQueueData | CivilCaseExcelQueueData;
-
-type ExcelJob = Job<ExcelQueueData, ExcelUploadActionResult, typeof QUEUE_NAME>;
-
-const invalidJobResult = (error: string): ExcelUploadActionResult => ({
-  success: false,
-  error,
-});
-
-const isFile = (value: unknown): value is File => value instanceof File;
-
-const isSerializedExcelFile = (
-  value: unknown,
-): value is SerializedExcelFile => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<SerializedExcelFile>;
-  return (
-    typeof candidate.name === "string" &&
-    typeof candidate.type === "string" &&
-    typeof candidate.lastModified === "number" &&
-    typeof candidate.size === "number" &&
-    typeof candidate.bytesBase64 === "string"
-  );
-};
-
-const serializeExcelFile = async (file: File): Promise<SerializedExcelFile> => {
-  const bytes = Buffer.from(await file.arrayBuffer());
-  return {
-    name: file.name,
-    type: file.type,
-    lastModified: file.lastModified,
-    size: bytes.byteLength,
-    bytesBase64: bytes.toString("base64"),
-  };
-};
-
-const deserializeExcelFile = (data: SerializedExcelFile): File => {
-  const bytes = Buffer.from(data.bytesBase64, "base64");
-  return new File([bytes], data.name, {
-    type: data.type,
-    lastModified: data.lastModified,
-  });
-};
-
-const serializeExcelJobData = async (
-  data: ExcelJobData,
-): Promise<ExcelQueueData> => ({
-  ...data,
-  file: await serializeExcelFile(data.file),
-});
 
 const excelQueue = new Queue<
   ExcelQueueData,
