@@ -1,24 +1,5 @@
 "use client";
 
-import {
-  calculateCriminalCaseStats,
-  CriminalCaseAdapter,
-  CriminalCaseStats,
-  ExactMatchMap,
-  FilterDropdown,
-  FilterOption,
-  FilterValues,
-  getFilterStateFromSearchParams,
-  isTextFieldKey,
-  PageListSkeleton,
-  Pagination,
-  Roles,
-  Table,
-  usePopup,
-  type CriminalCaseData,
-  type CriminalCaseFilters,
-  type CriminalCasesFilterOptions,
-} from "../../index";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
   useCallback,
@@ -40,6 +21,25 @@ import {
   FiUsers,
   FiX,
 } from "react-icons/fi";
+import {
+  calculateCriminalCaseStats,
+  CriminalCaseAdapter,
+  CriminalCaseStats,
+  ExactMatchMap,
+  FilterDropdown,
+  FilterOption,
+  FilterValues,
+  getFilterStateFromSearchParams,
+  isTextFieldKey,
+  PageListSkeleton,
+  Pagination,
+  Roles,
+  Table,
+  usePopup,
+  type CriminalCaseData,
+  type CriminalCaseFilters,
+  type CriminalCasesFilterOptions,
+} from "../../index";
 import {
   useAdaptiveNavigation,
   useAdaptivePathname,

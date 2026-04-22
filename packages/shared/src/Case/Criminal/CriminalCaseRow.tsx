@@ -1,11 +1,11 @@
 "use client";
 
-import type { CriminalCaseData } from "./CriminalCaseSchema";
+import { useMemo, useState } from "react";
 import Table from "../../Table/Table";
 import TipCell from "../../Table/TipCell";
-import { useMemo, useState } from "react";
 import Roles from "../../lib/Roles";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
+import type { CriminalCaseData } from "./CriminalCaseSchema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

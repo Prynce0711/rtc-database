@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FiInbox } from "react-icons/fi";
 import { TableInteractionContext } from "./TableContext";
 
@@ -219,11 +225,7 @@ function Table<T extends Record<string, unknown>>({
         <div className="overflow-x-auto overflow-y-visible">
           <table
             className="table table-compact table-sm uppercase w-full text-center"
-            style={
-              resizableColumns
-                ? { tableLayout: "fixed" }
-                : undefined
-            }
+            style={resizableColumns ? { tableLayout: "fixed" } : undefined}
           >
             {resizableColumns && (
               <colgroup>
