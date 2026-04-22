@@ -24,7 +24,7 @@ export function startUdpListener(mainWindow: BrowserWindow) {
       const payload = UdpData.parse(JSON.parse(msg.toString()));
 
       const devURL =
-        import.meta.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:3000";
+        import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
       const address =
         import.meta.env.MODE === "development"
           ? devURL

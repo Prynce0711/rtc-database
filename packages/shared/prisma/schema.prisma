@@ -672,3 +672,8 @@ model SyncState {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model Test {
+  id Int @id @default(autoincrement())
+  test String
+}
