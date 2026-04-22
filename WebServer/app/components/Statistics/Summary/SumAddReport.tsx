@@ -2,24 +2,24 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiArrowLeft,
-  FiChevronRight,
-  FiEye,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiChevronRight,
+    FiEye,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import AddRowsToolbar from "../Shared/AddRowsToolbar";
 import type { SummaryRow } from "./Schema";
 import {
-  SUMMARY_COURT_TYPES,
-  SUMMARY_MONTH_OPTIONS,
-  type SummaryCourtType,
+    SUMMARY_COURT_TYPES,
+    SUMMARY_MONTH_OPTIONS,
+    type SummaryCourtType,
 } from "./SummaryConstants";
 import {
-  computeSummaryTotal,
-  parseSummaryWorkbook,
-  toMonthKey,
+    computeSummaryTotal,
+    parseSummaryWorkbook,
+    toMonthKey,
 } from "./SummaryImportUtils";
 
 type EditableSummaryRow = Omit<SummaryRow, "id"> & {
@@ -674,7 +674,6 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
       {step === "edit" ? (
         <div className="space-y-4">
           <AddRowsToolbar onAddRows={addRows}>
-
             <input
               ref={fileInputRef}
               type="file"
