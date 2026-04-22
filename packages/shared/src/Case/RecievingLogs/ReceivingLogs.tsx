@@ -773,6 +773,8 @@ const ReceiveLogsPage: React.FC<{
             }
             onSort={(k) => handleSort(k as ReceiveSortKey)}
             showPagination={false}
+            resizableColumns
+            minColumnWidth={80}
             renderRow={(log) => (
               <ReceiveRow
                 key={(log as unknown as ReceiveLog).id}
