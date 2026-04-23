@@ -7,8 +7,19 @@ import {
 import { createAuthClient } from "better-auth/react";
 import { auth } from "./auth";
 
+const resolveAuthBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const currentOrigin = window.location.origin;
+    if (currentOrigin && currentOrigin !== "null") {
+      return currentOrigin;
+    }
+  }
+
+  return process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+};
+
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
+  baseURL: resolveAuthBaseUrl(),
   plugins: [
     adminClient(),
     magicLinkClient(),
