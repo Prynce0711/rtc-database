@@ -72,6 +72,7 @@ const createDirectChatsForRole = async (role: string, userId: string) => {
 };
 
 export const auth = betterAuth({
+  baseURL: process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
   trustedOrigins: [
     process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
     process.env.NATIVE_APP_URL || "http://localhost:5173",

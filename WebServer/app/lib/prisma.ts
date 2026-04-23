@@ -14,6 +14,8 @@ const prisma = new PrismaClient({ adapter });
 
 async function init() {
   await prisma.$executeRawUnsafe(`PRAGMA journal_mode = WAL;`);
+  await prisma.$executeRawUnsafe(`PRAGMA synchronous = NORMAL;`);
+  await prisma.$executeRawUnsafe(`PRAGMA busy_timeout = 5000;`);
 }
 
 init();

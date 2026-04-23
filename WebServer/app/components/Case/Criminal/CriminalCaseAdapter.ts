@@ -12,7 +12,7 @@ import {
   getCriminalCaseStats,
   updateCriminalCase,
 } from "./CriminalCasesActions";
-import { exportCasesExcel, uploadExcel } from "./ExcelActions";
+import { exportCasesExcel, uploadCriminalCaseExcel } from "./ExcelActions";
 
 export const criminalCaseAdapter: CriminalCaseAdapter = {
   doesCaseExist,
@@ -26,7 +26,7 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
   deleteCriminalCase,
   getCriminalCaseById,
   getCriminalCasesByIds,
-  uploadExcel,
+  uploadExcel: uploadCriminalCaseExcel,
   exportCasesExcel,
 };
 

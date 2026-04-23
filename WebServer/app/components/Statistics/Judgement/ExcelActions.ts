@@ -2,21 +2,14 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
+import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
+import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
 import {
   ActionResult,
   ExportExcelData,
-  isMappedRowEmpty,
-  processExcelUpload,
   UploadExcelResult,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
-import {
-  MTCJudgementRow,
-  MTCJudgementRowSchema,
-  RTCJudgementRow,
-  RTCJudgementRowSchema,
-} from "./Schema";
 
 const toNumber = (value: unknown): number => {
   if (value === undefined || value === null || value === "") return 0;
@@ -272,106 +265,10 @@ export async function uploadMunicipalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const result = await processExcelUpload<
-      MTCJudgementRow,
-      ReturnType<typeof getMtcCells>
-    >({
+    return startExcelUpload({
+      type: ExcelTypes.MUNICIPAL_JUDGEMENT,
       file,
-      requiredHeaders: {
-        "Branch No": ["Branches No.", "Branch No", "Branch"],
-      },
-      getCells: getMtcCells,
-      schema: MTCJudgementRowSchema,
-      skipRowsWithoutCell: ["branchNoCell"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const existingRows = await prisma.judgementMunicipal.findMany({
-          where: {
-            branchNo: mappedRow.branchNo,
-          },
-        });
-
-        const mappedEntries = Object.entries(mappedRow);
-        const hasExactMatch = existingRows.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRow as Record<string, unknown>)[key],
-            ),
-          ),
-        );
-
-        return { exists: hasExactMatch };
-      },
-      mapRow: (row) => {
-        const cells = getMtcCells(row);
-        if (isMappedRowEmpty(cells)) {
-          return { skip: true };
-        }
-
-        return {
-          mapped: {
-            branchNo: toBranch(cells.branchNoCell),
-            civilV: toNumber(cells.civilVCell),
-            civilInC: toNumber(cells.civilInCCell),
-            criminalV: toNumber(cells.criminalVCell),
-            criminalInC: toNumber(cells.criminalInCCell),
-            totalHeard: toNumber(cells.totalHeardCell),
-            disposedCivil: toNumber(cells.disposedCivilCell),
-            disposedCrim: toNumber(cells.disposedCrimCell),
-            totalDisposed: toNumber(cells.totalDisposedCell),
-            pdlM: toNumber(cells.pdlMCell),
-            pdlF: toNumber(cells.pdlFCell),
-            pdlTotal: toNumber(cells.pdlTotalCell),
-            pdlV: toNumber(cells.pdlVCell),
-            pdlI: toNumber(cells.pdlICell),
-            pdlBail: toNumber(cells.pdlBailCell),
-            pdlRecognizance: toNumber(cells.pdlRecognizanceCell),
-            pdlMinRor: toNumber(cells.pdlMinRorCell),
-            pdlMaxSentence: toNumber(cells.pdlMaxSentenceCell),
-            pdlDismissal: toNumber(cells.pdlDismissalCell),
-            pdlAcquittal: toNumber(cells.pdlAcquittalCell),
-            pdlMinSentence: toNumber(cells.pdlMinSentenceCell),
-            pdlOthers: toNumber(cells.pdlOthersCell),
-            total: toNumber(cells.totalCell),
-          },
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const inserted = await prisma.judgementMunicipal.createManyAndReturn({
-          data: rows.map((row) => ({
-            branchNo: row.branchNo ?? undefined,
-            civilV: toNumber(row.civilV),
-            civilInc: toNumber(row.civilInC),
-            criminalV: toNumber(row.criminalV),
-            criminalInc: toNumber(row.criminalInC),
-            totalHeard: toNumber(row.totalHeard),
-            disposedCivil: toNumber(row.disposedCivil),
-            disposedCrim: toNumber(row.disposedCrim),
-            totalDisposed: toNumber(row.totalDisposed),
-            pdlM: toNumber(row.pdlM),
-            pdlF: toNumber(row.pdlF),
-            pdlTotal: toNumber(row.pdlTotal),
-            pdlV: toNumber(row.pdlV),
-            pdlI: toNumber(row.pdlI),
-            pdlBail: toNumber(row.pdlBail),
-            pdlRecognizance: toNumber(row.pdlRecognizance),
-            pdlMinRor: toNumber(row.pdlMinRor),
-            pdlMaxSentence: toNumber(row.pdlMaxSentence),
-            pdlDismissal: toNumber(row.pdlDismissal),
-            pdlAcquittal: toNumber(row.pdlAcquittal),
-            pdlMinSentence: toNumber(row.pdlMinSentence),
-            pdlOthers: toNumber(row.pdlOthers),
-            total: toNumber(row.total),
-          })),
-        });
-
-        return { ids: inserted.map((item) => item.id), count: inserted.length };
-      },
     });
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
-    return result;
   } catch (error) {
     console.error("Municipal judgement Excel upload failed:", error);
     return { success: false, error: "Municipal judgement Excel upload failed" };
@@ -441,120 +338,10 @@ export async function uploadRegionalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    const result = await processExcelUpload<
-      RTCJudgementRow,
-      ReturnType<typeof getRtcCells>
-    >({
+    return startExcelUpload({
+      type: ExcelTypes.REGIONAL_JUDGEMENT,
       file,
-      requiredHeaders: {
-        "Branch No": ["Branches No.", "Branch No", "Branch"],
-      },
-      getCells: getRtcCells,
-      schema: RTCJudgementRowSchema,
-      skipRowsWithoutCell: ["branchNoCell"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const existingRows = await prisma.judgementRegional.findMany({
-          where: {
-            branchNo: mappedRow.branchNo,
-          },
-        });
-
-        const mappedEntries = Object.entries(mappedRow);
-        const hasExactMatch = existingRows.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(
-              value,
-              (existingRow as Record<string, unknown>)[key],
-            ),
-          ),
-        );
-
-        return { exists: hasExactMatch };
-      },
-      mapRow: (row) => {
-        const cells = getRtcCells(row);
-        if (isMappedRowEmpty(cells)) {
-          return { skip: true };
-        }
-
-        return {
-          mapped: {
-            branchNo: toBranch(cells.branchNoCell),
-            civilV: toNumber(cells.civilVCell),
-            civilInC: toNumber(cells.civilInCCell),
-            criminalV: toNumber(cells.criminalVCell),
-            criminalInC: toNumber(cells.criminalInCCell),
-            totalHeard: toNumber(cells.totalHeardCell),
-            disposedCivil: toNumber(cells.disposedCivilCell),
-            disposedCrim: toNumber(cells.disposedCrimCell),
-            summaryProc: toNumber(cells.summaryProcCell),
-            casesDisposed: toNumber(cells.casesDisposedCell),
-            pdlM: toNumber(cells.pdlMCell),
-            pdlF: toNumber(cells.pdlFCell),
-            pdlCICL: toNumber(cells.pdlCICLCell),
-            pdlTotal: toNumber(cells.pdlTotalCell),
-            pdlV: toNumber(cells.pdlVCell),
-            pdlInC: toNumber(cells.pdlInCCell),
-            pdlBail: toNumber(cells.pdlBailCell),
-            pdlRecognizance: toNumber(cells.pdlRecognizanceCell),
-            pdlMinRor: toNumber(cells.pdlMinRorCell),
-            pdlMaxSentence: toNumber(cells.pdlMaxSentenceCell),
-            pdlDismissal: toNumber(cells.pdlDismissalCell),
-            pdlAcquittal: toNumber(cells.pdlAcquittalCell),
-            pdlMinSentence: toNumber(cells.pdlMinSentenceCell),
-            pdlProbation: toNumber(cells.pdlProbationCell),
-            ciclM: toNumber(cells.ciclMCell),
-            ciclF: toNumber(cells.ciclFCell),
-            ciclV: toNumber(cells.ciclVCell),
-            ciclInC: toNumber(cells.ciclInCCell),
-            fine: toNumber(cells.fineCell),
-            total: toNumber(cells.totalCell),
-          },
-        };
-      },
-      onBatchInsert: async (rows) => {
-        const inserted = await prisma.judgementRegional.createManyAndReturn({
-          data: rows.map((row) => ({
-            branchNo: row.branchNo ?? undefined,
-            civilV: toNumber(row.civilV),
-            civilInc: toNumber(row.civilInC),
-            criminalV: toNumber(row.criminalV),
-            criminalInc: toNumber(row.criminalInC),
-            totalHeard: toNumber(row.totalHeard),
-            disposedCivil: toNumber(row.disposedCivil),
-            disposedCrim: toNumber(row.disposedCrim),
-            summaryProc: toNumber(row.summaryProc),
-            casesDisposed: toNumber(row.casesDisposed),
-            pdlM: toNumber(row.pdlM),
-            pdlF: toNumber(row.pdlF),
-            pdlCICL: toNumber(row.pdlCICL),
-            pdlTotal: toNumber(row.pdlTotal),
-            pdlV: toNumber(row.pdlV),
-            pdlInc: toNumber(row.pdlInC),
-            pdlBail: toNumber(row.pdlBail),
-            pdlRecognizance: toNumber(row.pdlRecognizance),
-            pdlMinRor: toNumber(row.pdlMinRor),
-            pdlMaxSentence: toNumber(row.pdlMaxSentence),
-            pdlDismissal: toNumber(row.pdlDismissal),
-            pdlAcquittal: toNumber(row.pdlAcquittal),
-            pdlMinSentence: toNumber(row.pdlMinSentence),
-            pdlProbation: toNumber(row.pdlProbation),
-            ciclM: toNumber(row.ciclM),
-            ciclF: toNumber(row.ciclF),
-            ciclV: toNumber(row.ciclV),
-            ciclInc: toNumber(row.ciclInC),
-            fine: toNumber(row.fine),
-            total: toNumber(row.total),
-          })),
-        });
-
-        return { ids: inserted.map((item) => item.id), count: inserted.length };
-      },
     });
-
-    await prisma.$executeRawUnsafe(`PRAGMA wal_checkpoint(TRUNCATE);`);
-
-    return result;
   } catch (error) {
     console.error("Regional judgement Excel upload failed:", error);
     return { success: false, error: "Regional judgement Excel upload failed" };
