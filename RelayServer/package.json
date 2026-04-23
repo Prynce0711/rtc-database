@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@rtc-database/shared": "workspace:*",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "http-proxy": "^1.18.1"
   },
   "devDependencies": {
+    "@types/http-proxy": "^1.17.16",
     "@types/node": "^20.19.22",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

@@ -1,10 +1,12 @@
 import "dotenv/config";
+import { startReverseProxy, stopReverseProxy } from "./reverseProxy";
 import {
   startUdpDiscoveryResponder,
   stopUdpDiscoveryResponder,
 } from "./udpDiscoveryResponder";
 
 async function startRelayServices(): Promise<void> {
+  startReverseProxy();
   startUdpDiscoveryResponder();
 
   console.log(
@@ -15,6 +17,7 @@ async function startRelayServices(): Promise<void> {
 function registerShutdownHooks(): void {
   const shutdown = () => {
     stopUdpDiscoveryResponder();
+    stopReverseProxy();
     process.exit(0);
   };
 

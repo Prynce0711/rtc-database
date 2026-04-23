@@ -9,7 +9,11 @@ import dgram from "dgram";
 import { networkInterfaces } from "node:os";
 
 const UDP_PORT = Number(process.env.UDP_PORT) || 41234;
-const BACKEND_PORT = Number(process.env.BACKEND_PORT) || 3000;
+const ADVERTISED_PORT =
+  Number(process.env.UDP_ADVERTISED_PORT) ||
+  Number(process.env.RELAY_PORT) ||
+  Number(process.env.BACKEND_PORT) ||
+  3000;
 
 let socket: dgram.Socket | null = null;
 
@@ -51,7 +55,7 @@ export function startUdpDiscoveryResponder(): void {
   socket.on("listening", () => {
     const address = socket!.address();
     console.log(
-      `[udp] Discovery responder listening on ${address.address}:${address.port} (backend=${advertisedHost}:${BACKEND_PORT})`,
+      `[udp] Discovery responder listening on ${address.address}:${address.port} (backend=${advertisedHost}:${ADVERTISED_PORT})`,
     );
   });
 
@@ -73,7 +77,7 @@ export function startUdpDiscoveryResponder(): void {
       type: UDP_DISCOVERY_RESPONSE_TYPE,
       service: UDP_SERVICE_NAME,
       host: advertisedHost,
-      port: BACKEND_PORT,
+      port: ADVERTISED_PORT,
       timestamp: Date.now(),
     };
 
