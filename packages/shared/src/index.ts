@@ -117,7 +117,14 @@ export * from "./lib/sync";
 export * from "./lib/utils";
 export * from "./Sidebar/SidebarAdapter";
 
-export { UDP_SERVICE_NAME, UdpData } from "./UdpData";
+export {
+  UDP_DISCOVERY_REQUEST_TYPE,
+  UDP_DISCOVERY_RESPONSE_TYPE,
+  UDP_SERVICE_NAME,
+  UdpData,
+  UdpDiscoveryRequest,
+  UdpDiscoveryResponse,
+} from "./UdpData";
 export type { BackendInfo } from "./UdpData";
 
 export type * from "./types/electron";

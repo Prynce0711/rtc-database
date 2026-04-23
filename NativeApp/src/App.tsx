@@ -301,7 +301,7 @@ export default function App() {
       } catch (error) {
         clearTimeout(timeoutId);
         console.warn(
-          "[startup] Dev backend health check failed. Waiting for UDP backend broadcast.",
+          "[startup] Dev backend health check failed. Waiting for UDP discovery response.",
           error,
         );
         return false;
@@ -326,10 +326,10 @@ export default function App() {
 
       if (!connectedInDev && isSubscribed) {
         if (isDevMode) {
-          console.log("[startup] Waiting for UDP backend broadcast...");
+          console.log("[startup] Waiting for UDP discovery responses...");
         } else {
           console.log(
-            "[startup] Production mode: waiting for backend broadcast via UDP...",
+            "[startup] Production mode: waiting for UDP discovery responses...",
           );
         }
 
@@ -377,10 +377,10 @@ export default function App() {
     autoOfflineReason === "disconnected"
       ? "Connection to backend was lost. Waiting for it to come back."
       : autoOfflineReason === "not-found"
-        ? "Backend not found yet. Waiting for health check or UDP broadcast."
+        ? "Backend not found yet. Waiting for health check or UDP discovery response."
         : isDevMode
-          ? "Checking dev backend health, then listening for UDP broadcast"
-          : "Listening for backend broadcast";
+          ? "Checking dev backend health, then sending UDP discovery"
+          : "Sending UDP discovery and waiting for gateway response";
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center gap-6 animate-fade-in px-4">

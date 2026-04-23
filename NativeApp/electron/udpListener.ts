@@ -1,65 +1,147 @@
-import { BackendInfo, UdpData } from "@rtc-database/shared";
+import {
+  type BackendInfo,
+  UDP_DISCOVERY_REQUEST_TYPE,
+  UDP_SERVICE_NAME,
+  UdpDiscoveryRequest,
+  UdpDiscoveryResponse,
+} from "@rtc-database/shared/src/UdpData";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
 
 const UDP_PORT = 41234;
+const BROADCAST_ADDR = "255.255.255.255";
+const DISCOVERY_BURST_COUNT = 3;
+const DISCOVERY_BURST_INTERVAL_MS = 200;
+const DISCOVERY_RETRY_INTERVAL_MS = 10000;
 
 let socket: dgram.Socket | null = null;
+let discoveryInterval: NodeJS.Timeout | null = null;
+let discoveryBurstTimers: NodeJS.Timeout[] = [];
+
+const clearDiscoveryBurstTimers = (): void => {
+  for (const timer of discoveryBurstTimers) {
+    clearTimeout(timer);
+  }
+
+  discoveryBurstTimers = [];
+};
+
+const buildBackendInfo = (
+  payload: { host: string; port: number },
+  sourceAddress: string,
+): BackendInfo => {
+  const resolvedHost =
+    payload.host && payload.host !== "0.0.0.0" ? payload.host : sourceAddress;
+
+  return {
+    url: `http://${resolvedHost}:${payload.port}`,
+    ip: resolvedHost,
+    port: payload.port,
+    lastSeen: Date.now(),
+  };
+};
+
+const sendDiscoveryRequest = (): void => {
+  if (!socket) {
+    return;
+  }
+
+  const payload: UdpDiscoveryRequest = {
+    type: UDP_DISCOVERY_REQUEST_TYPE,
+    service: UDP_SERVICE_NAME,
+    timestamp: Date.now(),
+  };
+
+  socket.send(
+    Buffer.from(JSON.stringify(payload)),
+    UDP_PORT,
+    BROADCAST_ADDR,
+    (error) => {
+      if (error) {
+        console.error("[udp] Failed to send discovery request:", error);
+      }
+    },
+  );
+};
+
+const sendDiscoveryBurst = (): void => {
+  clearDiscoveryBurstTimers();
+
+  for (let index = 0; index < DISCOVERY_BURST_COUNT; index += 1) {
+    const timer = setTimeout(() => {
+      sendDiscoveryRequest();
+    }, index * DISCOVERY_BURST_INTERVAL_MS);
+
+    discoveryBurstTimers.push(timer);
+  }
+};
 
 export function startUdpListener(mainWindow: BrowserWindow) {
-  if (socket) return;
+  if (socket) {
+    return;
+  }
 
-  console.log("🚀 Starting UDP listener (broadcast)...");
+  console.log("[udp] Starting discovery client...");
 
-  // reuseAddr helps if multiple listeners exist on the same host
   socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("listening", () => {
     const addr = socket!.address();
-    console.log(`📡 UDP broadcast listening on ${addr.address}:${addr.port}`);
+    socket!.setBroadcast(true);
+    console.log(`[udp] Discovery client bound on ${addr.address}:${addr.port}`);
+
+    sendDiscoveryBurst();
+
+    discoveryInterval = setInterval(() => {
+      sendDiscoveryBurst();
+    }, DISCOVERY_RETRY_INTERVAL_MS);
   });
 
   socket.on("message", (msg, rinfo) => {
+    let parsedPayload: unknown;
+
     try {
-      const payload = UdpData.parse(JSON.parse(msg.toString()));
-
-      const devURL =
-        import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
-      const address =
-        import.meta.env.MODE === "development"
-          ? devURL
-          : `http://${rinfo.address}`;
-
-      const backend: BackendInfo = {
-        url: `${address}:${payload.port}`,
-        ip: address,
-        port: payload.port,
-        lastSeen: Date.now(),
-      };
-
-      // 🔁 Forward to renderer
-      console.log(
-        `📨 Received UDP from ${address}:${payload.port} - forwarding to renderer`,
-      );
-      mainWindow.webContents.send("udp:backend", backend);
-    } catch (err) {
-      console.warn("Invalid UDP packet:", err);
+      parsedPayload = JSON.parse(msg.toString());
+    } catch {
+      return;
     }
+
+    const response = UdpDiscoveryResponse.safeParse(parsedPayload);
+    if (!response.success) {
+      return;
+    }
+
+    if (mainWindow.isDestroyed()) {
+      return;
+    }
+
+    const backend = buildBackendInfo(response.data, rinfo.address);
+
+    console.log(
+      `[udp] Received discovery response from ${rinfo.address}:${rinfo.port} -> ${backend.url}`,
+    );
+    mainWindow.webContents.send("udp:backend", backend);
   });
 
   socket.on("error", (err) => {
-    console.error("UDP socket error:", err);
-    socket?.close();
-    socket = null;
+    console.error("[udp] Discovery client socket error:", err);
+    stopUdpListener();
   });
 
-  socket.bind(UDP_PORT, () => {
-    socket!.setBroadcast(true);
-    console.log(`📥 Bound UDP socket on port ${UDP_PORT}`);
-  });
+  // Bind to an ephemeral client port so each app instance can discover independently.
+  socket.bind();
 }
 
 export function stopUdpListener() {
-  socket?.close();
-  socket = null;
+  clearDiscoveryBurstTimers();
+
+  if (discoveryInterval) {
+    clearInterval(discoveryInterval);
+    discoveryInterval = null;
+  }
+
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
 }

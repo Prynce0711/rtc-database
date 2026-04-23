@@ -1,5 +1,9 @@
 {
-  "watch": ["server.ts", "app/lib/udpBroadcast.ts", "app/lib/backup/**/*.ts"],
+  "watch": [
+    "server.ts",
+    "app/lib/udpDiscoveryResponder.ts",
+    "app/lib/backup/**/*.ts"
+  ],
   "exec": "ts-node --project tsconfig.server.json server.ts",
   "ext": "js ts"
 }

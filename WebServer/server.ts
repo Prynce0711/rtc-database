@@ -1,7 +1,12 @@
-import { startUdpBroadcast, stopUdpBroadcast } from "./app/lib/udpBroadcast";
+import "dotenv/config";
+
+import {
+  startUdpDiscoveryResponder,
+  stopUdpDiscoveryResponder,
+} from "./app/lib/udpDiscoveryResponder";
 
 async function startSidecarServices(): Promise<void> {
-  startUdpBroadcast();
+  startUdpDiscoveryResponder();
 
   console.log(
     `> Sidecar services started (env=${process.env.NODE_ENV ?? "development"})`,
@@ -10,7 +15,7 @@ async function startSidecarServices(): Promise<void> {
 
 function registerShutdownHooks(): void {
   const shutdown = () => {
-    stopUdpBroadcast();
+    stopUdpDiscoveryResponder();
     process.exit(0);
   };
 
