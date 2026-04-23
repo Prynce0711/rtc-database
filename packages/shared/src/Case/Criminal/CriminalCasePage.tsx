@@ -853,6 +853,7 @@ const CriminalCasePage: React.FC<{
           rowsPerPage={pageSize}
           showPagination={false}
           resizableColumns
+          disableCellTooltips={false}
           minColumnWidth={80}
           sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
           onSort={(k) => handleSort(k as SortKey)}

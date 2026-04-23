@@ -692,6 +692,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
             rowsPerPage={PAGE_SIZE}
             showPagination={false}
             resizableColumns
+            disableCellTooltips={false}
             minColumnWidth={110}
             sortConfig={{ key: sortConfig.key, order: sortConfig.order }}
             onSort={(k) => handleSort(k as SortableSPKey)}
