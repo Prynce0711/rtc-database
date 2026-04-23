@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -k -n next,sidecar,prisma,excelWorker \"next dev\" \"pnpm dev:sidecar\" \"prisma studio --browser none\" \"pnpm dev:excelWorker\"",
+    "dev": "concurrently -k -n next,prisma,excelWorker \"next dev\" \"prisma studio --browser none\" \"pnpm dev:excelWorker\"",
     "dev:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/excel.worker.ts --watch",
-    "dev:sidecar": "nodemon",
     "dev:noudp": "concurrently \"next dev\" \"prisma studio --browser none\"",
-    "build": "next build && pnpm build:sidecar",
-    "build:sidecar": "tsc -p tsconfig.server.json",
-    "start": "cross-env NODE_ENV=production concurrently -k -n next,sidecar,worker \"next start\" \"pnpm start:sidecar\" \"pnpm start:testWorker\"",
-    "start:sidecar": "node dist/server.js",
+    "build": "next build",
+    "start": "cross-env NODE_ENV=production concurrently -k -n next,worker \"next start\" \"pnpm start:testWorker\"",
+    "start:testWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/excel.worker.ts",
     "lint": "eslint",
     "postinstall": "pnpm rebuild better-sqlite3 rclone.js",
     "prepare": "next-ws patch"

@@ -2,9 +2,10 @@ packages:
   - packages/*
   - WebServer
   - NativeApp
+  - RelayServer
 
 onlyBuiltDependencies:
-  - '@prisma/engines'
+  - "@prisma/engines"
   - better-sqlite3
   - electron
   - esbuild

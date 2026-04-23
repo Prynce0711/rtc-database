@@ -9,7 +9,7 @@ import dgram from "dgram";
 import { networkInterfaces } from "node:os";
 
 const UDP_PORT = Number(process.env.UDP_PORT) || 41234;
-const BACKEND_PORT = Number(process.env.PORT) || 3000;
+const BACKEND_PORT = Number(process.env.BACKEND_PORT) || 3000;
 
 let socket: dgram.Socket | null = null;
 

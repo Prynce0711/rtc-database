@@ -1,15 +1,14 @@
 import "dotenv/config";
-
 import {
   startUdpDiscoveryResponder,
   stopUdpDiscoveryResponder,
-} from "./app/lib/udpDiscoveryResponder";
+} from "./udpDiscoveryResponder";
 
-async function startSidecarServices(): Promise<void> {
+async function startRelayServices(): Promise<void> {
   startUdpDiscoveryResponder();
 
   console.log(
-    `> Sidecar services started (env=${process.env.NODE_ENV ?? "development"})`,
+    `> Relay services started (env=${process.env.NODE_ENV ?? "development"})`,
   );
 }
 
@@ -23,8 +22,8 @@ function registerShutdownHooks(): void {
   process.once("SIGTERM", shutdown);
 }
 
-void startSidecarServices().catch((error: unknown) => {
-  console.error("Failed to start sidecar services:", error);
+void startRelayServices().catch((error: unknown) => {
+  console.error("Failed to start relay services:", error);
   process.exit(1);
 });
 
