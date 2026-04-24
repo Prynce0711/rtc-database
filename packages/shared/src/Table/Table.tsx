@@ -67,6 +67,7 @@ function Table<T extends Record<string, unknown>>({
   );
   const headerRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
   const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const tableRef = useRef<HTMLTableElement | null>(null);
   const activeResizeRef = useRef<ActiveResizeState | null>(null);
   const liveResizeWidthRef = useRef<number | null>(null);
   const effectiveMinColumnWidth = Math.max(72, minColumnWidth);
@@ -79,31 +80,45 @@ function Table<T extends Record<string, unknown>>({
   useEffect(() => {
     if (!resizableColumns) return;
 
-    const missingHeaders = headers.filter(
-      (h) => typeof columnWidths[h.key] !== "number",
-    );
+    const missingHeaders = headers.filter((h) => typeof columnWidths[h.key] !== "number");
     if (missingHeaders.length === 0) return;
 
     const measuredWidths: Record<string, number> = {};
     let hasMeasurements = false;
 
-    for (const header of missingHeaders) {
-      const headerCell = headerRefs.current[header.key];
-      if (!headerCell) continue;
+    const tableEl = tableRef.current;
 
-      measuredWidths[header.key] = Math.max(
-        effectiveMinColumnWidth,
-        Math.round(headerCell.getBoundingClientRect().width),
-      );
-      hasMeasurements = true;
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i];
+      if (typeof columnWidths[header.key] === "number") continue;
+
+      const headerCell = headerRefs.current[header.key];
+      let best = 0;
+
+      if (headerCell) {
+        best = Math.round(headerCell.getBoundingClientRect().width);
+      }
+
+      if (tableEl) {
+        const bodyRows = tableEl.querySelectorAll("tbody tr");
+        for (const row of Array.from(bodyRows)) {
+          const tds = row.querySelectorAll("td");
+          const td = tds[i] as HTMLTableCellElement | undefined;
+          if (!td) continue;
+          const w = Math.round(td.getBoundingClientRect().width);
+          if (w > best) best = w;
+        }
+      }
+
+      if (best > 0) {
+        measuredWidths[header.key] = Math.max(effectiveMinColumnWidth, best);
+        hasMeasurements = true;
+      }
     }
 
     if (!hasMeasurements) return;
 
-    setColumnWidths((prev) => ({
-      ...prev,
-      ...measuredWidths,
-    }));
+    setColumnWidths((prev) => ({ ...prev, ...measuredWidths }));
   }, [columnWidths, effectiveMinColumnWidth, headers, resizableColumns]);
 
   const startResize = useCallback(
@@ -205,9 +220,18 @@ function Table<T extends Record<string, unknown>>({
       <div className={`rounded-lg overflow-hidden ${className ?? ""}`}>
         <div className="overflow-x-auto overflow-y-visible">
           <table
+            ref={(node) => {
+              tableRef.current = node;
+            }}
             data-rtc-system-table="true"
             className="table table-compact table-sm uppercase w-full text-center rtc-unified-table"
-            style={resizableColumns ? { tableLayout: "fixed" } : undefined}
+            style={
+              resizableColumns
+                ? hasAllColumnWidths
+                  ? { tableLayout: "fixed" }
+                  : undefined
+                : undefined
+            }
           >
             {resizableColumns && (
               <colgroup>
