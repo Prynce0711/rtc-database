@@ -36,6 +36,7 @@ export interface CivilCaseAdapter extends BaseCaseAdapter {
   ) => Promise<ActionResult<CivilCaseData[]>>;
   uploadExcel: (
     file: File,
+    overrideValidation?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportCasesExcel: () => Promise<ActionResult<ExportExcelData>>;
 }

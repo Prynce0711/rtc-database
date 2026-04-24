@@ -107,6 +107,7 @@ export async function uploadCriminalCaseExcel(
 
     const headerMap = getExcelHeaderMap(CriminalCaseSchema);
     const branchHeaders = headerMap.branch ?? ["Branch"];
+    const nameHeaders = headerMap.name ?? ["Name"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
       const values = normalizeRowBySchema(CriminalCaseSchema, row);
@@ -121,7 +122,10 @@ export async function uploadCriminalCaseExcel(
       ReturnType<typeof getMappedCells>
     >({
       file,
-      requiredHeaders: { Branch: branchHeaders },
+      requiredHeaders: {
+        Branch: branchHeaders,
+        Name: nameHeaders,
+      },
       schema: CriminalCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber", "name"],

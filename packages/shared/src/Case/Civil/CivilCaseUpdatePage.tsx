@@ -2,40 +2,41 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type ChangeEvent,
-    type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
 } from "react";
 import {
-    FiAlertCircle,
-    FiArrowLeft,
-    FiCheck,
-    FiChevronLeft,
-    FiChevronRight,
-    FiCopy,
-    FiEdit3,
-    FiEye,
-    FiFileText,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiAlertCircle,
+  FiArrowLeft,
+  FiCheck,
+  FiChevronLeft,
+  FiChevronRight,
+  FiCopy,
+  FiEdit3,
+  FiEye,
+  FiFileText,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
+import { VALIDATION_ERROR_MARKER } from "../../lib/excel";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import {
-    CivilCaseEntry,
-    CivilCaseSchema,
-    civilCaseToEntry,
-    createEmptyCivilEntry,
-    type CivilCaseData,
+  CivilCaseEntry,
+  CivilCaseSchema,
+  civilCaseToEntry,
+  createEmptyCivilEntry,
+  type CivilCaseData,
 } from "./CivilCaseSchema";
 
 export enum CivilCaseUpdateType {
@@ -827,7 +828,17 @@ export const CivilCaseUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await adapter.uploadExcel(file);
+      let result = await adapter.uploadExcel(file);
+      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not civil cases, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        result = await adapter.uploadExcel(file, true);
+      }
+
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {

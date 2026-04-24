@@ -47,6 +47,7 @@ export interface RecievingLogsAdapter {
   ) => Promise<ActionResult<RecievingLog[]>>;
   uploadReceiveExcel: (
     file: File,
+    overrideValidation?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportReceiveLogsExcel: () => Promise<ActionResult<ExportExcelData>>;
 }

@@ -31,6 +31,7 @@ type ExcelJobPayload<TFile> = {
   file: TFile;
   fallbackMonth?: string;
   fallbackYear?: number;
+  overrideTemplateValidation?: boolean;
 };
 
 export type ExcelJobData<TFile = File> = ExcelJobPayload<TFile>;

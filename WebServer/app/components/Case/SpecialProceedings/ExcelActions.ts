@@ -23,6 +23,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 
 export async function uploadSpecialProceedingExcel(
   file: File,
+  overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -33,6 +34,7 @@ export async function uploadSpecialProceedingExcel(
     const result = await startExcelUpload({
       type: ExcelTypes.SPECIAL_PROCEEDING_CASE,
       file,
+      overrideTemplateValidation,
     });
 
     if (!result.success) {
