@@ -60,9 +60,18 @@ export default function MonthlyPage() {
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.STATISTICS;
 
+  // const [selectedMonth, setSelectedMonth] = useState(
+  //   new Date().toISOString().slice(0, 7),
+  // );
+
+  const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7),
+    String(today.getMonth() + 1).padStart(2, "0"),
   );
+
+  const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
+  const selectedDate = `${selectedYear}-${selectedMonth}`;
+
   const [search, setSearch] = useState("");
   const [activeCategoryView, setActiveCategoryView] =
     useState<MonthlyCategoryView>("New Cases Filed");
@@ -108,7 +117,7 @@ export default function MonthlyPage() {
       await Promise.all(
         Array.from(selectedIds).map((id) => deleteMonthlyStatistic(id)),
       );
-      const fresh = await getMonthlyStatistics(selectedMonth);
+      const fresh = await getMonthlyStatistics(selectedDate);
       if (fresh.success) setImportedData(fresh.result);
     } else if (selectionMode === "edit") {
       const selected = filteredData.filter(
@@ -127,16 +136,17 @@ export default function MonthlyPage() {
   };
 
   /* ---- Load from DB whenever selectedMonth changes ---- */
+
   useEffect(() => {
-    getMonthlyStatistics(selectedMonth).then((res) => {
+    getMonthlyStatistics(selectedDate).then((res) => {
       if (res.success) setImportedData(res.result);
     });
-  }, [selectedMonth]);
+  }, [selectedDate]);
 
   const monthlyData = useMemo(() => {
     const all = importedData ?? [];
-    return all.filter((r) => r.month === selectedMonth);
-  }, [importedData, selectedMonth]);
+    return all.filter((r) => r.month === selectedDate);
+  }, [importedData, selectedDate]);
 
   /* ---------- derived ---------- */
 
@@ -156,7 +166,7 @@ export default function MonthlyPage() {
         );
       });
 
-  const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString(
+  const monthLabel = new Date(selectedDate + "-01").toLocaleDateString(
     "en-US",
     { month: "long", year: "numeric" },
   );
@@ -187,13 +197,13 @@ export default function MonthlyPage() {
     ];
 
     XLSX.utils.book_append_sheet(workbook, worksheet, monthLabel);
-    XLSX.writeFile(workbook, `Monthly-Report-${selectedMonth}.xlsx`);
+    XLSX.writeFile(workbook, `Monthly-Report-${selectedDate}.xlsx`);
   };
 
   if (showAddPage) {
     return (
       <AddReportPage
-        month={selectedMonth}
+        month={selectedDate}
         initialCategory={activeCategoryView}
         initialData={editMode ? monthlyData : undefined}
         onBack={() => {
@@ -203,7 +213,7 @@ export default function MonthlyPage() {
         onSave={async (newRows) => {
           const res = await upsertMonthlyStatistics(newRows);
           if (res.success) {
-            const savedMonth = newRows[0]?.month ?? selectedMonth;
+            const savedMonth = newRows[0]?.month ?? selectedDate;
             const fresh = await getMonthlyStatistics(savedMonth);
             if (fresh.success) {
               setImportedData(fresh.result);
@@ -223,7 +233,7 @@ export default function MonthlyPage() {
     return (
       <ViewReportPage
         data={filteredData}
-        month={selectedMonth}
+        month={selectedDate}
         onBack={() => setShowViewPage(false)}
       />
     );
@@ -250,12 +260,49 @@ export default function MonthlyPage() {
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                <input
-                  type="month"
-                  className="input input-bordered input-md w-66"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                />
+                <div className="join">
+                    {/* MONTH */}
+                    <select
+                      className="select select-bordered join-item w-44"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                    >
+                      {[
+                        { value: "01", label: "January" },
+                        { value: "02", label: "February" },
+                        { value: "03", label: "March" },
+                        { value: "04", label: "April" },
+                        { value: "05", label: "May" },
+                        { value: "06", label: "June" },
+                        { value: "07", label: "July" },
+                        { value: "08", label: "August" },
+                        { value: "09", label: "September" },
+                        { value: "10", label: "October" },
+                        { value: "11", label: "November" },
+                        { value: "12", label: "December" },
+                      ].map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* YEAR */}
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className="input input-bordered join-item w-28"
+                      value={selectedYear}
+                      onChange={(e) =>
+                        setSelectedYear(
+                          e.target.value.replace(/\D/g, "").slice(0, 4),
+                        )
+                      }
+                    />
+            
+                </div>
+
                 <div className="flex items-center gap-2 flex-nowrap">
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
