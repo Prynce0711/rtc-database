@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { startDevDisconnectMonitor } from "./BackendMonitor";
 import { ensureNativeDatabaseReady } from "./databaseBootstrap";
 import "./ipcHandlers";
-import { startUdpListener } from "./udpListener";
+import { startUdpListener, stopUdpListener } from "./udpListener";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +76,10 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     void createWindow();
   }
+});
+
+app.on("before-quit", () => {
+  stopUdpListener();
 });
 
 app.whenReady().then(async () => {
