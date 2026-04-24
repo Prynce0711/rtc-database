@@ -104,7 +104,7 @@ function Table<T extends Record<string, unknown>>({
         for (const row of Array.from(bodyRows)) {
           const tds = row.querySelectorAll("td");
           const td = tds[i] as HTMLTableCellElement | undefined;
-          if (!td || td.colSpan > 1) continue;
+          if (!td) continue;
           const w = Math.round(td.getBoundingClientRect().width);
           if (w > best) best = w;
         }
