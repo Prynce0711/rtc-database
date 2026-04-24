@@ -18,6 +18,7 @@ import { Prisma } from "@rtc-database/shared/prisma/client";
 import { CaseType } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
+import { IS_WORKER } from "../ExcelWorkerUtils";
 
 const parseTime = (
   timeStr: string,
@@ -79,6 +80,9 @@ export async function uploadReceivingLogExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
+    if (!IS_WORKER) {
+      throw new Error("Cannot execute on non-worker");
+    }
     const candidateCaseNumbers = new Set<string>();
 
     console.log(

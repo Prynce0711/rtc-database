@@ -2,8 +2,8 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
-import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
 import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
+import { startExcelUpload } from "@/app/lib/workers/Excel/WorkerActions";
 import {
   ActionResult,
   ExportExcelData,

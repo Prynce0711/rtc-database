@@ -1,4 +1,4 @@
-import { Queue, QueueEvents, Worker } from "bullmq";
+import { Worker } from "bullmq";
 import { redisConnection } from "../../redis";
 import { uploadCivilCaseExcel } from "./Case/CivilCaseExcel";
 import { uploadCriminalCaseExcel } from "./Case/CriminalCaseExcel";
@@ -10,15 +10,14 @@ import { uploadEmployeeExcel } from "./Employee/EmployeeExcel";
 import {
   deserializeExcelFile,
   ExcelJob,
-  ExcelJobData,
   ExcelQueueData,
   ExcelTypes,
   ExcelUploadActionResult,
   invalidJobResult,
+  IS_WORKER,
   isFile,
   isSerializedExcelFile,
   QUEUE_NAME,
-  serializeExcelJobData,
 } from "./ExcelWorkerUtils";
 import { uploadInventoryDocumentExcel } from "./Statistics/InventoryDocumentExcel";
 import { uploadMonthlyStatisticsExcel } from "./Statistics/MonthlyStatisticsExcel";
@@ -28,51 +27,9 @@ import { uploadRegionalJudgementExcel } from "./Statistics/RegionalJudgementExce
 import { uploadRegionalTrialCourtExcel } from "./Statistics/RegionalTrialCourtExcel";
 import { uploadSummaryStatisticsExcel } from "./Statistics/SummaryStatisticsExcel";
 
-const JOB_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 const WORKER_LOCK_DURATION_MS = 10 * 60 * 1000;
-const IS_WORKER = process.env.IS_WORKER === "true";
 
-const excelQueue = new Queue<
-  ExcelQueueData,
-  ExcelUploadActionResult,
-  typeof QUEUE_NAME
->(QUEUE_NAME, {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: {
-      type: "exponential",
-      delay: 5000,
-    },
-  },
-});
-
-const excelQueueEvents = new QueueEvents(QUEUE_NAME, {
-  connection: redisConnection,
-});
-
-export const startExcelUpload = async (
-  data: ExcelJobData,
-): Promise<ExcelUploadActionResult> => {
-  if (!isFile(data.file)) {
-    return invalidJobResult("Invalid file data");
-  }
-
-  const queueData = await serializeExcelJobData(data);
-  const job = await excelQueue.add(QUEUE_NAME, queueData);
-
-  try {
-    await excelQueueEvents.waitUntilReady();
-    return await job.waitUntilFinished(excelQueueEvents, JOB_WAIT_TIMEOUT_MS);
-  } catch (error) {
-    console.error("Excel upload queue failed:", error);
-    return invalidJobResult(
-      error instanceof Error ? error.message : "Excel upload job failed",
-    );
-  }
-};
-
-const worker = IS_WORKER
+IS_WORKER
   ? new Worker<ExcelQueueData, ExcelUploadActionResult, typeof QUEUE_NAME>(
       QUEUE_NAME,
       async (job: ExcelJob): Promise<ExcelUploadActionResult> => {
@@ -161,5 +118,3 @@ if (!IS_WORKER) {
     "This process is not configured to run the Excel upload worker. Set IS_WORKER=true to enable it.",
   );
 }
-
-export default worker;
