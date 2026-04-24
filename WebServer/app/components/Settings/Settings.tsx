@@ -1,17 +1,19 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { RedirectingUI } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import SettingsTab from "./SettingsTab";
 import { TABS } from "./tabConfig";
 import TabContent from "./Tabs/TabContent";
-import { useSession } from "@/app/lib/authClient";
 
 const Settings = () => {
-  const { data: session } = useSession();
-  const role = session?.user?.role ?? Roles.USER;
+  const session = useSession();
+
+  const role = session.data?.user?.role ?? Roles.USER;
 
   const visibleTabs = useMemo(
     () => TABS.filter((tab) => tab.roles.includes(role)),
@@ -31,6 +33,10 @@ const Settings = () => {
       setActiveTab(visibleTabs[0].id);
     }
   }, [activeTab, visibleTabs]);
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading settings..." />;
+  }
 
   return (
     <DashboardLayout

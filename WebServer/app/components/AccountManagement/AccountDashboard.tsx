@@ -1,10 +1,10 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
+import { formatDate, Pagination, usePopup } from "@rtc-database/shared";
 import { User } from "@rtc-database/shared/prisma/browser";
 import { Status } from "@rtc-database/shared/prisma/enums";
-import Roles from "@/app/lib/Roles";
-import { formatDate } from "@rtc-database/shared";
-import { Pagination, usePopup } from "@rtc-database/shared";
 import {
   useEffect,
   useMemo,
@@ -16,7 +16,6 @@ import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { getAccounts, updateRole } from "./AccountActions";
 import AccountActionsButton from "./AccountActionsButton";
 import AddAccountDrawer from "./AddAccountDrawer";
-import { useSession } from "@/app/lib/authClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RoleFilterType = Roles | "ALL";
@@ -231,7 +230,7 @@ const AccountDashboard = () => {
   );
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
+  if (loading || session.isPending) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="flex flex-col items-center gap-4">

@@ -2,10 +2,10 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { RadioButton, RedirectingUI } from "@rtc-database/shared";
 import { useMemo, useRef, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import { RadioButton } from "@rtc-database/shared";
 import JudgementMTC from "./JudgementMTC";
 import JudgementRTC from "./JudgementRTC";
 
@@ -51,6 +51,7 @@ const views: {
 
 export default function Judgement() {
   const session = useSession();
+
   const canManageStats =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.STATISTICS;
@@ -112,6 +113,10 @@ export default function Judgement() {
       `Judgement-${activeView}-Report-${selectedYear}.xlsx`,
     );
   };
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading judgement reports..." />;
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8">
