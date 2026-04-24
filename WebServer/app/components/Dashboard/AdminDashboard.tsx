@@ -453,11 +453,10 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                 ].map((card, idx) => (
                   <div
                     key={idx}
-                    className={`transform hover:scale-105 ${
-                      isVisible
-                        ? "translate-y-0 opacity-100"
-                        : "translate-y-4 opacity-0"
-                    } card surface-card-hover group`}
+                    className={`transform hover:scale-105 ${isVisible
+                      ? "translate-y-0 opacity-100"
+                      : "translate-y-4 opacity-0"
+                      } card surface-card-hover group`}
                     style={{
                       transitionDelay: `${card.delay}ms`,
                       transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
@@ -484,11 +483,10 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                         </p>
                         {card.trend !== undefined && card.trend !== 0 && (
                           <div
-                            className={`mt-3 inline-flex items-center gap-2 px-3 py-1 text-xs font-bold ${
-                              card.trend >= 0
-                                ? "badge-success-soft"
-                                : "badge-error-soft"
-                            }`}
+                            className={`mt-3 inline-flex items-center gap-2 px-3 py-1 text-xs font-bold ${card.trend >= 0
+                              ? "badge-success-soft"
+                              : "badge-error-soft"
+                              }`}
                             style={{ borderRadius: "var(--radius-pill)" }}
                           >
                             {card.trend >= 0 ? (
