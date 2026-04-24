@@ -8,7 +8,12 @@ import {
 import { useSession } from "@/app/lib/authClient";
 import { getFileUrl } from "@/app/lib/socket/handlers/messageFile";
 import { useMessaging } from "@/app/lib/socket/hooks/useMessaging";
-import { ChatData, Message, usePopup } from "@rtc-database/shared";
+import {
+  ChatData,
+  Message,
+  RedirectingUI,
+  usePopup,
+} from "@rtc-database/shared";
 import { ChatType, Roles } from "@rtc-database/shared/prisma/browser";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -255,6 +260,7 @@ const GroupAvatar = ({
 // ═══════════════════════════════════════════════════════════════════════════════
 const Messages: React.FC = () => {
   const session = useSession();
+
   const statusPopup = usePopup();
   const currentUserId = session.data?.user?.id ?? "";
   const viewerId = currentUserId;
@@ -750,6 +756,10 @@ const Messages: React.FC = () => {
       cancelled = true;
     };
   }, [activeConvo, activeMessages, fileAccessByMessageId]);
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading messages..." />;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER

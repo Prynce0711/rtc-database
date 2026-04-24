@@ -1,8 +1,7 @@
 "use client";
 
 import { authClient, useSession } from "@/app/lib/authClient";
-import { isDarkMode } from "@rtc-database/shared";
-import { usePopup } from "@rtc-database/shared";
+import { isDarkMode, RedirectingUI, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -127,6 +126,10 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
     statusPopup.hidePopup();
     router.push("/");
   };
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading account..." />;
+  }
 
   return (
     <>

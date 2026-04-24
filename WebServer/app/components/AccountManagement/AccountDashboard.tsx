@@ -6,11 +6,11 @@ import { formatDate, Table, usePopup } from "@rtc-database/shared";
 import { User } from "@rtc-database/shared/prisma/browser";
 import { Status } from "@rtc-database/shared/prisma/enums";
 import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
 } from "react";
 import { FiLock, FiPlus, FiSearch } from "react-icons/fi";
 import { getAccounts, updateRole } from "./AccountActions";
@@ -193,7 +193,7 @@ const AccountDashboard = () => {
   }, [users, searchQuery, statusTab, roleFilter, sortKey, sortOrder]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
+  if (loading || session.isPending) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="flex flex-col items-center gap-4">

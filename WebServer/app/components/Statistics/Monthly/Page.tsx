@@ -2,10 +2,10 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { RadioButton, RedirectingUI } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import { RadioButton } from "@rtc-database/shared";
 import {
   deleteMonthlyStatistic,
   getMonthlyStatistics,
@@ -56,6 +56,7 @@ const categoryViews: {
 
 export default function MonthlyPage() {
   const session = useSession();
+
   const canManageStats =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.STATISTICS;
@@ -189,6 +190,10 @@ export default function MonthlyPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, monthLabel);
     XLSX.writeFile(workbook, `Monthly-Report-${selectedMonth}.xlsx`);
   };
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading monthly statistics..." />;
+  }
 
   if (showAddPage) {
     return (
