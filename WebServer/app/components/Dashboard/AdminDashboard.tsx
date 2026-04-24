@@ -30,7 +30,7 @@ import {
 
 import { UnifiedCaseData, UnifiedCaseStats } from "@rtc-database/shared";
 import { useRouter } from "next/navigation";
-import { RecentCases } from "./AdminCard";
+import { RecentCases, RecentActivities } from "./AdminCard";
 import DashboardLayout from "./DashboardLayout";
 
 interface Props {
@@ -44,15 +44,6 @@ interface Alert {
   message: string;
   count?: number;
   action?: () => void;
-}
-
-interface AuditLog {
-  id: string;
-  action: string;
-  user: string;
-  details: string;
-  timestamp: Date;
-  type: "create" | "update" | "delete" | "export" | "login";
 }
 
 const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
@@ -155,21 +146,6 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
     }
     return alertList;
   }, [stats, router]);
-
-  const auditLogs = useMemo((): AuditLog[] => {
-    const logs: AuditLog[] = [];
-    cases.slice(0, 5).forEach((c, i) => {
-      logs.push({
-        id: `log-${i}`,
-        action: "Case Created",
-        user: "Admin User",
-        details: `Case ${c.caseNumber} filed`,
-        timestamp: new Date(c.dateFiled || Date.now()),
-        type: "create",
-      });
-    });
-    return logs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [cases]);
 
   const branchPerformance = useMemo(() => {
     const branchMap: Record<
@@ -589,54 +565,7 @@ const AdminDashboard: React.FC<Props> = ({ onNavigate }) => {
                 </div>
 
                 {/* RECENT ACTIVITY */}
-                <div className="lg:col-span-2 card surface-card-hover">
-                  <div
-                    className="card-body"
-                    style={{ padding: "var(--space-card-padding)" }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <h2 className="card-title text-xl sm:text-2xl font-black">
-                        Recent Activity
-                      </h2>
-                      <span className="text-xs text-subtle">
-                        Last 5 system logs
-                      </span>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4 mt-5">
-                      {auditLogs.slice(0, 4).map((log) => (
-                        <div
-                          key={log.id}
-                          className="card hover:scale-[1.02]"
-                          style={{
-                            background: "var(--surface-inset)",
-                            transition: "var(--transition-base)",
-                            borderRadius: "var(--radius-sm)",
-                          }}
-                        >
-                          <div className="card-body p-4 flex-row items-start gap-4">
-                            <div className="avatar placeholder bg-primary">
-                              <div className="w-10 h-10 rounded-lg text-primary-content">
-                                <RefreshCw className="h-5 w-5" />
-                              </div>
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-bold text-base">
-                                {log.action}
-                              </p>
-                              <p className="text-sm text-muted">
-                                {log.details}
-                              </p>
-                              <p className="text-xs text-subtle mt-1">
-                                {log.timestamp.toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <RecentActivities />
               </section>
 
               {/* RECENT CASES */}
