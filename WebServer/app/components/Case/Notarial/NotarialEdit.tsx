@@ -1,23 +1,24 @@
 import {
-  CellInput,
-  usePopup,
-  useToast,
-  type ColDef,
+    CaseEntryToolbar,
+    CellInput,
+    usePopup,
+    useToast,
+    type ColDef,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiPlus,
-  FiSave,
-  FiTrash2,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronLeft,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import { NotarialFormEntry } from "./Notarial";
 import ReviewCard from "./NotarialReviewCard";
@@ -142,8 +143,8 @@ const NotarialEdit = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const [entryPage, setEntryPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rowsToAddInput, setRowsToAddInput] = useState("1");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (id: string, file: File | null) => {
     setEntries((prev) =>
       prev.map((e) =>
@@ -206,15 +207,6 @@ const NotarialEdit = ({
       });
     }, 60);
   }, []);
-
-  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
-  const canAddRowsFromInput =
-    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
-
-  const handleAddRowsFromInput = useCallback(() => {
-    if (!canAddRowsFromInput) return;
-    handleAddEntry(parsedRowsToAdd);
-  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -479,93 +471,30 @@ const NotarialEdit = ({
 
             {/* ── Row Controls Toolbar (outside tab bar, like Criminal Cases) ── */}
             {!isEdit && (
-              <div className="flex items-center gap-2 flex-wrap mb-3">
-                <button
-                  type="button"
-                  className="btn btn-success btn-md gap-1"
-                  onClick={() => handleAddEntry(1)}
-                >
-                  <FiPlus size={14} strokeWidth={2.5} />
-                  Add Row
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-md gap-1"
-                  onClick={() => handleAddEntry(5)}
-                >
-                  <FiPlus size={13} />
-                  +5 Rows
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-md gap-1"
-                  onClick={() => handleAddEntry(10)}
-                >
-                  <FiPlus size={13} />
-                  +10 Rows
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-warning btn-md"
-                  onClick={() => void handleClearTable()}
-                >
-                  Clear All
-                </button>
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
+                }}
+              >
                 <input
+                  ref={importFileInputRef}
                   type="file"
                   accept=".xlsx,.xls"
                   className="hidden"
-                  id="notarial-edit-import-input"
-                  onChange={(e) => {
-                    e.target.value = "";
+                  onChange={(event) => {
+                    event.target.value = "";
                   }}
                 />
                 <button
                   type="button"
-                  className="btn btn-outline btn-md gap-1"
-                  onClick={() => {
-                    const el = document.getElementById(
-                      "notarial-edit-import-input",
-                    ) as HTMLInputElement | null;
-                    el?.click();
-                  }}
+                  className="btn btn-info btn-outline gap-2"
+                  onClick={() => importFileInputRef.current?.click()}
                 >
-                  <FiPlus size={13} />
+                  <FiUpload size={15} />
                   Import Excel
                 </button>
-                <span className="text-xs text-base-content/60 ml-1">
-                  Enter Rows
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={rowsToAddInput}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    if (/^\d*$/.test(nextValue)) {
-                      setRowsToAddInput(nextValue);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleAddRowsFromInput();
-                    }
-                  }}
-                  className="input input-bordered input-sm w-20"
-                  aria-label="Enter number of rows to add"
-                />
-                <button
-                  type="button"
-                  className="btn btn-success btn-md gap-1"
-                  onClick={handleAddRowsFromInput}
-                  disabled={!canAddRowsFromInput}
-                >
-                  <FiPlus size={13} />
-                  Add
-                </button>
-              </div>
+              </CaseEntryToolbar>
             )}
 
             <div className="xls-sheet-wrap">
