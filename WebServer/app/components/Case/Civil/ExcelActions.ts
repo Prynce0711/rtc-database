@@ -25,6 +25,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadExcel(
   file: File,
   caseType: CaseType,
+  overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -41,6 +42,7 @@ export async function uploadExcel(
     const result = await startExcelUpload({
       type: ExcelTypes.CIVIL_CASE,
       file,
+      overrideTemplateValidation,
     });
 
     if (!result.success) {

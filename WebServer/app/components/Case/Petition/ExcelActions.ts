@@ -22,6 +22,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 
 export async function uploadPetitionExcel(
   file: File,
+  overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -32,6 +33,7 @@ export async function uploadPetitionExcel(
     const result = await startExcelUpload({
       type: ExcelTypes.PETITION_CASE,
       file,
+      overrideTemplateValidation,
     });
 
     if (!result.success) {

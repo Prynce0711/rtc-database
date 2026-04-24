@@ -4,6 +4,7 @@ import ActionResult from "../ActionResult";
 import { normalizeValueBySchema } from "./utils";
 
 const EXCEL_HEADERS_PREFIX = "excelHeaders:";
+export const VALIDATION_ERROR_MARKER = "EXCEL_VALIDATION_ERROR";
 
 export const QUERY_CHUNK_SIZE = 750;
 

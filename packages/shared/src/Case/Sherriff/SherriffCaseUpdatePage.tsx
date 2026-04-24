@@ -9,6 +9,7 @@ import {
   SherriffCaseEntry,
   sherriffCaseToEntry,
   usePopup,
+  VALIDATION_ERROR_MARKER,
 } from "@rtc-database/shared";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -500,7 +501,16 @@ export const SherriffCaseUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await adapter.uploadSheriffExcel(file);
+      let result = await adapter.uploadSheriffExcel(file);
+      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not sheriff cases, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        result = await adapter.uploadSheriffExcel(file, true);
+      }
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {

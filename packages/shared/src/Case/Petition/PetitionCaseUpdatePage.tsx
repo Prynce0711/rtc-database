@@ -25,6 +25,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
+import { VALIDATION_ERROR_MARKER } from "../../lib/excel";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
@@ -662,7 +663,16 @@ const PetitionCaseUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await adapter.uploadPetitionExcel(file);
+      let result = await adapter.uploadPetitionExcel(file);
+      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not petition cases, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        result = await adapter.uploadPetitionExcel(file, true);
+      }
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {

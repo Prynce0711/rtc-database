@@ -24,6 +24,7 @@ import { usePopup } from "../../Popup/PopupProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 
+import { VALIDATION_ERROR_MARKER } from "../../lib/excel";
 import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
 export enum ReceivingUpdateType {
@@ -493,7 +494,16 @@ const ReceiveUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await adapter.uploadReceiveExcel(file);
+      let result = await adapter.uploadReceiveExcel(file);
+      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not receiving logs, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        result = await adapter.uploadReceiveExcel(file, true);
+      }
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {

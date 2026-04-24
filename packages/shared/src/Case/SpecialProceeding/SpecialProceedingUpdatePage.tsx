@@ -7,6 +7,7 @@ import {
   SpecialProceedingData,
   SpecialProceedingEntry,
   usePopup,
+  VALIDATION_ERROR_MARKER,
 } from "../../index";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -391,7 +392,7 @@ const SpecialProceedingUpdatePage = ({
       : selectedCase
         ? [selectedCase]
         : [];
-  const popup = usePopup();
+  const statusPopup = usePopup();
   const [step, setStep] = useState<Step>("entry");
   const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -638,7 +639,7 @@ const SpecialProceedingUpdatePage = ({
         ? "Clear the table and reset the current row?"
         : `Clear all ${entries.length} rows and start over?`;
 
-    if (!(await popup.showConfirm(label))) return;
+    if (!(await statusPopup.showConfirm(label))) return;
 
     setEntries([
       {
@@ -656,7 +657,7 @@ const SpecialProceedingUpdatePage = ({
     setEntryPage(1);
     setAutoCaseNumbersByRow({});
     setExistingCaseNumbers([]);
-  }, [defaultArea, entries.length, popup]);
+  }, [defaultArea, entries.length, statusPopup]);
 
   const handleImportExcel = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -667,7 +668,17 @@ const SpecialProceedingUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await adapter.uploadSpecialProceedingExcel(file);
+      let result = await adapter.uploadSpecialProceedingExcel(file);
+      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not special proceedings, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        result = await adapter.uploadSpecialProceedingExcel(file, true);
+      }
+
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {
@@ -693,18 +704,18 @@ const SpecialProceedingUpdatePage = ({
       }
 
       if (!result.success) {
-        popup.showError(result.error || "Failed to import cases");
+        statusPopup.showError(result.error || "Failed to import cases");
         return;
       }
 
       if ((importPayload?.meta.importedCount ?? 0) === 0) {
-        popup.showError(
+        statusPopup.showError(
           "No valid rows to import. Failed rows have been downloaded for review.",
         );
         return;
       }
 
-      popup.showSuccess(
+      statusPopup.showSuccess(
         importPayload?.failedExcel
           ? "Import complete. Failed rows have been downloaded for review."
           : "Cases imported successfully",
@@ -880,7 +891,9 @@ const SpecialProceedingUpdatePage = ({
     });
     setEntries(validated);
     if (anyError) {
-      popup.showError("Please fill in all required fields before reviewing.");
+      statusPopup.showError(
+        "Please fill in all required fields before reviewing.",
+      );
       return;
     }
 
@@ -922,7 +935,7 @@ const SpecialProceedingUpdatePage = ({
           ? `Case number ${existingCases[0]} already exists. Continue anyway?`
           : `${existingCases.length} case numbers already exist. Continue anyway?`;
 
-      if (!(await popup.showConfirm(duplicateLabel))) {
+      if (!(await statusPopup.showConfirm(duplicateLabel))) {
         return;
       }
     }
@@ -934,9 +947,11 @@ const SpecialProceedingUpdatePage = ({
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
-    if (!(await popup.showConfirm(label))) return;
+    if (!(await statusPopup.showConfirm(label))) return;
     setIsSubmitting(true);
-    popup.showLoading(isEdit ? "Updating case..." : "Creating case(s)...");
+    statusPopup.showLoading(
+      isEdit ? "Updating case..." : "Creating case(s)...",
+    );
 
     const rollbackCreatedCases = async (
       createdIds: number[],
@@ -974,7 +989,9 @@ const SpecialProceedingUpdatePage = ({
     try {
       if (isEdit) {
         if (entries.length !== editCases.length) {
-          popup.showError("Proceedings row count mismatch. Please reload.");
+          statusPopup.showError(
+            "Proceedings row count mismatch. Please reload.",
+          );
           return;
         }
 
@@ -983,7 +1000,7 @@ const SpecialProceedingUpdatePage = ({
           const target = editCases[index];
 
           if (!target?.id) {
-            popup.showError(`Missing case id for row ${index + 1}`);
+            statusPopup.showError(`Missing case id for row ${index + 1}`);
             return;
           }
 
@@ -993,14 +1010,14 @@ const SpecialProceedingUpdatePage = ({
             payload,
           );
           if (!result.success) {
-            popup.showError(
+            statusPopup.showError(
               result.error || `Update failed for row ${index + 1}`,
             );
             return;
           }
         }
 
-        popup.showSuccess(
+        statusPopup.showSuccess(
           entries.length === 1
             ? "Case updated successfully"
             : `${entries.length} cases updated successfully`,
@@ -1015,7 +1032,7 @@ const SpecialProceedingUpdatePage = ({
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedCases(createdIds);
             setStep("entry");
-            popup.showError(
+            statusPopup.showError(
               [
                 `Failed to create row ${index + 1}: ${result.error || "Create failed"}.`,
                 rollbackErrors.length > 0
@@ -1030,13 +1047,13 @@ const SpecialProceedingUpdatePage = ({
           }
         }
         onCreate?.();
-        popup.showSuccess(
+        statusPopup.showSuccess(
           `${entries.length} case${entries.length > 1 ? "s" : ""} created successfully`,
         );
       }
       onClose();
     } catch (error) {
-      popup.showError(
+      statusPopup.showError(
         error instanceof Error ? error.message : "An error occurred",
       );
       console.error(error);

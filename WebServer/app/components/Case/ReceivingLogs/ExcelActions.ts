@@ -13,73 +13,12 @@ import {
   UploadExcelResult,
 } from "@rtc-database/shared";
 import { LogAction } from "@rtc-database/shared/prisma/client";
-import { CaseType } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
 import { createLog } from "../../ActivityLogs/LogActions";
 
-// Parse time string in various formats
-const parseTime = (
-  timeStr: string,
-): { hours: number; minutes: number; seconds: number } | null => {
-  if (!timeStr) return null;
-
-  const str = timeStr.toString().trim();
-
-  // Handle formats like "9:30AM", "9:30 AM", "09:30:00", etc.
-  const timeRegex = /(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AaPp][Mm])?/;
-  const match = str.match(timeRegex);
-
-  if (!match) return null;
-
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const seconds = match[3] ? parseInt(match[3], 10) : 0;
-  const ampm = match[4]?.trim().toUpperCase();
-
-  // Convert 12-hour to 24-hour format
-  if (ampm) {
-    if (ampm === "PM" && hours !== 12) {
-      hours += 12;
-    } else if (ampm === "AM" && hours === 12) {
-      hours = 0;
-    }
-  }
-
-  return { hours, minutes, seconds };
-};
-
-// Convert case type abbreviations to enum values
-const convertCaseType = (abbreviation: string | undefined): CaseType => {
-  if (!abbreviation) return CaseType.UNKNOWN;
-
-  const abbrev = abbreviation.toString().toUpperCase().trim();
-  const caseTypeMap: Record<string, CaseType> = {
-    CC: CaseType.CRIMINAL,
-    CVC: CaseType.CIVIL,
-    LRC: CaseType.LAND_REGISTRATION_CASE,
-    P: CaseType.PETITION,
-  };
-
-  return caseTypeMap[abbrev] || CaseType.UNKNOWN;
-};
-
-const parseDateCell = (value: unknown): Date | undefined => {
-  if (value == null || value === "") return undefined;
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? undefined : value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-  }
-
-  return undefined;
-};
-
 export async function uploadReceiveExcel(
   file: File,
+  overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -90,6 +29,7 @@ export async function uploadReceiveExcel(
     const result = await startExcelUpload({
       type: ExcelTypes.RECEIVING_LOG,
       file,
+      overrideTemplateValidation,
     });
 
     if (!result.success) {
