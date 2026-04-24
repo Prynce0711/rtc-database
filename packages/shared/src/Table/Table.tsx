@@ -1,11 +1,11 @@
 "use client";
 
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import { FiInbox } from "react-icons/fi";
 import Pagination from "./Pagination";
@@ -103,6 +103,9 @@ function Table<T extends Record<string, unknown>>({
         const bodyRows = tableEl.querySelectorAll("tbody tr");
         for (const row of Array.from(bodyRows)) {
           const tds = row.querySelectorAll("td");
+          // Skip rows with colSpan or missing columns (e.g., empty state)
+          if (tds.length !== headers.length) continue;
+
           const td = tds[i] as HTMLTableCellElement | undefined;
           if (!td) continue;
           const w = Math.round(td.getBoundingClientRect().width);
@@ -244,8 +247,8 @@ function Table<T extends Record<string, unknown>>({
                     style={
                       typeof columnWidths[h.key] === "number"
                         ? {
-                            width: `${columnWidths[h.key]}px`,
-                          }
+                          width: `${columnWidths[h.key]}px`,
+                        }
                         : undefined
                     }
                   />
@@ -275,15 +278,15 @@ function Table<T extends Record<string, unknown>>({
                       style={
                         resizableColumns
                           ? {
-                              width: columnWidths[h.key]
-                                ? `${columnWidths[h.key]}px`
-                                : undefined,
-                              maxWidth: columnWidths[h.key]
-                                ? `${columnWidths[h.key]}px`
-                                : undefined,
-                              minWidth: `${effectiveMinColumnWidth}px`,
-                              overflow: "hidden",
-                            }
+                            width: columnWidths[h.key]
+                              ? `${columnWidths[h.key]}px`
+                              : undefined,
+                            maxWidth: columnWidths[h.key]
+                              ? `${columnWidths[h.key]}px`
+                              : undefined,
+                            minWidth: `${effectiveMinColumnWidth}px`,
+                            overflow: "hidden",
+                          }
                           : undefined
                       }
                       className={`py-4 px-4 ${resizableColumns ? "relative overflow-hidden" : ""} ${h.className ?? ""} ${alignClass} text-sm font-bold uppercase tracking-wider text-base-content/50 ${h.sortable ? "cursor-pointer select-none hover:bg-base-200/50 transition-colors" : ""}`}
