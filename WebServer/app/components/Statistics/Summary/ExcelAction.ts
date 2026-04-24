@@ -4,7 +4,7 @@ import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
-import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
+import { startExcelUpload } from "@/app/lib/workers/Excel/WorkerActions";
 import {
   ActionResult,
   ExportExcelData,

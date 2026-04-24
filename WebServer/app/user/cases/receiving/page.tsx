@@ -2,12 +2,17 @@
 
 import recievingLogsAdapter from "@/app/components/Case/ReceivingLogs/RecievingLogsAdapter";
 import { useSession } from "@/app/lib/authClient";
-import { ReceivingLogsPage, Roles } from "@rtc-database/shared";
+import { ReceivingLogsPage, RedirectingUI, Roles } from "@rtc-database/shared";
 import { redirect } from "next/navigation";
 
 export default function Page() {
   const session = useSession();
-  if (!session?.data?.user?.role) {
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading case records..." />;
+  }
+
+  if (!session.data?.user?.role) {
     redirect("/");
   }
 

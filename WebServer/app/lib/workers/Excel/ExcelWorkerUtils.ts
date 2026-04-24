@@ -7,6 +7,8 @@ export type ExcelUploadActionResult = ActionResult<
 >;
 export const QUEUE_NAME = "excelQueue";
 
+export const IS_WORKER = process.env.IS_WORKER === "true";
+
 export enum ExcelTypes {
   CRIMINAL_CASE = "CRIMINAL_CASE",
   CIVIL_CASE = "CIVIL_CASE",
@@ -76,6 +78,7 @@ export const isSerializedExcelFile = (
 export const serializeExcelFile = async (
   file: File,
 ): Promise<SerializedExcelFile> => {
+  console.log("Serializing file...");
   const bytes = Buffer.from(await file.arrayBuffer());
   return {
     name: file.name,

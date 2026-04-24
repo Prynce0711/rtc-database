@@ -12,6 +12,7 @@ import {
   processExcelUpload,
   valuesAreEqual,
 } from "@rtc-database/shared";
+import { IS_WORKER } from "../ExcelWorkerUtils";
 
 const toText = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim();
@@ -94,6 +95,10 @@ export async function uploadInventoryDocumentExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
+    if (!IS_WORKER) {
+      throw new Error("Cannot execute on non-worker");
+    }
+
     const result = await processExcelUpload<
       InventoryDocumentSchema,
       ReturnType<typeof getInventoryCells>

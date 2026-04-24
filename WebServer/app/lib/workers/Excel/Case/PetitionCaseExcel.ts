@@ -22,11 +22,16 @@ import {
 } from "@rtc-database/shared/lib/caseNumbering";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
+import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadPetitionCaseExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
+    if (!IS_WORKER) {
+      throw new Error("Cannot execute on non-worker");
+    }
+
     console.log(
       `OK Petition Excel file received: ${file.name} (${file.size} bytes)`,
     );

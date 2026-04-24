@@ -4,11 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -k -n next,prisma,excelWorker \"next dev\" \"prisma studio --browser none\" \"pnpm dev:excelWorker\"",
-    "dev:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/excel.worker.ts --watch",
-    "dev:noudp": "concurrently \"next dev\" \"prisma studio --browser none\"",
+    "dev:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts --watch",
     "build": "next build",
-    "start": "cross-env NODE_ENV=production concurrently -k -n next,worker \"next start\" \"pnpm start:testWorker\"",
-    "start:testWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/excel.worker.ts",
+    "start": "cross-env NODE_ENV=production concurrently -k -n next,worker \"next start\" \"pnpm start:excelWorker\"",
+    "start:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts",
     "lint": "eslint",
     "postinstall": "pnpm rebuild better-sqlite3 rclone.js",
     "prepare": "next-ws patch"

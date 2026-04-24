@@ -2,13 +2,14 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { RedirectingUI } from "@rtc-database/shared";
 import { useRef, useState } from "react";
 import {
-    FiCalendar,
-    FiDownload,
-    FiFileText,
-    FiGrid,
-    FiPlus,
+  FiCalendar,
+  FiDownload,
+  FiFileText,
+  FiGrid,
+  FiPlus,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import Inventory, { type InventoryCourtFilter } from "./Inventory";
@@ -65,6 +66,7 @@ const INVENTORY_EXPORT_HEADERS = [
 
 export default function AnnualPage() {
   const session = useSession();
+
   const canManageStats =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.STATISTICS;
@@ -161,6 +163,10 @@ export default function AnnualPage() {
   const yearOptions = Array.from({ length: 13 }, (_, i) =>
     (currentYear - 10 + i).toString(),
   );
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading annual reports..." />;
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8">

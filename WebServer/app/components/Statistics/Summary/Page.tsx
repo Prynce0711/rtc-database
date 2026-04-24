@@ -2,6 +2,7 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
+import { RedirectingUI } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
 import {
   FiCalendar,
@@ -97,6 +98,7 @@ const TOTAL_FIELDS: Array<
 
 export default function SummaryPage() {
   const session = useSession();
+
   const canManageStats =
     session?.data?.user?.role === Roles.ADMIN ||
     session?.data?.user?.role === Roles.STATISTICS;
@@ -268,6 +270,10 @@ export default function SummaryPage() {
       `Summary-${activeCourtType}-${effectiveYear}-${selectedMonth}.xlsx`,
     );
   };
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading summary statistics..." />;
+  }
 
   if (showAddPage) {
     return (
