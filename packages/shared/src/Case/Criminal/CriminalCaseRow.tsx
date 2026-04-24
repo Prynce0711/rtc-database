@@ -46,6 +46,10 @@ const CriminalCaseRow = ({
 }) => {
   const router = useAdaptiveNavigation();
   const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
+  const detentionStatus =
+    caseItem.detained && caseItem.detained.trim()
+      ? caseItem.detained
+      : "Released";
 
   return (
     <tr
@@ -108,20 +112,20 @@ const CriminalCaseRow = ({
       <TipCell label="Court" value={caseItem.court} />
 
       {/* DETENTION STATUS */}
-      <td className="text-center whitespace-nowrap">
+      <TipCell label="Detention" value={detentionStatus}>
         <span
-          className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition
+          className={`inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition
           ${
             caseItem.detained && caseItem.detained.trim()
               ? "bg-gray-100 text-gray-500 border-gray-200"
               : "bg-neutral-800 text-white border-neutral-700"
           }`}
         >
-          {caseItem.detained && caseItem.detained.trim()
-            ? caseItem.detained
-            : "Released"}
+          <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+            {detentionStatus}
+          </span>
         </span>
-      </td>
+      </TipCell>
 
       <TipCell label="Consolidation" value={caseItem.consolidation} truncate />
       <TipCell label="EQC No." value={caseItem.eqcNumber ?? "N/A"} />
