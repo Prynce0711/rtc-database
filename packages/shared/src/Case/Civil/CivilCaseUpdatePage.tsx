@@ -2,40 +2,40 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ChangeEvent,
+    type KeyboardEvent,
 } from "react";
 import {
-  FiAlertCircle,
-  FiArrowLeft,
-  FiCheck,
-  FiChevronLeft,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiFileText,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiAlertCircle,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronLeft,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiFileText,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
 import { createTempId } from "../../utils";
+import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import {
-  CivilCaseEntry,
-  CivilCaseSchema,
-  civilCaseToEntry,
-  createEmptyCivilEntry,
-  type CivilCaseData,
+    CivilCaseEntry,
+    CivilCaseSchema,
+    civilCaseToEntry,
+    createEmptyCivilEntry,
+    type CivilCaseData,
 } from "./CivilCaseSchema";
 
 export enum CivilCaseUpdateType {
@@ -614,7 +614,6 @@ export const CivilCaseUpdatePage = ({
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
-  const [rowsToAddInput, setRowsToAddInput] = useState("1");
   const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -804,15 +803,6 @@ export const CivilCaseUpdatePage = ({
     },
     [defaultArea],
   );
-
-  const parsedRowsToAdd = Number.parseInt(rowsToAddInput, 10);
-  const canAddRowsFromInput =
-    Number.isFinite(parsedRowsToAdd) && parsedRowsToAdd > 0;
-
-  const handleAddRowsFromInput = useCallback(() => {
-    if (!canAddRowsFromInput) return;
-    handleAddEntry(parsedRowsToAdd);
-  }, [canAddRowsFromInput, handleAddEntry, parsedRowsToAdd]);
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -1494,46 +1484,12 @@ export const CivilCaseUpdatePage = ({
             )}
 
             {!isEdit && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  marginBottom: 12,
+              <CaseEntryToolbar
+                onAddRows={handleAddEntry}
+                onClearAll={() => {
+                  void handleClearTable();
                 }}
               >
-                <button
-                  type="button"
-                  className="btn btn-success gap-2"
-                  onClick={() => handleAddEntry(1)}
-                >
-                  <FiPlus size={15} />
-                  Add Row
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-success btn-outline gap-2"
-                  onClick={() => handleAddEntry(5)}
-                >
-                  <FiPlus size={15} />
-                  +5 Rows
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-success btn-outline gap-2"
-                  onClick={() => handleAddEntry(10)}
-                >
-                  <FiPlus size={15} />
-                  +10 Rows
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-warning btn-outline"
-                  onClick={() => void handleClearTable()}
-                >
-                  Clear All
-                </button>
                 <input
                   ref={importFileInputRef}
                   type="file"
@@ -1550,41 +1506,7 @@ export const CivilCaseUpdatePage = ({
                   <FiUpload size={15} />
                   {uploading ? "Importing..." : "Import Excel"}
                 </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-base-content/70">
-                    Enter Rows
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={rowsToAddInput}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      if (/^\d*$/.test(nextValue)) {
-                        setRowsToAddInput(nextValue);
-                      }
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleAddRowsFromInput();
-                      }
-                    }}
-                    className="input input-bordered input-sm w-20"
-                    aria-label="Enter number of rows to add"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-success btn-outline gap-2"
-                    onClick={handleAddRowsFromInput}
-                    disabled={!canAddRowsFromInput}
-                  >
-                    <FiPlus size={15} />
-                    Add
-                  </button>
-                </div>
-              </div>
+              </CaseEntryToolbar>
             )}
 
             <div className="xls-sheet-wrap">

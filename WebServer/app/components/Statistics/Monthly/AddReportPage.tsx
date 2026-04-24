@@ -2,25 +2,26 @@
 
 import { getHeaderRowInfo } from "@rtc-database/shared";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  FiArrowLeft,
-  FiCheck,
-  FiChevronRight,
-  FiCopy,
-  FiEdit3,
-  FiEye,
-  FiPlus,
-  FiSave,
-  FiTrash2,
-  FiUpload,
+    FiArrowLeft,
+    FiCheck,
+    FiChevronRight,
+    FiCopy,
+    FiEdit3,
+    FiEye,
+    FiPlus,
+    FiSave,
+    FiTrash2,
+    FiUpload,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
+import AddRowsToolbar from "../Shared/AddRowsToolbar";
 import { CATEGORY_OPTIONS } from "./MonthlyFieldConfig";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
@@ -980,45 +981,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
           </div>
 
           {/* ── Toolbar ── */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              className="btn btn-success gap-2"
-              onClick={() => addRows(1)}
-            >
-              <FiPlus size={15} />
-              Add Row
-            </button>
-            <button
-              className="btn btn-success btn-outline gap-2"
-              onClick={() => addRows(5)}
-            >
-              <FiPlus size={15} />
-              +5 Rows
-            </button>
-            <button
-              className="btn btn-success btn-outline gap-2"
-              onClick={() => addRows(10)}
-            >
-              <FiPlus size={15} />
-              +10 Rows
-            </button>
-
-            <div
-              style={{
-                width: 1,
-                height: 28,
-                background: "var(--surface-border)",
-                margin: "0 4px",
-              }}
-            />
-
+          <AddRowsToolbar onAddRows={addRows}>
             <input
               ref={fileInputRef}
               type="file"
@@ -1193,7 +1156,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
                 })}
               </div>
             </>
-          </div>
+          </AddRowsToolbar>
 
           {/* ── Sheet ── */}
           <div className="xls-sheet-wrap">
