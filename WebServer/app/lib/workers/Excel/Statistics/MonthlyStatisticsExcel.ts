@@ -13,6 +13,7 @@ import {
   processExcelUpload,
   valuesAreEqual,
 } from "@rtc-database/shared";
+import { IS_WORKER } from "../ExcelWorkerUtils";
 
 const toNumber = (value: unknown): number => {
   if (value === undefined || value === null || value === "") return 0;
@@ -53,6 +54,10 @@ export async function uploadMonthlyStatisticsExcel(
   fallbackMonth?: string,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
+    if (!IS_WORKER) {
+      throw new Error("Cannot execute on non-worker");
+    }
+
     const result = await processExcelUpload<
       MonthlyRow,
       ReturnType<typeof getMonthlyCells>

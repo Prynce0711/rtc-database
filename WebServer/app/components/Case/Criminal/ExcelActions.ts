@@ -9,7 +9,8 @@ import {
   UploadExcelResult,
 } from "@rtc-database/shared";
 
-import { startExcelUpload } from "@/app/lib/workers/Excel/excel.worker";
+import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
+import { startExcelUpload } from "@/app/lib/workers/Excel/WorkerActions";
 import {
   ActionResult,
   BaseCaseSchema,
@@ -22,7 +23,6 @@ import {
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { createLog } from "../../ActivityLogs/LogActions";
-import { ExcelTypes } from "@/app/lib/workers/Excel/ExcelWorkerUtils";
 
 export async function uploadCriminalCaseExcel(
   file: File,

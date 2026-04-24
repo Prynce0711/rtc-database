@@ -3,6 +3,7 @@
 import { parseSummaryWorkbook } from "@/app/components/Statistics/Summary/SummaryImportUtils";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult, UploadExcelResult } from "@rtc-database/shared";
+import { IS_WORKER } from "../ExcelWorkerUtils";
 
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
@@ -12,6 +13,10 @@ export async function uploadSummaryStatisticsExcel(
   fallbackYear?: number,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
+    if (!IS_WORKER) {
+      throw new Error("Cannot execute on non-worker");
+    }
+
     const now = new Date();
     const selectedYear =
       typeof fallbackYear === "number" && Number.isFinite(fallbackYear)
