@@ -57,7 +57,11 @@ const CivilCaseRow = ({
       )}
       <TipCell
         label="Case Number"
-        value={caseItem.caseNumber}
+        value={
+          caseItem.caseNumber?.toLowerCase().includes("undocketed")
+            ? "UNDOCKETED"
+            : caseItem.caseNumber
+        }
         className="font-semibold"
       />
       <TipCell label="Branch" value={caseItem.branch} />
