@@ -1,0 +1,8 @@
+{
+  "watch": [
+    "app/lib/workers",
+    "../packages/shared"
+  ],
+  "ext": "ts,tsx,js,json",
+  "exec": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts"
+}

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -k -n next,prisma,excelWorker \"next dev\" \"prisma studio --browser none\" \"pnpm dev:excelWorker\"",
-    "dev:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts --watch",
+    "dev:excelWorker": "nodemon",
     "build": "next build",
     "start": "cross-env NODE_ENV=production concurrently -k -n next,worker \"next start\" \"pnpm start:excelWorker\"",
     "start:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts",

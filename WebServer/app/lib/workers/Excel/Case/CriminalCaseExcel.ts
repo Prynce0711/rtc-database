@@ -8,9 +8,7 @@ import {
   normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
-  QUERY_CHUNK_SIZE,
   UploadExcelResult,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import {
   parseCaseNumber,
@@ -37,72 +35,14 @@ export async function uploadCriminalCaseExcel(
     }
     console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
-    const candidateCaseNumbers = new Set<string>();
-
-    // Peek workbook to log sheet names and pre-collect case numbers for faster exact-match checks.
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
         `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
-
-      for (const sheetName of workbook.SheetNames) {
-        const worksheet = workbook.Sheets[sheetName];
-        const rows =
-          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-
-        for (const row of rows) {
-          const normalized = normalizeRowBySchema(CriminalCaseSchema, row);
-          const caseNumber = normalized.caseNumber;
-          if (typeof caseNumber !== "string") continue;
-          const trimmed = caseNumber.trim();
-          if (trimmed) {
-            candidateCaseNumbers.add(trimmed);
-          }
-        }
-      }
     } catch (peekError) {
       console.warn("WARN Unable to preview workbook for logging:", peekError);
-    }
-
-    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
-    const exactMatchCache = new Map<string, boolean>();
-
-    if (candidateCaseNumbers.size > 0) {
-      const allCaseNumbers = Array.from(candidateCaseNumbers);
-
-      for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
-        const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
-
-        const existingCases = await prisma.case.findMany({
-          where: {
-            caseType: CaseType.CRIMINAL,
-            caseNumber: {
-              in: caseNumberChunk,
-            },
-          },
-          include: {
-            criminalCase: true,
-          },
-        });
-
-        for (const existingCase of existingCases) {
-          if (!existingCase.criminalCase || !existingCase.caseNumber) continue;
-
-          const key = existingCase.caseNumber.trim();
-          if (!key) continue;
-
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.criminalCase,
-          } as Record<string, unknown>;
-
-          const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(mergedCase);
-          existingByCaseNumber.set(key, bucket);
-        }
-      }
     }
 
     const headerMap = getExcelHeaderMap(CriminalCaseSchema);
@@ -129,46 +69,33 @@ export async function uploadCriminalCaseExcel(
       schema: CriminalCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber", "name"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const mappedEntries = Object.entries(mappedRow);
-
-        const cacheKey = JSON.stringify(
-          mappedEntries
-            .slice()
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              value instanceof Date
-                ? value.getTime()
-                : typeof value === "string"
-                  ? value.trim()
-                  : (value ?? null),
-            ]),
-        );
-
-        const cachedResult = exactMatchCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          return { exists: cachedResult };
-        }
-
-        const caseNumberKey =
-          typeof mappedRow.caseNumber === "string"
-            ? mappedRow.caseNumber.trim()
-            : "";
-
-        const candidates = caseNumberKey
-          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
-          : [];
-
-        const hasExactMatch = candidates.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRow[key]),
+      uniqueKeys: ["caseNumber"],
+      checkExistingUniqueKeys: async (keys) => {
+        const normalizedKeys = Array.from(
+          new Set(
+            keys.map((key) => key.trim()).filter((key) => key.length > 0),
           ),
         );
 
-        exactMatchCache.set(cacheKey, hasExactMatch);
+        if (normalizedKeys.length === 0) {
+          return new Set<string>();
+        }
 
-        return { exists: hasExactMatch };
+        const existing = await prisma.case.findMany({
+          where: {
+            caseType: CaseType.CRIMINAL,
+            caseNumber: { in: normalizedKeys },
+          },
+          select: {
+            caseNumber: true,
+          },
+        });
+
+        return new Set(
+          existing
+            .map((c) => c.caseNumber?.trim())
+            .filter((value): value is string => !!value),
+        );
       },
       mapRow: (row) => {
         const cells = getMappedCells(row);

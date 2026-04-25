@@ -6,7 +6,6 @@ import {
   CaseType,
   Prisma,
   ProcessExcelMeta,
-  QUERY_CHUNK_SIZE,
   SheriffCaseSchema,
   UploadExcelResult,
   getExcelHeaderMap,
@@ -14,7 +13,6 @@ import {
   normalizeRowBySchema,
   processExcelUpload,
   splitCaseDataBySchema,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import {
   parseSheriffCaseNumber,
@@ -34,74 +32,17 @@ export async function uploadSheriffCaseExcel(
 
     console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
-    const candidateCaseNumbers = new Set<string>();
-
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
         `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
-
-      for (const sheetName of workbook.SheetNames) {
-        const worksheet = workbook.Sheets[sheetName];
-        const rows =
-          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-
-        for (const row of rows) {
-          const normalized = normalizeRowBySchema(SheriffCaseSchema, row);
-          const caseNumber = normalized.caseNumber;
-          if (typeof caseNumber !== "string") continue;
-          const trimmed = caseNumber.trim();
-          if (trimmed) {
-            candidateCaseNumbers.add(trimmed);
-          }
-        }
-      }
     } catch (peekError) {
       console.warn(
         "WARN Unable to preview sheriff workbook for matching:",
         peekError,
       );
-    }
-
-    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
-    const exactMatchCache = new Map<string, boolean>();
-
-    if (candidateCaseNumbers.size > 0) {
-      const allCaseNumbers = Array.from(candidateCaseNumbers);
-
-      for (let i = 0; i < allCaseNumbers.length; i += QUERY_CHUNK_SIZE) {
-        const caseNumberChunk = allCaseNumbers.slice(i, i + QUERY_CHUNK_SIZE);
-
-        const existingCases = await prisma.case.findMany({
-          where: {
-            caseType: CaseType.SHERRIFF,
-            caseNumber: {
-              in: caseNumberChunk,
-            },
-          },
-          include: {
-            sheriffCase: true,
-          },
-        });
-
-        for (const existingCase of existingCases) {
-          if (!existingCase.sheriffCase || !existingCase.caseNumber) continue;
-
-          const key = existingCase.caseNumber.trim();
-          if (!key) continue;
-
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.sheriffCase,
-          } as Record<string, unknown>;
-
-          const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(mergedCase);
-          existingByCaseNumber.set(key, bucket);
-        }
-      }
     }
 
     const headerMap = getExcelHeaderMap(SheriffCaseSchema);
@@ -120,52 +61,33 @@ export async function uploadSheriffCaseExcel(
       schema: SheriffCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const mappedEntries = Object.entries(mappedRow);
-
-        const cacheKey = JSON.stringify(
-          mappedEntries
-            .slice()
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              value instanceof Date
-                ? value.getTime()
-                : typeof value === "string"
-                  ? value.trim()
-                  : (value ?? null),
-            ]),
-        );
-
-        const cachedResult = exactMatchCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          return {
-            exists: cachedResult,
-            fields: cachedResult ? mappedEntries.map(([key]) => key) : [],
-          };
-        }
-
-        const caseNumberKey =
-          typeof mappedRow.caseNumber === "string"
-            ? mappedRow.caseNumber.trim()
-            : "";
-
-        const candidates = caseNumberKey
-          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
-          : [];
-
-        const hasExactMatch = candidates.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRow[key]),
+      uniqueKeys: ["caseNumber"],
+      checkExistingUniqueKeys: async (keys) => {
+        const normalizedKeys = Array.from(
+          new Set(
+            keys.map((key) => key.trim()).filter((key) => key.length > 0),
           ),
         );
 
-        exactMatchCache.set(cacheKey, hasExactMatch);
+        if (normalizedKeys.length === 0) {
+          return new Set<string>();
+        }
 
-        return {
-          exists: hasExactMatch,
-          fields: hasExactMatch ? mappedEntries.map(([key]) => key) : [],
-        };
+        const existing = await prisma.case.findMany({
+          where: {
+            caseType: CaseType.SHERRIFF,
+            caseNumber: { in: normalizedKeys },
+          },
+          select: {
+            caseNumber: true,
+          },
+        });
+
+        return new Set(
+          existing
+            .map((c) => c.caseNumber?.trim())
+            .filter((value): value is string => !!value),
+        );
       },
       mapRow: (row) => {
         const cells = getMappedCells(row);
