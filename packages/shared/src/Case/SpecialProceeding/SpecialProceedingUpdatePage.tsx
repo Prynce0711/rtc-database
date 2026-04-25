@@ -6,8 +6,8 @@ import {
   SpecialProceedingAdapter,
   SpecialProceedingData,
   SpecialProceedingEntry,
+  SpecialProceedingSchema,
   usePopup,
-  VALIDATION_ERROR_MARKER,
 } from "../../index";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -35,6 +35,13 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import CaseEntryToolbar from "../CaseEntryToolbar";
+import {
+  CASE_IMPORT_DRAFT_KEYS,
+  consumeCaseImportDraft,
+  downloadImportFailedExcel,
+  previewSpecialProceedingImport,
+  shouldLoadCaseImportDraft,
+} from "../importPreview";
 
 type ColDef = {
   key: keyof Omit<
@@ -193,6 +200,23 @@ const applyAreaToCaseNumber = (
   const parsed = parseCaseNumberParts(value);
 
   return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
+};
+
+const importedSpecialProceedingRowToEntry = (
+  row: SpecialProceedingSchema,
+): SpecialProceedingEntry => {
+  const baseEntry = createEmptySpecialProceedingEntry();
+
+  return {
+    ...baseEntry,
+    ...row,
+    id: baseEntry.id,
+    baseCaseID: baseEntry.baseCaseID,
+    isManual: true,
+    errors: {},
+    collapsed: false,
+    saved: false,
+  };
 };
 
 function validateEntry(
@@ -466,6 +490,25 @@ const SpecialProceedingUpdatePage = ({
   }, [type, selectedCase, selectedCases, isEdit]);
 
   useEffect(() => {
+    if (isEdit || !shouldLoadCaseImportDraft()) return;
+
+    const importedRows = consumeCaseImportDraft<SpecialProceedingSchema>(
+      CASE_IMPORT_DRAFT_KEYS.specialProceeding,
+    );
+
+    if (!importedRows || importedRows.length === 0) {
+      return;
+    }
+
+    setEntries(importedRows.map(importedSpecialProceedingRowToEntry));
+    setStep("entry");
+    setEntryPage(1);
+    setReviewIdx(0);
+    setExistingCaseNumbers([]);
+    setAutoCaseNumbersByRow({});
+  }, [isEdit]);
+
+  useEffect(() => {
     if (isEdit) {
       setAutoCaseNumbersByRow({});
       return;
@@ -668,57 +711,30 @@ const SpecialProceedingUpdatePage = ({
 
     setUploading(true);
     try {
-      let result = await adapter.uploadSpecialProceedingExcel(file);
-      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
-        const continueUpload = await statusPopup.showWarning(
-          "Some sheets are not special proceedings, do you want to continue?",
-        );
-        if (!continueUpload) {
-          return;
-        }
-        result = await adapter.uploadSpecialProceedingExcel(file, true);
-      }
+      const result = await previewSpecialProceedingImport(file);
 
-      const importPayload = result.success ? result.result : result.errorResult;
+      downloadImportFailedExcel(result.failedExcel);
 
-      if (importPayload?.failedExcel) {
-        const { fileName, base64 } = importPayload.failedExcel;
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
-
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to import cases");
-        return;
-      }
-
-      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+      if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
-          "No valid rows to import. Failed rows have been downloaded for review.",
+          result.error ||
+            (result.failedExcel
+              ? "No valid rows were loaded. Failed rows were downloaded for review."
+              : "No valid rows were loaded."),
         );
         return;
       }
 
+      setEntries(result.rows.map(importedSpecialProceedingRowToEntry));
+      setStep("entry");
+      setEntryPage(1);
+      setReviewIdx(0);
+      setExistingCaseNumbers([]);
+      setAutoCaseNumbersByRow({});
       statusPopup.showSuccess(
-        importPayload?.failedExcel
-          ? "Import complete. Failed rows have been downloaded for review."
-          : "Cases imported successfully",
+        result.failedExcel
+          ? "Excel data loaded into the draft. Failed rows were downloaded for review."
+          : "Excel data loaded into the draft. Review and save to apply it.",
       );
     } finally {
       setUploading(false);
@@ -1704,7 +1720,7 @@ const SpecialProceedingUpdatePage = ({
               </div>
             </div>
 
-            <div className="rv-layout">
+            <div className="rv-layout rv-layout-fixed-sidebar">
               {entries.length > 1 && (
                 <div className="rv-sidebar">
                   <div className="rv-sidebar-head">{entries.length} Cases</div>

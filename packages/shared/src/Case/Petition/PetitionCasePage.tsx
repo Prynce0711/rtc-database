@@ -35,6 +35,12 @@ import {
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
+import {
+  CASE_IMPORT_DRAFT_KEYS,
+  downloadImportFailedExcel,
+  previewPetitionCaseImport,
+  saveCaseImportDraft,
+} from "../importPreview";
 import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
 import PetitionCaseRow from "./PetitionCaseRow";
 import type {
@@ -316,39 +322,38 @@ const PetitionCasePage: React.FC<{
 
   const handleUpload = async (file: File) => {
     setUploading(true);
-    const result = await adapter.uploadPetitionExcel(file);
-    setUploading(false);
+    try {
+      const result = await previewPetitionCaseImport(file);
 
-    if (!result.success) {
-      statusPopup.showError(result.error || "Upload failed");
-      return;
-    }
+      downloadImportFailedExcel(result.failedExcel);
 
-    statusPopup.showSuccess("Excel upload completed.");
-
-    if (result.result?.failedExcel) {
-      const { fileName, base64 } = result.result.failedExcel;
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      if (!result.success || result.rows.length === 0) {
+        statusPopup.showError(
+          result.error ||
+            (result.failedExcel
+              ? "No valid rows were loaded. Failed rows were downloaded for review."
+              : "No valid rows were loaded."),
+        );
+        return;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.petition, result.rows)) {
+        statusPopup.showError("Failed to stage imported rows.");
+        return;
+      }
+
+      statusPopup.showSuccess(
+        result.failedExcel
+          ? "Excel data staged. Failed rows were downloaded for review."
+          : "Excel data staged. Review and save the draft to add it to the table.",
+      );
+      router.push(`/user/cases/petition/add?importDraft=${Date.now()}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
-
-    await fetchCases();
   };
 
   const handleExport = async () => {

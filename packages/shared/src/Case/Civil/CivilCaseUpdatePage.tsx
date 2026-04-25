@@ -25,11 +25,17 @@ import {
   FiUpload,
 } from "react-icons/fi";
 import { CaseType } from "../../generated/prisma/enums";
-import { VALIDATION_ERROR_MARKER } from "../../lib/excel";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
+import {
+  CASE_IMPORT_DRAFT_KEYS,
+  consumeCaseImportDraft,
+  downloadImportFailedExcel,
+  previewCivilCaseImport,
+  shouldLoadCaseImportDraft,
+} from "../importPreview";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import {
   CivilCaseEntry,
@@ -333,6 +339,16 @@ const withDefaultAreaForAutoEntry = (
     ),
   };
 };
+
+const importedCivilRowToEntry = (row: CivilCaseSchema): CivilCaseEntry => ({
+  ...createEmptyCivilEntry(),
+  ...row,
+  id: createTempId(),
+  isManual: true,
+  errors: {},
+  collapsed: false,
+  saved: false,
+});
 
 function validateEntry(
   entry: CivilCaseEntry,
@@ -640,6 +656,26 @@ export const CivilCaseUpdatePage = ({
   }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
+    if (isEdit || !shouldLoadCaseImportDraft()) return;
+
+    const importedRows = consumeCaseImportDraft<CivilCaseSchema>(
+      CASE_IMPORT_DRAFT_KEYS.civil,
+    );
+
+    if (!importedRows || importedRows.length === 0) {
+      return;
+    }
+
+    setEntries(importedRows.map(importedCivilRowToEntry));
+    setStep("entry");
+    setActiveTab(0);
+    setEntryPage(1);
+    setReviewIdx(0);
+    setExistingCaseNumbers([]);
+    setAutoCaseNumbersByRow({});
+  }, [isEdit]);
+
+  useEffect(() => {
     if (isEdit) {
       setAutoCaseNumbersByRow({});
       return;
@@ -828,57 +864,31 @@ export const CivilCaseUpdatePage = ({
 
     setUploading(true);
     try {
-      let result = await adapter.uploadExcel(file);
-      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
-        const continueUpload = await statusPopup.showWarning(
-          "Some sheets are not civil cases, do you want to continue?",
-        );
-        if (!continueUpload) {
-          return;
-        }
-        result = await adapter.uploadExcel(file, true);
-      }
+      const result = await previewCivilCaseImport(file);
 
-      const importPayload = result.success ? result.result : result.errorResult;
+      downloadImportFailedExcel(result.failedExcel);
 
-      if (importPayload?.failedExcel) {
-        const { fileName, base64 } = importPayload.failedExcel;
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }
-
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to import cases");
-        return;
-      }
-
-      if ((importPayload?.meta.importedCount ?? 0) === 0) {
+      if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
-          "No valid rows to import. Failed rows have been downloaded for review.",
+          result.error ||
+            (result.failedExcel
+              ? "No valid rows were loaded. Failed rows were downloaded for review."
+              : "No valid rows were loaded."),
         );
         return;
       }
 
+      setEntries(result.rows.map(importedCivilRowToEntry));
+      setStep("entry");
+      setActiveTab(0);
+      setEntryPage(1);
+      setReviewIdx(0);
+      setExistingCaseNumbers([]);
+      setAutoCaseNumbersByRow({});
       statusPopup.showSuccess(
-        importPayload?.failedExcel
-          ? "Import complete. Failed rows have been downloaded for review."
-          : "Cases imported successfully",
+        result.failedExcel
+          ? "Excel data loaded into the draft. Failed rows were downloaded for review."
+          : "Excel data loaded into the draft. Review and save to apply it.",
       );
     } finally {
       setUploading(false);
@@ -1896,7 +1906,7 @@ export const CivilCaseUpdatePage = ({
               </div>
             </div>
 
-            <div className="rv-layout">
+            <div className="rv-layout rv-layout-fixed-sidebar">
               {entries.length > 1 && (
                 <div className="rv-sidebar">
                   <div className="rv-sidebar-head">{entries.length} Cases</div>
