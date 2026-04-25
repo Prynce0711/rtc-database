@@ -34,7 +34,13 @@ const Settings = () => {
     }
   }, [activeTab, visibleTabs]);
 
-  if (session.isPending) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || session.isPending) {
     return <RedirectingUI titleText="Loading settings..." />;
   }
 

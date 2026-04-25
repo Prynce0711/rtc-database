@@ -4,11 +4,17 @@ import recievingLogsAdapter from "@/app/components/Case/ReceivingLogs/RecievingL
 import { useSession } from "@/app/lib/authClient";
 import { ReceivingLogsPage, RedirectingUI, Roles } from "@rtc-database/shared";
 import { redirect } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Page() {
   const session = useSession();
+  const [mounted, setMounted] = useState(false);
 
-  if (session.isPending) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || session.isPending) {
     return <RedirectingUI titleText="Loading case records..." />;
   }
 
