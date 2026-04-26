@@ -15,9 +15,21 @@ Standalone LAN relay service for RTC Database.
 - `RELAY_LISTEN_HOST`: local bind address for relay proxy (default `0.0.0.0`)
 - `RELAY_PORT`: local bind port for relay proxy (default `3000`)
 - `RELAY_INSECURE_TLS`: set `true` to skip TLS cert verification for HTTPS upstream
+- `RELAY_USE_HTTPS`: set `true` to serve relay on HTTPS
+- `RELAY_TLS_DIR`: directory for auto-generated/managed relay TLS files (default `.relay-tls`)
+- `RELAY_TLS_KEY_PATH`: custom key path (optional)
+- `RELAY_TLS_CERT_PATH`: custom cert path (optional)
+- `RELAY_TLS_AUTO_GENERATE`: auto-generate self-signed cert/key when missing (default `true`)
+- `RELAY_TLS_CERT_HOSTS`: comma-separated SAN hosts/IPs for generated cert
+
 - `UDP_PORT`: UDP discovery port to listen on (default `41234`)
 - `UDP_ADVERTISED_HOST`: hostname/IP advertised to clients
 - `UDP_ADVERTISED_PORT`: port advertised to clients (defaults to `RELAY_PORT`)
+- `UDP_ADVERTISED_PROTOCOL`: protocol advertised to clients (`http`/`https`). Defaults to `https` when `RELAY_USE_HTTPS=true`, otherwise `http`.
+
+## TLS Notes
+
+- Auto-generated certificates are self-signed and not automatically trusted by browsers/OS trust stores.
 
 ## Setup
 

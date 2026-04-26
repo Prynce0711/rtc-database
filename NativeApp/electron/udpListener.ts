@@ -27,14 +27,15 @@ const clearDiscoveryBurstTimers = (): void => {
 };
 
 const buildBackendInfo = (
-  payload: { host: string; port: number },
+  payload: { protocol?: "http" | "https"; host: string; port: number },
   sourceAddress: string,
 ): BackendInfo => {
   const resolvedHost =
     payload.host && payload.host !== "0.0.0.0" ? payload.host : sourceAddress;
+  const protocol = payload.protocol ?? "http";
 
   return {
-    url: `http://${resolvedHost}:${payload.port}`,
+    url: `${protocol}://${resolvedHost}:${payload.port}`,
     ip: resolvedHost,
     port: payload.port,
     lastSeen: Date.now(),

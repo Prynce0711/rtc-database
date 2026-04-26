@@ -77,10 +77,12 @@ export const createEmptyArchiveSheet = (
 
 export const normalizeArchivePath = (value?: string | null): string =>
   (value ?? "")
-    .replaceAll("\\", "/")
+    .replace(/\\/g, "/")
     .split("/")
     .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+    .filter(
+      (segment) => segment.length > 0 && segment !== "." && segment !== "..",
+    )
     .join("/");
 
 export const normalizeArchiveName = (value?: string | null): string =>

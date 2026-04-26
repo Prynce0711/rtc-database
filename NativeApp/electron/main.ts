@@ -1,10 +1,10 @@
 import { app, BrowserWindow } from "electron";
-
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startDevDisconnectMonitor } from "./BackendMonitor";
 import { ensureNativeDatabaseReady } from "./databaseBootstrap";
 import "./ipcHandlers";
+import { configureRelayCertificatePinning } from "./relayTrust";
 import { startUdpListener, stopUdpListener } from "./udpListener";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -89,5 +89,6 @@ app.whenReady().then(async () => {
     console.error("[db] Failed to initialize native database:", error);
   }
 
+  configureRelayCertificatePinning();
   void createWindow();
 });

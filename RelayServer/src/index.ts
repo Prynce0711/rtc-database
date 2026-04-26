@@ -6,7 +6,7 @@ import {
 } from "./udpDiscoveryResponder";
 
 async function startRelayServices(): Promise<void> {
-  startReverseProxy();
+  await startReverseProxy();
   startUdpDiscoveryResponder();
 
   console.log(

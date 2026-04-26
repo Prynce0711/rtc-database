@@ -1,13 +1,5 @@
 "use client";
-import { env } from "next-runtime-env";
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { createContext, ReactNode, useContext, useEffect, useRef } from "react";
 import { useWebSocket } from "./hooks/useWebsocket";
 import {
   AnySocketEvent,
@@ -42,12 +34,8 @@ export const useSocket = () => {
 };
 
 const SocketProvider = ({ children }: Prop) => {
-  const url = useMemo(() => {
-    return () =>
-      env("NEXT_PUBLIC_URL")?.startsWith("https")
-        ? `wss://${window.location.host}/api/user/socket`
-        : `ws://${window.location.host}/api/user/socket`;
-  }, []);
+  const url = () =>
+    `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/user/socket`;
   const { socket } = useWebSocket(url, {
     reconnect: true,
     reconnectIntervalMs: 5000,

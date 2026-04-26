@@ -2,17 +2,29 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const allowedDevOrigins = new Set(["localhost", "127.0.0.1"]);
+const allowedServerActionOrigins = new Set([
+  "localhost:3000",
+  "localhost:3443",
+  "127.0.0.1:3000",
+  "127.0.0.1:3443",
+]);
 
-try {
-  const configuredDevHost = process.env.NEXT_PUBLIC_URL
-    ? new URL(process.env.NEXT_PUBLIC_URL).hostname
-    : undefined;
-  if (configuredDevHost) {
-    allowedDevOrigins.add(configuredDevHost);
+const addOriginHost = (rawUrl: string | undefined) => {
+  if (!rawUrl) {
+    return;
   }
-} catch {
-  // Ignore malformed NEXT_PUBLIC_URL in local development.
-}
+
+  try {
+    const parsed = new URL(rawUrl);
+    allowedDevOrigins.add(parsed.hostname);
+    allowedServerActionOrigins.add(parsed.host);
+  } catch {
+    // Ignore malformed URLs in environment configuration.
+  }
+};
+
+addOriginHost(process.env.NEXT_PUBLIC_URL);
+addOriginHost(process.env.NATIVE_APP_URL);
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -23,6 +35,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
+      allowedOrigins: [...allowedServerActionOrigins],
     },
     proxyClientMaxBodySize: "50mb",
   },
