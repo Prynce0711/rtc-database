@@ -34,13 +34,6 @@ import ExcelValidationErrorPopup from "../../Popup/ExcelValidationErrorPopup";
 import { usePopup } from "../../Popup/PopupProvider";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
-import {
-  CASE_IMPORT_DRAFT_KEYS,
-  consumeCaseImportDraft,
-  downloadImportFailedExcel,
-  previewCivilCaseImport,
-  shouldLoadCaseImportDraft,
-} from "../importPreview";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import {
   CivilCaseEntry,
@@ -344,16 +337,6 @@ const withDefaultAreaForAutoEntry = (
     ),
   };
 };
-
-const importedCivilRowToEntry = (row: CivilCaseSchema): CivilCaseEntry => ({
-  ...createEmptyCivilEntry(),
-  ...row,
-  id: createTempId(),
-  isManual: true,
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
 
 function validateEntry(
   entry: CivilCaseEntry,
@@ -702,26 +685,6 @@ export const CivilCaseUpdatePage = ({
   }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
-    if (isEdit || !shouldLoadCaseImportDraft()) return;
-
-    const importedRows = consumeCaseImportDraft<CivilCaseSchema>(
-      CASE_IMPORT_DRAFT_KEYS.civil,
-    );
-
-    if (!importedRows || importedRows.length === 0) {
-      return;
-    }
-
-    setEntries(importedRows.map(importedCivilRowToEntry));
-    setStep("entry");
-    setActiveTab(0);
-    setEntryPage(1);
-    setReviewIdx(0);
-    setExistingCaseNumbers([]);
-    setAutoCaseNumbersByRow({});
-  }, [isEdit]);
-
-  useEffect(() => {
     if (isEdit) {
       setAutoCaseNumbersByRow({});
       return;
@@ -1019,25 +982,15 @@ export const CivilCaseUpdatePage = ({
 
       if ((importPayload?.meta.importedCount ?? 0) === 0) {
         statusPopup.showError(
-          result.error ||
-            (result.failedExcel
-              ? "No valid rows were loaded. Failed rows were downloaded for review."
-              : "No valid rows were loaded."),
+          "No valid rows to import. Failed rows have been downloaded for review.",
         );
         return;
       }
 
-      setEntries(result.rows.map(importedCivilRowToEntry));
-      setStep("entry");
-      setActiveTab(0);
-      setEntryPage(1);
-      setReviewIdx(0);
-      setExistingCaseNumbers([]);
-      setAutoCaseNumbersByRow({});
       statusPopup.showSuccess(
-        result.failedExcel
-          ? "Excel data loaded into the draft. Failed rows were downloaded for review."
-          : "Excel data loaded into the draft. Review and save to apply it.",
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Cases imported successfully",
       );
     } finally {
       setUploading(false);
@@ -2073,7 +2026,7 @@ export const CivilCaseUpdatePage = ({
               </div>
             </div>
 
-            <div className="rv-layout rv-layout-fixed-sidebar">
+            <div className="rv-layout">
               {entries.length > 1 && (
                 <div className="rv-sidebar">
                   <div className="rv-sidebar-head">{entries.length} Cases</div>

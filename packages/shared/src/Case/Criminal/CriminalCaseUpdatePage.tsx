@@ -12,6 +12,7 @@ import {
   ExcelValidationErrorPopup,
   usePopup,
   useToast,
+  VALIDATION_ERROR_MARKER,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, {
@@ -39,13 +40,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
-import {
-  CASE_IMPORT_DRAFT_KEYS,
-  consumeCaseImportDraft,
-  downloadImportFailedExcel,
-  previewCriminalCaseImport,
-  shouldLoadCaseImportDraft,
-} from "../importPreview";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 
@@ -129,18 +123,6 @@ const applyAreaToCaseNumber = (
 
   return formatCaseNumber(normalizedArea, parsed.number, resolvedYear);
 };
-
-const importedCriminalRowToEntry = (
-  row: CriminalCaseSchema,
-): CriminalCaseEntry => ({
-  ...createEmptyCriminalEntry(),
-  ...row,
-  id: createTempId(),
-  isManual: true,
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
 
 type ColDef = {
   key: string;
@@ -929,26 +911,6 @@ const CriminalCaseUpdatePage = ({
   }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
-    if (isEdit || !shouldLoadCaseImportDraft()) return;
-
-    const importedRows = consumeCaseImportDraft<CriminalCaseSchema>(
-      CASE_IMPORT_DRAFT_KEYS.criminal,
-    );
-
-    if (!importedRows || importedRows.length === 0) {
-      return;
-    }
-
-    setEntries(importedRows.map(importedCriminalRowToEntry));
-    setStep("entry");
-    setActiveTab(0);
-    setEntryPage(1);
-    setReviewIdx(0);
-    setExistingCaseNumbers([]);
-    setAutoCaseNumbersByRow({});
-  }, [isEdit]);
-
-  useEffect(() => {
     if (isEdit) {
       setAutoCaseNumbersByRow({});
       return;
@@ -1256,25 +1218,15 @@ const CriminalCaseUpdatePage = ({
 
       if ((importPayload?.meta.importedCount ?? 0) === 0) {
         statusPopup.showError(
-          result.error ||
-            (result.failedExcel
-              ? "No valid rows were loaded. Failed rows were downloaded for review."
-              : "No valid rows were loaded."),
+          "No valid rows to import. Failed rows have been downloaded for review.",
         );
         return;
       }
 
-      setEntries(result.rows.map(importedCriminalRowToEntry));
-      setStep("entry");
-      setActiveTab(0);
-      setEntryPage(1);
-      setReviewIdx(0);
-      setExistingCaseNumbers([]);
-      setAutoCaseNumbersByRow({});
       statusPopup.showSuccess(
-        result.failedExcel
-          ? "Excel data loaded into the draft. Failed rows were downloaded for review."
-          : "Excel data loaded into the draft. Review and save to apply it.",
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Cases imported successfully",
       );
     } finally {
       setUploading(false);
@@ -2357,7 +2309,7 @@ const CriminalCaseUpdatePage = ({
                 </div>
               </div>
 
-              <div className="rv-layout rv-layout-fixed-sidebar">
+              <div className="rv-layout">
                 {entries.length > 1 && (
                   <div className="rv-sidebar">
                     <div className="rv-sidebar-head">

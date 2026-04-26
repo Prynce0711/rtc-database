@@ -33,18 +33,8 @@ import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import ExcelValidationErrorPopup from "../../Popup/ExcelValidationErrorPopup";
 import { usePopup } from "../../Popup/PopupProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
-import {
-  CASE_IMPORT_DRAFT_KEYS,
-  consumeCaseImportDraft,
-  downloadImportFailedExcel,
-  previewPetitionCaseImport,
-  shouldLoadCaseImportDraft,
-} from "../importPreview";
 import type { PetitionCaseAdapter } from "./PetitionCaseAdapter";
-import type {
-  PetitionCaseData,
-  PetitionCaseSchema,
-} from "./PetitionCaseSchema";
+import type { PetitionCaseData } from "./PetitionCaseSchema";
 
 export enum PetitionCaseUpdateType {
   ADD = "ADD",
@@ -164,23 +154,6 @@ const applyAreaToCaseNumber = (
 
   return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
 };
-
-const toEntryDate = (value?: string | Date | null): string =>
-  value ? new Date(value).toISOString().slice(0, 10) : today;
-
-const importedPetitionRowToEntry = (row: PetitionCaseSchema): EntryForm => ({
-  ...emptyEntry(uid(), AUTO_DEFAULT_AREA),
-  caseNumber: row.caseNumber ?? "",
-  isManual: true,
-  raffledToBranch: row.raffledTo ?? row.branch ?? "",
-  dateFiled: toEntryDate(row.date ?? row.dateFiled),
-  petitioners: row.petitioner ?? "",
-  titleNo: "",
-  nature: row.nature ?? "",
-  errors: {},
-  collapsed: false,
-  saved: false,
-});
 
 const REQUIRED_FIELDS = [
   "caseNumber",
@@ -557,25 +530,6 @@ const PetitionCaseUpdatePage = ({
   }, [isEdit, selectedCase, selectedCases]);
 
   useEffect(() => {
-    if (isEdit || !shouldLoadCaseImportDraft()) return;
-
-    const importedRows = consumeCaseImportDraft<PetitionCaseSchema>(
-      CASE_IMPORT_DRAFT_KEYS.petition,
-    );
-
-    if (!importedRows || importedRows.length === 0) {
-      return;
-    }
-
-    setEntries(importedRows.map(importedPetitionRowToEntry));
-    setStep("entry");
-    setEntryPage(1);
-    setReviewIdx(0);
-    setExistingCaseNumbers([]);
-    setAutoCaseNumbersByRow({});
-  }, [isEdit]);
-
-  useEffect(() => {
     if (isEdit) {
       setAutoCaseNumbersByRow({});
       return;
@@ -833,28 +787,44 @@ const PetitionCaseUpdatePage = ({
       );
       const importPayload = result.success ? result.result : result.errorResult;
 
-      downloadImportFailedExcel(result.failedExcel);
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
 
-      if (!result.success || result.rows.length === 0) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import petitions");
+        return;
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
         statusPopup.showError(
-          result.error ||
-            (result.failedExcel
-              ? "No valid rows were loaded. Failed rows were downloaded for review."
-              : "No valid rows were loaded."),
+          "No valid rows to import. Failed rows have been downloaded for review.",
         );
         return;
       }
 
-      setEntries(result.rows.map(importedPetitionRowToEntry));
-      setStep("entry");
-      setEntryPage(1);
-      setReviewIdx(0);
-      setExistingCaseNumbers([]);
-      setAutoCaseNumbersByRow({});
       statusPopup.showSuccess(
-        result.failedExcel
-          ? "Excel data loaded into the draft. Failed rows were downloaded for review."
-          : "Excel data loaded into the draft. Review and save to apply it.",
+        importPayload?.failedExcel
+          ? "Import complete. Failed rows have been downloaded for review."
+          : "Petitions imported successfully",
       );
     } finally {
       setUploading(false);
@@ -1887,7 +1857,7 @@ const PetitionCaseUpdatePage = ({
             </div>
 
             {/* Review layout */}
-            <div className="rv-layout rv-layout-fixed-sidebar">
+            <div className="rv-layout">
               {entries.length > 1 && (
                 <div className="rv-sidebar">
                   <div className="rv-sidebar-head">{entries.length} Cases</div>

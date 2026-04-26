@@ -46,12 +46,6 @@ import {
 } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
-import {
-  CASE_IMPORT_DRAFT_KEYS,
-  downloadImportFailedExcel,
-  previewCriminalCaseImport,
-  saveCaseImportDraft,
-} from "../importPreview";
 import CriminalCaseRow from "./CriminalCaseRow";
 
 type CaseFilterValues = CriminalCaseFilters;
@@ -431,31 +425,50 @@ const CriminalCasePage: React.FC<{
 
     setUploading(true);
     try {
-      const result = await previewCriminalCaseImport(file);
+      const result = await adapter.uploadExcel(file);
+      const importPayload = result.success ? result.result : result.errorResult;
 
-      downloadImportFailedExcel(result.failedExcel);
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
 
-      if (!result.success || result.rows.length === 0) {
-        statusPopup.showError(
-          result.error ||
-            (result.failedExcel
-              ? "No valid rows were loaded. Failed rows were downloaded for review."
-              : "No valid rows were loaded."),
-        );
-        return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
 
-      if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.criminal, result.rows)) {
-        statusPopup.showError("Failed to stage imported rows.");
-        return;
-      }
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+      } else {
+        if ((importPayload?.meta.importedCount ?? 0) === 0) {
+          statusPopup.showError(
+            "No valid rows to import. Failed rows have been downloaded for review.",
+          );
+          return;
+        }
 
-      statusPopup.showSuccess(
-        result.failedExcel
-          ? "Excel data staged. Failed rows were downloaded for review."
-          : "Excel data staged. Review and save the draft to add it to the table.",
-      );
-      router.push(`/user/cases/criminal/add?importDraft=${Date.now()}`);
+        statusPopup.showSuccess("Cases imported successfully");
+        await fetchCases();
+
+        if (importPayload?.failedExcel) {
+          statusPopup.showSuccess(
+            "Import complete. Failed rows have been downloaded for review.",
+          );
+        }
+      }
     } finally {
       setUploading(false);
       e.target.value = "";
