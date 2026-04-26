@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  getRecentArchiveFiles,
-  type ArchiveRecentFile,
-} from "@/app/components/Case/ReceivingLogs/RecievingLogsActions";
+  getRecentArchiveItems,
+  type ArchiveRecentItem,
+} from "@/app/components/Case/Archives/ArchiveActions";
 import { usePopup } from "@rtc-database/shared";
 import { Archive, Clock3, ExternalLink, FileArchive } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ interface Props {
 }
 
 const ArchiveDashboard: React.FC<Props> = ({ staffId }) => {
-  const [recentFiles, setRecentFiles] = useState<ArchiveRecentFile[]>([]);
+  const [recentFiles, setRecentFiles] = useState<ArchiveRecentItem[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
   const statusPopup = usePopup();
   const router = useRouter();
@@ -25,7 +25,7 @@ const ArchiveDashboard: React.FC<Props> = ({ staffId }) => {
 
     const loadRecentArchiveFiles = async () => {
       try {
-        const result = await getRecentArchiveFiles(5);
+        const result = await getRecentArchiveItems(5);
         if (!active) return;
 
         if (result.success) {
@@ -61,12 +61,12 @@ const ArchiveDashboard: React.FC<Props> = ({ staffId }) => {
             Recent Archive Files
           </h2>
           <p className="text-sm text-base-content/60">
-            Latest document records received in archive logs
+            Latest document records tracked by archive staff
           </p>
         </div>
         <button
           className="btn btn-sm btn-outline btn-primary"
-          onClick={() => router.push("/user/cases/receiving")}
+          onClick={() => router.push("/user/cases/archive")}
           type="button"
         >
           <ExternalLink className="h-3.5 w-3.5" />
@@ -98,23 +98,20 @@ const ArchiveDashboard: React.FC<Props> = ({ staffId }) => {
                 <div className="min-w-0">
                   <p className="font-semibold text-base-content truncate flex items-center gap-2">
                     <FileArchive className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate">{file.fileName}</span>
+                    <span className="truncate">{file.name}</span>
                   </p>
                   <p className="text-xs text-base-content/60 mt-1 truncate">
-                    {file.caseType}
-                    {file.caseNumber ? ` - ${file.caseNumber}` : ""}
-                    {file.branchNumber ? ` - Branch ${file.branchNumber}` : ""}
+                    {file.entryType}
+                    {file.parentPath ? ` - ${file.parentPath}` : " - Root"}
                   </p>
                 </div>
                 <span className="badge badge-outline text-xs whitespace-nowrap">
-                  {new Date(file.uploadedAt).toLocaleDateString()}
+                  {new Date(file.updatedAt).toLocaleDateString()}
                 </span>
               </div>
               <p className="mt-2 text-xs text-base-content/55 flex items-center gap-1.5">
                 <Clock3 className="h-3 w-3" />
-                Received: {file.dateRecieved
-                  ? new Date(file.dateRecieved).toLocaleDateString()
-                  : "N/A"}
+                Updated: {new Date(file.updatedAt).toLocaleDateString()}
               </p>
             </div>
           ))}
@@ -127,10 +124,10 @@ const ArchiveDashboard: React.FC<Props> = ({ staffId }) => {
     <StaffDashboard
       staffId={staffId}
       dashboardTitle="Archive Dashboard"
-      dashboardSubtitle="Manage archived and receiving log cases"
+      dashboardSubtitle="Manage archived files and document records"
       loadingTitle="Loading Archive Dashboard"
       loadingSubtitle="Fetching archive case data..."
-      viewAllPath="/user/cases/receiving"
+      viewAllPath="/user/cases/archive"
       showRecentCases={false}
       recentSection={recentSection}
     />

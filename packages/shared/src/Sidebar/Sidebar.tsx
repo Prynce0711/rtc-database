@@ -370,6 +370,7 @@ const caseNavItems: NavItem[] = [
       { label: "Petition", href: "petition" },
       { label: "Special Proceedings", href: "proceedings" },
       { label: "Receiving Logs", href: "receiving" },
+      { label: "Archive Explorer", href: "archive" },
       { label: "Notarial", href: "notarial" },
       { label: "Sheriff", href: "sheriff" },
     ],
@@ -404,8 +405,8 @@ const statisticsNavItem: NavItem = caseNavItems[1];
 const adminStatisticsNavItem: NavItem = caseNavItems[2];
 const archiveOnlyNavItem: NavItem = {
   icon: <FiFileText />,
-  href: "cases/receiving",
-  label: "Archive",
+  href: "cases/archive",
+  label: "Archive Explorer",
 };
 const notarialOnlyNavItem: NavItem = {
   icon: <FiFileText />,

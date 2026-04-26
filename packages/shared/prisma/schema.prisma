@@ -15,6 +15,13 @@ enum ChatType {
   DIRECT
 }
 
+enum ArchiveEntryType {
+  FOLDER
+  FILE
+  DOCUMENT
+  SPREADSHEET
+}
+
 enum Roles {
   admin
   user
@@ -387,8 +394,29 @@ model FileData {
   createdAt DateTime  @default(now())
   updatedAt DateTime? @updatedAt
 
+  archiveEntries ArchiveEntry[]
   notarials    Notarial[]
   chatMessages ChatMessage[]
+}
+
+model ArchiveEntry {
+  id          Int              @id @default(autoincrement())
+  name        String
+  parentPath  String           @default("")
+  fullPath    String           @unique
+  entryType   ArchiveEntryType @default(FILE)
+  description String?
+  extension   String?
+  textContent String?
+  sheetData   Json?
+  fileId      Int?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime?        @updatedAt
+
+  file FileData? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@unique([parentPath, name])
+  @@index([parentPath, entryType, name])
 }
 
 model RegionalTrialCourt {

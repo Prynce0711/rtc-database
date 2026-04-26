@@ -8,6 +8,7 @@ export * from "./Case/BaseCaseAdapter";
 export * from "./Case/BaseCaseSchema";
 export * from "./Case/CaseDetailsShared";
 export { default as CaseEntryToolbar } from "./Case/CaseEntryToolbar";
+export * from "./Case/Archives";
 export * from "./Case/Civil/CivilCaseAdapter";
 export { default as CivilCasePage } from "./Case/Civil/CivilCasePage";
 export { default as CivilCaseRow } from "./Case/Civil/CivilCaseRow";
