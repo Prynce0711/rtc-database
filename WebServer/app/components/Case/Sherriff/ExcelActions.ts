@@ -27,6 +27,7 @@ export async function uploadSheriffExcel(
   overrideTemplateValidation = false,
   overrideDuplicates = false,
   overwriteDuplicates = false,
+  allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -41,6 +42,7 @@ export async function uploadSheriffExcel(
       overrideTemplateValidation,
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
     });
 

@@ -431,6 +431,7 @@ export type ProcessExcelMeta = {
 type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   overrideDuplicates?: boolean;
   overwriteDuplicates?: boolean;
+  allowInFileDuplicates?: boolean;
   validateOnly?: boolean;
   file: File;
   requiredHeaders: Record<string, string[]>;
@@ -503,6 +504,7 @@ export async function processExcelUpload<
   const {
     overrideDuplicates = false,
     overwriteDuplicates = false,
+    allowInFileDuplicates = false,
     validateOnly = false,
     file,
     requiredHeaders,
@@ -654,12 +656,14 @@ export async function processExcelUpload<
           // Do not fail the row yet so we can find ALL duplicates
         }
 
-        const effectiveConflicts = bypassDbConflict
-          ? inFileConflicts
-          : [...dbConflicts, ...inFileConflicts];
+        // Always track for reporting (validate-only uses this for the popup)
+        inFileConflicts.forEach(({ value }) => allInFileDuplicates.add(value));
+
+        const effectiveDbConflicts = bypassDbConflict ? [] : dbConflicts;
+        const effectiveInFileConflicts = allowInFileDuplicates ? [] : inFileConflicts;
+        const effectiveConflicts = [...effectiveDbConflicts, ...effectiveInFileConflicts];
 
         if (effectiveConflicts.length > 0) {
-          inFileConflicts.forEach(({ value }) => allInFileDuplicates.add(value));
           const message = buildUniqueConflictMessage(
             effectiveConflicts.map(({ key }) => key),
             "already exists",
@@ -677,9 +681,9 @@ export async function processExcelUpload<
           continue;
         }
 
-        const sheetConflicts = rowUniqueEntries.filter(({ value }) =>
-          sheetUniqueKeys.has(value),
-        );
+        const sheetConflicts = allowInFileDuplicates
+          ? []
+          : rowUniqueEntries.filter(({ value }) => sheetUniqueKeys.has(value));
 
         if (sheetConflicts.length > 0) {
           sheetConflicts.forEach(({ value }) => allInFileDuplicates.add(value));

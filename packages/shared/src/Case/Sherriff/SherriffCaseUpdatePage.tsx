@@ -379,7 +379,11 @@ export const SherriffCaseUpdatePage = ({
     inFileDuplicateKeys?: string[];
   } | null>(null);
   const validationPopupResolverRef = useRef<
-    ((mode: "create" | "overwrite" | null) => void) | null
+    ((
+      decision:
+        | { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }
+        | null,
+    ) => void) | null
   >(null);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
@@ -401,7 +405,9 @@ export const SherriffCaseUpdatePage = ({
       inFileDuplicateKeys?: string[];
     }) => {
       setValidationPopupData(data);
-      return new Promise<"create" | "overwrite" | null>((resolve) => {
+      return new Promise<
+        { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" } | null
+      >((resolve) => {
         validationPopupResolverRef.current = resolve;
       });
     },
@@ -575,8 +581,10 @@ export const SherriffCaseUpdatePage = ({
       let overrideTemplate = false;
       let overrideDuplicates = false;
       let overwriteDuplicates = false;
+      let allowInFileDuplicates = false;
       let validationResult = await adapter.uploadSheriffExcel(
         file,
+        false,
         false,
         false,
         false,
@@ -596,6 +604,7 @@ export const SherriffCaseUpdatePage = ({
         validationResult = await adapter.uploadSheriffExcel(
           file,
           overrideTemplate,
+          false,
           false,
           false,
           true,
@@ -627,8 +636,9 @@ export const SherriffCaseUpdatePage = ({
           if (decision === null) {
             return;
           }
-          overrideDuplicates = decision === "create";
-          overwriteDuplicates = decision === "overwrite";
+          overrideDuplicates = decision.dbMode === "create";
+          overwriteDuplicates = decision.dbMode === "overwrite";
+          allowInFileDuplicates = decision.inFileMode === "create";
         }
       } else if (!validationResult.success) {
         statusPopup.showError(
@@ -642,6 +652,7 @@ export const SherriffCaseUpdatePage = ({
         overrideTemplate,
         overrideDuplicates,
         overwriteDuplicates,
+        allowInFileDuplicates,
         false,
       );
       const importPayload = result.success ? result.result : result.errorResult;
@@ -676,8 +687,8 @@ export const SherriffCaseUpdatePage = ({
   };
 
   const handleValidationPopupContinue = useCallback(
-    (mode: "create" | "overwrite") => {
-      validationPopupResolverRef.current?.(mode);
+    (decision: { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }) => {
+      validationPopupResolverRef.current?.(decision);
       validationPopupResolverRef.current = null;
       setValidationPopupData(null);
     },

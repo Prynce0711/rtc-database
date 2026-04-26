@@ -28,6 +28,7 @@ export async function uploadExcel(
   overrideTemplateValidation = false,
   overrideDuplicates = false,
   overwriteDuplicates = false,
+  allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -48,6 +49,7 @@ export async function uploadExcel(
       overrideTemplateValidation,
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
     });
 

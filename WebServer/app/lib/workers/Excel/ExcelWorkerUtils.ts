@@ -32,6 +32,7 @@ export type ExcelJobData = {
   overrideTemplateValidation?: boolean;
   overrideDuplicates?: boolean;
   overwriteDuplicates?: boolean;
+  allowInFileDuplicates?: boolean;
   validateOnly?: boolean;
   fallbackMonth?: string;
   fallbackYear?: number;
@@ -43,6 +44,7 @@ export type ExcelQueueData = {
   overrideTemplateValidation?: boolean;
   overrideDuplicates?: boolean;
   overwriteDuplicates?: boolean;
+  allowInFileDuplicates?: boolean;
   validateOnly?: boolean;
   fallbackMonth?: string;
   fallbackYear?: number;

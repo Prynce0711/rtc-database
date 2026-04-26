@@ -39,6 +39,7 @@ export interface CivilCaseAdapter extends BaseCaseAdapter {
     overrideValidation?: boolean,
     overrideDuplicates?: boolean,
     overwriteDuplicates?: boolean,
+    allowInFileDuplicates?: boolean,
     validateOnly?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportCasesExcel: () => Promise<ActionResult<ExportExcelData>>;

@@ -26,6 +26,7 @@ export async function uploadCivilCaseExcel(
   file: File,
   overrideDuplicates = false,
   overwriteDuplicates = false,
+  allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -77,6 +78,7 @@ export async function uploadCivilCaseExcel(
     const result = await processExcelUpload<CivilCaseSchema>({
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
       file,
       requiredHeaders: { Branch: branchHeaders },
