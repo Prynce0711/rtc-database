@@ -361,11 +361,13 @@ export const SherriffCaseUpdatePage = ({
     inFileDuplicateKeys?: string[];
   } | null>(null);
   const validationPopupResolverRef = useRef<
-    ((
-      decision:
-        | { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }
-        | null,
-    ) => void) | null
+    | ((
+        decision: {
+          dbMode: "create" | "overwrite";
+          inFileMode: "skip" | "create";
+        } | null,
+      ) => void)
+    | null
   >(null);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
@@ -387,9 +389,10 @@ export const SherriffCaseUpdatePage = ({
       inFileDuplicateKeys?: string[];
     }) => {
       setValidationPopupData(data);
-      return new Promise<
-        { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" } | null
-      >((resolve) => {
+      return new Promise<{
+        dbMode: "create" | "overwrite";
+        inFileMode: "skip" | "create";
+      } | null>((resolve) => {
         validationPopupResolverRef.current = resolve;
       });
     },
@@ -666,7 +669,10 @@ export const SherriffCaseUpdatePage = ({
   };
 
   const handleValidationPopupContinue = useCallback(
-    (decision: { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }) => {
+    (decision: {
+      dbMode: "create" | "overwrite";
+      inFileMode: "skip" | "create";
+    }) => {
       validationPopupResolverRef.current?.(decision);
       validationPopupResolverRef.current = null;
       setValidationPopupData(null);

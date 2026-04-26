@@ -442,11 +442,13 @@ const PetitionCaseUpdatePage = ({
     inFileDuplicateKeys?: string[];
   } | null>(null);
   const validationPopupResolverRef = useRef<
-    ((
-      decision:
-        | { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }
-        | null,
-    ) => void) | null
+    | ((
+        decision: {
+          dbMode: "create" | "overwrite";
+          inFileMode: "skip" | "create";
+        } | null,
+      ) => void)
+    | null
   >(null);
   const [step, setStep] = useState<Step>("entry");
   const [entryPage, setEntryPage] = useState(1);
@@ -472,9 +474,10 @@ const PetitionCaseUpdatePage = ({
       inFileDuplicateKeys?: string[];
     }) => {
       setValidationPopupData(data);
-      return new Promise<
-        { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" } | null
-      >((resolve) => {
+      return new Promise<{
+        dbMode: "create" | "overwrite";
+        inFileMode: "skip" | "create";
+      } | null>((resolve) => {
         validationPopupResolverRef.current = resolve;
       });
     },
@@ -830,7 +833,10 @@ const PetitionCaseUpdatePage = ({
   };
 
   const handleValidationPopupContinue = useCallback(
-    (decision: { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }) => {
+    (decision: {
+      dbMode: "create" | "overwrite";
+      inFileMode: "skip" | "create";
+    }) => {
       validationPopupResolverRef.current?.(decision);
       validationPopupResolverRef.current = null;
       setValidationPopupData(null);
