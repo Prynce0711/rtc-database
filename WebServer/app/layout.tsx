@@ -8,6 +8,7 @@ import { PublicEnvScript } from "next-runtime-env";
 import { Montserrat } from "next/font/google";
 import { isDarkModeEnabled } from "./components/Sidebar/DarkModeActions";
 import "./globals.css";
+import { ChatNotificationProvider } from "./lib/socket/ChatNotificationProvider";
 import SocketProvider from "./lib/socket/SocketProvider";
 import SessionProvider from "./lib/sync/SessionProvider";
 
@@ -41,7 +42,9 @@ export default async function RootLayout({
         <PopupProvider>
           <ToastProvider>
             <SessionProvider>
-              <SocketProvider>{children}</SocketProvider>
+              <SocketProvider>
+                <ChatNotificationProvider>{children}</ChatNotificationProvider>
+              </SocketProvider>
             </SessionProvider>
           </ToastProvider>
         </PopupProvider>

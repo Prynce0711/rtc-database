@@ -7,18 +7,23 @@ const Toast = ({
   type = ToastType.INFO,
   onClose,
   href,
+  title,
 }: {
   message: string;
   type: ToastType;
   onClose?: () => void;
   href?: string;
+  title?: string;
 }) => {
   return (
     <div
       className={`alert ${type} pointer-events-auto shadow-lg min-w-72 max-w-md w-full flex items-start justify-between gap-2`}
       role="alert"
     >
-      <span className="text-sm font-medium pr-2 flex-1">{message}</span>
+      <div className="flex-1 pr-2">
+        {title && <div className="text-sm font-bold mb-1">{title}</div>}
+        <span className="text-sm font-medium">{message}</span>
+      </div>
       <div className="flex items-center gap-1 shrink-0">
         {href && (
           <AdaptiveLink href={href} className="btn btn-ghost btn-xs">

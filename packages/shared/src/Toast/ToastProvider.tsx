@@ -24,6 +24,7 @@ type ToastItem = {
   message: string;
   duration: number;
   href?: string;
+  title?: string;
 };
 
 type ToastContextType = {
@@ -32,11 +33,32 @@ type ToastContextType = {
     type?: ToastType,
     duration?: number,
     href?: string,
+    title?: string,
   ) => string;
-  info: (message: string, duration?: number, href?: string) => string;
-  success: (message: string, duration?: number, href?: string) => string;
-  warning: (message: string, duration?: number, href?: string) => string;
-  error: (message: string, duration?: number, href?: string) => string;
+  info: (
+    message: string,
+    duration?: number,
+    href?: string,
+    title?: string,
+  ) => string;
+  success: (
+    message: string,
+    duration?: number,
+    href?: string,
+    title?: string,
+  ) => string;
+  warning: (
+    message: string,
+    duration?: number,
+    href?: string,
+    title?: string,
+  ) => string;
+  error: (
+    message: string,
+    duration?: number,
+    href?: string,
+    title?: string,
+  ) => string;
   dismissToast: (id: string) => void;
   clearToasts: () => void;
 };
@@ -83,9 +105,13 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
       type: ToastType = ToastType.INFO,
       duration = 4000,
       href?: string,
+      title?: string,
     ) => {
       const id = createToastId();
-      setToasts((prev) => [...prev, { id, message, type, duration, href }]);
+      setToasts((prev) => [
+        ...prev,
+        { id, message, type, duration, href, title },
+      ]);
       return id;
     },
     [],
@@ -118,14 +144,14 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
 
   const value: ToastContextType = {
     showToast,
-    info: (message, duration, href) =>
-      showToast(message, ToastType.INFO, duration, href),
-    success: (message, duration, href) =>
-      showToast(message, ToastType.SUCCESS, duration, href),
-    warning: (message, duration, href) =>
-      showToast(message, ToastType.WARNING, duration, href),
-    error: (message, duration, href) =>
-      showToast(message, ToastType.ERROR, duration, href),
+    info: (message, duration, href, title) =>
+      showToast(message, ToastType.INFO, duration, href, title),
+    success: (message, duration, href, title) =>
+      showToast(message, ToastType.SUCCESS, duration, href, title),
+    warning: (message, duration, href, title) =>
+      showToast(message, ToastType.WARNING, duration, href, title),
+    error: (message, duration, href, title) =>
+      showToast(message, ToastType.ERROR, duration, href, title),
     dismissToast,
     clearToasts,
   };
@@ -150,6 +176,7 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
                 message={toast.message}
                 onClose={() => dismissToast(toast.id)}
                 href={toast.href}
+                title={toast.title}
               />
             </motion.div>
           ))}
