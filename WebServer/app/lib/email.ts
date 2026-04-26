@@ -1,7 +1,7 @@
 "use server";
 
-import nodemailer from "nodemailer";
 import { loadSystemSettings } from "@/app/lib/systemSettings";
+import nodemailer from "nodemailer";
 
 function escapeHtml(input: string): string {
   return input
@@ -35,7 +35,6 @@ export async function sendEmail(
     const transporter = nodemailer.createTransport({
       host: systemSettings.smtpHost,
       port: systemSettings.smtpPort,
-      secure: true,
       auth: {
         user: systemSettings.senderEmail, // Your Gmail address
         pass: systemSettings.senderPassword, // The 16-character App Password

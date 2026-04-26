@@ -78,6 +78,9 @@ const parseDateCell = (value: unknown): Date | undefined => {
 
 export async function uploadReceivingLogExcel(
   file: File,
+  overrideDuplicates = false,
+  _overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -158,6 +161,8 @@ export async function uploadReceivingLogExcel(
       Prisma.RecievingLogCreateManyInput,
       ReturnType<typeof getMappedCells>
     >({
+      overrideDuplicates,
+      validateOnly,
       file,
       requiredHeaders: { "Case no.": caseNumberHeaders },
       schema: ReceivingLogSchema,
@@ -266,7 +271,7 @@ export async function uploadReceivingLogExcel(
           mapped,
         };
       },
-      onBatchInsert: async (rows) => {
+      onBatchInsert: async (rows, _overwrite) => {
         const created = await prisma.recievingLog.createManyAndReturn({
           data: rows,
         });

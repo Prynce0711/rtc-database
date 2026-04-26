@@ -25,6 +25,9 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadSheriffExcel(
   file: File,
   overrideTemplateValidation = false,
+  overrideDuplicates = false,
+  overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -36,6 +39,9 @@ export async function uploadSheriffExcel(
       type: ExcelTypes.SHERIFF_CASE,
       file,
       overrideTemplateValidation,
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
     });
 
     if (!result.success) {

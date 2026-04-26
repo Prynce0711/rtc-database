@@ -26,6 +26,9 @@ export async function uploadExcel(
   file: File,
   caseType: CaseType,
   overrideTemplateValidation = false,
+  overrideDuplicates = false,
+  overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -43,6 +46,9 @@ export async function uploadExcel(
       type: ExcelTypes.CIVIL_CASE,
       file,
       overrideTemplateValidation,
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
     });
 
     if (!result.success) {

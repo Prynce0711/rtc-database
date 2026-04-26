@@ -175,6 +175,10 @@ model CivilCase {
   notes               String?
   nature              String?
   originCaseNumber    String?
+  reRaffleDate        DateTime?
+  reRaffleBranch      String?
+  consolitationDate   DateTime?
+  consolidationBranch String?
   dateRemanded        DateTime?
   remandedNote        String?
   undocketed          Boolean   @default(false)

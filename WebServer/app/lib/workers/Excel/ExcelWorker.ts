@@ -404,17 +404,47 @@ IS_WORKER
 
         switch (jobType) {
           case ExcelTypes.CRIMINAL_CASE:
-            return uploadCriminalCaseExcel(file);
+            return uploadCriminalCaseExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.CIVIL_CASE:
-            return uploadCivilCaseExcel(file);
+            return uploadCivilCaseExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.PETITION_CASE:
-            return uploadPetitionCaseExcel(file);
+            return uploadPetitionCaseExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.RECEIVING_LOG:
-            return uploadReceivingLogExcel(file);
+            return uploadReceivingLogExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.SHERIFF_CASE:
-            return uploadSheriffCaseExcel(file);
+            return uploadSheriffCaseExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.SPECIAL_PROCEEDING_CASE:
-            return uploadSpecialProceedingCaseExcel(file);
+            return uploadSpecialProceedingCaseExcel(
+              file,
+              job.data.overrideDuplicates,
+              job.data.overwriteDuplicates,
+              job.data.validateOnly,
+            );
           case ExcelTypes.EMPLOYEE:
             return uploadEmployeeExcel(file);
           case ExcelTypes.MUNICIPAL_TRIAL_COURT:

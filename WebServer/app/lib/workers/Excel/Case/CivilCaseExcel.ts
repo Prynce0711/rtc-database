@@ -24,6 +24,9 @@ import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadCivilCaseExcel(
   file: File,
+  overrideDuplicates = false,
+  overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -49,14 +52,8 @@ export async function uploadCivilCaseExcel(
       const cells = normalizeRowBySchema(CivilCaseSchema, row);
 
       const caseNumberRaw = cells.caseNumber?.toString().trim();
-      const petitioner = cells.petitioners
-        ?.toString()
-        .trim()
-        .replace(" ", "-");
-      const respondent = cells.defendants
-        ?.toString()
-        .trim()
-        .replace(" ", "-");
+      const petitioner = cells.petitioners?.toString().trim().replace(" ", "-");
+      const respondent = cells.defendants?.toString().trim().replace(" ", "-");
       const dateFiled =
         cells.dateFiled instanceof Date || typeof cells.dateFiled === "string"
           ? new Date(cells.dateFiled)
@@ -78,6 +75,9 @@ export async function uploadCivilCaseExcel(
     };
 
     const result = await processExcelUpload<CivilCaseSchema>({
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
       file,
       requiredHeaders: { Branch: branchHeaders },
       schema: CivilCaseSchema,
@@ -141,8 +141,19 @@ export async function uploadCivilCaseExcel(
           mapped: validation.data,
         };
       },
-      onBatchInsert: async (rows) => {
+      onBatchInsert: async (rows, overwrite) => {
         return prisma.$transaction(async (tx) => {
+          if (overwrite) {
+            const caseNumbers = rows
+              .map((row) => String(row.caseNumber ?? "").trim())
+              .filter(Boolean);
+            if (caseNumbers.length > 0) {
+              await tx.case.deleteMany({
+                where: { caseType: CaseType.CIVIL, caseNumber: { in: caseNumbers } },
+              });
+            }
+          }
+
           const caseRows: Prisma.CaseCreateManyInput[] = [];
 
           rows.forEach((row) => {

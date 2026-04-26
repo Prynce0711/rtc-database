@@ -36,6 +36,9 @@ export interface SherriffCaseAdapter extends BaseCaseAdapter {
   uploadSheriffExcel: (
     file: File,
     overrideValidation?: boolean,
+    overrideDuplicates?: boolean,
+    overwriteDuplicates?: boolean,
+    validateOnly?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportSheriffExcel: () => Promise<ActionResult<ExportExcelData>>;
 }

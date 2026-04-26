@@ -26,7 +26,20 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
   deleteCriminalCase,
   getCriminalCaseById,
   getCriminalCasesByIds,
-  uploadExcel: uploadCriminalCaseExcel,
+  uploadExcel: (
+    file,
+    overrideValidation,
+    overrideDuplicates,
+    overwriteDuplicates,
+    validateOnly,
+  ) =>
+    uploadCriminalCaseExcel(
+      file,
+      overrideValidation,
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
+    ),
   exportCasesExcel,
 };
 

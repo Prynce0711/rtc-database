@@ -8,6 +8,8 @@ import {
   CriminalCaseEntry,
   CriminalCaseSchema,
   criminalCaseToEntry,
+  EXCEL_VALIDATION_RESULT,
+  ExcelValidationErrorPopup,
   usePopup,
   useToast,
 } from "@rtc-database/shared";
@@ -840,9 +842,41 @@ const CriminalCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const [uploading, setUploading] = useState(false);
+  const [validationPopupData, setValidationPopupData] = useState<{
+    errorCount: number;
+    duplicateCount: number;
+    inFileDuplicateCount: number;
+    validCount: number;
+    totalCount: number;
+    failedExcel?: { fileName: string; base64: string };
+    duplicateKeys?: string[];
+    inFileDuplicateKeys?: string[];
+  } | null>(null);
+  const validationPopupResolverRef = useRef<
+    ((mode: "create" | "overwrite" | null) => void) | null
+  >(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const router = useAdaptiveNavigation();
+
+  const promptValidationDecision = useCallback(
+    (data: {
+      errorCount: number;
+      duplicateCount: number;
+      inFileDuplicateCount: number;
+      validCount: number;
+      totalCount: number;
+      failedExcel?: { fileName: string; base64: string };
+      duplicateKeys?: string[];
+      inFileDuplicateKeys?: string[];
+    }) => {
+      setValidationPopupData(data);
+      return new Promise<"create" | "overwrite" | null>((resolve) => {
+        validationPopupResolverRef.current = resolve;
+      });
+    },
+    [],
+  );
 
   const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
     criminalCaseToEntry({ ...sc, id: sc.id ?? createTempId() });
@@ -1103,11 +1137,110 @@ const CriminalCaseUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await previewCriminalCaseImport(file);
+      let overrideTemplate = false;
+      let overrideDuplicates = false;
+      let overwriteDuplicates = false;
 
-      downloadImportFailedExcel(result.failedExcel);
+      let validationResult = await adapter.uploadExcel(
+        file,
+        false,
+        false,
+        false,
+        true,
+      );
+      if (
+        !validationResult.success &&
+        validationResult.error?.includes(VALIDATION_ERROR_MARKER)
+      ) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not criminal cases, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        overrideTemplate = true;
+        validationResult = await adapter.uploadExcel(
+          file,
+          overrideTemplate,
+          false,
+          false,
+          true,
+        );
+      }
 
-      if (!result.success || result.rows.length === 0) {
+      if (
+        !validationResult.success &&
+        validationResult.error === EXCEL_VALIDATION_RESULT
+      ) {
+        const validationPayload = validationResult.errorResult;
+        const duplicateCount = validationPayload?.duplicateKeys?.length ?? 0;
+        const inFileDuplicateCount =
+          validationPayload?.inFileDuplicateKeys?.length ?? 0;
+        const errorCount = validationPayload?.meta.errorCount ?? 0;
+
+        if (duplicateCount > 0 || inFileDuplicateCount > 0 || errorCount > 0) {
+          const decision = await promptValidationDecision({
+            errorCount,
+            duplicateCount,
+            inFileDuplicateCount,
+            validCount: validationPayload?.meta.validRows ?? 0,
+            totalCount: validationPayload?.meta.totalRows ?? 0,
+            failedExcel: validationPayload?.failedExcel,
+            duplicateKeys: validationPayload?.duplicateKeys,
+            inFileDuplicateKeys: validationPayload?.inFileDuplicateKeys,
+          });
+
+          if (decision === null) {
+            return;
+          }
+          overrideDuplicates = decision === "create";
+          overwriteDuplicates = decision === "overwrite";
+        }
+      } else if (!validationResult.success) {
+        statusPopup.showError(
+          validationResult.error || "Failed to validate Excel file",
+        );
+        return;
+      }
+
+      const result = await adapter.uploadExcel(
+        file,
+        overrideTemplate,
+        overrideDuplicates,
+        overwriteDuplicates,
+        false,
+      );
+
+      const importPayload = result.success ? result.result : result.errorResult;
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to import cases");
+        return;
+      }
+
+      if (importPayload?.failedExcel) {
+        const { fileName, base64 } = importPayload.failedExcel;
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      if ((importPayload?.meta.importedCount ?? 0) === 0) {
         statusPopup.showError(
           result.error ||
             (result.failedExcel
@@ -1134,6 +1267,21 @@ const CriminalCaseUpdatePage = ({
       input.value = "";
     }
   };
+
+  const handleValidationPopupContinue = useCallback(
+    (mode: "create" | "overwrite") => {
+      validationPopupResolverRef.current?.(mode);
+      validationPopupResolverRef.current = null;
+      setValidationPopupData(null);
+    },
+    [],
+  );
+
+  const handleValidationPopupCancel = useCallback(() => {
+    validationPopupResolverRef.current?.(null);
+    validationPopupResolverRef.current = null;
+    setValidationPopupData(null);
+  }, []);
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -2387,6 +2535,20 @@ const CriminalCaseUpdatePage = ({
           )}
         </AnimatePresence>
       </div>
+      {validationPopupData && (
+        <ExcelValidationErrorPopup
+          errorCount={validationPopupData.errorCount}
+          duplicateCount={validationPopupData.duplicateCount}
+          inFileDuplicateCount={validationPopupData.inFileDuplicateCount}
+          validCount={validationPopupData.validCount}
+          totalCount={validationPopupData.totalCount}
+          failedExcel={validationPopupData.failedExcel}
+          duplicateKeys={validationPopupData.duplicateKeys}
+          inFileDuplicateKeys={validationPopupData.inFileDuplicateKeys}
+          onContinue={handleValidationPopupContinue}
+          onCancel={handleValidationPopupCancel}
+        />
+      )}
     </>
   );
 };

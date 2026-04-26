@@ -26,15 +26,27 @@ export enum ExcelTypes {
   SUMMARY_STATISTICS = "SUMMARY_STATISTICS",
 }
 
-type ExcelJobPayload<TFile> = {
+export type ExcelJobData = {
   type: ExcelTypes;
-  file: TFile;
+  file: File;
+  overrideTemplateValidation?: boolean;
+  overrideDuplicates?: boolean;
+  overwriteDuplicates?: boolean;
+  validateOnly?: boolean;
   fallbackMonth?: string;
   fallbackYear?: number;
-  overrideTemplateValidation?: boolean;
 };
 
-export type ExcelJobData<TFile = File> = ExcelJobPayload<TFile>;
+export type ExcelQueueData = {
+  type: ExcelTypes;
+  file: SerializedExcelFile;
+  overrideTemplateValidation?: boolean;
+  overrideDuplicates?: boolean;
+  overwriteDuplicates?: boolean;
+  validateOnly?: boolean;
+  fallbackMonth?: string;
+  fallbackYear?: number;
+};
 
 export type SerializedExcelFile = {
   name: string;
@@ -43,8 +55,6 @@ export type SerializedExcelFile = {
   size: number;
   bytesBase64: string;
 };
-
-export type ExcelQueueData = ExcelJobData<SerializedExcelFile>;
 
 export type ExcelJob = Job<
   ExcelQueueData,

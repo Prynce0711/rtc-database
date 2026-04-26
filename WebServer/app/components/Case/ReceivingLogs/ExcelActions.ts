@@ -19,6 +19,9 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadReceiveExcel(
   file: File,
   overrideTemplateValidation = false,
+  overrideDuplicates = false,
+  overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
@@ -30,6 +33,9 @@ export async function uploadReceiveExcel(
       type: ExcelTypes.RECEIVING_LOG,
       file,
       overrideTemplateValidation,
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
     });
 
     if (!result.success) {

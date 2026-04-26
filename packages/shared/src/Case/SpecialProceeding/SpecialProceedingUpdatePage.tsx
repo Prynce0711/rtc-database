@@ -3,6 +3,8 @@
 import {
   CaseType,
   createEmptySpecialProceedingEntry,
+  EXCEL_VALIDATION_RESULT,
+  ExcelValidationErrorPopup,
   SpecialProceedingAdapter,
   SpecialProceedingData,
   SpecialProceedingEntry,
@@ -422,6 +424,19 @@ const SpecialProceedingUpdatePage = ({
   const [reviewIdx, setReviewIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [validationPopupData, setValidationPopupData] = useState<{
+    errorCount: number;
+    duplicateCount: number;
+    inFileDuplicateCount: number;
+    validCount: number;
+    totalCount: number;
+    failedExcel?: { fileName: string; base64: string };
+    duplicateKeys?: string[];
+    inFileDuplicateKeys?: string[];
+  } | null>(null);
+  const validationPopupResolverRef = useRef<
+    ((mode: "create" | "overwrite" | null) => void) | null
+  >(null);
   const [existingCaseNumbers, setExistingCaseNumbers] = useState<string[]>([]);
   const [autoCaseNumbersByRow, setAutoCaseNumbersByRow] = useState<
     Record<number, string>
@@ -431,6 +446,25 @@ const SpecialProceedingUpdatePage = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
+
+  const promptValidationDecision = useCallback(
+    (data: {
+      errorCount: number;
+      duplicateCount: number;
+      inFileDuplicateCount: number;
+      validCount: number;
+      totalCount: number;
+      failedExcel?: { fileName: string; base64: string };
+      duplicateKeys?: string[];
+      inFileDuplicateKeys?: string[];
+    }) => {
+      setValidationPopupData(data);
+      return new Promise<"create" | "overwrite" | null>((resolve) => {
+        validationPopupResolverRef.current = resolve;
+      });
+    },
+    [],
+  );
 
   const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
     if (isEdit && editCases.length > 0) {
@@ -711,9 +745,80 @@ const SpecialProceedingUpdatePage = ({
 
     setUploading(true);
     try {
-      const result = await previewSpecialProceedingImport(file);
+      let overrideTemplate = false;
+      let overrideDuplicates = false;
+      let overwriteDuplicates = false;
+      let validationResult = await adapter.uploadSpecialProceedingExcel(
+        file,
+        false,
+        false,
+        false,
+        true,
+      );
+      if (
+        !validationResult.success &&
+        validationResult.error?.includes(VALIDATION_ERROR_MARKER)
+      ) {
+        const continueUpload = await statusPopup.showWarning(
+          "Some sheets are not special proceedings, do you want to continue?",
+        );
+        if (!continueUpload) {
+          return;
+        }
+        overrideTemplate = true;
+        validationResult = await adapter.uploadSpecialProceedingExcel(
+          file,
+          true,
+          false,
+          false,
+          true,
+        );
+      }
 
-      downloadImportFailedExcel(result.failedExcel);
+      if (
+        !validationResult.success &&
+        validationResult.error === EXCEL_VALIDATION_RESULT
+      ) {
+        const validationPayload = validationResult.errorResult;
+        const duplicateCount = validationPayload?.duplicateKeys?.length ?? 0;
+        const inFileDuplicateCount =
+          validationPayload?.inFileDuplicateKeys?.length ?? 0;
+        const errorCount = validationPayload?.meta.errorCount ?? 0;
+
+        if (duplicateCount > 0 || inFileDuplicateCount > 0 || errorCount > 0) {
+          const decision = await promptValidationDecision({
+            errorCount,
+            duplicateCount,
+            inFileDuplicateCount,
+            validCount: validationPayload?.meta.validRows ?? 0,
+            totalCount: validationPayload?.meta.totalRows ?? 0,
+            failedExcel: validationPayload?.failedExcel,
+            duplicateKeys: validationPayload?.duplicateKeys,
+            inFileDuplicateKeys: validationPayload?.inFileDuplicateKeys,
+          });
+
+          if (decision === null) {
+            return;
+          }
+          overrideDuplicates = decision === "create";
+          overwriteDuplicates = decision === "overwrite";
+        }
+      } else if (!validationResult.success) {
+        statusPopup.showError(
+          validationResult.error || "Failed to validate Excel file",
+        );
+        return;
+      }
+
+      const result = await adapter.uploadSpecialProceedingExcel(
+        file,
+        overrideTemplate,
+        overrideDuplicates,
+        overwriteDuplicates,
+        false,
+      );
+
+      const importPayload = result.success ? result.result : result.errorResult;
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
@@ -741,6 +846,21 @@ const SpecialProceedingUpdatePage = ({
       input.value = "";
     }
   };
+
+  const handleValidationPopupContinue = useCallback(
+    (mode: "create" | "overwrite") => {
+      validationPopupResolverRef.current?.(mode);
+      validationPopupResolverRef.current = null;
+      setValidationPopupData(null);
+    },
+    [],
+  );
+
+  const handleValidationPopupCancel = useCallback(() => {
+    validationPopupResolverRef.current?.(null);
+    validationPopupResolverRef.current = null;
+    setValidationPopupData(null);
+  }, []);
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1909,6 +2029,20 @@ const SpecialProceedingUpdatePage = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {validationPopupData && (
+        <ExcelValidationErrorPopup
+          errorCount={validationPopupData.errorCount}
+          duplicateCount={validationPopupData.duplicateCount}
+          inFileDuplicateCount={validationPopupData.inFileDuplicateCount}
+          validCount={validationPopupData.validCount}
+          totalCount={validationPopupData.totalCount}
+          failedExcel={validationPopupData.failedExcel}
+          duplicateKeys={validationPopupData.duplicateKeys}
+          inFileDuplicateKeys={validationPopupData.inFileDuplicateKeys}
+          onContinue={handleValidationPopupContinue}
+          onCancel={handleValidationPopupCancel}
+        />
+      )}
     </div>
   );
 };

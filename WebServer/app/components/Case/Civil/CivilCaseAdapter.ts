@@ -27,7 +27,21 @@ export const civilCaseAdapter: CivilCaseAdapter = {
   deleteCivilCase,
   getCivilCaseById,
   getCivilCasesByIds,
-  uploadExcel: (file) => uploadExcel(file, CaseType.CIVIL),
+  uploadExcel: (
+    file,
+    overrideValidation,
+    overrideDuplicates,
+    overwriteDuplicates,
+    validateOnly,
+  ) =>
+    uploadExcel(
+      file,
+      CaseType.CIVIL,
+      overrideValidation,
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
+    ),
   exportCasesExcel,
 };
 
