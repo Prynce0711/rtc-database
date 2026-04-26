@@ -1,11 +1,9 @@
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "./app/lib/auth";
+import { getAllowedOrigins } from "./app/lib/originAllowlist";
 
-const allowedOrigins = new Set([
-  process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
-  process.env.NATIVE_APP_URL || "http://localhost:5173",
-]);
+const allowedOrigins = new Set(getAllowedOrigins());
 
 function applyCorsHeaders(request: NextRequest, response: NextResponse) {
   const origin = request.headers.get("origin") || "";

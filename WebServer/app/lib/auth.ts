@@ -9,6 +9,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { admin, magicLink, twoFactor } from "better-auth/plugins";
 import { createLog } from "../components/ActivityLogs/LogActions";
 import { sendEmail } from "./email";
+import { getAllowedOrigins } from "./originAllowlist";
 import { prisma } from "./prisma";
 // If your Prisma file is located elsewhere, you can change the path
 
@@ -73,10 +74,7 @@ const createDirectChatsForRole = async (role: string, userId: string) => {
 
 export const auth = betterAuth({
   baseURL: process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
-  trustedOrigins: [
-    process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
-    process.env.NATIVE_APP_URL || "http://localhost:5173",
-  ],
+  trustedOrigins: getAllowedOrigins(),
   database: prismaAdapter(prisma, {
     provider: "sqlite", // or "mysql", "postgresql", ...etc
   }),
