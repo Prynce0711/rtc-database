@@ -20,11 +20,15 @@ import {
 } from "react-icons/fi";
 import type { RecievingLog } from "../../generated/prisma/browser";
 import { CaseType } from "../../generated/prisma/enums";
+import ExcelValidationErrorPopup from "../../Popup/ExcelValidationErrorPopup";
 import { usePopup } from "../../Popup/PopupProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 
-import { VALIDATION_ERROR_MARKER } from "../../lib/excel";
+import {
+  EXCEL_VALIDATION_RESULT,
+  VALIDATION_ERROR_MARKER,
+} from "../../lib/excel";
 import { ReceivingLogEntry } from "./RecievingLogsSchema";
 
 export enum ReceivingUpdateType {
@@ -359,6 +363,19 @@ const ReceiveUpdatePage = ({
   const statusPopup = usePopup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [validationPopupData, setValidationPopupData] = useState<{
+    errorCount: number;
+    duplicateCount: number;
+    inFileDuplicateCount: number;
+    validCount: number;
+    totalCount: number;
+    failedExcel?: { fileName: string; base64: string };
+    duplicateKeys?: string[];
+    inFileDuplicateKeys?: string[];
+  } | null>(null);
+  const validationPopupResolverRef = useRef<
+    ((mode: "create" | "overwrite" | null) => void) | null
+  >(null);
   const [step, setStep] = useState<Step>("entry");
   const [activeTab, setActiveTab] = useState(0);
   const [entryPage, setEntryPage] = useState(1);
@@ -366,6 +383,25 @@ const ReceiveUpdatePage = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const nextTempIdRef = useRef<number>(-1000);
+
+  const promptValidationDecision = useCallback(
+    (data: {
+      errorCount: number;
+      duplicateCount: number;
+      inFileDuplicateCount: number;
+      validCount: number;
+      totalCount: number;
+      failedExcel?: { fileName: string; base64: string };
+      duplicateKeys?: string[];
+      inFileDuplicateKeys?: string[];
+    }) => {
+      setValidationPopupData(data);
+      return new Promise<"create" | "overwrite" | null>((resolve) => {
+        validationPopupResolverRef.current = resolve;
+      });
+    },
+    [],
+  );
 
   const makeFromLog = (log: RecievingLog): ReceivingLogEntry => ({
     id: log.id,
@@ -494,16 +530,78 @@ const ReceiveUpdatePage = ({
 
     setUploading(true);
     try {
-      let result = await adapter.uploadReceiveExcel(file);
-      if (!result.success && result.error?.includes(VALIDATION_ERROR_MARKER)) {
+      let overrideTemplate = false;
+      let overrideDuplicates = false;
+      let overwriteDuplicates = false;
+      let validationResult = await adapter.uploadReceiveExcel(
+        file,
+        false,
+        false,
+        false,
+        true,
+      );
+      if (
+        !validationResult.success &&
+        validationResult.error?.includes(VALIDATION_ERROR_MARKER)
+      ) {
         const continueUpload = await statusPopup.showWarning(
           "Some sheets are not receiving logs, do you want to continue?",
         );
         if (!continueUpload) {
           return;
         }
-        result = await adapter.uploadReceiveExcel(file, true);
+        overrideTemplate = true;
+        validationResult = await adapter.uploadReceiveExcel(
+          file,
+          overrideTemplate,
+          false,
+          false,
+          true,
+        );
       }
+
+      if (
+        !validationResult.success &&
+        validationResult.error === EXCEL_VALIDATION_RESULT
+      ) {
+        const validationPayload = validationResult.errorResult;
+        const duplicateCount = validationPayload?.duplicateKeys?.length ?? 0;
+        const inFileDuplicateCount =
+          validationPayload?.inFileDuplicateKeys?.length ?? 0;
+        const errorCount = validationPayload?.meta.errorCount ?? 0;
+
+        if (duplicateCount > 0 || inFileDuplicateCount > 0 || errorCount > 0) {
+          const decision = await promptValidationDecision({
+            errorCount,
+            duplicateCount,
+            inFileDuplicateCount,
+            validCount: validationPayload?.meta.validRows ?? 0,
+            totalCount: validationPayload?.meta.totalRows ?? 0,
+            failedExcel: validationPayload?.failedExcel,
+            duplicateKeys: validationPayload?.duplicateKeys,
+            inFileDuplicateKeys: validationPayload?.inFileDuplicateKeys,
+          });
+
+          if (decision === null) {
+            return;
+          }
+          overrideDuplicates = decision === "create";
+          overwriteDuplicates = decision === "overwrite";
+        }
+      } else if (!validationResult.success) {
+        statusPopup.showError(
+          validationResult.error || "Failed to validate Excel file",
+        );
+        return;
+      }
+
+      const result = await adapter.uploadReceiveExcel(
+        file,
+        overrideTemplate,
+        overrideDuplicates,
+        overwriteDuplicates,
+        false,
+      );
       const importPayload = result.success ? result.result : result.errorResult;
 
       if (importPayload?.failedExcel) {
@@ -552,6 +650,21 @@ const ReceiveUpdatePage = ({
       input.value = "";
     }
   };
+
+  const handleValidationPopupContinue = useCallback(
+    (mode: "create" | "overwrite") => {
+      validationPopupResolverRef.current?.(mode);
+      validationPopupResolverRef.current = null;
+      setValidationPopupData(null);
+    },
+    [],
+  );
+
+  const handleValidationPopupCancel = useCallback(() => {
+    validationPopupResolverRef.current?.(null);
+    validationPopupResolverRef.current = null;
+    setValidationPopupData(null);
+  }, []);
 
   const handleRemove = (id: number) =>
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -1301,6 +1414,20 @@ const ReceiveUpdatePage = ({
           </motion.div>
         )}
       </AnimatePresence>
+      {validationPopupData && (
+        <ExcelValidationErrorPopup
+          errorCount={validationPopupData.errorCount}
+          duplicateCount={validationPopupData.duplicateCount}
+          inFileDuplicateCount={validationPopupData.inFileDuplicateCount}
+          validCount={validationPopupData.validCount}
+          totalCount={validationPopupData.totalCount}
+          failedExcel={validationPopupData.failedExcel}
+          duplicateKeys={validationPopupData.duplicateKeys}
+          inFileDuplicateKeys={validationPopupData.inFileDuplicateKeys}
+          onContinue={handleValidationPopupContinue}
+          onCancel={handleValidationPopupCancel}
+        />
+      )}
     </div>
   );
 };

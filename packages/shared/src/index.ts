@@ -76,6 +76,7 @@ export { default as RadioButton } from "./Filter/RadioButton";
 export { default as Suggestions } from "./Filter/Suggestions";
 
 export { default as ConfirmPopup } from "./Popup/ConfirmPopup";
+export { default as ExcelValidationErrorPopup } from "./Popup/ExcelValidationErrorPopup";
 export { default as ErrorPopup } from "./Popup/ErrorPopup";
 export { default as FileViewerModal } from "./Popup/FileViewerModal";
 export { default as LoadingPopup } from "./Popup/LoadingPopup";

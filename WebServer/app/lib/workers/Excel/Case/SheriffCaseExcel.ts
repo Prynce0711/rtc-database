@@ -24,6 +24,9 @@ import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadSheriffCaseExcel(
   file: File,
+  overrideDuplicates = false,
+  overwriteDuplicates = false,
+  validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -56,6 +59,9 @@ export async function uploadSheriffCaseExcel(
     };
 
     const result = await processExcelUpload<SheriffCaseSchema>({
+      overrideDuplicates,
+      overwriteDuplicates,
+      validateOnly,
       file,
       requiredHeaders: { "Case Number": caseNumberHeaders },
       schema: SheriffCaseSchema,
@@ -112,8 +118,19 @@ export async function uploadSheriffCaseExcel(
           mapped: validation.data,
         };
       },
-      onBatchInsert: async (rows) => {
+      onBatchInsert: async (rows, overwrite) => {
         return prisma.$transaction(async (tx) => {
+          if (overwrite) {
+            const caseNumbers = rows
+              .map((row) => String(row.caseNumber ?? "").trim())
+              .filter(Boolean);
+            if (caseNumbers.length > 0) {
+              await tx.case.deleteMany({
+                where: { caseType: CaseType.SHERRIFF, caseNumber: { in: caseNumbers } },
+              });
+            }
+          }
+
           const caseRows: Prisma.CaseCreateManyInput[] = [];
 
           rows.forEach((row) => {

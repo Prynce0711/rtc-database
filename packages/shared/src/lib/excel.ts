@@ -5,6 +5,8 @@ import { normalizeValueBySchema } from "./utils";
 
 const EXCEL_HEADERS_PREFIX = "excelHeaders:";
 export const VALIDATION_ERROR_MARKER = "EXCEL_VALIDATION_ERROR";
+export const EXCEL_DUPLICATE_ERROR = "EXCEL_DUPLICATE_ERROR";
+export const EXCEL_VALIDATION_RESULT = "EXCEL_VALIDATION_RESULT";
 
 export const QUERY_CHUNK_SIZE = 750;
 
@@ -427,6 +429,9 @@ export type ProcessExcelMeta = {
 };
 
 type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
+  overrideDuplicates?: boolean;
+  overwriteDuplicates?: boolean;
+  validateOnly?: boolean;
   file: File;
   requiredHeaders: Record<string, string[]>;
   schema: z.ZodType<T>;
@@ -441,7 +446,7 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
     errorMessage?: string;
     uniqueKey?: string;
   };
-  onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
+  onBatchInsert: (rows: T[], overwrite: boolean) => Promise<{ ids?: number[]; count?: number }>;
 } & (
   | {
       uniqueKeys: Array<keyof TCells>;
@@ -485,6 +490,8 @@ function buildUniqueConflictMessage(
 export type UploadExcelResult = {
   failedExcel?: ExportExcelData;
   meta: ProcessExcelMeta;
+  duplicateKeys?: string[];
+  inFileDuplicateKeys?: string[];
 };
 
 export async function processExcelUpload<
@@ -494,6 +501,9 @@ export async function processExcelUpload<
   options: ProcessExcelOptions<T, TCells>,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   const {
+    overrideDuplicates = false,
+    overwriteDuplicates = false,
+    validateOnly = false,
     file,
     requiredHeaders,
     schema,
@@ -533,6 +543,9 @@ export async function processExcelUpload<
 
   const failedRowsBySheet = new Map<string, FailedRow[]>();
   const globalUniqueKeys = new Set<string>();
+  const allDatabaseDuplicates = new Set<string>();
+  const allInFileDuplicates = new Set<string>();
+  const bypassDbConflict = overrideDuplicates || overwriteDuplicates;
 
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName];
@@ -629,14 +642,26 @@ export async function processExcelUpload<
           : [];
 
       if (rowUniqueEntries.length > 0) {
-        const existingConflicts = rowUniqueEntries.filter(
-          ({ value }) =>
-            existingUniqueKeys.has(value) || globalUniqueKeys.has(value),
+        const dbConflicts = rowUniqueEntries.filter(({ value }) =>
+          existingUniqueKeys.has(value),
+        );
+        const inFileConflicts = rowUniqueEntries.filter(({ value }) =>
+          globalUniqueKeys.has(value),
         );
 
-        if (existingConflicts.length > 0) {
+        if (!bypassDbConflict && dbConflicts.length > 0) {
+          dbConflicts.forEach(({ value }) => allDatabaseDuplicates.add(value));
+          // Do not fail the row yet so we can find ALL duplicates
+        }
+
+        const effectiveConflicts = bypassDbConflict
+          ? inFileConflicts
+          : [...dbConflicts, ...inFileConflicts];
+
+        if (effectiveConflicts.length > 0) {
+          inFileConflicts.forEach(({ value }) => allInFileDuplicates.add(value));
           const message = buildUniqueConflictMessage(
-            existingConflicts.map(({ key }) => key),
+            effectiveConflicts.map(({ key }) => key),
             "already exists",
           );
           sheetFailed++;
@@ -657,6 +682,7 @@ export async function processExcelUpload<
         );
 
         if (sheetConflicts.length > 0) {
+          sheetConflicts.forEach(({ value }) => allInFileDuplicates.add(value));
           const message = buildUniqueConflictMessage(
             sheetConflicts.map(({ key }) => key),
             "duplicated in this file",
@@ -736,22 +762,28 @@ export async function processExcelUpload<
     }
 
     if (sheetValidRows.length > 0) {
-      try {
+      if (!validateOnly) {
+        try {
+          console.log(
+            `✓ Sheet "${sheetName}": importing ${sheetValidRows.length} valid row(s) to database...`,
+          );
+          const insertResult = await onBatchInsert(sheetValidRows, overwriteDuplicates);
+          const ids = insertResult.ids ?? [];
+          validationResults.imported += insertResult.count ?? ids.length;
+          validationResults.importedIds.push(...ids);
+          console.log(
+            `✓ Sheet "${sheetName}": imported ${insertResult.count ?? ids.length} row(s)`,
+          );
+        } catch (error: unknown) {
+          return {
+            success: false,
+            error: `Database import failed: ${(error as Error)?.message || "Unknown error"}`,
+          };
+        }
+      } else {
         console.log(
-          `✓ Sheet "${sheetName}": importing ${sheetValidRows.length} valid row(s) to database...`,
+          `ℹ️ Sheet "${sheetName}": validation-only mode, skipping database import of ${sheetValidRows.length} row(s)`,
         );
-        const insertResult = await onBatchInsert(sheetValidRows);
-        const ids = insertResult.ids ?? [];
-        validationResults.imported += insertResult.count ?? ids.length;
-        validationResults.importedIds.push(...ids);
-        console.log(
-          `✓ Sheet "${sheetName}": imported ${insertResult.count ?? ids.length} row(s)`,
-        );
-      } catch (error: unknown) {
-        return {
-          success: false,
-          error: `Database import failed: ${(error as Error)?.message || "Unknown error"}`,
-        };
       }
     }
 
@@ -787,6 +819,42 @@ export async function processExcelUpload<
     failedExcelData = { fileName: `failed-rows-${Date.now()}.xlsx`, base64 };
   }
 
+  const inFileDuplicateKeys =
+    allInFileDuplicates.size > 0 ? Array.from(allInFileDuplicates) : undefined;
+
+  const buildMeta = () => ({
+    importedIds: validationResults.importedIds,
+    importedCount: validationResults.imported,
+    errorCount: validationResults.errors.length,
+    sheetSummary: validationResults.sheetSummary,
+    totalRows: validationResults.total,
+    validRows: validationResults.valid,
+  });
+
+  if (allDatabaseDuplicates.size > 0) {
+    if (validateOnly) {
+      return {
+        success: false,
+        error: EXCEL_VALIDATION_RESULT,
+        errorResult: {
+          meta: buildMeta(),
+          duplicateKeys: Array.from(allDatabaseDuplicates),
+          inFileDuplicateKeys,
+          failedExcel: failedExcelData,
+        },
+      };
+    }
+    return {
+      success: false,
+      error: EXCEL_DUPLICATE_ERROR,
+      errorResult: {
+        meta: buildMeta(),
+        duplicateKeys: Array.from(allDatabaseDuplicates),
+        inFileDuplicateKeys,
+      },
+    };
+  }
+
   if (validationResults.valid === 0) {
     const existingRowCount = validationResults.errors.filter((error) => {
       if ("message" in error.errors) {
@@ -805,6 +873,18 @@ export async function processExcelUpload<
         ? `No valid rows to import. ${existingRowCount} row(s) already exist in the database.`
         : "No valid rows to import";
 
+    if (validateOnly) {
+      return {
+        success: false,
+        error: EXCEL_VALIDATION_RESULT,
+        errorResult: {
+          failedExcel: failedExcelData,
+          inFileDuplicateKeys,
+          meta: buildMeta(),
+        },
+      };
+    }
+
     if (allFailedRowsAlreadyExist) {
       return { success: false, error: noValidRowsMessage };
     }
@@ -813,33 +893,29 @@ export async function processExcelUpload<
       ? {
           success: false,
           error: noValidRowsMessage,
-          errorResult: {
-            failedExcel: failedExcelData,
-            meta: {
-              importedIds: validationResults.importedIds,
-              importedCount: validationResults.imported,
-              errorCount: validationResults.errors.length,
-              sheetSummary: validationResults.sheetSummary,
-              totalRows: validationResults.total,
-              validRows: validationResults.valid,
-            },
-          },
+          errorResult: { failedExcel: failedExcelData, inFileDuplicateKeys, meta: buildMeta() },
         }
       : { success: false, error: noValidRowsMessage };
+  }
+
+  if (validateOnly && (validationResults.errors.length > 0 || failedExcelData)) {
+    return {
+      success: false,
+      error: EXCEL_VALIDATION_RESULT,
+      errorResult: {
+        failedExcel: failedExcelData,
+        inFileDuplicateKeys,
+        meta: buildMeta(),
+      },
+    };
   }
 
   return {
     success: true,
     result: {
       failedExcel: failedExcelData,
-      meta: {
-        importedIds: validationResults.importedIds,
-        importedCount: validationResults.imported,
-        errorCount: validationResults.errors.length,
-        sheetSummary: validationResults.sheetSummary,
-        totalRows: validationResults.total,
-        validRows: validationResults.valid,
-      },
+      inFileDuplicateKeys,
+      meta: buildMeta(),
     },
   };
 }
