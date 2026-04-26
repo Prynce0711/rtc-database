@@ -31,6 +31,7 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
     overrideValidation,
     overrideDuplicates,
     overwriteDuplicates,
+    allowInFileDuplicates,
     validateOnly,
   ) =>
     uploadCriminalCaseExcel(
@@ -38,6 +39,7 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
       overrideValidation,
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
     ),
   exportCasesExcel,

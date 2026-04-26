@@ -50,6 +50,7 @@ export interface RecievingLogsAdapter {
     overrideValidation?: boolean,
     overrideDuplicates?: boolean,
     overwriteDuplicates?: boolean,
+    allowInFileDuplicates?: boolean,
     validateOnly?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportReceiveLogsExcel: () => Promise<ActionResult<ExportExcelData>>;

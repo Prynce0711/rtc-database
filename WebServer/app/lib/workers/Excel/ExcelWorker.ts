@@ -408,6 +408,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.CIVIL_CASE:
@@ -415,6 +416,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.PETITION_CASE:
@@ -422,6 +424,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.RECEIVING_LOG:
@@ -429,6 +432,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.SHERIFF_CASE:
@@ -436,6 +440,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.SPECIAL_PROCEEDING_CASE:
@@ -443,6 +448,7 @@ IS_WORKER
               file,
               job.data.overrideDuplicates,
               job.data.overwriteDuplicates,
+              job.data.allowInFileDuplicates,
               job.data.validateOnly,
             );
           case ExcelTypes.EMPLOYEE:

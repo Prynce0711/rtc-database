@@ -39,6 +39,7 @@ export interface PetitionCaseAdapter extends BaseCaseAdapter {
     overrideValidation?: boolean,
     overrideDuplicates?: boolean,
     overwriteDuplicates?: boolean,
+    allowInFileDuplicates?: boolean,
     validateOnly?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportPetitionsExcel: () => Promise<ActionResult<ExportExcelData>>;

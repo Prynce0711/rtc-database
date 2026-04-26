@@ -32,6 +32,7 @@ export const civilCaseAdapter: CivilCaseAdapter = {
     overrideValidation,
     overrideDuplicates,
     overwriteDuplicates,
+    allowInFileDuplicates,
     validateOnly,
   ) =>
     uploadExcel(
@@ -40,6 +41,7 @@ export const civilCaseAdapter: CivilCaseAdapter = {
       overrideValidation,
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
     ),
   exportCasesExcel,

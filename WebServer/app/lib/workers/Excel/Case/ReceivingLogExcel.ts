@@ -80,6 +80,7 @@ export async function uploadReceivingLogExcel(
   file: File,
   overrideDuplicates = false,
   _overwriteDuplicates = false,
+  _allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {

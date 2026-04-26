@@ -5,6 +5,12 @@ import { useState } from "react";
 import ModalBase from "./ModalBase";
 
 export type DuplicateHandlingMode = "create" | "overwrite";
+export type InFileDuplicateMode = "skip" | "create";
+
+export type ExcelImportDecision = {
+  dbMode: DuplicateHandlingMode;
+  inFileMode: InFileDuplicateMode;
+};
 
 export type ExcelValidationErrorPopupProps = {
   errorCount: number;
@@ -15,7 +21,7 @@ export type ExcelValidationErrorPopupProps = {
   failedExcel?: { fileName: string; base64: string };
   duplicateKeys?: string[];
   inFileDuplicateKeys?: string[];
-  onContinue: (mode: DuplicateHandlingMode) => void;
+  onContinue: (decision: ExcelImportDecision) => void;
   onCancel: () => void;
 };
 
@@ -32,6 +38,7 @@ const ExcelValidationErrorPopup = ({
   onCancel,
 }: ExcelValidationErrorPopupProps) => {
   const [duplicateMode, setDuplicateMode] = useState<DuplicateHandlingMode | null>(null);
+  const [inFileMode, setInFileMode] = useState<InFileDuplicateMode | null>(null);
 
   const downloadFailedRows = () => {
     if (!failedExcel) return;
@@ -65,7 +72,9 @@ const ExcelValidationErrorPopup = ({
       ? "In-File Duplicates Found"
       : "Validation Issues";
 
-  const canContinue = !hasDbDuplicates || duplicateMode !== null;
+  const canContinue =
+    (!hasDbDuplicates || duplicateMode !== null) &&
+    (!hasInFileDuplicates || inFileMode !== null);
 
   return (
     <ModalBase onClose={onCancel}>
@@ -122,22 +131,60 @@ const ExcelValidationErrorPopup = ({
             </button>
           )}
 
-          {/* In-file duplicates info */}
+          {/* In-file duplicates handling */}
           {hasInFileDuplicates && (
-            <div className="bg-base-200/50 rounded-lg p-3 text-sm space-y-1.5">
-              <p className="font-semibold text-base-content/80">
-                In-file duplicates (will be skipped):
-              </p>
-              <p className="text-base-content/60 text-xs">
-                These rows share a case number with another row in the same file. They cannot be imported and will be excluded regardless.
-              </p>
-              {inFileDuplicateKeys && inFileDuplicateKeys.length <= 5 && (
-                <ul className="space-y-0.5 text-base-content/60 text-xs pt-1">
-                  {inFileDuplicateKeys.map((key) => (
-                    <li key={key}>• {key}</li>
-                  ))}
-                </ul>
-              )}
+            <div className="bg-base-200/50 rounded-lg p-3 text-sm space-y-3">
+              <div>
+                <p className="font-semibold text-base-content/80 mb-0.5">
+                  In-file duplicates — choose how to handle:
+                </p>
+                <p className="text-base-content/60 text-xs mb-1">
+                  These rows share a case number with another row in the same file.
+                </p>
+                {inFileDuplicateKeys && inFileDuplicateKeys.length <= 5 && (
+                  <ul className="space-y-0.5 text-base-content/60 text-xs">
+                    {inFileDuplicateKeys.map((key) => (
+                      <li key={key}>• {key}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="inFileMode"
+                  className="radio radio-sm mt-0.5"
+                  checked={inFileMode === "skip"}
+                  onChange={() => setInFileMode("skip")}
+                />
+                <div>
+                  <p className="text-sm font-medium text-base-content">
+                    Import first occurrence only
+                  </p>
+                  <p className="text-xs text-base-content/60">
+                    Only the first row with each case number is imported; later occurrences are skipped.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="inFileMode"
+                  className="radio radio-sm mt-0.5"
+                  checked={inFileMode === "create"}
+                  onChange={() => setInFileMode("create")}
+                />
+                <div>
+                  <p className="text-sm font-medium text-base-content">
+                    Import all occurrences
+                  </p>
+                  <p className="text-xs text-base-content/60">
+                    All rows are imported, creating multiple records with the same case number.
+                  </p>
+                </div>
+              </label>
             </div>
           )}
 
@@ -201,7 +248,12 @@ const ExcelValidationErrorPopup = ({
               Cancel
             </button>
             <button
-              onClick={() => onContinue(duplicateMode ?? "create")}
+              onClick={() =>
+                onContinue({
+                  dbMode: duplicateMode ?? "create",
+                  inFileMode: inFileMode ?? "skip",
+                })
+              }
               disabled={!canContinue}
               className="btn btn-primary flex-1"
             >

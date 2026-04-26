@@ -42,6 +42,7 @@ export interface SpecialProceedingAdapter extends BaseCaseAdapter {
     overrideValidation?: boolean,
     overrideDuplicates?: boolean,
     overwriteDuplicates?: boolean,
+    allowInFileDuplicates?: boolean,
     validateOnly?: boolean,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportSpecialProceedingsExcel: () => Promise<ActionResult<ExportExcelData>>;

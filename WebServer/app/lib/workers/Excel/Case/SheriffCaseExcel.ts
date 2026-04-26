@@ -26,6 +26,7 @@ export async function uploadSheriffCaseExcel(
   file: File,
   overrideDuplicates = false,
   overwriteDuplicates = false,
+  allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -61,6 +62,7 @@ export async function uploadSheriffCaseExcel(
     const result = await processExcelUpload<SheriffCaseSchema>({
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
       file,
       requiredHeaders: { "Case Number": caseNumberHeaders },

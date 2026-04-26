@@ -26,6 +26,7 @@ export async function uploadSpecialProceedingCaseExcel(
   file: File,
   overrideDuplicates = false,
   overwriteDuplicates = false,
+  allowInFileDuplicates = false,
   validateOnly = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
@@ -63,6 +64,7 @@ export async function uploadSpecialProceedingCaseExcel(
     >({
       overrideDuplicates,
       overwriteDuplicates,
+      allowInFileDuplicates,
       validateOnly,
       file,
       requiredHeaders: { "Case Number": caseNumberHeaders },

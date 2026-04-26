@@ -835,7 +835,11 @@ const CriminalCaseUpdatePage = ({
     inFileDuplicateKeys?: string[];
   } | null>(null);
   const validationPopupResolverRef = useRef<
-    ((mode: "create" | "overwrite" | null) => void) | null
+    ((
+      decision:
+        | { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }
+        | null,
+    ) => void) | null
   >(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -853,7 +857,9 @@ const CriminalCaseUpdatePage = ({
       inFileDuplicateKeys?: string[];
     }) => {
       setValidationPopupData(data);
-      return new Promise<"create" | "overwrite" | null>((resolve) => {
+      return new Promise<
+        { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" } | null
+      >((resolve) => {
         validationPopupResolverRef.current = resolve;
       });
     },
@@ -1102,9 +1108,11 @@ const CriminalCaseUpdatePage = ({
       let overrideTemplate = false;
       let overrideDuplicates = false;
       let overwriteDuplicates = false;
+      let allowInFileDuplicates = false;
 
       let validationResult = await adapter.uploadExcel(
         file,
+        false,
         false,
         false,
         false,
@@ -1124,6 +1132,7 @@ const CriminalCaseUpdatePage = ({
         validationResult = await adapter.uploadExcel(
           file,
           overrideTemplate,
+          false,
           false,
           false,
           true,
@@ -1155,8 +1164,9 @@ const CriminalCaseUpdatePage = ({
           if (decision === null) {
             return;
           }
-          overrideDuplicates = decision === "create";
-          overwriteDuplicates = decision === "overwrite";
+          overrideDuplicates = decision.dbMode === "create";
+          overwriteDuplicates = decision.dbMode === "overwrite";
+          allowInFileDuplicates = decision.inFileMode === "create";
         }
       } else if (!validationResult.success) {
         statusPopup.showError(
@@ -1170,6 +1180,7 @@ const CriminalCaseUpdatePage = ({
         overrideTemplate,
         overrideDuplicates,
         overwriteDuplicates,
+        allowInFileDuplicates,
         false,
       );
 
@@ -1221,8 +1232,8 @@ const CriminalCaseUpdatePage = ({
   };
 
   const handleValidationPopupContinue = useCallback(
-    (mode: "create" | "overwrite") => {
-      validationPopupResolverRef.current?.(mode);
+    (decision: { dbMode: "create" | "overwrite"; inFileMode: "skip" | "create" }) => {
+      validationPopupResolverRef.current?.(decision);
       validationPopupResolverRef.current = null;
       setValidationPopupData(null);
     },
