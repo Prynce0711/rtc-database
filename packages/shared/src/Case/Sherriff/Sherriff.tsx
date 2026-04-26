@@ -36,6 +36,12 @@ import {
 import { useAdaptiveRouter } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
+import {
+  CASE_IMPORT_DRAFT_KEYS,
+  downloadImportFailedExcel,
+  previewSheriffCaseImport,
+  saveCaseImportDraft,
+} from "../importPreview";
 import SherriffCaseRow from "./SherriffCaseRow";
 
 type CaseFilterValues = SheriffCaseFilters;
@@ -332,50 +338,31 @@ const Sherriff: React.FC<{
 
     setUploading(true);
     try {
-      const result = await adapter.uploadSheriffExcel(file);
-      const importPayload = result.success ? result.result : result.errorResult;
+      const result = await previewSheriffCaseImport(file);
 
-      if (importPayload?.failedExcel) {
-        const { fileName, base64 } = importPayload.failedExcel;
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
+      downloadImportFailedExcel(result.failedExcel);
 
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+      if (!result.success || result.rows.length === 0) {
+        statusPopup.showError(
+          result.error ||
+            (result.failedExcel
+              ? "No valid rows were loaded. Failed rows were downloaded for review."
+              : "No valid rows were loaded."),
+        );
+        return;
       }
 
-      if (!result.success) {
-        statusPopup.showError(result.error || "Failed to import cases");
-      } else {
-        if ((importPayload?.meta.importedCount ?? 0) === 0) {
-          statusPopup.showError(
-            "No valid rows to import. Failed rows have been downloaded for review.",
-          );
-          return;
-        }
-
-        statusPopup.showSuccess("Cases imported successfully");
-        await fetchCases();
-
-        if (importPayload?.failedExcel) {
-          statusPopup.showSuccess(
-            "Import complete. Failed rows have been downloaded for review.",
-          );
-        }
+      if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.sheriff, result.rows)) {
+        statusPopup.showError("Failed to stage imported rows.");
+        return;
       }
+
+      statusPopup.showSuccess(
+        result.failedExcel
+          ? "Excel data staged. Failed rows were downloaded for review."
+          : "Excel data staged. Review and save the draft to add it to the table.",
+      );
+      router.push(`/user/cases/sheriff/add?importDraft=${Date.now()}`);
     } finally {
       setUploading(false);
       e.target.value = "";

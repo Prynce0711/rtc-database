@@ -36,6 +36,12 @@ import {
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
+import {
+  CASE_IMPORT_DRAFT_KEYS,
+  downloadImportFailedExcel,
+  previewCivilCaseImport,
+  saveCaseImportDraft,
+} from "../importPreview";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import CivilCaseRow from "./CivilCaseRow";
 import {
@@ -317,40 +323,36 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const handleUpload = async (file: File) => {
     setUploading(true);
     try {
-      const result = await adapter.uploadExcel(file);
-      const importPayload = result.success ? result.result : result.errorResult;
+      const result = await previewCivilCaseImport(file);
 
-      if (importPayload?.failedExcel) {
-        const failedFileLink = document.createElement("a");
-        failedFileLink.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${importPayload.failedExcel.base64}`;
-        failedFileLink.download = importPayload.failedExcel.fileName;
-        failedFileLink.click();
-      }
+      downloadImportFailedExcel(result.failedExcel);
 
-      if (!result.success || !result.result) {
+      if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
-          !result.success ? result.error || "Upload failed" : "Upload failed",
+          result.error ||
+            (result.failedExcel
+              ? "No valid rows were loaded. Failed rows were downloaded for review."
+              : "No valid rows were loaded."),
         );
         return;
       }
 
-      if ((result.result.meta?.importedCount ?? 0) === 0) {
-        statusPopup.showError(
-          importPayload?.failedExcel
-            ? "No valid rows were imported. Failed rows were downloaded for review."
-            : "No valid rows were imported.",
-        );
+      if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.civil, result.rows)) {
+        statusPopup.showError("Failed to stage imported rows.");
         return;
       }
 
       statusPopup.showSuccess(
-        importPayload?.failedExcel
-          ? "Import complete. Failed rows were downloaded for review."
-          : "Excel upload completed.",
+        result.failedExcel
+          ? "Excel data staged. Failed rows were downloaded for review."
+          : "Excel data staged. Review and save the draft to add it to the table.",
       );
-      await fetchCases();
+      router.push(`/user/cases/civil/add?importDraft=${Date.now()}`);
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 

@@ -1198,6 +1198,10 @@
     overflow: hidden;
     box-shadow: var(--shadow-soft);
   }
+  .rv-layout-fixed-sidebar {
+    align-items: flex-start;
+    overflow: visible;
+  }
   .rv-sidebar {
     width: 210px;
     flex-shrink: 0;
@@ -1205,6 +1209,13 @@
     background: var(--color-base-100);
     display: flex;
     flex-direction: column;
+  }
+  .rv-layout-fixed-sidebar .rv-sidebar {
+    align-self: flex-start;
+    position: sticky;
+    top: 88px;
+    z-index: 1;
+    max-height: calc(100vh - 310px);
   }
   .rv-sidebar-head {
     padding: 13px 16px 10px;
@@ -1219,6 +1230,9 @@
   .rv-sidebar-list {
     overflow-y: auto;
     flex: 1;
+  }
+  .rv-layout-fixed-sidebar .rv-sidebar-list {
+    min-height: 0;
   }
   .rv-sidebar-item {
     display: flex;
@@ -1287,6 +1301,7 @@
   }
   .rv-panel {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     max-height: calc(100vh - 310px);
   }
