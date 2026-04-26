@@ -11,7 +11,8 @@
   "dependencies": {
     "@rtc-database/shared": "workspace:*",
     "dotenv": "^17.2.3",
-    "http-proxy": "^1.18.1"
+    "http-proxy": "^1.18.1",
+    "selfsigned": "^5.5.0"
   },
   "devDependencies": {
     "@types/http-proxy": "^1.17.16",

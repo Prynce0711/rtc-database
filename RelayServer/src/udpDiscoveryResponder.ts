@@ -14,6 +14,11 @@ const ADVERTISED_PORT =
   Number(process.env.RELAY_PORT) ||
   Number(process.env.BACKEND_PORT) ||
   3000;
+const ADVERTISED_PROTOCOL =
+  process.env.UDP_ADVERTISED_PROTOCOL?.trim().toLowerCase() === "https" ||
+  process.env.RELAY_USE_HTTPS?.trim().toLowerCase() === "true"
+    ? "https"
+    : "http";
 
 let socket: dgram.Socket | null = null;
 
@@ -76,6 +81,7 @@ export function startUdpDiscoveryResponder(): void {
     const response: UdpDiscoveryResponse = {
       type: UDP_DISCOVERY_RESPONSE_TYPE,
       service: UDP_SERVICE_NAME,
+      protocol: ADVERTISED_PROTOCOL,
       host: advertisedHost,
       port: ADVERTISED_PORT,
       timestamp: Date.now(),
