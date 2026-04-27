@@ -707,7 +707,7 @@ model SystemSettings {
   systemAnnouncement String?
 
   smtpHost       String? @default("smtp.gmail.com")
-  smtpPort       Int?    @default(587)
+  smtpPort       Int?    @default(465)
   senderName     String? @default("RTC Notifications")
   senderEmail    String? @default("noreply@rtc.com")
   senderPassword String?

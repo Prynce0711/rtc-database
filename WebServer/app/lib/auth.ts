@@ -7,6 +7,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, magicLink, twoFactor } from "better-auth/plugins";
+import { randomInt } from "node:crypto";
 import { createLog } from "../components/ActivityLogs/LogActions";
 import { sendEmail } from "./email";
 import { getAllowedOrigins } from "./originAllowlist";
@@ -14,6 +15,37 @@ import { prisma } from "./prisma";
 // If your Prisma file is located elsewhere, you can change the path
 
 const ROLE_VALUES = new Set(Object.values(PrismaRole));
+const MAGIC_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const MAGIC_CODE_LENGTH = 10;
+const MAGIC_CODE_GROUP_SIZE = 5;
+const MAGIC_CODE_EXPIRY_MINUTES = 5;
+
+const generateMagicCode = (): string =>
+  Array.from(
+    { length: MAGIC_CODE_LENGTH },
+    () => MAGIC_CODE_ALPHABET[randomInt(0, MAGIC_CODE_ALPHABET.length)],
+  ).join("");
+
+const formatMagicCode = (token: string): string =>
+  token
+    .match(new RegExp(`.{1,${String(MAGIC_CODE_GROUP_SIZE)}}`, "g"))
+    ?.join("-") ?? token;
+
+const asMutableRecord = (
+  value: unknown,
+): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+const getStringProperty = (
+  value: unknown,
+  propertyName: string,
+): string | undefined => {
+  const record = asMutableRecord(value);
+  const propertyValue = record?.[propertyName];
+  return typeof propertyValue === "string" ? propertyValue : undefined;
+};
 
 const createDirectChatsForRole = async (role: string, userId: string) => {
   if (!role || !userId) return;
@@ -86,11 +118,23 @@ export const auth = betterAuth({
     admin(),
     twoFactor(),
     magicLink({
-      sendMagicLink: async ({ email, token, url }, ctx) => {
-        sendEmail(
+      allowedAttempts: 5,
+      expiresIn: MAGIC_CODE_EXPIRY_MINUTES * 60, // in seconds
+      generateToken: async () => generateMagicCode(),
+      sendMagicLink: async ({ email, token }) => {
+        const formattedCode = formatMagicCode(token);
+
+        await sendEmail(
           email,
-          "Your Magic Link for RTC Database",
-          `Click the link to sign in: ${url}`,
+          "Your Magic Code for RTC Database",
+          [
+            "Use this magic code to sign in to RTC Database:",
+            "",
+            formattedCode,
+            "",
+            `This code expires in ${String(MAGIC_CODE_EXPIRY_MINUTES)} minutes.`,
+            "Open the RTC Database login page on a device connected to the same local network, choose Magic Code, and paste this code there.",
+          ].join("\n"),
         );
       },
       disableSignUp: true,

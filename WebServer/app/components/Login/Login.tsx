@@ -8,17 +8,49 @@ import {
   useAnimation,
 } from "framer-motion";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { signIn } from "../../lib/authClient";
+
+const MAGIC_CODE_LENGTH = 10;
+const MAGIC_CODE_GROUP_SIZE = 5;
+
+const normalizeMagicCode = (value: string): string =>
+  value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, MAGIC_CODE_LENGTH);
+
+const formatMagicCode = (value: string): string =>
+  normalizeMagicCode(value)
+    .match(new RegExp(`.{1,${String(MAGIC_CODE_GROUP_SIZE)}}`, "g"))
+    ?.join("-") ?? "";
+
+const getMagicCodeErrorMessage = (errorCode: string): string => {
+  switch (errorCode) {
+    case "INVALID_TOKEN":
+      return "That magic code was not recognized. Check the code and try again.";
+    case "EXPIRED_TOKEN":
+      return "That magic code has expired. Request a new code and try again.";
+    case "ATTEMPTS_EXCEEDED":
+      return "That magic code was entered too many times. Request a new code and try again.";
+    case "new_user_signup_disabled":
+      return "This account is not allowed to sign in with a magic code.";
+    default:
+      return "Magic code sign-in could not be completed. Please try again.";
+  }
+};
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [magicCode, setMagicCode] = useState("");
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isVerifyingMagicCode, setIsVerifyingMagicCode] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -71,6 +103,26 @@ const Login: React.FC = () => {
     }
   }, [error]);
 
+  useEffect(() => {
+    const errorCode = searchParams.get("error");
+    if (!errorCode) {
+      return;
+    }
+
+    setError(getMagicCodeErrorMessage(errorCode));
+
+    if (typeof window !== "undefined") {
+      const cleanedUrl = `${window.location.pathname}${window.location.hash}`;
+      window.history.replaceState({}, "", cleanedUrl);
+    }
+  }, [searchParams]);
+
+  const normalizedMagicCode = useMemo(
+    () => normalizeMagicCode(magicCode),
+    [magicCode],
+  );
+  const isBusy = isLoading || isVerifyingMagicCode;
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -119,6 +171,33 @@ const Login: React.FC = () => {
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
+    }
+  };
+
+  const handleMagicCodeLogin = async () => {
+    setError("");
+
+    if (normalizedMagicCode.length !== MAGIC_CODE_LENGTH) {
+      setError("Enter the full magic code from your email.");
+      return;
+    }
+
+    setIsVerifyingMagicCode(true);
+
+    try {
+      const verifyUrl = new URL(
+        "/api/auth/magic-link/verify",
+        window.location.origin,
+      );
+      verifyUrl.searchParams.set("token", normalizedMagicCode);
+      verifyUrl.searchParams.set("callbackURL", "/");
+      verifyUrl.searchParams.set("newUserCallbackURL", "/");
+      verifyUrl.searchParams.set("errorCallbackURL", "/");
+
+      window.location.assign(verifyUrl.toString());
+    } catch {
+      setIsVerifyingMagicCode(false);
+      setError("Unable to continue with that magic code right now.");
     }
   };
 
@@ -322,7 +401,7 @@ shadow-xl
                 className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 focus:scale-[1.02]"
                 placeholder="admin@rtc.gov.ph"
                 required
-                disabled={isLoading}
+                disabled={isBusy}
               />
             </motion.div>
 
@@ -347,14 +426,14 @@ shadow-xl
                   className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 pr-12 focus:scale-[1.02]"
                   placeholder="••••••••"
                   required
-                  disabled={isLoading}
+                  disabled={isBusy}
                 />
 
                 <motion.button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content transition"
-                  disabled={isLoading}
+                  disabled={isBusy}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -375,6 +454,7 @@ shadow-xl
                 className="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isBusy}
               />
               <label htmlFor="remember" className="text-sm cursor-pointer">
                 Remember me
@@ -383,7 +463,7 @@ shadow-xl
 
             <motion.button
               type="submit"
-              disabled={isLoading}
+              disabled={isBusy}
               className="btn btn-primary w-full text-base font-semibold mt-6 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -401,6 +481,62 @@ shadow-xl
               )}
             </motion.button>
           </form>
+
+          <div className="divider text-xs text-base-content/70 mt-8 mb-6">
+            Or Use Magic Code
+          </div>
+
+          <motion.div
+            className="space-y-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.85 }}
+          >
+            <p className="text-sm text-base-content/85">
+              If your admin sent you a magic code because email links do not
+              open on this local network, paste it here.
+            </p>
+
+            <div className="form-control">
+              <label htmlFor="magicCode" className="label">
+                <span className="label-text font-semibold text-base">
+                  Magic Code
+                </span>
+              </label>
+              <input
+                type="text"
+                id="magicCode"
+                value={magicCode}
+                onChange={(e) => setMagicCode(formatMagicCode(e.target.value))}
+                className="input input-bordered w-full bg-base-200 tracking-[0.2em] uppercase transition-all duration-200 focus:input-secondary"
+                placeholder="ABCDE-FGHIJ"
+                disabled={isBusy}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <span className="label-text-alt mt-2 text-base-content/70">
+                Paste the code from your email, then continue.
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary w-full text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
+              onClick={() => void handleMagicCodeLogin()}
+              disabled={isBusy}
+            >
+              {isVerifyingMagicCode ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  <span>Checking Magic Code...</span>
+                </>
+              ) : (
+                "Sign In With Magic Code"
+              )}
+            </button>
+          </motion.div>
 
           <div className="divider text-xs text-base-content/70 mt-8">
             Authorized Access Only
