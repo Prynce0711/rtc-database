@@ -1202,8 +1202,12 @@ const CriminalCaseUpdatePage = ({
     [existingCaseNumbers, isEdit],
   );
 
-  const existingCaseRowCount = entries.filter(
-    (entry) => entry.isManual && isCaseAlreadyExisting(entry.caseNumber),
+  const existingCaseRowCount = entries.filter((entry) =>
+    isCaseAlreadyExisting(
+      entry.isManual || isEdit
+        ? entry.caseNumber || ""
+        : autoCaseNumbersByRow[entry.id] ?? "",
+    ),
   ).length;
 
   const getDisplayCaseNumber = (entry: CriminalCaseEntry): string => {
@@ -1255,8 +1259,7 @@ const CriminalCaseUpdatePage = ({
     const caseNumbers = Array.from(
       new Set(
         entries
-          .filter((entry) => entry.isManual)
-          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .map((entry) => normalizeCaseNumber(getDisplayCaseNumber(entry)))
           .filter((value) => value.length > 0),
       ),
     );
