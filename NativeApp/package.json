@@ -47,7 +47,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "**/node_modules/better-sqlite3/**/*"
+      "**/node_modules/better-sqlite3/**/*",
+      "**/node_modules/rclone.js/bin/**/*"
     ],
     "win": {
       "icon": "public/SupremeCourtLogo.ico"

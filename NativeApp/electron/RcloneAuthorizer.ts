@@ -1,8 +1,21 @@
 import { execFile, type ChildProcess } from "node:child_process";
-import rclone from "rclone.js";
+import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { app } from "electron";
 
 const OAUTH_BACKUP_PROVIDERS = new Set(["drive", "onedrive", "dropbox"]);
 const DEFAULT_AUTH_CALLBACK_PORT = 53682;
+const require = createRequire(import.meta.url);
+const RCLONE_EXECUTABLE_NAME =
+  process.platform === "win32" ? "rclone.exe" : "rclone";
+
+type RcloneInvoker = (
+  command: string,
+  ...args: Array<string | Record<string, unknown>>
+) => ChildProcess;
+
+let cachedRcloneInvoker: RcloneInvoker | null = null;
 
 const formatError = (error: unknown): string => {
   if (error instanceof Error) {
@@ -21,6 +34,43 @@ const redactRcloneLogText = (value: string): string =>
     .replace(/(token\s*=\s*)(.+)/gi, "$1***")
     .replace(/("access_token"\s*:\s*")(.*?)(")/gi, "$1***$3")
     .replace(/("refresh_token"\s*:\s*")(.*?)(")/gi, "$1***$3");
+
+const resolveBundledRcloneExecutablePath = (): string => {
+  const packageJsonPath = require.resolve("rclone.js/package.json");
+  const packagedExecutablePath = path.join(
+    path.dirname(packageJsonPath),
+    "bin",
+    RCLONE_EXECUTABLE_NAME,
+  );
+
+  if (!app.isPackaged) {
+    return packagedExecutablePath;
+  }
+
+  return packagedExecutablePath.replace(
+    `${path.sep}app.asar${path.sep}`,
+    `${path.sep}app.asar.unpacked${path.sep}`,
+  );
+};
+
+const getRcloneInvoker = (): RcloneInvoker => {
+  if (cachedRcloneInvoker) {
+    return cachedRcloneInvoker;
+  }
+
+  const executablePath = resolveBundledRcloneExecutablePath();
+
+  if (!existsSync(executablePath)) {
+    throw new Error(
+      `Bundled rclone executable was not found at "${executablePath}". Rebuild the app so Electron unpacks rclone into resources/app.asar.unpacked.`,
+    );
+  }
+
+  process.env.RCLONE_EXECUTABLE = executablePath;
+  cachedRcloneInvoker = require("rclone.js") as RcloneInvoker;
+
+  return cachedRcloneInvoker;
+};
 
 const isAuthServerPortConflictError = (message: string): boolean => {
   const lowered = message.toLowerCase();
@@ -151,6 +201,7 @@ const runRcloneAuthorizeForToken = async (
 ): Promise<string> => {
   console.log(`[rclone:${provider}] running authorize`);
 
+  const rclone = getRcloneInvoker();
   const subprocess = rclone("authorize", provider, {
     "auto-confirm": true,
   }) as ChildProcess;
