@@ -523,12 +523,12 @@ function adminSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+      {/* <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
         <ActionBtn
           icon={<FiBell />}
           label="Notifications"
@@ -536,7 +536,7 @@ function adminSidebar({
           isExpanded={isExpanded}
           onClick={onOpenNotifications}
         />
-      </div>
+      </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
