@@ -157,6 +157,11 @@ export const getPinnedRelayFingerprint = (): string | null => {
   return getPinnedRelayCertificatePin()?.fingerprint256 ?? null;
 };
 
+export const getPinnedRelayBaseUrl = (): string | null => {
+  const pinnedRelay = getPinnedRelayCertificatePin();
+  return pinnedRelay ? buildPinnedRelayUrl(pinnedRelay) : null;
+};
+
 export const savePinnedRelayCertificatePin = (
   relay: RelayCertificatePin,
 ): RelayCertificatePin => {

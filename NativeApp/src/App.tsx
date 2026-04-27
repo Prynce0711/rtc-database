@@ -13,7 +13,7 @@ interface BackendInfo {
   ip: string;
   port: number;
   lastSeen: number;
-  source?: "udp" | "manual" | "dev";
+  source?: "udp" | "manual" | "dev" | "saved";
   relayFingerprint256?: string | null;
   relaySubjectName?: string | null;
   relayIssuerName?: string | null;
@@ -43,6 +43,21 @@ type RelayTrustUpdateResponse = {
   success: boolean;
   error?: string;
 };
+type RelayStartupSettingsResponse = {
+  success: boolean;
+  result?: {
+    autoConnectPinnedRelay?: boolean;
+    pinnedRelayUrl?: string | null;
+  };
+  error?: string;
+};
+type RelayStartupSettingsUpdateResponse = {
+  success: boolean;
+  result?: {
+    autoConnectPinnedRelay?: boolean;
+  };
+  error?: string;
+};
 type InspectBackendOptions = {
   requireReachable?: boolean;
   throwOnFailure?: boolean;
@@ -55,6 +70,8 @@ const AUTO_OFFLINE_MS = AUTO_OFFLINE_SECONDS * 1000;
 const OFFLINE_REASON_QUERY_KEY = "offlineReason";
 const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
 const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
+const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
 const DEFAULT_HTTP_PORT = 80;
 const DEFAULT_HTTPS_PORT = 443;
 // Flip this back to true when we want to restore the offline client flow.
@@ -113,7 +130,11 @@ const buildManualBackendUrl = (
   const normalizedPortSource = portInput.trim() || parsedUrl.port;
   const normalizedPort = Number(normalizedPortSource || fallbackPort);
 
-  if (!Number.isInteger(normalizedPort) || normalizedPort < 1 || normalizedPort > 65535) {
+  if (
+    !Number.isInteger(normalizedPort) ||
+    normalizedPort < 1 ||
+    normalizedPort > 65535
+  ) {
     throw new Error("Enter a valid port number from 1 to 65535.");
   }
 
@@ -343,6 +364,17 @@ export default function App() {
   const [manualConnectError, setManualConnectError] = useState<string | null>(
     null,
   );
+  const [startupSettingsLoaded, setStartupSettingsLoaded] = useState(false);
+  const [autoConnectPinnedRelay, setAutoConnectPinnedRelay] = useState(true);
+  const [savedPinnedRelayUrl, setSavedPinnedRelayUrl] = useState<string | null>(
+    null,
+  );
+  const [isSavingStartupPreference, setIsSavingStartupPreference] =
+    useState(false);
+  const [isTryingSavedRelay, setIsTryingSavedRelay] = useState(false);
+  const [startupPreferenceError, setStartupPreferenceError] = useState<
+    string | null
+  >(null);
   const [isDevMode] = useState(() => import.meta.env.MODE === "development");
   const backendDevUrl = normalizeBaseUrl(
     import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000",
@@ -353,6 +385,7 @@ export default function App() {
   const autoOfflineTimeoutRef = useRef<number | null>(null);
   const autoOfflineIntervalRef = useRef<number | null>(null);
   const backendListenerAttachedRef = useRef(false);
+  const attemptedSavedRelayUrlRef = useRef<string | null>(null);
 
   const clearAutoOfflineTimers = () => {
     if (typeof window === "undefined") {
@@ -418,6 +451,101 @@ export default function App() {
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (typeof window === "undefined" || !window.ipcRenderer?.invoke) {
+      setStartupSettingsLoaded(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void (async () => {
+      try {
+        const result = (await window.ipcRenderer.invoke(
+          RELAY_GET_STARTUP_SETTINGS_CHANNEL,
+        )) as RelayStartupSettingsResponse;
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!result.success) {
+          throw new Error(
+            result.error || "Unable to load startup preferences right now.",
+          );
+        }
+
+        setAutoConnectPinnedRelay(
+          result.result?.autoConnectPinnedRelay ?? true,
+        );
+        setSavedPinnedRelayUrl(
+          result.result?.pinnedRelayUrl
+            ? normalizeBaseUrl(result.result.pinnedRelayUrl)
+            : null,
+        );
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStartupPreferenceError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load startup preferences right now.",
+        );
+      } finally {
+        if (isMounted) {
+          setStartupSettingsLoaded(true);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updateAutoConnectPinnedRelayPreference = async (
+    enabled: boolean,
+  ): Promise<void> => {
+    const previousValue = autoConnectPinnedRelay;
+    setStartupPreferenceError(null);
+    setAutoConnectPinnedRelay(enabled);
+    setIsSavingStartupPreference(true);
+
+    try {
+      if (typeof window === "undefined" || !window.ipcRenderer?.invoke) {
+        return;
+      }
+
+      const result = (await window.ipcRenderer.invoke(
+        RELAY_SET_STARTUP_SETTINGS_CHANNEL,
+        { autoConnectPinnedRelay: enabled },
+      )) as RelayStartupSettingsUpdateResponse;
+
+      if (!result.success) {
+        throw new Error(
+          result.error || "Unable to save startup preference right now.",
+        );
+      }
+
+      setAutoConnectPinnedRelay(
+        result.result?.autoConnectPinnedRelay ?? enabled,
+      );
+    } catch (error) {
+      setAutoConnectPinnedRelay(previousValue);
+      setStartupPreferenceError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save startup preference right now.",
+      );
+    } finally {
+      setIsSavingStartupPreference(false);
+    }
+  };
 
   const inspectBackendBeforeConnect = async (
     targetUrl: string,
@@ -583,6 +711,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!startupSettingsLoaded) {
+      return;
+    }
+
     if (mode !== "connecting") {
       return;
     }
@@ -595,6 +727,66 @@ export default function App() {
       );
       startAutoOfflineCountdown("disconnected");
     }
+
+    const trySavedPinnedRelay = async (): Promise<boolean> => {
+      if (!autoConnectPinnedRelay || !savedPinnedRelayUrl) {
+        return false;
+      }
+
+      const normalizedSavedRelayUrl = normalizeBaseUrl(savedPinnedRelayUrl);
+      if (attemptedSavedRelayUrlRef.current === normalizedSavedRelayUrl) {
+        return false;
+      }
+
+      attemptedSavedRelayUrlRef.current = normalizedSavedRelayUrl;
+      setIsTryingSavedRelay(true);
+
+      console.log(
+        `[startup] Trying saved relay first: ${normalizedSavedRelayUrl}`,
+      );
+
+      try {
+        const inspectedBackend: BackendInfo = {
+          ...(await inspectBackendBeforeConnect(normalizedSavedRelayUrl, {
+            requireReachable: true,
+            throwOnFailure: true,
+          })),
+          source: "saved",
+        };
+
+        if (!isSubscribed || modeRef.current !== "connecting") {
+          return false;
+        }
+
+        setAvailableOfflineBackend(inspectedBackend);
+        setDiscoveredBackends((previousBackends) =>
+          upsertDiscoveredBackend(previousBackends, inspectedBackend),
+        );
+
+        if (!inspectedBackend.isPreferred) {
+          console.warn(
+            `[startup] Saved relay responded but is blocked pending approval: ${normalizedSavedRelayUrl} (${inspectedBackend.relayTrustState ?? "unknown"}).`,
+          );
+          return true;
+        }
+
+        console.log(
+          `[startup] Saved relay healthy. Redirecting to ${normalizedSavedRelayUrl}.`,
+        );
+        redirectToBackend(inspectedBackend.url);
+        return true;
+      } catch (error) {
+        console.warn(
+          `[startup] Saved relay could not be reached. Falling back to discovery: ${normalizedSavedRelayUrl}.`,
+          error,
+        );
+        return false;
+      } finally {
+        if (isSubscribed) {
+          setIsTryingSavedRelay(false);
+        }
+      }
+    };
 
     const tryDevelopmentBackend = async (): Promise<boolean> => {
       if (!isDevMode) {
@@ -653,9 +845,12 @@ export default function App() {
     };
 
     void (async () => {
-      const connectedInDev = await tryDevelopmentBackend();
+      const handledBySavedRelay = await trySavedPinnedRelay();
+      const connectedInDev = handledBySavedRelay
+        ? false
+        : await tryDevelopmentBackend();
 
-      if (!connectedInDev && isSubscribed) {
+      if (!handledBySavedRelay && !connectedInDev && isSubscribed) {
         if (isDevMode) {
           console.log("[startup] Waiting for UDP discovery responses...");
         } else {
@@ -664,10 +859,7 @@ export default function App() {
           );
         }
 
-        if (
-          OFFLINE_MODE_ENABLED &&
-          autoOfflineReason !== "disconnected"
-        ) {
+        if (OFFLINE_MODE_ENABLED && autoOfflineReason !== "disconnected") {
           console.warn(
             "[startup] Backend not found. Waiting before switching to offline mode.",
           );
@@ -687,7 +879,15 @@ export default function App() {
         redirectTimerRef.current = null;
       }
     };
-  }, [backendDevUrl, isDevMode, mode]);
+  }, [
+    autoConnectPinnedRelay,
+    autoOfflineReason,
+    backendDevUrl,
+    isDevMode,
+    mode,
+    savedPinnedRelayUrl,
+    startupSettingsLoaded,
+  ]);
 
   const reconnectToBackend = () => {
     if (!availableOfflineBackend || typeof window === "undefined") {
@@ -716,10 +916,10 @@ export default function App() {
 
   const relayUnavailableBackend =
     reviewBackends.length === 0
-      ? discoveredBackends.find(
+      ? (discoveredBackends.find(
           (backend) =>
             backend.source !== "manual" && isUsualRelayUnavailable(backend),
-        ) ?? null
+        ) ?? null)
       : null;
   const relayUnavailableBackendLabel = relayUnavailableBackend
     ? getUsualBackendLabel(relayUnavailableBackend)
@@ -771,6 +971,8 @@ export default function App() {
         if (!result?.success) {
           throw new Error(result?.error || "Unable to save this server.");
         }
+
+        setSavedPinnedRelayUrl(normalizeBaseUrl(backend.url));
       }
 
       redirectToBackend(backend.url);
@@ -837,23 +1039,27 @@ export default function App() {
     );
   }
 
-  const connectionHint = reviewBackends.length > 0
-    ? "A different server was found. Please choose Yes or No before this device connects."
-    : relayUnavailableBackend
-      ? "The usual server can't be reached right now. You can keep waiting or enter another server manually if your admin gave you one."
-    : hasDismissedUnexpectedBackend
-      ? "You chose not to connect to the different server. Still waiting for the usual server."
-      : OFFLINE_MODE_ENABLED
-      ? autoOfflineReason === "disconnected"
-        ? "Connection to backend was lost. Waiting for it to come back."
-        : autoOfflineReason === "not-found"
-          ? "Backend not found yet. Waiting for health check or UDP discovery response."
-          : isDevMode
-            ? "Checking dev backend health, then sending UDP discovery"
-            : "Sending UDP discovery and waiting for gateway response"
-      : isDevMode
-        ? "Checking dev backend health, then waiting for a backend response"
-        : "Sending UDP discovery and waiting for gateway response";
+  const connectionHint = !startupSettingsLoaded
+    ? "Loading startup preferences..."
+    : isTryingSavedRelay
+      ? "Trying the usual saved server first."
+      : reviewBackends.length > 0
+        ? "A different server was found. Please choose Yes or No before this device connects."
+        : relayUnavailableBackend
+          ? "The usual server can't be reached right now. You can keep waiting or enter another server manually if your admin gave you one."
+          : hasDismissedUnexpectedBackend
+            ? "You chose not to connect to the different server. Still waiting for the usual server."
+            : OFFLINE_MODE_ENABLED
+              ? autoOfflineReason === "disconnected"
+                ? "Connection to backend was lost. Waiting for it to come back."
+                : autoOfflineReason === "not-found"
+                  ? "Backend not found yet. Waiting for health check or UDP discovery response."
+                  : isDevMode
+                    ? "Checking dev backend health, then sending UDP discovery"
+                    : "Sending UDP discovery and waiting for gateway response"
+              : isDevMode
+                ? "Checking dev backend health, then waiting for a backend response"
+                : "Sending UDP discovery and waiting for gateway response";
 
   const shouldHideLoaderForWarning =
     status === "locating" && reviewBackends.length > 0;
@@ -887,8 +1093,8 @@ export default function App() {
                     </p>
                     <p className="text-xs opacity-70">
                       If your admin gave you a new server address, you can enter
-                      it below. Otherwise, keep waiting and try the usual
-                      server again.
+                      it below. Otherwise, keep waiting and try the usual server
+                      again.
                     </p>
                   </div>
                 )}
@@ -904,6 +1110,47 @@ export default function App() {
                     </p>
                   </div>
 
+                  {/* <div className="rounded-xl border border-base-300 bg-base-200/60 px-4 py-3 space-y-2">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="toggle toggle-warning toggle-sm mt-0.5"
+                        checked={autoConnectPinnedRelay}
+                        onChange={(event) =>
+                          void updateAutoConnectPinnedRelayPreference(
+                            event.target.checked,
+                          )
+                        }
+                        disabled={
+                          !startupSettingsLoaded ||
+                          isSavingStartupPreference ||
+                          isTryingSavedRelay
+                        }
+                      />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Try the usual saved server first
+                        </p>
+                        <p className="text-xs opacity-70">
+                          If this device already remembers a server, try it
+                          automatically before waiting for discovery.
+                        </p>
+                      </div>
+                    </label>
+
+                    <p className="text-xs opacity-70 break-all">
+                      {savedPinnedRelayUrl
+                        ? `Saved server: ${savedPinnedRelayUrl}`
+                        : "No saved server has been remembered on this device yet."}
+                    </p>
+
+                    {startupPreferenceError && (
+                      <p className="text-xs font-medium text-error">
+                        {startupPreferenceError}
+                      </p>
+                    )}
+                  </div> */}
+
                   <div className="grid gap-3 md:grid-cols-[9rem_minmax(0,1fr)_8rem_auto]">
                     <label className="form-control">
                       <span className="label-text text-xs font-medium mb-1">
@@ -917,7 +1164,7 @@ export default function App() {
                             event.target.value as "http" | "https",
                           )
                         }
-                        disabled={isManualConnectPending}
+                        disabled={isManualConnectPending || isTryingSavedRelay}
                       >
                         <option value="https">https</option>
                         <option value="http">http</option>
@@ -936,7 +1183,7 @@ export default function App() {
                         onChange={(event) =>
                           setManualBackendAddress(event.target.value)
                         }
-                        disabled={isManualConnectPending}
+                        disabled={isManualConnectPending || isTryingSavedRelay}
                       />
                     </label>
 
@@ -953,7 +1200,7 @@ export default function App() {
                         onChange={(event) =>
                           setManualBackendPort(event.target.value)
                         }
-                        disabled={isManualConnectPending}
+                        disabled={isManualConnectPending || isTryingSavedRelay}
                       />
                     </label>
 
@@ -965,7 +1212,7 @@ export default function App() {
                         type="button"
                         className="btn btn-primary"
                         onClick={() => void connectToManualBackend()}
-                        disabled={isManualConnectPending}
+                        disabled={isManualConnectPending || isTryingSavedRelay}
                       >
                         {isManualConnectPending ? "Checking..." : "Connect"}
                       </button>
@@ -1020,12 +1267,6 @@ export default function App() {
                           </p>
                         )}
 
-                        {backend.usualRelayReachable === false && (
-                          <p className="font-medium text-error">
-                            The usual server can't be reached right now.
-                          </p>
-                        )}
-
                         {backend.relayFingerprint256 && (
                           <p className="font-medium">
                             New secure ID:
@@ -1047,13 +1288,17 @@ export default function App() {
                         )}
                       </div>
 
-                      <p className="text-xs opacity-70">{noticeCopy.helpText}</p>
+                      <p className="text-xs opacity-70">
+                        {noticeCopy.helpText}
+                      </p>
 
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           className="btn btn-warning btn-sm"
-                          onClick={() => void approveAndConnectToBackend(backend)}
+                          onClick={() =>
+                            void approveAndConnectToBackend(backend)
+                          }
                           disabled={isApproving}
                         >
                           {isApproving ? "Saving..." : noticeCopy.actionLabel}

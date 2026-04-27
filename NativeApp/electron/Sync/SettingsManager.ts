@@ -19,6 +19,7 @@ export type ElectronWindowState = {
 type SettingsSnapshotState = {
   deviceId?: string;
   windowState?: ElectronWindowState;
+  autoConnectPinnedRelay?: boolean;
 };
 
 export const settingsSnapshotPath = (): string =>
@@ -26,6 +27,9 @@ export const settingsSnapshotPath = (): string =>
 
 const sanitizeFiniteNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+const sanitizeBoolean = (value: unknown): boolean | undefined =>
+  typeof value === "boolean" ? value : undefined;
 
 const sanitizeWindowState = (
   value: unknown,
@@ -78,10 +82,14 @@ const readSettingsSnapshotState = async (): Promise<
     const parsedDeviceId = deviceID.safeParse(parsed.deviceId);
     const deviceId = parsedDeviceId.success ? parsedDeviceId.data : undefined;
     const windowState = sanitizeWindowState(parsed.windowState);
+    const autoConnectPinnedRelay = sanitizeBoolean(
+      parsed.autoConnectPinnedRelay,
+    );
 
     return {
       deviceId,
       windowState,
+      autoConnectPinnedRelay,
     };
   } catch (error) {
     if (isRecord(error) && error.code === "ENOENT") {
@@ -109,6 +117,9 @@ const writeSettingsSnapshotState = async (
         savedAt: new Date().toISOString(),
         ...(snapshot.deviceId ? { deviceId: snapshot.deviceId } : {}),
         ...(snapshot.windowState ? { windowState: snapshot.windowState } : {}),
+        ...(snapshot.autoConnectPinnedRelay !== undefined
+          ? { autoConnectPinnedRelay: snapshot.autoConnectPinnedRelay }
+          : {}),
       },
       null,
       2,
@@ -141,6 +152,24 @@ export const saveWindowStateSnapshot = async (
   await writeSettingsSnapshotState({
     deviceId: existingSnapshot.deviceId,
     windowState,
+    autoConnectPinnedRelay: existingSnapshot.autoConnectPinnedRelay,
+  });
+};
+
+export const getAutoConnectPinnedRelayEnabled = async (): Promise<boolean> => {
+  const existingSnapshot = await getSettingsSnapshotState();
+  return existingSnapshot.autoConnectPinnedRelay ?? true;
+};
+
+export const saveAutoConnectPinnedRelayEnabled = async (
+  enabled: boolean,
+): Promise<void> => {
+  const existingSnapshot = await getSettingsSnapshotState();
+
+  await writeSettingsSnapshotState({
+    deviceId: existingSnapshot.deviceId,
+    windowState: existingSnapshot.windowState,
+    autoConnectPinnedRelay: enabled,
   });
 };
 
@@ -155,6 +184,7 @@ export const getOrCreateDeviceId = async (): Promise<string> => {
   await writeSettingsSnapshotState({
     deviceId,
     windowState: existingSnapshot.windowState,
+    autoConnectPinnedRelay: existingSnapshot.autoConnectPinnedRelay,
   });
 
   return deviceId;

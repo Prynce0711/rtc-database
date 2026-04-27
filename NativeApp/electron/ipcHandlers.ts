@@ -23,15 +23,22 @@ import {
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
 import {
+  getPinnedRelayBaseUrl,
   inspectBackendTrust,
   probeRelayReachability,
   savePinnedRelayCertificatePin,
 } from "./relayTrust";
-import { getOrCreateDeviceId } from "./Sync/SettingsManager";
+import {
+  getAutoConnectPinnedRelayEnabled,
+  getOrCreateDeviceId,
+  saveAutoConnectPinnedRelayEnabled,
+} from "./Sync/SettingsManager";
 import { formatError, resolveSafePath } from "./utils";
 
 const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
 const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
+const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
 
 const bringWindowToFront = (window: BrowserWindow | null): void => {
   if (!window || window.isDestroyed()) {
@@ -87,6 +94,54 @@ ipcMain.handle(RELAY_INSPECT_BACKEND_CHANNEL, async (_event, args: unknown) => {
     };
   }
 });
+
+ipcMain.handle(RELAY_GET_STARTUP_SETTINGS_CHANNEL, async () => {
+  try {
+    return {
+      success: true,
+      result: {
+        autoConnectPinnedRelay: await getAutoConnectPinnedRelayEnabled(),
+        pinnedRelayUrl: getPinnedRelayBaseUrl(),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
+});
+
+ipcMain.handle(
+  RELAY_SET_STARTUP_SETTINGS_CHANNEL,
+  async (_event, args: unknown) => {
+    try {
+      if (
+        !isRecord(args) ||
+        typeof args.autoConnectPinnedRelay !== "boolean"
+      ) {
+        return {
+          success: false,
+          error: "Startup preference is required.",
+        };
+      }
+
+      await saveAutoConnectPinnedRelayEnabled(args.autoConnectPinnedRelay);
+
+      return {
+        success: true,
+        result: {
+          autoConnectPinnedRelay: args.autoConnectPinnedRelay,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: formatError(error),
+      };
+    }
+  },
+);
 
 ipcMain.handle(RELAY_TRUST_BACKEND_CHANNEL, async (_event, args: unknown) => {
   try {
