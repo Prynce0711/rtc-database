@@ -977,7 +977,11 @@ const PetitionCaseUpdatePage = ({
     const existingCases = await refreshExistingCaseNumbers();
     let existingCaseMap = new Map<string, PetitionCaseData>();
 
-    if (!isEdit && importConflictMode === "create" && existingCases.length > 0) {
+    if (
+      !isEdit &&
+      importConflictMode === "create" &&
+      existingCases.length > 0
+    ) {
       const duplicateLabel =
         existingCases.length === 1
           ? `Case number ${existingCases[0]} already exists. Continue anyway?`
@@ -1013,9 +1017,9 @@ const PetitionCaseUpdatePage = ({
         ? entries.length === 1
           ? "Save this imported petition row?"
           : `Save ${entries.length} imported petition rows?`
-      : entries.length === 1
-        ? "Create this petition entry?"
-        : `Create ${entries.length} petition entries?`;
+        : entries.length === 1
+          ? "Create this petition entry?"
+          : `Create ${entries.length} petition entries?`;
 
     if (!(await statusPopup.showConfirm(label))) return;
 
@@ -1100,7 +1104,9 @@ const PetitionCaseUpdatePage = ({
 
           const existingCase =
             importConflictMode === "update-existing"
-              ? existingCaseMap.get(normalizeCaseNumber(getDisplayCaseNumber(e)))
+              ? existingCaseMap.get(
+                  normalizeCaseNumber(getDisplayCaseNumber(e)),
+                )
               : undefined;
 
           const result = existingCase?.id
@@ -1303,7 +1309,10 @@ const PetitionCaseUpdatePage = ({
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
-                      Existing case no.: {importConflictMode === "create" ? "Create duplicate" : "Update existing"}
+                      Existing case no.:{" "}
+                      {importConflictMode === "create"
+                        ? "Create duplicate"
+                        : "Update existing"}
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />

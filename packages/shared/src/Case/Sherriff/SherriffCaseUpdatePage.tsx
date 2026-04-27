@@ -798,7 +798,11 @@ export const SherriffCaseUpdatePage = ({
     const existingCases = await refreshExistingCaseNumbers();
     let existingCaseMap = new Map<string, SheriffCaseData>();
 
-    if (!isEdit && importConflictMode === "create" && existingCases.length > 0) {
+    if (
+      !isEdit &&
+      importConflictMode === "create" &&
+      existingCases.length > 0
+    ) {
       const duplicateLabel =
         existingCases.length === 1
           ? `Case number ${existingCases[0]} already exists. Continue anyway?`
@@ -832,9 +836,9 @@ export const SherriffCaseUpdatePage = ({
         ? entries.length === 1
           ? "Save this imported row?"
           : `Save ${entries.length} imported rows?`
-      : entries.length === 1
-        ? "Create this case?"
-        : `Create ${entries.length} cases?`;
+        : entries.length === 1
+          ? "Create this case?"
+          : `Create ${entries.length} cases?`;
     if (!(await statusPopup.showConfirm(label))) return;
     setIsSubmitting(true);
     statusPopup.showLoading(
@@ -1137,7 +1141,10 @@ export const SherriffCaseUpdatePage = ({
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
-                      Existing case no.: {importConflictMode === "create" ? "Create duplicate" : "Update existing"}
+                      Existing case no.:{" "}
+                      {importConflictMode === "create"
+                        ? "Create duplicate"
+                        : "Update existing"}
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
