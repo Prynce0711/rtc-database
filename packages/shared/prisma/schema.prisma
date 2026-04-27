@@ -111,9 +111,9 @@ model Case {
   specialProceeding SpecialProceeding?
   sheriffCase       SheriffCase?
 
-  unloadedCase      UnloadedCase?
-  consolidatedCase  ConsolidatedCase?
-  reraffledCase     ReraffledCase?
+  unloadedCase      UnloadedCase[]
+  consolidatedCase  ConsolidatedCase[]
+  reraffledCase     ReraffledCase[]
 
   @@unique([caseType, year, area, number])
 }
