@@ -17,12 +17,12 @@ import {
   upsertCriminalCasesInWorker,
 } from "./Sync/Case/CriminalCasesWorkerManager";
 import {
-  getOrCreateDeviceId,
   isRecord,
   sanitizeSessionUser,
   saveSessionUserSnapshot,
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
+import { getOrCreateDeviceId } from "./Sync/SettingsManager";
 import { formatError, resolveSafePath } from "./utils";
 
 const bringWindowToFront = (window: BrowserWindow | null): void => {

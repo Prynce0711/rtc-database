@@ -1,7 +1,8 @@
 {
   "name": "rtc-database-nativeapp",
+  "productName": "RTC Database",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,6 +38,7 @@
   },
   "build": {
     "appId": "com.prynce0711.rtc-app",
+    "icon": "public/SupremeCourtLogo.ico",
     "files": [
       "dist-electron/**/*",
       "dist/**/*",
@@ -47,6 +49,9 @@
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
+    "win": {
+      "icon": "public/SupremeCourtLogo.ico"
+    },
     "directories": {
       "buildResources": "dist",
       "output": "release-builds"
