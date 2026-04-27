@@ -218,6 +218,58 @@ const isUsualRelayUnavailable = (backend: BackendInfo): boolean =>
   backend.relayWarningKind === "different-backend" &&
   backend.usualRelayReachable === false;
 
+const getBackendSelectionStatusLabel = (backend: BackendInfo): string => {
+  if (backend.isPreferred) {
+    return "Trusted server";
+  }
+
+  if (backend.relayWarningKind === "certificate-changed") {
+    return "Security record changed";
+  }
+
+  if (backend.relayWarningKind === "different-backend") {
+    return backend.usualRelayReachable === false
+      ? "Usual server unavailable"
+      : "Different server";
+  }
+
+  if (backend.relayWarningKind === "unverified") {
+    return "Needs confirmation";
+  }
+
+  return "Found server";
+};
+
+const getBackendSelectionActionLabel = (
+  backend: BackendInfo,
+  isDismissed: boolean,
+): string => {
+  if (backend.isPreferred) {
+    return "Connect";
+  }
+
+  return isDismissed ? "Review Again" : "Review";
+};
+
+const getBackendSelectionBadgeClass = (backend: BackendInfo): string => {
+  if (backend.isPreferred) {
+    return "badge-success";
+  }
+
+  if (
+    backend.relayWarningKind === "certificate-changed" ||
+    backend.relayWarningKind === "different-backend"
+  ) {
+    return "badge-warning";
+  }
+
+  if (backend.relayWarningKind === "unverified") {
+    return "badge-error";
+  }
+
+  return "badge-neutral";
+};
+
 const getUnexpectedBackendCopy = (backend: BackendInfo) => {
   const foundBackendLabel = getFoundBackendLabel(backend);
   const usualBackendLabel = getUsualBackendLabel(backend);
@@ -358,6 +410,9 @@ export default function App() {
   const [isManualConnectPending, setIsManualConnectPending] = useState(false);
   const [dismissedUnexpectedBackendKeys, setDismissedUnexpectedBackendKeys] =
     useState<string[]>([]);
+  const [selectedReviewBackendKey, setSelectedReviewBackendKey] = useState<
+    string | null
+  >(null);
   const [backendApprovalError, setBackendApprovalError] = useState<
     string | null
   >(null);
@@ -900,15 +955,20 @@ export default function App() {
   };
 
   const reviewBackends = discoveredBackends.filter((backend) => {
+    const backendKey = getBackendKey(backend);
     const needsApproval =
       !backend.isPreferred &&
       (backend.relayTrustState === "changed" ||
         backend.relayTrustState === "unverified");
+    const isSelectedForReview = selectedReviewBackendKey === backendKey;
     const shouldShowRelayUnavailableNoticeOnly =
-      backend.source !== "manual" && isUsualRelayUnavailable(backend);
+      !isSelectedForReview &&
+      backend.source !== "manual" &&
+      isUsualRelayUnavailable(backend);
 
     return (
-      !dismissedUnexpectedBackendKeys.includes(getBackendKey(backend)) &&
+      (!dismissedUnexpectedBackendKeys.includes(backendKey) ||
+        isSelectedForReview) &&
       needsApproval &&
       !shouldShowRelayUnavailableNoticeOnly
     );
@@ -932,16 +992,35 @@ export default function App() {
       (backend.relayTrustState === "changed" ||
         backend.relayTrustState === "unverified"),
   );
+  const selectableBackends = discoveredBackends;
 
   const declineUnexpectedBackend = (backend: BackendInfo) => {
     const backendKey = getBackendKey(backend);
 
     setBackendApprovalError(null);
+    setSelectedReviewBackendKey((currentKey) =>
+      currentKey === backendKey ? null : currentKey,
+    );
     setDismissedUnexpectedBackendKeys((previousKeys) =>
       previousKeys.includes(backendKey)
         ? previousKeys
         : [...previousKeys, backendKey],
     );
+  };
+
+  const selectDiscoveredBackend = (backend: BackendInfo) => {
+    const backendKey = getBackendKey(backend);
+
+    setBackendApprovalError(null);
+    setManualConnectError(null);
+    setSelectedReviewBackendKey(backendKey);
+    setDismissedUnexpectedBackendKeys((previousKeys) =>
+      previousKeys.filter((key) => key !== backendKey),
+    );
+
+    if (backend.isPreferred) {
+      redirectToBackend(backend.url);
+    }
   };
 
   const approveAndConnectToBackend = async (backend: BackendInfo) => {
@@ -952,6 +1031,7 @@ export default function App() {
     const backendKey = getBackendKey(backend);
     setBackendApprovalError(null);
     setApprovingBackendKey(backendKey);
+    setSelectedReviewBackendKey(null);
     setDismissedUnexpectedBackendKeys((previousKeys) =>
       previousKeys.filter((key) => key !== backendKey),
     );
@@ -1010,6 +1090,7 @@ export default function App() {
       setDiscoveredBackends((previousBackends) =>
         upsertDiscoveredBackend(previousBackends, inspectedBackend),
       );
+      setSelectedReviewBackendKey(getBackendKey(inspectedBackend));
       setDismissedUnexpectedBackendKeys((previousKeys) =>
         previousKeys.filter((key) => key !== getBackendKey(inspectedBackend)),
       );
@@ -1048,7 +1129,7 @@ export default function App() {
         : relayUnavailableBackend
           ? "The usual server can't be reached right now. You can keep waiting or enter another server manually if your admin gave you one."
           : hasDismissedUnexpectedBackend
-            ? "You chose not to connect to the different server. Still waiting for the usual server."
+            ? "You chose not to connect to that server. You can pick it again below or keep waiting for the usual server."
             : OFFLINE_MODE_ENABLED
               ? autoOfflineReason === "disconnected"
                 ? "Connection to backend was lost. Waiting for it to come back."
@@ -1096,6 +1177,65 @@ export default function App() {
                       it below. Otherwise, keep waiting and try the usual server
                       again.
                     </p>
+                  </div>
+                )}
+
+                {selectableBackends.length > 0 && (
+                  <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-base font-semibold">
+                        Servers we found
+                      </p>
+                      <p className="text-sm opacity-70">
+                        If you want to try a server again or choose another one
+                        we found, pick it here.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {selectableBackends.map((backend) => {
+                        const backendKey = getBackendKey(backend);
+                        const isDismissed =
+                          dismissedUnexpectedBackendKeys.includes(backendKey);
+
+                        return (
+                          <div
+                            key={backendKey}
+                            className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-200/60 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <p className="font-medium break-all">
+                                {backend.url}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span
+                                  className={`badge badge-sm ${getBackendSelectionBadgeClass(backend)}`}
+                                >
+                                  {getBackendSelectionStatusLabel(backend)}
+                                </span>
+                                {isDismissed && (
+                                  <span className="text-warning font-medium">
+                                    Dismissed earlier
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm md:self-center"
+                              onClick={() => selectDiscoveredBackend(backend)}
+                              disabled={isManualConnectPending || isTryingSavedRelay}
+                            >
+                              {getBackendSelectionActionLabel(
+                                backend,
+                                isDismissed,
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
