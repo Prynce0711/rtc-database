@@ -245,12 +245,13 @@ export async function getGarageFileUrl(
         : {}),
     });
 
-    // Generate a presigned URL valid for 1 hour
-    const url = await getSignedUrl(garageClient, command, { expiresIn: 3600 });
+    const signedUrl = await getSignedUrl(garageClient, command, {
+      expiresIn: 3600,
+    });
 
     return {
       success: true,
-      result: url,
+      result: `/api/user/garage?url=${encodeURIComponent(signedUrl)}`,
     };
   } catch (err) {
     console.error("Get file URL error:", err);
