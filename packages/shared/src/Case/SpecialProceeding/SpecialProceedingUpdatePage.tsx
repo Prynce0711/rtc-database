@@ -85,7 +85,6 @@ const FROZEN_COLS: ColDef[] = [
     placeholder: "",
     type: "date",
     width: 148,
-    required: true,
     mono: true,
   },
 ];
@@ -97,7 +96,6 @@ const TAB_GROUP_COLS: ColDef[] = [
     placeholder: "Branch 1",
     type: "text",
     width: 148,
-    required: true,
   },
   {
     key: "petitioner",
@@ -105,7 +103,6 @@ const TAB_GROUP_COLS: ColDef[] = [
     placeholder: "Full name of petitioner(s)",
     type: "text",
     width: 220,
-    required: true,
   },
   {
     key: "nature",
@@ -113,7 +110,6 @@ const TAB_GROUP_COLS: ColDef[] = [
     placeholder: "e.g. Petition for Adoption",
     type: "text",
     width: 240,
-    required: true,
   },
   {
     key: "respondent",
@@ -121,13 +117,12 @@ const TAB_GROUP_COLS: ColDef[] = [
     placeholder: "e.g. Republic of the Philippines",
     type: "text",
     width: 260,
-    required: true,
   },
 ];
 
 const REQUIRED_FIELDS: Array<
   keyof Omit<SpecialProceedingEntry, "id" | "errors" | "saved">
-> = ["caseNumber", "date", "raffledTo", "petitioner", "nature", "respondent"];
+> = ["caseNumber"];
 const normalizeCaseNumber = (value: string) => value.trim();
 const TODAY = new Date().toISOString().slice(0, 10);
 const AUTO_DEFAULT_AREA = "M";
