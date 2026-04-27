@@ -629,7 +629,7 @@ const SpecialProceedingUpdatePage = ({
     });
 
     return byCaseNumber;
-  }, [adapter, entries, getDisplayCaseNumber, isEdit]);
+  }, [adapter, entries, isEdit]);
 
   const handleAreaChange = useCallback((id: number, areaInput: string) => {
     const normalizedArea = normalizeAreaCode(areaInput);
@@ -711,6 +711,14 @@ const SpecialProceedingUpdatePage = ({
     },
     [defaultArea],
   );
+
+  const getDisplayCaseNumber = (entry: SpecialProceedingEntry): string => {
+    if (entry.isManual || isEdit) {
+      return String(entry.caseNumber ?? "");
+    }
+
+    return autoCaseNumbersByRow[entry.id] ?? "";
+  };
 
   const handleClearTable = useCallback(async () => {
     const label =
@@ -830,14 +838,6 @@ const SpecialProceedingUpdatePage = ({
       ),
   ).length;
   const incompleteCount = entries.length - completedCount;
-
-  const getDisplayCaseNumber = (entry: SpecialProceedingEntry): string => {
-    if (entry.isManual || isEdit) {
-      return String(entry.caseNumber ?? "");
-    }
-
-    return autoCaseNumbersByRow[entry.id] ?? "";
-  };
 
   const isCaseAlreadyExisting = useCallback(
     (caseNumber: string) => {

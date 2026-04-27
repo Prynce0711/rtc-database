@@ -519,7 +519,7 @@ export const SherriffCaseUpdatePage = ({
     });
 
     return byCaseNumber;
-  }, [adapter, entries, getDisplayCaseNumber, isEdit]);
+  }, [adapter, entries, isEdit]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
