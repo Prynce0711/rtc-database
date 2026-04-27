@@ -796,7 +796,6 @@ const CriminalCasePage: React.FC<{
               sortable: true,
             },
             { key: "dateFiled", label: "Date Filed", sortable: true },
-            { key: "caseType", label: "Case Type", sortable: true },
             { key: "name", label: "Name", sortable: true },
             { key: "charge", label: "Charge", sortable: true },
             { key: "infoSheet", label: "Info Sheet", sortable: true },

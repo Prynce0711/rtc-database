@@ -97,11 +97,6 @@ const CriminalCaseRow = ({
         className="text-base-content/70"
       />
       <TipCell
-        label="Case Type"
-        value={caseItem.caseType}
-        className="font-medium"
-      />
-      <TipCell
         label="Name"
         value={caseItem.name}
         truncate

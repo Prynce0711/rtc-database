@@ -180,11 +180,7 @@ const importedPetitionRowToEntry = (row: PetitionCaseSchema): EntryForm => ({
 
 const REQUIRED_FIELDS = [
   "caseNumber",
-  "raffledToBranch",
-  "dateFiled",
-  "petitioners",
   "titleNo",
-  "nature",
 ] as const;
 
 type ColDef = {
@@ -214,7 +210,6 @@ const FROZEN_COLS: ColDef[] = [
     placeholder: "",
     type: "date",
     width: 150,
-    required: true,
     mono: true,
   },
 ];
@@ -227,7 +222,6 @@ const TAB_COLS: ColDef[] = [
     placeholder: "Branch 1",
     type: "text",
     width: 160,
-    required: true,
   },
   {
     key: "titleNo",
@@ -243,7 +237,6 @@ const TAB_COLS: ColDef[] = [
     placeholder: "Full name",
     type: "text",
     width: 220,
-    required: true,
   },
   {
     key: "nature",
@@ -251,7 +244,6 @@ const TAB_COLS: ColDef[] = [
     placeholder: "Petition for...",
     type: "text",
     width: 240,
-    required: true,
   },
 ];
 
@@ -354,7 +346,7 @@ function ReviewCard({
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Raffled to Branch</div>
+                <div className="rv-field-label">Branch</div>
                 <div className="rv-field-value">
                   {entry.raffledToBranch || <span className="rv-empty">—</span>}
                 </div>

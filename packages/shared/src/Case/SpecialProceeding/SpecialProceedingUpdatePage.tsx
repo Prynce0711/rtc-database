@@ -342,7 +342,7 @@ function ReviewCard({
                 </div>
               </div>
               <div className="rv-field">
-                <div className="rv-field-label">Raffled to Branch</div>
+                <div className="rv-field-label">Branch</div>
                 <div className="rv-field-value">
                   {entry.raffledTo || <span className="rv-empty">—</span>}
                 </div>

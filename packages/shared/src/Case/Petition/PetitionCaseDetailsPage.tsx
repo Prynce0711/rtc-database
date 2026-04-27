@@ -139,13 +139,13 @@ export default function PetitionCaseDetailsPage({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <DetailField label="Case Number" value={caseData.caseNumber} />
             <DetailField label="Petitioner" value={caseData.petitioner} />
-            <DetailField label="Raffled To" value={caseData.raffledTo} />
+            <DetailField label="Branch" value={caseData.raffledTo} />
             <DetailField
               label="Date"
               value={formatLongDate(caseData.date ?? caseData.dateFiled)}
             />
             <DetailField label="Nature" value={caseData.nature} />
-            <DetailField label="Branch" value={caseData.branch} />
+            <DetailField label="Branch/Station" value={caseData.branch} />
           </div>
         </DetailSection>
 

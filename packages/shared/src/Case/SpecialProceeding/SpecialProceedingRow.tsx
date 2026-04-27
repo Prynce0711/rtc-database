@@ -62,7 +62,7 @@ const SpecialProceedingRow = ({
         value={caseItem.caseNumber}
         className="font-semibold"
       />
-      <TipCell label="Raffled To" value={caseItem.raffledTo} />
+      <TipCell label="Branch" value={caseItem.raffledTo} />
       <TipCell
         label="Date Filed"
         value={formatDate(caseItem.date)}

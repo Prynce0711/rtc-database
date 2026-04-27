@@ -57,7 +57,7 @@ type SPFilters = NonNullable<SpecialProceedingsFilterOptions["filters"]>;
 
 const SP_FILTER_OPTIONS: FilterOption[] = [
   { key: "caseNumber", label: "SPC. No.", type: "text" },
-  { key: "raffledTo", label: "Raffled to Branch", type: "text" },
+  { key: "raffledTo", label: "Branch", type: "text" },
   { key: "petitioner", label: "Petitioners", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
   { key: "respondent", label: "Respondent", type: "text" },
@@ -672,7 +672,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
               { key: "caseNumber", label: "SPC. NO.", sortable: true },
               {
                 key: "raffledTo",
-                label: "RAFFLED TO BRANCH",
+                label: "BRANCH",
                 sortable: true,
               },
               { key: "date", label: "DATE FILED", sortable: true },

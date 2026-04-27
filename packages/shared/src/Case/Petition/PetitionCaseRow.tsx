@@ -63,7 +63,7 @@ const PetitionCaseRow = ({
         value={caseItem.caseNumber}
         className="font-semibold"
       />
-      <TipCell label="Raffled To" value={caseItem.raffledTo ?? "—"} />
+      <TipCell label="Branch" value={caseItem.raffledTo ?? "—"} />
       <TipCell label="Date" value={dateStr} className="text-base-content/70" />
       <TipCell
         label="Petitioner"

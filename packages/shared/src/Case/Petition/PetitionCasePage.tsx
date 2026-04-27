@@ -57,7 +57,7 @@ type SortConfig = { key: SortKey; order: "asc" | "desc" };
 const PETITION_FILTER_OPTIONS: FilterOption[] = [
   { key: "caseNumber", label: "Case Number", type: "text" },
   { key: "petitioner", label: "Petitioner", type: "text" },
-  { key: "raffledTo", label: "Raffled To", type: "text" },
+  { key: "raffledTo", label: "Branch", type: "text" },
   { key: "nature", label: "Nature", type: "text" },
   { key: "date", label: "Date", type: "daterange" },
 ];
@@ -577,7 +577,7 @@ const PetitionCasePage: React.FC<{
         <StatsCard
           label="BRANCHES"
           value={(stats.distinctBranches ?? 0).toLocaleString()}
-          subtitle="Distinct raffle branches"
+          subtitle="Distinct branches"
           icon={
             FiUsers as unknown as React.ComponentType<
               React.SVGProps<SVGSVGElement>
@@ -615,7 +615,7 @@ const PetitionCasePage: React.FC<{
                 ]
               : []),
             { key: "caseNumber", label: "Case Number", sortable: true },
-            { key: "raffledTo", label: "Raffled To", sortable: true },
+            { key: "raffledTo", label: "Branch", sortable: true },
             { key: "date", label: "Date", sortable: true },
             { key: "petitioner", label: "Petitioner", sortable: true },
             { key: "nature", label: "Nature", sortable: true },

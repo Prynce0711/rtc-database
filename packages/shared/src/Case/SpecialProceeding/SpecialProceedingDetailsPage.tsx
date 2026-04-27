@@ -260,10 +260,7 @@ export default function SpecialProceedingDetailsPage({
             <DetailSection label="Case Information">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <DetailField label="SPC No." value={caseData.caseNumber} />
-                <DetailField
-                  label="Raffled to Branch"
-                  value={caseData.raffledTo}
-                />
+                <DetailField label="Branch" value={caseData.raffledTo} />
                 <DetailField
                   label="Date Filed"
                   value={formatLongDate(caseData.date)}
