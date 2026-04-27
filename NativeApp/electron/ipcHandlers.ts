@@ -24,6 +24,7 @@ import {
 } from "./Sync/SessionManager";
 import {
   inspectBackendTrust,
+  probeRelayReachability,
   savePinnedRelayCertificatePin,
 } from "./relayTrust";
 import { getOrCreateDeviceId } from "./Sync/SettingsManager";
@@ -61,6 +62,17 @@ ipcMain.handle(RELAY_INSPECT_BACKEND_CHANNEL, async (_event, args: unknown) => {
       return {
         success: false,
         error: "Server URL is required.",
+      };
+    }
+
+    if (
+      args.requireReachable === true &&
+      !(await probeRelayReachability(args.url))
+    ) {
+      return {
+        success: false,
+        error:
+          "No server was found at that address and port. Check the address and port, then try again.",
       };
     }
 
@@ -103,6 +115,10 @@ ipcMain.handle(RELAY_TRUST_BACKEND_CHANNEL, async (_event, args: unknown) => {
 
     const pinnedRelay = savePinnedRelayCertificatePin({
       fingerprint256: args.relayFingerprint256,
+      protocol:
+        parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:"
+          ? (parsedUrl.protocol.slice(0, -1) as "http" | "https")
+          : "https",
       hostname: parsedUrl.hostname,
       port,
       establishedAt: new Date().toISOString(),

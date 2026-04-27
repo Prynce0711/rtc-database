@@ -13,12 +13,15 @@ interface BackendInfo {
   ip: string;
   port: number;
   lastSeen: number;
+  source?: "udp" | "manual" | "dev";
   relayFingerprint256?: string | null;
   relaySubjectName?: string | null;
   relayIssuerName?: string | null;
   pinnedRelayFingerprint256?: string | null;
   usualRelayHostname?: string | null;
+  usualRelayProtocol?: "http" | "https" | null;
   usualRelayPort?: number | null;
+  usualRelayReachable?: boolean | null;
   relayTrustState?: "trusted" | "new" | "changed" | "unverified";
   relayWarningKind?:
     | "certificate-changed"
@@ -39,6 +42,10 @@ type RelayInspectBackendResponse = {
 type RelayTrustUpdateResponse = {
   success: boolean;
   error?: string;
+};
+type InspectBackendOptions = {
+  requireReachable?: boolean;
+  throwOnFailure?: boolean;
 };
 
 const HEALTH_PATH = "/api/health";
@@ -78,6 +85,45 @@ const buildBackendInfoFromUrl = (url: string): BackendInfo => {
       lastSeen: Date.now(),
     };
   }
+};
+
+const buildManualBackendUrl = (
+  protocol: "http" | "https",
+  addressInput: string,
+  portInput: string,
+): string => {
+  const trimmedAddress = addressInput.trim();
+
+  if (!trimmedAddress) {
+    throw new Error("Enter a server address.");
+  }
+
+  const hasProtocolPrefix = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(
+    trimmedAddress,
+  );
+  const parsedUrl = new URL(
+    hasProtocolPrefix ? trimmedAddress : `${protocol}://${trimmedAddress}`,
+  );
+  const normalizedProtocol =
+    parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:"
+      ? parsedUrl.protocol.slice(0, -1)
+      : protocol;
+  const fallbackPort =
+    normalizedProtocol === "https" ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+  const normalizedPortSource = portInput.trim() || parsedUrl.port;
+  const normalizedPort = Number(normalizedPortSource || fallbackPort);
+
+  if (!Number.isInteger(normalizedPort) || normalizedPort < 1 || normalizedPort > 65535) {
+    throw new Error("Enter a valid port number from 1 to 65535.");
+  }
+
+  parsedUrl.protocol = `${normalizedProtocol}:`;
+  parsedUrl.port = String(normalizedPort);
+  parsedUrl.pathname = "";
+  parsedUrl.search = "";
+  parsedUrl.hash = "";
+
+  return normalizeBaseUrl(parsedUrl.toString());
 };
 
 const sortDiscoveredBackends = (backends: BackendInfo[]): BackendInfo[] =>
@@ -140,11 +186,16 @@ const getUsualBackendLabel = (backend: BackendInfo): string | null => {
     return null;
   }
 
+  const usualProtocol = backend.usualRelayProtocol ?? "https";
   const defaultPort =
-    backend.url.startsWith("https://") ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+    usualProtocol === "https" ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
   const usualPort = backend.usualRelayPort ?? defaultPort;
   return `${backend.usualRelayHostname}:${String(usualPort)}`;
 };
+
+const isUsualRelayUnavailable = (backend: BackendInfo): boolean =>
+  backend.relayWarningKind === "different-backend" &&
+  backend.usualRelayReachable === false;
 
 const getUnexpectedBackendCopy = (backend: BackendInfo) => {
   const foundBackendLabel = getFoundBackendLabel(backend);
@@ -164,6 +215,18 @@ const getUnexpectedBackendCopy = (backend: BackendInfo) => {
   }
 
   if (backend.relayWarningKind === "different-backend") {
+    if (backend.usualRelayReachable === false) {
+      return {
+        title: "The usual server can't be reached right now",
+        description: usualBackendLabel
+          ? `This device usually connects to ${usualBackendLabel}, but we could not reach it right now.`
+          : "We could not reach the usual saved server for this device right now.",
+        helpText:
+          "If your admin gave you a replacement server, choose Yes to connect and save it for next time. Otherwise, choose No and keep waiting.",
+        actionLabel,
+      };
+    }
+
     return {
       title: "This is not the usual server for this device",
       description: usualBackendLabel
@@ -266,11 +329,20 @@ export default function App() {
   const [approvingBackendKey, setApprovingBackendKey] = useState<string | null>(
     null,
   );
+  const [manualBackendProtocol, setManualBackendProtocol] = useState<
+    "http" | "https"
+  >("https");
+  const [manualBackendAddress, setManualBackendAddress] = useState("");
+  const [manualBackendPort, setManualBackendPort] = useState("");
+  const [isManualConnectPending, setIsManualConnectPending] = useState(false);
   const [dismissedUnexpectedBackendKeys, setDismissedUnexpectedBackendKeys] =
     useState<string[]>([]);
   const [backendApprovalError, setBackendApprovalError] = useState<
     string | null
   >(null);
+  const [manualConnectError, setManualConnectError] = useState<string | null>(
+    null,
+  );
   const [isDevMode] = useState(() => import.meta.env.MODE === "development");
   const backendDevUrl = normalizeBaseUrl(
     import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000",
@@ -349,6 +421,7 @@ export default function App() {
 
   const inspectBackendBeforeConnect = async (
     targetUrl: string,
+    options: InspectBackendOptions = {},
   ): Promise<BackendInfo> => {
     const baseBackend = buildBackendInfoFromUrl(targetUrl);
 
@@ -362,10 +435,19 @@ export default function App() {
     try {
       const result = (await window.ipcRenderer.invoke(
         RELAY_INSPECT_BACKEND_CHANNEL,
-        { url: targetUrl },
+        {
+          url: targetUrl,
+          requireReachable: options.requireReachable === true,
+        },
       )) as RelayInspectBackendResponse;
 
       if (!result.success) {
+        if (options.throwOnFailure) {
+          throw new Error(
+            result.error || "Unable to verify that server right now.",
+          );
+        }
+
         return {
           ...baseBackend,
           relayTrustState: "unverified",
@@ -379,7 +461,13 @@ export default function App() {
         ...result.result,
         lastSeen: Date.now(),
       };
-    } catch {
+    } catch (error) {
+      if (options.throwOnFailure) {
+        throw error instanceof Error
+          ? error
+          : new Error("Unable to verify that server right now.");
+      }
+
       return {
         ...baseBackend,
         relayTrustState: "unverified",
@@ -463,14 +551,19 @@ export default function App() {
     backendListenerAttachedRef.current = true;
 
     window.ipcRenderer.onBackend((backend: BackendInfo) => {
-      setAvailableOfflineBackend(backend);
+      const discoveredBackend: BackendInfo = {
+        ...backend,
+        source: "udp",
+      };
+
+      setAvailableOfflineBackend(discoveredBackend);
       setDiscoveredBackends((previousBackends) =>
-        upsertDiscoveredBackend(previousBackends, backend),
+        upsertDiscoveredBackend(previousBackends, discoveredBackend),
       );
 
       if (modeRef.current === "local") {
         console.log(
-          `[offline] Backend detected while in local mode: ${backend.url}`,
+          `[offline] Backend detected while in local mode: ${discoveredBackend.url}`,
         );
         return;
       }
@@ -480,11 +573,11 @@ export default function App() {
       }
 
       console.log(
-        `[startup] Backend discovered via UDP: ${backend.url} (${backend.relayTrustState ?? "unknown"})`,
+        `[startup] Backend discovered via UDP: ${discoveredBackend.url} (${discoveredBackend.relayTrustState ?? "unknown"})`,
       );
 
-      if (backend.isPreferred) {
-        redirectToBackend(backend.url);
+      if (discoveredBackend.isPreferred) {
+        redirectToBackend(discoveredBackend.url);
       }
     });
   }, []);
@@ -528,7 +621,10 @@ export default function App() {
           return false;
         }
 
-        const inspectedBackend = await inspectBackendBeforeConnect(backendDevUrl);
+        const inspectedBackend: BackendInfo = {
+          ...(await inspectBackendBeforeConnect(backendDevUrl)),
+          source: "dev",
+        };
         setAvailableOfflineBackend(inspectedBackend);
         setDiscoveredBackends((previousBackends) =>
           upsertDiscoveredBackend(previousBackends, inspectedBackend),
@@ -603,13 +699,31 @@ export default function App() {
     window.location.href = targetUrl;
   };
 
-  const reviewBackends = discoveredBackends.filter(
-    (backend) =>
-      !dismissedUnexpectedBackendKeys.includes(getBackendKey(backend)) &&
+  const reviewBackends = discoveredBackends.filter((backend) => {
+    const needsApproval =
       !backend.isPreferred &&
       (backend.relayTrustState === "changed" ||
-        backend.relayTrustState === "unverified"),
-  );
+        backend.relayTrustState === "unverified");
+    const shouldShowRelayUnavailableNoticeOnly =
+      backend.source !== "manual" && isUsualRelayUnavailable(backend);
+
+    return (
+      !dismissedUnexpectedBackendKeys.includes(getBackendKey(backend)) &&
+      needsApproval &&
+      !shouldShowRelayUnavailableNoticeOnly
+    );
+  });
+
+  const relayUnavailableBackend =
+    reviewBackends.length === 0
+      ? discoveredBackends.find(
+          (backend) =>
+            backend.source !== "manual" && isUsualRelayUnavailable(backend),
+        ) ?? null
+      : null;
+  const relayUnavailableBackendLabel = relayUnavailableBackend
+    ? getUsualBackendLabel(relayUnavailableBackend)
+    : null;
 
   const hasDismissedUnexpectedBackend = discoveredBackends.some(
     (backend) =>
@@ -671,6 +785,49 @@ export default function App() {
     }
   };
 
+  const connectToManualBackend = async () => {
+    setManualConnectError(null);
+    setBackendApprovalError(null);
+    setIsManualConnectPending(true);
+
+    try {
+      const manualBackendUrl = buildManualBackendUrl(
+        manualBackendProtocol,
+        manualBackendAddress,
+        manualBackendPort,
+      );
+      const inspectedBackend: BackendInfo = {
+        ...(await inspectBackendBeforeConnect(manualBackendUrl, {
+          requireReachable: true,
+          throwOnFailure: true,
+        })),
+        source: "manual",
+      };
+
+      setAvailableOfflineBackend(inspectedBackend);
+      setDiscoveredBackends((previousBackends) =>
+        upsertDiscoveredBackend(previousBackends, inspectedBackend),
+      );
+      setDismissedUnexpectedBackendKeys((previousKeys) =>
+        previousKeys.filter((key) => key !== getBackendKey(inspectedBackend)),
+      );
+
+      if (!inspectedBackend.isPreferred) {
+        return;
+      }
+
+      redirectToBackend(inspectedBackend.url);
+    } catch (error) {
+      setManualConnectError(
+        error instanceof Error
+          ? error.message
+          : "Unable to use that server address right now.",
+      );
+    } finally {
+      setIsManualConnectPending(false);
+    }
+  };
+
   if (OFFLINE_MODE_ENABLED && mode === "local") {
     return (
       <LocalModeApp
@@ -682,6 +839,8 @@ export default function App() {
 
   const connectionHint = reviewBackends.length > 0
     ? "A different server was found. Please choose Yes or No before this device connects."
+    : relayUnavailableBackend
+      ? "The usual server can't be reached right now. You can keep waiting or enter another server manually if your admin gave you one."
     : hasDismissedUnexpectedBackend
       ? "You chose not to connect to the different server. Still waiting for the usual server."
       : OFFLINE_MODE_ENABLED
@@ -715,6 +874,110 @@ export default function App() {
                     Auto-switching to offline mode in {autoOfflineCountdown}s...
                   </p>
                 )}
+
+                {relayUnavailableBackend && (
+                  <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-warning/30 bg-base-100 p-5 text-left shadow-lg space-y-2">
+                    <p className="text-base font-semibold text-warning">
+                      The usual server can't be reached right now
+                    </p>
+                    <p className="text-sm opacity-80">
+                      {relayUnavailableBackendLabel
+                        ? `This device usually connects to ${relayUnavailableBackendLabel}, but we could not reach it right now.`
+                        : "We could not reach the usual saved server for this device right now."}
+                    </p>
+                    <p className="text-xs opacity-70">
+                      If your admin gave you a new server address, you can enter
+                      it below. Otherwise, keep waiting and try the usual
+                      server again.
+                    </p>
+                  </div>
+                )}
+
+                <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold">
+                      Connect to a server manually
+                    </p>
+                    <p className="text-sm opacity-70">
+                      If automatic discovery is not finding the server, enter
+                      the server address and port here.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-[9rem_minmax(0,1fr)_8rem_auto]">
+                    <label className="form-control">
+                      <span className="label-text text-xs font-medium mb-1">
+                        Protocol
+                      </span>
+                      <select
+                        className="select select-bordered"
+                        value={manualBackendProtocol}
+                        onChange={(event) =>
+                          setManualBackendProtocol(
+                            event.target.value as "http" | "https",
+                          )
+                        }
+                        disabled={isManualConnectPending}
+                      >
+                        <option value="https">https</option>
+                        <option value="http">http</option>
+                      </select>
+                    </label>
+
+                    <label className="form-control">
+                      <span className="label-text text-xs font-medium mb-1">
+                        Server address or URL
+                      </span>
+                      <input
+                        type="text"
+                        className="input input-bordered w-full"
+                        placeholder="192.168.254.72 or https://192.168.254.72"
+                        value={manualBackendAddress}
+                        onChange={(event) =>
+                          setManualBackendAddress(event.target.value)
+                        }
+                        disabled={isManualConnectPending}
+                      />
+                    </label>
+
+                    <label className="form-control">
+                      <span className="label-text text-xs font-medium mb-1">
+                        Port
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="input input-bordered w-full"
+                        placeholder="3443"
+                        value={manualBackendPort}
+                        onChange={(event) =>
+                          setManualBackendPort(event.target.value)
+                        }
+                        disabled={isManualConnectPending}
+                      />
+                    </label>
+
+                    <label className="form-control">
+                      <span className="label-text text-xs font-medium mb-1 opacity-0">
+                        Connect
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => void connectToManualBackend()}
+                        disabled={isManualConnectPending}
+                      >
+                        {isManualConnectPending ? "Checking..." : "Connect"}
+                      </button>
+                    </label>
+                  </div>
+
+                  {manualConnectError && (
+                    <p className="text-sm font-medium text-error">
+                      {manualConnectError}
+                    </p>
+                  )}
+                </div>
               </>
             )}
 
@@ -754,6 +1017,12 @@ export default function App() {
                             <span className="ml-1 font-semibold">
                               {usualBackendLabel}
                             </span>
+                          </p>
+                        )}
+
+                        {backend.usualRelayReachable === false && (
+                          <p className="font-medium text-error">
+                            The usual server can't be reached right now.
                           </p>
                         )}
 

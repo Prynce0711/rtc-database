@@ -1,13 +1,16 @@
+import { RELAY_HEALTH_PATH, type BackendInfo } from "@rtc-database/shared";
 import { app, session } from "electron";
-import type { BackendInfo } from "@rtc-database/shared/src/UdpData";
 import { X509Certificate } from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 import path from "node:path";
 import tls from "node:tls";
 
 export type RelayCertificatePin = {
   fingerprint256: string;
+  protocol?: "http" | "https";
   hostname?: string;
   port?: number;
   establishedAt?: string;
@@ -22,6 +25,20 @@ type RelayTrustStore = {
 
 const RELAY_TRUST_STORE_FILENAME = "relay-trust-store.json";
 const RELAY_CERTIFICATE_PROBE_TIMEOUT_MS = 4000;
+const RELAY_HEALTH_PROBE_TIMEOUT_MS = 4000;
+
+const normalizeRelayProtocol = (
+  value: unknown,
+): "http" | "https" | undefined => {
+  if (value === "http" || value === "https") {
+    return value;
+  }
+
+  return undefined;
+};
+
+const getDefaultPortForProtocol = (protocol: "http" | "https"): number =>
+  protocol === "https" ? 443 : 80;
 
 export const normalizeFingerprint = (value: string): string => {
   const trimmed = value.trim().toLowerCase();
@@ -82,6 +99,7 @@ const sanitizeRelayCertificatePin = (
   relay: RelayCertificatePin,
 ): RelayCertificatePin => ({
   fingerprint256: normalizeFingerprint(relay.fingerprint256),
+  protocol: normalizeRelayProtocol(relay.protocol),
   hostname:
     typeof relay.hostname === "string" && relay.hostname.trim()
       ? relay.hostname.trim().toLowerCase()
@@ -203,6 +221,67 @@ const formatCertificateName = (value: unknown): string | undefined => {
   return parts.length > 0 ? parts.join(", ") : undefined;
 };
 
+const buildPinnedRelayUrl = (relay: RelayCertificatePin): string | null => {
+  if (!relay.hostname?.trim()) {
+    return null;
+  }
+
+  const protocol = normalizeRelayProtocol(relay.protocol) ?? "https";
+  const port = relay.port ?? getDefaultPortForProtocol(protocol);
+
+  return `${protocol}://${relay.hostname}:${String(port)}`;
+};
+
+export const probeRelayReachability = async (
+  baseUrl: string,
+): Promise<boolean> => {
+  try {
+    const target = new URL(baseUrl);
+
+    if (target.protocol !== "http:" && target.protocol !== "https:") {
+      return false;
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      const requestImpl =
+        target.protocol === "https:" ? https.request : http.request;
+
+      const request = requestImpl(
+        {
+          protocol: target.protocol,
+          hostname: target.hostname,
+          port: target.port || undefined,
+          path: `${target.pathname.replace(/\/+$/, "")}${RELAY_HEALTH_PATH}`,
+          method: "GET",
+          rejectUnauthorized: false,
+        },
+        (response) => {
+          response.resume();
+          response.once("end", () => {
+            resolve(
+              response.statusCode !== undefined &&
+                response.statusCode >= 200 &&
+                response.statusCode < 300,
+            );
+          });
+        },
+      );
+
+      request.setTimeout(RELAY_HEALTH_PROBE_TIMEOUT_MS, () => {
+        request.destroy(new Error("Health check timed out"));
+      });
+
+      request.once("error", () => {
+        resolve(false);
+      });
+
+      request.end();
+    });
+  } catch {
+    return false;
+  }
+};
+
 export const inspectLocalRelayCertificate = async (
   hostname: string,
   port: number,
@@ -284,7 +363,9 @@ export type BackendTrustAssessment = Pick<
   | "relayIssuerName"
   | "pinnedRelayFingerprint256"
   | "usualRelayHostname"
+  | "usualRelayProtocol"
   | "usualRelayPort"
+  | "usualRelayReachable"
   | "relayTrustState"
   | "relayWarningKind"
   | "isPreferred"
@@ -295,13 +376,17 @@ export const inspectBackendTrust = async (
 ): Promise<BackendTrustAssessment> => {
   const pinnedRelay = getPinnedRelayCertificatePin();
   const pinnedRelayFingerprint256 = pinnedRelay?.fingerprint256 ?? null;
+  const pinnedRelayProtocol = normalizeRelayProtocol(pinnedRelay?.protocol) ?? "https";
+  const pinnedRelayPort = pinnedRelay?.port ?? getDefaultPortForProtocol(pinnedRelayProtocol);
   const assessment: BackendTrustAssessment = {
     relayFingerprint256: null,
     relaySubjectName: null,
     relayIssuerName: null,
     pinnedRelayFingerprint256,
     usualRelayHostname: pinnedRelay?.hostname ?? null,
-    usualRelayPort: pinnedRelay?.port ?? null,
+    usualRelayProtocol: pinnedRelay ? pinnedRelayProtocol : null,
+    usualRelayPort: pinnedRelay ? pinnedRelayPort : null,
+    usualRelayReachable: null,
     relayTrustState: pinnedRelay ? "unverified" : "new",
     relayWarningKind: pinnedRelay ? "unverified" : null,
     isPreferred: !pinnedRelay,
@@ -311,6 +396,25 @@ export const inspectBackendTrust = async (
     const parsedBackendUrl = new URL(backendUrl);
     const isHttpsBackend = parsedBackendUrl.protocol === "https:";
     const backendPort = Number(parsedBackendUrl.port) || 443;
+    const currentBackendProtocol =
+      parsedBackendUrl.protocol === "http:" ? "http" : "https";
+    const shouldCheckPinnedRelayReachability = Boolean(
+      pinnedRelay?.hostname &&
+        (
+          pinnedRelay.hostname !== parsedBackendUrl.hostname ||
+          pinnedRelayPort !== backendPort ||
+          pinnedRelayProtocol !== currentBackendProtocol
+        ),
+    );
+    const pinnedRelayReachabilityPromise = shouldCheckPinnedRelayReachability
+      ? probeRelayReachability(
+          buildPinnedRelayUrl({
+            ...pinnedRelay!,
+            protocol: pinnedRelayProtocol,
+            port: pinnedRelayPort,
+          })!,
+        )
+      : null;
 
     if (isHttpsBackend) {
       const certificate = await inspectLocalRelayCertificate(
@@ -345,15 +449,22 @@ export const inspectBackendTrust = async (
     assessment.isPreferred = false;
 
     if (!isHttpsBackend || !assessment.relayFingerprint256) {
+      if (pinnedRelayReachabilityPromise) {
+        assessment.usualRelayReachable = await pinnedRelayReachabilityPromise;
+      }
       assessment.relayTrustState = "unverified";
       assessment.relayWarningKind = "unverified";
       return assessment;
     }
 
+    if (pinnedRelayReachabilityPromise) {
+      assessment.usualRelayReachable = await pinnedRelayReachabilityPromise;
+    }
+
     assessment.relayTrustState = "changed";
     assessment.relayWarningKind =
       pinnedRelay.hostname === parsedBackendUrl.hostname &&
-      pinnedRelay.port === backendPort
+      pinnedRelayPort === backendPort
         ? "certificate-changed"
         : "different-backend";
 
@@ -388,6 +499,7 @@ export const configureRelayCertificatePinning = (): void => {
     if (!pinnedRelay) {
       store.relay = savePinnedRelayCertificatePin({
         fingerprint256,
+        protocol: "https",
         hostname,
         port: Number((request as { port?: number }).port) || 0,
         establishedAt: new Date().toISOString(),

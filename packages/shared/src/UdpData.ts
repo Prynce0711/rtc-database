@@ -5,6 +5,7 @@ export const UDP_DISCOVERY_REQUEST_TYPE = "DISCOVER_BACKEND";
 export const UDP_DISCOVERY_RESPONSE_TYPE = "BACKEND_AVAILABLE";
 export const UDP_DISCOVERY_MULTICAST_GROUP = "239.255.67.89";
 export const UDP_DISCOVERY_MULTICAST_TTL = 1;
+export const RELAY_HEALTH_PATH = "/_rtc/relay-health";
 
 export const UdpDiscoveryRequest = z.object({
   type: z.literal(UDP_DISCOVERY_REQUEST_TYPE),
@@ -49,7 +50,9 @@ export type BackendInfo = {
   relayIssuerName?: string | null;
   pinnedRelayFingerprint256?: string | null;
   usualRelayHostname?: string | null;
+  usualRelayProtocol?: "http" | "https" | null;
   usualRelayPort?: number | null;
+  usualRelayReachable?: boolean | null;
   relayTrustState?: RelayTrustState;
   relayWarningKind?: RelayWarningKind;
   isPreferred?: boolean;

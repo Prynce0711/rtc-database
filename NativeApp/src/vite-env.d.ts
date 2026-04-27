@@ -10,7 +10,9 @@ interface BackendInfo {
   relayIssuerName?: string | null;
   pinnedRelayFingerprint256?: string | null;
   usualRelayHostname?: string | null;
+  usualRelayProtocol?: "http" | "https" | null;
   usualRelayPort?: number | null;
+  usualRelayReachable?: boolean | null;
   relayTrustState?: "trusted" | "new" | "changed" | "unverified";
   relayWarningKind?:
     | "certificate-changed"

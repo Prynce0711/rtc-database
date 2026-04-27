@@ -1,3 +1,4 @@
+import { RELAY_HEALTH_PATH } from "@rtc-database/shared/src/UdpData";
 import httpProxy from "http-proxy";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -391,7 +392,26 @@ export async function startReverseProxy(): Promise<void> {
     }
   });
 
-  const requestHandler: http.RequestListener = (request, response) => {
+const requestHandler: http.RequestListener = (request, response) => {
+    const requestPath = request.url
+      ? new URL(request.url, "http://relay.local").pathname
+      : "";
+
+    if (requestPath === RELAY_HEALTH_PATH) {
+      response.writeHead(200, {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      });
+      response.end(
+        JSON.stringify({
+          ok: true,
+          relay: true,
+          timestamp: Date.now(),
+        }),
+      );
+      return;
+    }
+
     const relayRequest = request as RelayRequest;
     relayRequest.relayHopCount = getTrustedRelayHop(request.headers);
     stripRelayHeaders(request.headers);
