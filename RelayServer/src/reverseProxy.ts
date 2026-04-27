@@ -25,6 +25,7 @@ type RelayConfig = {
   listenHost: string;
   listenPort: number;
   targetUrl: string;
+  originOverride: URL | null;
   insecureTls: boolean;
   useHttps: boolean;
   tlsCertPath: string;
@@ -97,6 +98,27 @@ const parseBoolean = (
 
 const resolvePath = (rawPath: string): string =>
   path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath);
+
+const parseOriginOverride = (
+  enabledRaw: string | undefined,
+  originRaw: string | undefined,
+  fallbackRaw: string,
+): URL | null => {
+  if (!parseBoolean(enabledRaw, false)) {
+    return null;
+  }
+
+  const configuredOrigin = originRaw?.trim() || fallbackRaw;
+
+  const parsedOrigin = new URL(configuredOrigin);
+  if (parsedOrigin.protocol !== "http:" && parsedOrigin.protocol !== "https:") {
+    throw new Error(
+      "RELAY_OVERRIDE_ORIGIN_URL or RELAY_TARGET_URL must start with http:// or https://",
+    );
+  }
+
+  return parsedOrigin;
+};
 
 const parseTlsCertHosts = (
   rawHosts: string | undefined,
@@ -177,6 +199,11 @@ const resolveRelayConfig = (): RelayConfig => {
 
   const listenHost = process.env.RELAY_LISTEN_HOST?.trim() || "0.0.0.0";
   const useHttps = parseBoolean(process.env.RELAY_USE_HTTPS, false);
+  const originOverride = parseOriginOverride(
+    process.env.RELAY_OVERRIDE_ORIGIN,
+    process.env.RELAY_OVERRIDE_ORIGIN_URL,
+    targetUrl,
+  );
   const tlsBasePath = resolvePath(
     process.env.RELAY_TLS_DIR?.trim() || ".relay-tls",
   );
@@ -196,6 +223,7 @@ const resolveRelayConfig = (): RelayConfig => {
       3000,
     ),
     targetUrl,
+    originOverride,
     insecureTls: parseBoolean(process.env.RELAY_INSECURE_TLS, false),
     useHttps,
     tlsKeyPath,
@@ -248,6 +276,43 @@ const getTrustedRelayHop = (headers: http.IncomingHttpHeaders): number => {
   return parseRelayHop(readHeaderValue(headers, RELAY_HOP_HEADER));
 };
 
+const getPortForUrl = (url: URL): string =>
+  url.port || (url.protocol === "https:" ? "443" : "80");
+
+const applyOriginForwarding = (
+  proxyReq: http.ClientRequest,
+  request: http.IncomingMessage,
+  config: RelayConfig,
+): void => {
+  const originalHost = readHeaderValue(request.headers, "host");
+  const originalProto = getForwardedProto(request);
+  const originalPort = getForwardedPort(originalHost, config.listenPort);
+  const hasOriginHeader = !!readHeaderValue(request.headers, "origin");
+  const forwardedOrigin =
+    hasOriginHeader && config.originOverride ? config.originOverride : null;
+
+  const forwardedHost = forwardedOrigin?.host ?? originalHost;
+  const forwardedProto =
+    forwardedOrigin?.protocol === "https:"
+      ? "https"
+      : forwardedOrigin?.protocol === "http:"
+        ? "http"
+        : originalProto;
+  const forwardedPort = forwardedOrigin
+    ? getPortForUrl(forwardedOrigin)
+    : originalPort;
+
+  if (forwardedOrigin) {
+    proxyReq.setHeader("origin", forwardedOrigin.origin);
+  }
+
+  if (forwardedHost) {
+    proxyReq.setHeader("x-forwarded-host", forwardedHost);
+  }
+  proxyReq.setHeader("x-forwarded-proto", forwardedProto);
+  proxyReq.setHeader("x-forwarded-port", forwardedPort);
+};
+
 let proxy: httpProxy | null = null;
 let server: http.Server | https.Server | null = null;
 
@@ -280,21 +345,14 @@ export async function startReverseProxy(): Promise<void> {
   proxy.on("proxyReq", (proxyReq, request) => {
     const relayRequest = request as RelayRequest;
     const hopCount = relayRequest.relayHopCount ?? 0;
-    const originalHost = readHeaderValue(request.headers, "host");
-    const originalProto = getForwardedProto(request);
-    const originalPort = getForwardedPort(originalHost, config.listenPort);
 
     proxyReq.removeHeader(RELAY_HOP_HEADER);
     proxyReq.removeHeader(RELAY_HOP_TOKEN_HEADER);
     proxyReq.setHeader(RELAY_HOP_HEADER, String(hopCount + 1));
     proxyReq.setHeader(RELAY_HOP_TOKEN_HEADER, RELAY_HOP_RUNTIME_TOKEN);
 
-    // Keep forwarded host/proto aligned with browser Origin so Next Server Actions validation passes.
-    if (originalHost) {
-      proxyReq.setHeader("x-forwarded-host", originalHost);
-    }
-    proxyReq.setHeader("x-forwarded-proto", originalProto);
-    proxyReq.setHeader("x-forwarded-port", originalPort);
+    // Keep forwarded host/proto aligned with the effective Origin so Next Server Actions validation passes.
+    applyOriginForwarding(proxyReq, request, config);
   });
 
   proxy.on("proxyReqWs", (proxyReq, request) => {
@@ -305,6 +363,8 @@ export async function startReverseProxy(): Promise<void> {
     proxyReq.removeHeader(RELAY_HOP_TOKEN_HEADER);
     proxyReq.setHeader(RELAY_HOP_HEADER, String(hopCount + 1));
     proxyReq.setHeader(RELAY_HOP_TOKEN_HEADER, RELAY_HOP_RUNTIME_TOKEN);
+
+    applyOriginForwarding(proxyReq, request, config);
   });
 
   proxy.on("error", (error, request, responseOrSocket) => {
