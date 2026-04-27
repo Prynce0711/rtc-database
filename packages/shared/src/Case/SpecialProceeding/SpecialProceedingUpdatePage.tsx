@@ -67,6 +67,7 @@ type ColDef = {
 
 type ModalType = "ADD" | "EDIT";
 type Step = "entry" | "review";
+type ImportConflictMode = "create" | "update-existing";
 
 const FROZEN_COLS: ColDef[] = [
   {
@@ -427,6 +428,8 @@ const SpecialProceedingUpdatePage = ({
     Record<number, string>
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [importConflictMode, setImportConflictMode] =
+    useState<ImportConflictMode>("create");
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -593,7 +596,39 @@ const SpecialProceedingUpdatePage = ({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [entries, isEdit]);
+  }, [adapter, entries, isEdit]);
+
+  const getExistingCasesByCaseNumber = useCallback(async () => {
+    if (isEdit) {
+      return new Map<string, SpecialProceedingData>();
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(getDisplayCaseNumber(entry)))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      return new Map<string, SpecialProceedingData>();
+    }
+
+    const result = await adapter.getSpecialProceedingsByCaseNumbers(caseNumbers);
+    if (!result.success || !result.result) {
+      return new Map<string, SpecialProceedingData>();
+    }
+
+    const byCaseNumber = new Map<string, SpecialProceedingData>();
+    result.result.forEach((item) => {
+      const normalized = normalizeCaseNumber(String(item.caseNumber ?? ""));
+      if (!normalized || byCaseNumber.has(normalized)) return;
+      byCaseNumber.set(normalized, item);
+    });
+
+    return byCaseNumber;
+  }, [adapter, entries, getDisplayCaseNumber, isEdit]);
 
   const handleAreaChange = useCallback((id: number, areaInput: string) => {
     const normalizedArea = normalizeAreaCode(areaInput);
@@ -944,8 +979,9 @@ const SpecialProceedingUpdatePage = ({
 
   const handleSubmit = async () => {
     const existingCases = await refreshExistingCaseNumbers();
+    let existingCaseMap = new Map<string, SpecialProceedingData>();
 
-    if (!isEdit && existingCases.length > 0) {
+    if (!isEdit && importConflictMode === "create" && existingCases.length > 0) {
       const duplicateLabel =
         existingCases.length === 1
           ? `Case number ${existingCases[0]} already exists. Continue anyway?`
@@ -956,10 +992,31 @@ const SpecialProceedingUpdatePage = ({
       }
     }
 
+    if (!isEdit && importConflictMode === "update-existing") {
+      existingCaseMap = await getExistingCasesByCaseNumber();
+      const rowsToUpdate = entries.filter((entry) =>
+        existingCaseMap.has(normalizeCaseNumber(getDisplayCaseNumber(entry))),
+      ).length;
+      const rowsToCreate = entries.length - rowsToUpdate;
+
+      const importModeLabel =
+        rowsToUpdate > 0
+          ? `Update ${rowsToUpdate} existing ${rowsToUpdate === 1 ? "case" : "cases"} and create ${rowsToCreate} new ${rowsToCreate === 1 ? "case" : "cases"}?`
+          : `No matching existing case numbers were found. Create ${entries.length} ${entries.length === 1 ? "case" : "cases"}?`;
+
+      if (!(await statusPopup.showConfirm(importModeLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? entries.length === 1
         ? "Save changes to this case?"
         : `Save changes to ${entries.length} cases?`
+      : importConflictMode === "update-existing"
+        ? entries.length === 1
+          ? "Save this imported row?"
+          : `Save ${entries.length} imported rows?`
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
@@ -1041,31 +1098,70 @@ const SpecialProceedingUpdatePage = ({
         onUpdate?.();
       } else {
         const createdIds: number[] = [];
+        let successfulCreates = 0;
+        let successfulUpdates = 0;
         for (let index = 0; index < entries.length; index++) {
           const e = entries[index];
           const payload = buildPayload(e);
-          const result = await adapter.createSpecialProceeding(payload);
+
+          const existingCase =
+            importConflictMode === "update-existing"
+              ? existingCaseMap.get(normalizeCaseNumber(getDisplayCaseNumber(e)))
+              : undefined;
+
+          const result = existingCase?.id
+            ? await adapter.updateSpecialProceeding(existingCase.id, payload)
+            : await adapter.createSpecialProceeding(payload);
+
           if (!result.success) {
             const rollbackErrors = await rollbackCreatedCases(createdIds);
             setStep("entry");
             statusPopup.showError(
               [
-                `Failed to create row ${index + 1}: ${result.error || "Create failed"}.`,
+                `${existingCase?.id ? "Failed to update" : "Failed to create"} row ${index + 1}: ${result.error || "Save failed"}.`,
                 rollbackErrors.length > 0
                   ? `Rollback issues: ${rollbackErrors.join(" | ")}`
-                  : "Any created rows in this batch were rolled back.",
+                  : existingCase?.id
+                    ? "Any newly created rows in this batch were rolled back."
+                    : "Any created rows in this batch were rolled back.",
               ].join(" "),
             );
             return;
           }
-          if (result.result?.id) {
+
+          if (existingCase?.id) {
+            successfulUpdates += 1;
+          } else {
+            successfulCreates += 1;
+          }
+
+          if (!existingCase?.id && result.result?.id) {
             createdIds.push(result.result.id);
           }
         }
         onCreate?.();
-        statusPopup.showSuccess(
-          `${entries.length} case${entries.length > 1 ? "s" : ""} created successfully`,
-        );
+        if (
+          importConflictMode === "update-existing" &&
+          successfulUpdates > 0 &&
+          successfulCreates > 0
+        ) {
+          statusPopup.showSuccess(
+            `${successfulUpdates} updated, ${successfulCreates} created successfully`,
+          );
+        } else if (
+          importConflictMode === "update-existing" &&
+          successfulUpdates > 0
+        ) {
+          statusPopup.showSuccess(
+            successfulUpdates === 1
+              ? "Case updated successfully"
+              : `${successfulUpdates} cases updated successfully`,
+          );
+        } else {
+          statusPopup.showSuccess(
+            `${entries.length} case${entries.length > 1 ? "s" : ""} created successfully`,
+          );
+        }
       }
       onClose();
     } catch (error) {
@@ -1194,6 +1290,10 @@ const SpecialProceedingUpdatePage = ({
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
                       Per-row mode (default: Auto)
+                    </span>
+                    <span className="xls-pill xls-pill-neutral">
+                      <span className="xls-pill-dot" />
+                      Existing case no.: {importConflictMode === "create" ? "Create duplicate" : "Update existing"}
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
@@ -1327,6 +1427,23 @@ const SpecialProceedingUpdatePage = ({
                   <FiUpload size={15} />
                   {uploading ? "Importing..." : "Import Excel"}
                 </button>
+                <div className="flex items-center gap-2 ml-2">
+                  <span className="text-xs text-base-content/60">
+                    Existing case no.
+                  </span>
+                  <select
+                    className="select select-sm select-bordered"
+                    value={importConflictMode}
+                    onChange={(e) =>
+                      setImportConflictMode(
+                        e.target.value as ImportConflictMode,
+                      )
+                    }
+                  >
+                    <option value="create">Create duplicate</option>
+                    <option value="update-existing">Update existing</option>
+                  </select>
+                </div>
               </CaseEntryToolbar>
             )}
 

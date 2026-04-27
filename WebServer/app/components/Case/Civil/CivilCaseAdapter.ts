@@ -7,6 +7,7 @@ import {
   createCivilCase,
   deleteCivilCase,
   getCivilCaseById,
+  getCivilCasesByCaseNumbers,
   getCivilCaseNumberPreview,
   getCivilCases,
   getCivilCasesByIds,
@@ -27,6 +28,7 @@ export const civilCaseAdapter: CivilCaseAdapter = {
   deleteCivilCase,
   getCivilCaseById,
   getCivilCasesByIds,
+  getCivilCasesByCaseNumbers,
   uploadExcel: (file) => uploadExcel(file, CaseType.CIVIL),
   exportCasesExcel,
 };

@@ -272,3 +272,55 @@ export async function getCriminalCasesByIds(
     };
   }
 }
+
+export async function getCriminalCasesByCaseNumbers(
+  caseNumbers: string[],
+): Promise<ActionResult<CriminalCaseData[]>> {
+  try {
+    const normalizedCaseNumbers = Array.from(
+      new Set(
+        caseNumbers
+          .map((caseNumber) => String(caseNumber ?? "").trim())
+          .filter((caseNumber) => caseNumber.length > 0),
+      ),
+    );
+
+    if (normalizedCaseNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        caseType: CaseType.CRIMINAL,
+        caseNumber: { in: normalizedCaseNumbers },
+        criminalCase: { isNot: null },
+      },
+      include: {
+        criminalCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const caseCombined: CriminalCaseData[] = cases
+      .filter(
+        (c): c is Case & { criminalCase: CriminalCase } => !!c.criminalCase,
+      )
+      .map((c) => ({
+        ...c.criminalCase,
+        ...c,
+      }));
+
+    return { success: true, result: caseCombined };
+  } catch (error) {
+    return {
+      success: false,
+      error: logError(
+        "[criminal-cases] Failed to fetch cases by case number",
+        error,
+      ),
+    };
+  }
+}

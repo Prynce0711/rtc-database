@@ -73,6 +73,11 @@ const criminalCaseAdapter: CriminalCaseAdapter = {
       IPC_CHANNELS.CRIMINAL_CASE_GET_BY_IDS,
       ids,
     ),
+  getCriminalCasesByCaseNumbers: (caseNumbers: string[]) =>
+    invokeIpc<ActionResult<CriminalCaseData[]>>(
+      IPC_CHANNELS.CRIMINAL_CASE_GET_BY_CASE_NUMBERS,
+      caseNumbers,
+    ),
   uploadExcel: () => {
     throw new Error("Not implemented in Electron");
   },

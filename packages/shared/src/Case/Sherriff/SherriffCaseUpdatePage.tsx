@@ -335,6 +335,7 @@ function ReviewCard({
 
 type UpdateType = "ADD" | "EDIT";
 type Step = "entry" | "review";
+type ImportConflictMode = "create" | "update-existing";
 
 export const SherriffCaseUpdatePage = ({
   type,
@@ -371,6 +372,8 @@ export const SherriffCaseUpdatePage = ({
     Record<string, string>
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [importConflictMode, setImportConflictMode] =
+    useState<ImportConflictMode>("create");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -484,7 +487,39 @@ export const SherriffCaseUpdatePage = ({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [entries, isEdit]);
+  }, [adapter, entries, isEdit]);
+
+  const getExistingCasesByCaseNumber = useCallback(async () => {
+    if (isEdit) {
+      return new Map<string, SheriffCaseData>();
+    }
+
+    const caseNumbers = Array.from(
+      new Set(
+        entries
+          .map((entry) => normalizeCaseNumber(getDisplayCaseNumber(entry)))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (caseNumbers.length === 0) {
+      return new Map<string, SheriffCaseData>();
+    }
+
+    const result = await adapter.getSheriffCasesByCaseNumbers(caseNumbers);
+    if (!result.success || !result.result) {
+      return new Map<string, SheriffCaseData>();
+    }
+
+    const byCaseNumber = new Map<string, SheriffCaseData>();
+    result.result.forEach((item) => {
+      const normalized = normalizeCaseNumber(String(item.caseNumber ?? ""));
+      if (!normalized || byCaseNumber.has(normalized)) return;
+      byCaseNumber.set(normalized, item);
+    });
+
+    return byCaseNumber;
+  }, [adapter, entries, getDisplayCaseNumber, isEdit]);
 
   const handleChange = (id: number, field: string, value: string | boolean) => {
     setEntries((prev) =>
@@ -761,8 +796,9 @@ export const SherriffCaseUpdatePage = ({
 
   const handleSubmit = async () => {
     const existingCases = await refreshExistingCaseNumbers();
+    let existingCaseMap = new Map<string, SheriffCaseData>();
 
-    if (!isEdit && existingCases.length > 0) {
+    if (!isEdit && importConflictMode === "create" && existingCases.length > 0) {
       const duplicateLabel =
         existingCases.length === 1
           ? `Case number ${existingCases[0]} already exists. Continue anyway?`
@@ -773,8 +809,29 @@ export const SherriffCaseUpdatePage = ({
       }
     }
 
+    if (!isEdit && importConflictMode === "update-existing") {
+      existingCaseMap = await getExistingCasesByCaseNumber();
+      const rowsToUpdate = entries.filter((entry) =>
+        existingCaseMap.has(normalizeCaseNumber(getDisplayCaseNumber(entry))),
+      ).length;
+      const rowsToCreate = entries.length - rowsToUpdate;
+
+      const importModeLabel =
+        rowsToUpdate > 0
+          ? `Update ${rowsToUpdate} existing ${rowsToUpdate === 1 ? "case" : "cases"} and create ${rowsToCreate} new ${rowsToCreate === 1 ? "case" : "cases"}?`
+          : `No matching existing case numbers were found. Create ${entries.length} ${entries.length === 1 ? "case" : "cases"}?`;
+
+      if (!(await statusPopup.showConfirm(importModeLabel))) {
+        return;
+      }
+    }
+
     const label = isEdit
       ? "Save changes to this case?"
+      : importConflictMode === "update-existing"
+        ? entries.length === 1
+          ? "Save this imported row?"
+          : `Save ${entries.length} imported rows?`
       : entries.length === 1
         ? "Create this case?"
         : `Create ${entries.length} cases?`;
@@ -842,6 +899,7 @@ export const SherriffCaseUpdatePage = ({
       } else {
         const createdCaseIds: number[] = [];
         let successfulCreates = 0;
+        let successfulUpdates = 0;
 
         for (let idx = 0; idx < entries.length; idx++) {
           const entry = entries[idx];
@@ -858,6 +916,36 @@ export const SherriffCaseUpdatePage = ({
               ].join(" "),
             );
             return;
+          }
+
+          const existingCase =
+            importConflictMode === "update-existing"
+              ? existingCaseMap.get(
+                  normalizeCaseNumber(getDisplayCaseNumber(entry)),
+                )
+              : undefined;
+
+          if (existingCase?.id) {
+            const response = await adapter.updateSheriffCase(existingCase.id, {
+              ...parsed.data,
+              isManual: entry.isManual,
+            });
+            if (!response.success) {
+              const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
+              setStep("entry");
+              statusPopup.showError(
+                [
+                  `Failed to update existing row ${idx + 1}: ${response.error || "Unknown error"}.`,
+                  rollbackErrors.length > 0
+                    ? `Rollback issues: ${rollbackErrors.join(" | ")}`
+                    : "Any newly created rows in this batch were rolled back.",
+                ].join(" "),
+              );
+              return;
+            }
+
+            successfulUpdates += 1;
+            continue;
           }
 
           const response = await adapter.createSheriffCase({
@@ -885,11 +973,11 @@ export const SherriffCaseUpdatePage = ({
           }
         }
 
-        if (successfulCreates !== entries.length) {
+        if (successfulCreates + successfulUpdates !== entries.length) {
           const rollbackErrors = await rollbackCreatedCases(createdCaseIds);
           setStep("entry");
           console.error(
-            `Only ${successfulCreates} of ${entries.length} cases were created successfully.`,
+            `Only ${successfulCreates + successfulUpdates} of ${entries.length} rows were saved successfully.`,
             rollbackErrors,
           );
 
@@ -905,11 +993,30 @@ export const SherriffCaseUpdatePage = ({
         }
 
         onCreateAction?.();
-        statusPopup.showSuccess(
-          entries.length === 1
-            ? "Case created successfully"
-            : `${entries.length} cases created successfully`,
-        );
+        if (
+          importConflictMode === "update-existing" &&
+          successfulUpdates > 0 &&
+          successfulCreates > 0
+        ) {
+          statusPopup.showSuccess(
+            `${successfulUpdates} updated, ${successfulCreates} created successfully`,
+          );
+        } else if (
+          importConflictMode === "update-existing" &&
+          successfulUpdates > 0
+        ) {
+          statusPopup.showSuccess(
+            successfulUpdates === 1
+              ? "Case updated successfully"
+              : `${successfulUpdates} cases updated successfully`,
+          );
+        } else {
+          statusPopup.showSuccess(
+            entries.length === 1
+              ? "Case created successfully"
+              : `${entries.length} cases created successfully`,
+          );
+        }
       }
 
       onCloseAction();
@@ -1030,6 +1137,10 @@ export const SherriffCaseUpdatePage = ({
                     </span>
                     <span className="xls-pill xls-pill-neutral">
                       <span className="xls-pill-dot" />
+                      Existing case no.: {importConflictMode === "create" ? "Create duplicate" : "Update existing"}
+                    </span>
+                    <span className="xls-pill xls-pill-neutral">
+                      <span className="xls-pill-dot" />
                       {entries.length} {entries.length === 1 ? "row" : "rows"}
                     </span>
                     <span
@@ -1127,6 +1238,23 @@ export const SherriffCaseUpdatePage = ({
                   <FiUpload size={15} />
                   {uploading ? "Importing..." : "Import Excel"}
                 </button>
+                <div className="flex items-center gap-2 ml-2">
+                  <span className="text-xs text-base-content/60">
+                    Existing case no.
+                  </span>
+                  <select
+                    className="select select-sm select-bordered"
+                    value={importConflictMode}
+                    onChange={(e) =>
+                      setImportConflictMode(
+                        e.target.value as ImportConflictMode,
+                      )
+                    }
+                  >
+                    <option value="create">Create duplicate</option>
+                    <option value="update-existing">Update existing</option>
+                  </select>
+                </div>
               </CaseEntryToolbar>
             )}
 

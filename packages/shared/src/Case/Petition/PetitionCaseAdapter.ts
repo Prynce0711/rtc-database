@@ -34,6 +34,9 @@ export interface PetitionCaseAdapter extends BaseCaseAdapter {
   getPetitionsByIds: (
     ids: (string | number)[],
   ) => Promise<ActionResult<PetitionCaseData[]>>;
+  getPetitionsByCaseNumbers: (
+    caseNumbers: string[],
+  ) => Promise<ActionResult<PetitionCaseData[]>>;
   uploadPetitionExcel: (
     file: File,
     overrideValidation?: boolean,

@@ -34,6 +34,9 @@ export interface SpecialProceedingAdapter extends BaseCaseAdapter {
   getSpecialProceedingsByIds: (
     ids: (string | number)[],
   ) => Promise<ActionResult<SpecialProceedingData[]>>;
+  getSpecialProceedingsByCaseNumbers: (
+    caseNumbers: string[],
+  ) => Promise<ActionResult<SpecialProceedingData[]>>;
   getSpecialProceedingByCaseNumber: (
     caseNumber: string,
   ) => Promise<ActionResult<SpecialProceedingData>>;

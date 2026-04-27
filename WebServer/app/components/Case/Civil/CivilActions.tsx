@@ -543,3 +543,53 @@ export async function getCivilCasesByIds(
     return { success: false, error: "Failed to fetch cases" };
   }
 }
+
+export async function getCivilCasesByCaseNumbers(
+  caseNumbers: string[],
+): Promise<ActionResult<CivilCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedCaseNumbers = Array.from(
+      new Set(
+        caseNumbers
+          .map((caseNumber) => String(caseNumber ?? "").trim())
+          .filter((caseNumber) => caseNumber.length > 0),
+      ),
+    );
+
+    if (normalizedCaseNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        caseType: CaseType.CIVIL,
+        caseNumber: { in: normalizedCaseNumbers },
+        civilCase: { isNot: null },
+      },
+      include: {
+        civilCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const caseCombined: CivilCaseData[] = cases
+      .filter((c): c is Case & { civilCase: CivilCase } => !!c.civilCase)
+      .map((c) => ({
+        ...c.civilCase,
+        ...c,
+      }));
+
+    return { success: true, result: caseCombined };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases by case number" };
+  }
+}

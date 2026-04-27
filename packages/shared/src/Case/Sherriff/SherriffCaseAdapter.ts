@@ -33,6 +33,9 @@ export interface SherriffCaseAdapter extends BaseCaseAdapter {
   getSheriffCasesByIds: (
     ids: (string | number)[],
   ) => Promise<ActionResult<SheriffCaseData[]>>;
+  getSheriffCasesByCaseNumbers: (
+    caseNumbers: string[],
+  ) => Promise<ActionResult<SheriffCaseData[]>>;
   uploadSheriffExcel: (
     file: File,
     overrideValidation?: boolean,

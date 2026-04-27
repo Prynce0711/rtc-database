@@ -13,5 +13,6 @@ export const IPC_CHANNELS = {
   CRIMINAL_CASE_NUMBER_PREVIEW: "case:criminal:number-preview",
   CRIMINAL_CASE_GET_BY_ID: "case:criminal:get-by-id",
   CRIMINAL_CASE_GET_BY_IDS: "case:criminal:get-by-ids",
+  CRIMINAL_CASE_GET_BY_CASE_NUMBERS: "case:criminal:get-by-case-numbers",
   UPSERT_CRIMINAL_CASES: "sync:criminal:upsert-batch",
 } as const;

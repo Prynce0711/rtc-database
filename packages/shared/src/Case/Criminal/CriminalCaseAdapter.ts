@@ -34,6 +34,9 @@ export interface CriminalCaseAdapter extends BaseCaseAdapter {
   getCriminalCasesByIds: (
     ids: (string | number)[],
   ) => Promise<ActionResult<CriminalCaseData[]>>;
+  getCriminalCasesByCaseNumbers: (
+    caseNumbers: string[],
+  ) => Promise<ActionResult<CriminalCaseData[]>>;
   uploadExcel: (
     file: File,
     overrideValidation?: boolean,

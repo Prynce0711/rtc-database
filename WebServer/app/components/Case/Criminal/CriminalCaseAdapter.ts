@@ -8,6 +8,7 @@ import {
   getCriminalCaseById,
   getCriminalCaseNumberPreview,
   getCriminalCases,
+  getCriminalCasesByCaseNumbers,
   getCriminalCasesByIds,
   getCriminalCaseStats,
   updateCriminalCase,
@@ -26,6 +27,7 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
   deleteCriminalCase,
   getCriminalCaseById,
   getCriminalCasesByIds,
+  getCriminalCasesByCaseNumbers,
   uploadExcel: uploadCriminalCaseExcel,
   exportCasesExcel,
 };

@@ -8,6 +8,7 @@ import {
   deletePetition,
   getPetitionById,
   getPetitionCaseNumberPreview,
+  getPetitionsByCaseNumbers,
   getPetitions,
   getPetitionsByIds,
   getPetitionStats,
@@ -26,6 +27,7 @@ export const petitionCaseAdapter: PetitionCaseAdapter = {
   deletePetition,
   getPetitionById,
   getPetitionsByIds,
+  getPetitionsByCaseNumbers,
   uploadPetitionExcel,
   exportPetitionsExcel,
 };

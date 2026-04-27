@@ -7,6 +7,7 @@ import {
   createSheriffCase,
   deleteSheriffCase,
   getSheriffCaseById,
+  getSheriffCasesByCaseNumbers,
   getSheriffCaseNumberPreview,
   getSheriffCases,
   getSheriffCasesByIds,
@@ -26,6 +27,7 @@ export const sherriffCaseAdapter: SherriffCaseAdapter = {
   deleteSheriffCase,
   getSheriffCaseById,
   getSheriffCasesByIds,
+  getSheriffCasesByCaseNumbers,
   uploadSheriffExcel,
   exportSheriffExcel,
 };

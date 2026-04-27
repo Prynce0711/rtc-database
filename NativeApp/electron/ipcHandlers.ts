@@ -8,6 +8,7 @@ import {
   getCriminalCaseById,
   getCriminalCaseNumberPreview,
   getCriminalCases,
+  getCriminalCasesByCaseNumbers,
   getCriminalCasesByIds,
   getCriminalCaseStats,
 } from "./Sync/Case/CriminalCasesActions";
@@ -77,6 +78,13 @@ ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASE_GET_BY_ID, async (_event, id) => {
 ipcMain.handle(IPC_CHANNELS.CRIMINAL_CASE_GET_BY_IDS, async (_event, ids) => {
   return getCriminalCasesByIds(ids);
 });
+
+ipcMain.handle(
+  IPC_CHANNELS.CRIMINAL_CASE_GET_BY_CASE_NUMBERS,
+  async (_event, caseNumbers) => {
+    return getCriminalCasesByCaseNumbers(caseNumbers);
+  },
+);
 
 ipcMain.handle(IPC_CHANNELS.FILES_SELECT_BASE_FOLDER, async () => {
   const result = await dialog.showOpenDialog({

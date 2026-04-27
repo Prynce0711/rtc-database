@@ -562,3 +562,50 @@ export async function getPetitionByCaseNumber(
     return { success: false, error: "Failed to fetch petition" };
   }
 }
+
+export async function getPetitionsByCaseNumbers(
+  caseNumbers: string[],
+): Promise<ActionResult<PetitionCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedCaseNumbers = Array.from(
+      new Set(
+        caseNumbers
+          .map((caseNumber) => String(caseNumber ?? "").trim())
+          .filter((caseNumber) => caseNumber.length > 0),
+      ),
+    );
+
+    if (normalizedCaseNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const results = await prisma.case.findMany({
+      where: {
+        caseType: CaseType.PETITION,
+        caseNumber: { in: normalizedCaseNumbers },
+        petition: { isNot: null },
+      },
+      include: { petition: true },
+    });
+
+    const petitionCases: PetitionCaseData[] = results
+      .filter((c): c is Case & { petition: Petition } => !!c.petition)
+      .map((c) => ({
+        ...c.petition,
+        ...c,
+      }));
+
+    return { success: true, result: petitionCases };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: "Failed to fetch petitions by case number",
+    };
+  }
+}

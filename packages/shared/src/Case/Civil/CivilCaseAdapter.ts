@@ -34,6 +34,9 @@ export interface CivilCaseAdapter extends BaseCaseAdapter {
   getCivilCasesByIds: (
     ids: (string | number)[],
   ) => Promise<ActionResult<CivilCaseData[]>>;
+  getCivilCasesByCaseNumbers: (
+    caseNumbers: string[],
+  ) => Promise<ActionResult<CivilCaseData[]>>;
   uploadExcel: (
     file: File,
     overrideValidation?: boolean,

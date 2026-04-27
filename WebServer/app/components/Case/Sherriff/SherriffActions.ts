@@ -527,3 +527,53 @@ export async function getSheriffCasesByIds(
     return { success: false, error: "Failed to fetch cases" };
   }
 }
+
+export async function getSheriffCasesByCaseNumbers(
+  caseNumbers: string[],
+): Promise<ActionResult<SheriffCaseData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedCaseNumbers = Array.from(
+      new Set(
+        caseNumbers
+          .map((caseNumber) => String(caseNumber ?? "").trim())
+          .filter((caseNumber) => caseNumber.length > 0),
+      ),
+    );
+
+    if (normalizedCaseNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const cases = await prisma.case.findMany({
+      where: {
+        caseType: CaseType.SHERRIFF,
+        caseNumber: { in: normalizedCaseNumbers },
+        sheriffCase: { isNot: null },
+      },
+      include: {
+        sheriffCase: {
+          omit: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const caseCombined: SheriffCaseData[] = cases
+      .filter((c): c is Case & { sheriffCase: SheriffCase } => !!c.sheriffCase)
+      .map((c) => ({
+        ...c.sheriffCase,
+        ...c,
+      }));
+
+    return { success: true, result: caseCombined };
+  } catch (error) {
+    console.error(error);
+    return { success: false, error: "Failed to fetch cases by case number" };
+  }
+}

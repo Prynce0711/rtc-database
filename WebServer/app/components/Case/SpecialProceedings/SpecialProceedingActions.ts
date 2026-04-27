@@ -624,3 +624,53 @@ export async function getSpecialProceedingByCaseNumber(
     return { success: false, error: "Failed to fetch special proceeding" };
   }
 }
+
+export async function getSpecialProceedingsByCaseNumbers(
+  caseNumbers: string[],
+): Promise<ActionResult<SpecialProceedingData[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const normalizedCaseNumbers = Array.from(
+      new Set(
+        caseNumbers
+          .map((caseNumber) => String(caseNumber ?? "").trim())
+          .filter((caseNumber) => caseNumber.length > 0),
+      ),
+    );
+
+    if (normalizedCaseNumbers.length === 0) {
+      return { success: true, result: [] };
+    }
+
+    const results = await prisma.case.findMany({
+      where: {
+        caseType: CaseType.SCA,
+        caseNumber: { in: normalizedCaseNumbers },
+        specialProceeding: { isNot: null },
+      },
+      include: { specialProceeding: true },
+    });
+
+    const specialProceedings: SpecialProceedingData[] = results
+      .filter(
+        (c): c is Case & { specialProceeding: SpecialProceeding } =>
+          !!c.specialProceeding,
+      )
+      .map((c) => ({
+        ...c.specialProceeding,
+        ...c,
+      }));
+
+    return { success: true, result: specialProceedings };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: "Failed to fetch special proceedings by case number",
+    };
+  }
+}
