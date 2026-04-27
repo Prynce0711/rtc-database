@@ -1,5 +1,7 @@
 import {
   type BackendInfo,
+  UDP_DISCOVERY_MULTICAST_GROUP,
+  UDP_DISCOVERY_MULTICAST_TTL,
   UDP_DISCOVERY_REQUEST_TYPE,
   UDP_SERVICE_NAME,
   UdpDiscoveryRequest,
@@ -10,7 +12,6 @@ import { BrowserWindow } from "electron";
 import { inspectBackendTrust } from "./relayTrust";
 
 const UDP_PORT = 41234;
-const BROADCAST_ADDR = "255.255.255.255";
 const DISCOVERY_BURST_COUNT = 3;
 const DISCOVERY_BURST_INTERVAL_MS = 200;
 const DISCOVERY_RETRY_INTERVAL_MS = 10000;
@@ -43,7 +44,9 @@ const buildBackendInfo = (
   };
 };
 
-const enrichBackendTrust = async (backend: BackendInfo): Promise<BackendInfo> => ({
+const enrichBackendTrust = async (
+  backend: BackendInfo,
+): Promise<BackendInfo> => ({
   ...backend,
   ...(await inspectBackendTrust(backend.url)),
 });
@@ -62,7 +65,7 @@ const sendDiscoveryRequest = (): void => {
   socket.send(
     Buffer.from(JSON.stringify(payload)),
     UDP_PORT,
-    BROADCAST_ADDR,
+    UDP_DISCOVERY_MULTICAST_GROUP,
     (error) => {
       if (error) {
         console.error("[udp] Failed to send discovery request:", error);
@@ -94,8 +97,11 @@ export function startUdpListener(mainWindow: BrowserWindow) {
 
   socket.on("listening", () => {
     const addr = socket!.address();
-    socket!.setBroadcast(true);
-    console.log(`[udp] Discovery client bound on ${addr.address}:${addr.port}`);
+    socket!.setMulticastTTL(UDP_DISCOVERY_MULTICAST_TTL);
+    socket!.setMulticastLoopback(true);
+    console.log(
+      `[udp] Discovery client bound on ${addr.address}:${addr.port} (multicast=${UDP_DISCOVERY_MULTICAST_GROUP}:${UDP_PORT})`,
+    );
 
     sendDiscoveryBurst();
 
@@ -143,7 +149,7 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   });
 
   // Bind to an ephemeral client port so each app instance can discover independently.
-  socket.bind();
+  socket.bind(0, "0.0.0.0");
 }
 
 export function stopUdpListener() {

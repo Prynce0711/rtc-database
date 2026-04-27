@@ -1,4 +1,6 @@
 import {
+  UDP_DISCOVERY_MULTICAST_GROUP,
+  UDP_DISCOVERY_MULTICAST_TTL,
   UDP_DISCOVERY_REQUEST_TYPE,
   UDP_DISCOVERY_RESPONSE_TYPE,
   UDP_SERVICE_NAME,
@@ -9,6 +11,8 @@ import dgram from "dgram";
 import { networkInterfaces } from "node:os";
 
 const UDP_PORT = Number(process.env.UDP_PORT) || 41234;
+const UDP_MULTICAST_GROUP =
+  process.env.UDP_MULTICAST_GROUP?.trim() || UDP_DISCOVERY_MULTICAST_GROUP;
 const ADVERTISED_PORT =
   Number(process.env.UDP_ADVERTISED_PORT) ||
   Number(process.env.RELAY_PORT) ||
@@ -21,6 +25,7 @@ const ADVERTISED_PROTOCOL =
     : "http";
 
 let socket: dgram.Socket | null = null;
+let joinedMulticastInterfaces: string[] = [];
 
 const getAdvertisedHost = (): string => {
   const configuredHost = process.env.UDP_ADVERTISED_HOST?.trim();
@@ -48,6 +53,63 @@ const getAdvertisedHost = (): string => {
   return "127.0.0.1";
 };
 
+const getActiveIpv4Addresses = (): string[] => {
+  const interfaces = networkInterfaces();
+  const addresses = new Set<string>();
+
+  for (const ifaceList of Object.values(interfaces)) {
+    if (!ifaceList) {
+      continue;
+    }
+
+    for (const iface of ifaceList) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        addresses.add(iface.address);
+      }
+    }
+  }
+
+  return [...addresses];
+};
+
+const joinDiscoveryMulticastGroup = (): void => {
+  if (!socket) {
+    return;
+  }
+
+  joinedMulticastInterfaces = [];
+
+  for (const interfaceAddress of getActiveIpv4Addresses()) {
+    try {
+      socket.addMembership(UDP_MULTICAST_GROUP, interfaceAddress);
+      joinedMulticastInterfaces.push(interfaceAddress);
+      console.log(
+        `[udp] Joined multicast group ${UDP_MULTICAST_GROUP} on ${interfaceAddress}.`,
+      );
+    } catch (error) {
+      console.warn(
+        `[udp] Failed to join multicast group ${UDP_MULTICAST_GROUP} on ${interfaceAddress}:`,
+        error,
+      );
+    }
+  }
+
+  if (joinedMulticastInterfaces.length === 0) {
+    try {
+      socket.addMembership(UDP_MULTICAST_GROUP);
+      joinedMulticastInterfaces.push("default");
+      console.log(
+        `[udp] Joined multicast group ${UDP_MULTICAST_GROUP} on the default interface.`,
+      );
+    } catch (error) {
+      console.error(
+        `[udp] Failed to join multicast group ${UDP_MULTICAST_GROUP} on any interface:`,
+        error,
+      );
+    }
+  }
+};
+
 export function startUdpDiscoveryResponder(): void {
   if (socket) {
     return;
@@ -55,12 +117,16 @@ export function startUdpDiscoveryResponder(): void {
 
   const advertisedHost = getAdvertisedHost();
 
-  socket = dgram.createSocket("udp4");
+  socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("listening", () => {
+    socket!.setMulticastTTL(UDP_DISCOVERY_MULTICAST_TTL);
+    socket!.setMulticastLoopback(true);
+    joinDiscoveryMulticastGroup();
+
     const address = socket!.address();
     console.log(
-      `[udp] Discovery responder listening on ${address.address}:${address.port} (backend=${advertisedHost}:${ADVERTISED_PORT})`,
+      `[udp] Discovery responder listening on ${address.address}:${address.port} (multicast=${UDP_MULTICAST_GROUP}, backend=${advertisedHost}:${ADVERTISED_PORT})`,
     );
   });
 
@@ -108,7 +174,7 @@ export function startUdpDiscoveryResponder(): void {
     console.error("[udp] Discovery responder error:", error);
   });
 
-  socket.bind(UDP_PORT);
+  socket.bind(UDP_PORT, "0.0.0.0");
 }
 
 export function stopUdpDiscoveryResponder(): void {
@@ -116,6 +182,8 @@ export function stopUdpDiscoveryResponder(): void {
     socket.close();
     socket = null;
   }
+
+  joinedMulticastInterfaces = [];
 
   console.log("[udp] Discovery responder stopped");
 }

@@ -121,6 +121,8 @@ export * from "./lib/utils";
 export * from "./Sidebar/SidebarAdapter";
 
 export {
+  UDP_DISCOVERY_MULTICAST_GROUP,
+  UDP_DISCOVERY_MULTICAST_TTL,
   UDP_DISCOVERY_REQUEST_TYPE,
   UDP_DISCOVERY_RESPONSE_TYPE,
   UDP_SERVICE_NAME,
