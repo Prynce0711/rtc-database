@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
-  FiCalendar,
   FiCheck,
   FiDownload,
   FiEdit2,
@@ -31,6 +30,7 @@ import Pagination from "../../Table/Pagination";
 import Table from "../../Table/Table";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
 import ReceiveRow from "./ReceivingRow";
+import CaseSectionHeader from "../CaseSectionHeader";
 import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
 import type { ReceivingLogFilterOptions } from "./RecievingLogsSchema";
 import {
@@ -71,7 +71,9 @@ const toReceiveFilters = (filters: FilterValues): ReceiveLogFilterValues => ({
 const ReceiveLogsPage: React.FC<{
   adapter: RecievingLogsAdapter;
   role: Roles;
-}> = ({ adapter, role }) => {
+  mode?: "case" | "transmittal";
+  headerNavigation?: React.ReactNode;
+}> = ({ adapter, role, mode = "case", headerNavigation }) => {
   const router = useAdaptiveRouter();
   const [logs, setLogs] = useState<ReceiveLog[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -84,7 +86,9 @@ const ReceiveLogsPage: React.FC<{
   );
   const [deletingSelected, setDeletingSelected] = useState(false);
 
-  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
+  const isTransmittal = mode === "transmittal";
+  const isAdminOrAtty =
+    !isTransmittal && (role === Roles.ADMIN || role === Roles.ATTY);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -416,124 +420,111 @@ const ReceiveLogsPage: React.FC<{
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
-        {/* Header */}
-        <header className="card bg-base-100 shadow-xl mb-8">
-          <div className="card-body p-4 sm:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                  <span>Cases</span>
-                  <span className="text-base-content/30">/</span>
-                  <span className="text-base-content/70 font-medium">
-                    Receiving Logs
-                  </span>
-                </div>
-                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
-                  Receiving Logs
-                </h2>
-                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
-                  <FiCalendar className="shrink-0 w-4 h-4" />
-                  <span>Track all received documents and case filings</span>
-                </p>
-              </div>
-              {isAdminOrAtty && (
-                <div className="flex flex-col items-end gap-3">
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <button
-                      className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
-                      onClick={async () => {
-                        setExporting(true);
-                        try {
-                          const result = await adapter.exportReceiveLogsExcel();
-                          if (!result.success) {
-                            statusPopup.showError(
-                              result.error || "Failed to export receiving logs",
-                            );
-                            return;
-                          }
-
-                          if (!result.result) {
-                            statusPopup.showError("No data to export");
-                            return;
-                          }
-
-                          const { fileName, base64 } = result.result;
-                          const byteCharacters = atob(base64);
-                          const byteNumbers = new Array(byteCharacters.length);
-                          for (let i = 0; i < byteCharacters.length; i++) {
-                            byteNumbers[i] = byteCharacters.charCodeAt(i);
-                          }
-                          const byteArray = new Uint8Array(byteNumbers);
-                          const blob = new Blob([byteArray], {
-                            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                          });
-
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = fileName;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(url);
-                        } finally {
-                          setExporting(false);
+        <div className="mb-8">
+          <CaseSectionHeader
+            sectionLabel="Receiving Logs"
+            title="Receiving Logs"
+            description="Track all received documents and case filings"
+            navigation={headerNavigation}
+            actions={
+              isAdminOrAtty ? (
+                <>
+                  <button
+                    className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                    onClick={async () => {
+                      setExporting(true);
+                      try {
+                        const result = await adapter.exportReceiveLogsExcel();
+                        if (!result.success) {
+                          statusPopup.showError(
+                            result.error || "Failed to export receiving logs",
+                          );
+                          return;
                         }
-                      }}
-                      disabled={exporting}
-                      aria-busy={exporting}
-                      aria-label="Export data to Excel"
-                    >
-                      <FiDownload className="h-5 w-5" />
-                      {exporting ? "Exporting..." : "Export Excel"}
-                    </button>
 
-                    <button
-                      className={ButtonStyles.primary}
-                      onClick={() => {
-                        router.push("/user/cases/receiving/add");
-                      }}
-                      aria-label="Add new receiving log entry"
+                        if (!result.result) {
+                          statusPopup.showError("No data to export");
+                          return;
+                        }
+
+                        const { fileName, base64 } = result.result;
+                        const byteCharacters = atob(base64);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                          byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], {
+                          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        });
+
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                      } finally {
+                        setExporting(false);
+                      }
+                    }}
+                    disabled={exporting}
+                    aria-busy={exporting}
+                    aria-label="Export data to Excel"
+                  >
+                    <FiDownload className="h-5 w-5" />
+                    {exporting ? "Exporting..." : "Export Excel"}
+                  </button>
+
+                  <button
+                    className={ButtonStyles.primary}
+                    onClick={() => {
+                      router.push("/user/cases/receiving/add");
+                    }}
+                    aria-label="Add new receiving log entry"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Add Entry
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <span>Hover over table cells to see full details</span>
-            </div>
-          </div>
-        </header>
+                      <path
+                        fillRule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Add Entry
+                  </button>
+                </>
+              ) : undefined
+            }
+            footer={
+              <div className="inline-flex items-center gap-2 rounded-lg border border-info/20 bg-info/10 px-3 py-1.5 text-xs font-medium text-info select-none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Hover over table cells to see full details</span>
+              </div>
+            }
+          />
+        </div>
 
         {/* Search + Filter + Add */}
         <div className="relative mb-6">
@@ -762,7 +753,11 @@ const ReceiveLogsPage: React.FC<{
               <ReceiveRow
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
-                onView={(l) => router.push(`/user/cases/receiving/${l.id}`)}
+                onView={
+                  isTransmittal
+                    ? undefined
+                    : (l) => router.push(`/user/cases/receiving/${l.id}`)
+                }
                 isAdminOrAtty={isAdminOrAtty}
                 isSelected={selectedLogIds.includes(
                   (log as unknown as ReceiveLog).id,

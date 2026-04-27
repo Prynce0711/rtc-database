@@ -10,7 +10,6 @@ import React, {
 } from "react";
 import {
   FiBarChart2,
-  FiCalendar,
   FiCheck,
   FiDownload,
   FiEdit2,
@@ -42,6 +41,7 @@ import {
   previewCivilCaseImport,
   saveCaseImportDraft,
 } from "../importPreview";
+import CaseSectionHeader from "../CaseSectionHeader";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import CivilCaseRow from "./CivilCaseRow";
 import {
@@ -69,10 +69,12 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
 
 const PAGE_SIZE = 10;
 
-const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
-  role,
-  adapter,
-}) => {
+const CivilCasePage: React.FC<{
+  role: Roles;
+  adapter: CivilCaseAdapter;
+  mode?: "case" | "transmittal";
+  headerNavigation?: React.ReactNode;
+}> = ({ role, adapter, mode = "case", headerNavigation }) => {
   const router = useAdaptiveNavigation();
   const statusPopup = usePopup();
 
@@ -100,7 +102,9 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const canManage = role === Roles.ADMIN || role === Roles.ATTY;
+  const isTransmittal = mode === "transmittal";
+  const canManage =
+    !isTransmittal && (role === Roles.ADMIN || role === Roles.ATTY);
   const isSelecting = canManage && selectionMode !== null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -393,47 +397,34 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="card bg-base-100 shadow-xl">
-        <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                <span>Cases</span>
-                <span className="text-base-content/30">/</span>
-                <span className="text-base-content/70 font-medium">Civil</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                Civil Cases
-              </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/50">
-                <FiCalendar className="shrink-0" />
-                <span>Manage civil cases and filings</span>
-              </p>
-            </div>
+      <CaseSectionHeader
+        sectionLabel="Civil"
+        title="Civil Cases"
+        description="Manage civil cases and filings"
+        navigation={headerNavigation}
+        actions={
+          <>
+            <button
+              className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+              onClick={() => void handleExport()}
+              disabled={exporting}
+            >
+              <FiDownload className="h-5 w-5" />
+              {exporting ? "Exporting..." : "Export Excel"}
+            </button>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            {canManage && (
               <button
-                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
-                onClick={() => void handleExport()}
-                disabled={exporting}
+                className={ButtonStyles.primary}
+                onClick={() => router.push("/user/cases/civil/add")}
               >
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
+                <FiFileText className="h-5 w-5" />
+                Add Record
               </button>
-
-              {canManage && (
-                <button
-                  className={ButtonStyles.primary}
-                  onClick={() => router.push("/user/cases/civil/add")}
-                >
-                  <FiFileText className="h-5 w-5" />
-                  Add Record
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+            )}
+          </>
+        }
+      />
 
       <div className="relative">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -674,7 +665,11 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             <CivilCaseRow
               key={caseItem.id}
               caseItem={caseItem}
-              onView={(item) => router.push(`/user/cases/civil/${item.id}`)}
+              onView={
+                isTransmittal
+                  ? undefined
+                  : (item) => router.push(`/user/cases/civil/${item.id}`)
+              }
               selected={selectedCaseIds.includes(caseItem.id)}
               isSelecting={isSelecting}
               onToggleSelect={

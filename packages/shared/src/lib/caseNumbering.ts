@@ -1,4 +1,8 @@
-import { CaseType, Prisma } from "../generated/prisma/client";
+import {
+  CaseType,
+  Prisma,
+  TransmittalSection,
+} from "../generated/prisma/client";
 
 type ParsedCaseNumber = {
   area: string;
@@ -248,6 +252,173 @@ export const syncSheriffCaseCounterToAtLeast = async (
       where: {
         caseType_area_year: {
           caseType: CaseType.SHERRIFF,
+          area: "",
+          year,
+        },
+      },
+      data: {
+        last: candidateNumber,
+      },
+    });
+  }
+};
+
+export const getNextTransmittalCaseNumber = async (
+  tx: Prisma.TransactionClient,
+  section: TransmittalSection,
+  area: string,
+  year: number,
+): Promise<{
+  number: number;
+  caseNumber: string;
+  area: string;
+  year: number;
+}> => {
+  const normalizedArea = area.toUpperCase();
+
+  const counter = await tx.transmittalCaseCounter.upsert({
+    where: {
+      section_area_year: {
+        section,
+        area: normalizedArea,
+        year,
+      },
+    },
+    update: {
+      last: { increment: 1 },
+    },
+    create: {
+      section,
+      area: normalizedArea,
+      year,
+      last: 1,
+    },
+  });
+
+  return {
+    number: counter.last,
+    caseNumber: formatAutoCaseNumber(normalizedArea, counter.last, year),
+    area: normalizedArea,
+    year,
+  };
+};
+
+export const getNextSheriffTransmittalCaseNumber = async (
+  tx: Prisma.TransactionClient,
+  year: number,
+): Promise<{
+  number: number;
+  caseNumber: string;
+  year: number;
+}> => {
+  const counter = await tx.transmittalCaseCounter.upsert({
+    where: {
+      section_area_year: {
+        section: TransmittalSection.SHERIFF,
+        area: "",
+        year,
+      },
+    },
+    update: {
+      last: { increment: 1 },
+    },
+    create: {
+      section: TransmittalSection.SHERIFF,
+      area: "",
+      year,
+      last: 1,
+    },
+  });
+
+  return {
+    number: counter.last,
+    caseNumber: formatSheriffCaseNumber(counter.last, year),
+    year,
+  };
+};
+
+export const syncTransmittalCaseCounterToAtLeast = async (
+  tx: Prisma.TransactionClient,
+  section: TransmittalSection,
+  area: string,
+  year: number,
+  candidateNumber: number,
+): Promise<void> => {
+  if (!Number.isFinite(candidateNumber) || candidateNumber <= 0) return;
+
+  const normalizedArea = area.toUpperCase();
+  const existing = await tx.transmittalCaseCounter.findUnique({
+    where: {
+      section_area_year: {
+        section,
+        area: normalizedArea,
+        year,
+      },
+    },
+  });
+
+  if (!existing) {
+    await tx.transmittalCaseCounter.create({
+      data: {
+        section,
+        area: normalizedArea,
+        year,
+        last: candidateNumber,
+      },
+    });
+    return;
+  }
+
+  if (candidateNumber > existing.last) {
+    await tx.transmittalCaseCounter.update({
+      where: {
+        section_area_year: {
+          section,
+          area: normalizedArea,
+          year,
+        },
+      },
+      data: {
+        last: candidateNumber,
+      },
+    });
+  }
+};
+
+export const syncSheriffTransmittalCaseCounterToAtLeast = async (
+  tx: Prisma.TransactionClient,
+  year: number,
+  candidateNumber: number,
+): Promise<void> => {
+  if (!Number.isFinite(candidateNumber) || candidateNumber <= 0) return;
+
+  const existing = await tx.transmittalCaseCounter.findUnique({
+    where: {
+      section_area_year: {
+        section: TransmittalSection.SHERIFF,
+        area: "",
+        year,
+      },
+    },
+  });
+
+  if (!existing) {
+    await tx.transmittalCaseCounter.create({
+      data: {
+        section: TransmittalSection.SHERIFF,
+        area: "",
+        year,
+        last: candidateNumber,
+      },
+    });
+    return;
+  }
+
+  if (candidateNumber > existing.last) {
+    await tx.transmittalCaseCounter.update({
+      where: {
+        section_area_year: {
+          section: TransmittalSection.SHERIFF,
           area: "",
           year,
         },

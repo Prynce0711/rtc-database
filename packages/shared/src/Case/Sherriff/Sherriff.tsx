@@ -23,7 +23,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FiAlertCircle,
   FiBarChart2,
-  FiCalendar,
   FiCheck,
   FiDownload,
   FiEdit2,
@@ -42,6 +41,7 @@ import {
   previewSheriffCaseImport,
   saveCaseImportDraft,
 } from "../importPreview";
+import CaseSectionHeader from "../CaseSectionHeader";
 import SherriffCaseRow from "./SherriffCaseRow";
 
 type CaseFilterValues = SheriffCaseFilters;
@@ -63,7 +63,9 @@ type SortConfig = { key: SortKey; order: "asc" | "desc" };
 const Sherriff: React.FC<{
   role: Roles;
   adapter: SherriffCaseAdapter;
-}> = ({ role, adapter }) => {
+  mode?: "case" | "transmittal";
+  headerNavigation?: React.ReactNode;
+}> = ({ role, adapter, mode = "case", headerNavigation }) => {
   const router = useAdaptiveRouter();
   const statusPopup = usePopup();
   const [records, setRecords] = useState<SheriffCaseData[]>([]);
@@ -89,7 +91,9 @@ const Sherriff: React.FC<{
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const isAdminOrAtty = role === "admin" || role === "atty";
+  const isTransmittal = mode === "transmittal";
+  const isAdminOrAtty =
+    !isTransmittal && (role === "admin" || role === "atty");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -423,80 +427,67 @@ const Sherriff: React.FC<{
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
-        {/* Header */}
-        <header className="card bg-base-100 shadow-xl mb-8">
-          <div className="card-body p-4 sm:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                  <span>Cases</span>
-                  <span className="text-base-content/30">/</span>
-                  <span className="text-base-content/70 font-medium">
-                    Sheriff
-                  </span>
-                </div>
-                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
-                  Sheriff Cases
-                </h2>
-                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
-                  <FiCalendar className="shrink-0 w-4 h-4" />
-                  <span>Manage sheriff cases and filings</span>
-                </p>
+        <div className="mb-8">
+          <CaseSectionHeader
+            sectionLabel="Sheriff"
+            title="Sheriff Cases"
+            description="Manage sheriff cases and filings"
+            navigation={headerNavigation}
+            actions={
+              isAdminOrAtty ? (
+                <>
+                  <button
+                    className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                    onClick={handleExport}
+                    disabled={exporting}
+                  >
+                    <FiDownload className="h-5 w-5" />
+                    {exporting ? "Exporting..." : "Export Excel"}
+                  </button>
+                  <button
+                    className={ButtonStyles.primary}
+                    onClick={() => router.push("/user/cases/sheriff/add")}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Add Record
+                  </button>
+                </>
+              ) : undefined
+            }
+            footer={
+              <div className="inline-flex items-center gap-2 rounded-lg border border-info/20 bg-info/10 px-3 py-1.5 text-xs font-medium text-info select-none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Hover over table cells to see full details</span>
               </div>
-              {isAdminOrAtty && (
-                <div className="flex flex-col items-end gap-3">
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <button
-                      className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
-                      onClick={handleExport}
-                      disabled={exporting}
-                    >
-                      <FiDownload className="h-5 w-5" />
-                      {exporting ? "Exporting..." : "Export Excel"}
-                    </button>
-                    <button
-                      className={ButtonStyles.primary}
-                      onClick={() => router.push("/user/cases/sheriff/add")}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Add Record
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <span>Hover over table cells to see full details</span>
-            </div>
-          </div>
-        </header>
+            }
+          />
+        </div>
 
         {/* Search and Actions */}
         <div className="relative mb-6">
@@ -710,18 +701,25 @@ const Sherriff: React.FC<{
               <SherriffCaseRow
                 key={r.id}
                 record={r}
-                onRowClick={(item) => {
-                  try {
-                    localStorage.setItem("__temp_case", JSON.stringify(item));
-                    localStorage.setItem(
-                      "__temp_cases",
-                      JSON.stringify(records || []),
-                    );
-                  } catch (e) {
-                    // ignore
-                  }
-                  router.push(`/user/cases/sheriff/${item.id}`);
-                }}
+                onRowClick={
+                  isTransmittal
+                    ? undefined
+                    : (item) => {
+                        try {
+                          localStorage.setItem(
+                            "__temp_case",
+                            JSON.stringify(item),
+                          );
+                          localStorage.setItem(
+                            "__temp_cases",
+                            JSON.stringify(records || []),
+                          );
+                        } catch (e) {
+                          // ignore
+                        }
+                        router.push(`/user/cases/sheriff/${item.id}`);
+                      }
+                }
                 selected={selectedRecordIds.includes(r.id)}
                 isSelecting={isSelecting}
                 onToggleSelect={

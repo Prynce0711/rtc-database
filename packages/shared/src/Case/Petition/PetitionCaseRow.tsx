@@ -12,12 +12,13 @@ const PetitionCaseRow = ({
   canManage,
 }: {
   caseItem: PetitionCaseData;
-  onView: (item: PetitionCaseData) => void;
+  onView?: (item: PetitionCaseData) => void;
   selected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
   canManage: boolean;
 }) => {
+  const isClickable = typeof onView === "function";
   const dateStr = caseItem.date
     ? new Date(caseItem.date).toLocaleDateString("en-PH", {
         year: "numeric",
@@ -28,7 +29,7 @@ const PetitionCaseRow = ({
 
   return (
     <tr
-      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm ${
+      className={`bg-base-100 hover:bg-base-200 transition-colors ${isClickable ? "cursor-pointer" : ""} text-sm ${
         isSelecting && selected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
@@ -36,7 +37,7 @@ const PetitionCaseRow = ({
           onToggleSelect(caseItem.id, !selected);
           return;
         }
-        onView(caseItem);
+        onView?.(caseItem);
       }}
     >
       {canManage && isSelecting && (

@@ -20,14 +20,16 @@ const CivilCaseRow = ({
   onToggleSelect,
 }: {
   caseItem: CivilCaseData;
-  onView: (c: CivilCaseData) => void;
+  onView?: (c: CivilCaseData) => void;
   selected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
+  const isClickable = typeof onView === "function";
+
   return (
     <tr
-      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm ${
+      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 ${isClickable ? "cursor-pointer" : ""} text-sm ${
         isSelecting && selected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
@@ -35,7 +37,7 @@ const CivilCaseRow = ({
           onToggleSelect?.(caseItem.id, !selected);
           return;
         }
-        onView(caseItem);
+        onView?.(caseItem);
       }}
     >
       {isSelecting && (
