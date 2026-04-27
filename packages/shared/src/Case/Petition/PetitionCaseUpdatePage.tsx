@@ -814,7 +814,7 @@ const PetitionCaseUpdatePage = ({
   );
 
   const existingCaseRowCount = entries.filter(
-    (entry) => entry.isManual && isCaseAlreadyExisting(entry.caseNumber),
+    (entry) => isCaseAlreadyExisting(getDisplayCaseNumber(entry)),
   ).length;
 
   const duplicateCaseNumbers = useMemo(() => {
@@ -858,8 +858,7 @@ const PetitionCaseUpdatePage = ({
     const caseNumbers = Array.from(
       new Set(
         entries
-          .filter((entry) => entry.isManual)
-          .map((entry) => normalizeCaseNumber(entry.caseNumber))
+          .map((entry) => normalizeCaseNumber(getDisplayCaseNumber(entry)))
           .filter((value) => value.length > 0),
       ),
     );

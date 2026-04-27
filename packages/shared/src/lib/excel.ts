@@ -53,7 +53,9 @@ export const getRowValuesBySchema = <T extends z.ZodRawShape>(
 
   for (const key of Object.keys(headers) as Array<keyof T>) {
     const aliases = headers[key] ?? [];
-    values[key] = findColumnValue(row, aliases);
+    values[key] = findColumnValue(row, aliases, {
+      mode: String(key) === "caseNumber" ? "strict-header" : "fuzzy",
+    });
   }
 
   return values;
@@ -69,7 +71,9 @@ export const normalizeRowBySchema = <T extends z.ZodRawShape>(
 
   for (const key of Object.keys(headers) as Array<keyof T>) {
     const aliases = headers[key] ?? [];
-    const rawValue = findColumnValue(row, aliases);
+    const rawValue = findColumnValue(row, aliases, {
+      mode: String(key) === "caseNumber" ? "strict-header" : "fuzzy",
+    });
     values[key] = normalizeValueBySchema(rawValue, shape[key] as unknown);
   }
 
@@ -79,6 +83,12 @@ export const normalizeRowBySchema = <T extends z.ZodRawShape>(
 export type ExportExcelData = {
   fileName: string;
   base64: string;
+};
+
+type ColumnLookupMode = "fuzzy" | "strict-header";
+
+type FindColumnValueOptions = {
+  mode?: ColumnLookupMode;
 };
 
 // Helper to convert Excel serial date to JS Date
@@ -161,11 +171,43 @@ const generatePeriodVariations = (text: string): string[] => {
 export const findColumnValue = (
   row: Record<string, unknown>,
   possibleNames: string[],
+  options?: FindColumnValueOptions,
 ): unknown => {
+  const mode = options?.mode ?? "fuzzy";
+
   // Generate all variations with periods
   const allVariations: string[] = [];
   for (const name of possibleNames) {
     allVariations.push(...generatePeriodVariations(name));
+  }
+
+  if (mode === "strict-header") {
+    const normalize = (value: string) =>
+      value.toLowerCase().replace(/[\s.]/g, "").trim();
+    const normalizedNames = Array.from(
+      new Set(
+        allVariations
+          .map(normalize)
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    for (const key of Object.keys(row)) {
+      const normalizedKey = normalize(key);
+      if (!normalizedKey) continue;
+
+      const isHeaderMatch = normalizedNames.some(
+        (normalizedName) =>
+          normalizedKey === normalizedName ||
+          normalizedKey.startsWith(normalizedName),
+      );
+
+      if (isHeaderMatch) {
+        return row[key];
+      }
+    }
+
+    return undefined;
   }
 
   // First try exact match (case-insensitive)

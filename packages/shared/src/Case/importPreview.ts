@@ -365,19 +365,7 @@ export const previewCivilCaseImport = async (
 
       const caseNumberRaw =
         typeof cells.caseNumber === "string" ? cells.caseNumber.trim() : "";
-      const petitioner =
-        typeof cells.petitioners === "string"
-          ? cells.petitioners.trim().replace(/\s+/g, "-")
-          : "";
-      const respondent =
-        typeof cells.defendants === "string"
-          ? cells.defendants.trim().replace(/\s+/g, "-")
-          : "";
-      const dateFiled = parseDateCell(cells.dateFiled);
-
-      const caseNumber = caseNumberRaw.toLowerCase().includes("undocketed")
-        ? `${caseNumberRaw}${petitioner ? `-${petitioner}` : ""}${respondent ? `-${respondent}` : ""}-${dateFiled?.getTime() ?? "nofiledate"}`
-        : caseNumberRaw;
+      const caseNumber = caseNumberRaw;
 
       return {
         mapped: {
@@ -385,7 +373,7 @@ export const previewCivilCaseImport = async (
           caseNumber,
           assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
           caseType: CaseType.CIVIL,
-          undocketed: caseNumber.toLowerCase().includes("undocketed"),
+          undocketed: caseNumberRaw.toLowerCase().includes("undocketed"),
         },
       };
     },
