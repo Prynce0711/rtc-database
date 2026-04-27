@@ -22,6 +22,9 @@ export const BaseCaseSchema = z.object({
       excelHeaders([
         "Case No",
         "Case Number",
+        "Petition No",
+        "Petition No.",
+        "Petition Number",
         "Criminal Case No",
         "Criminal Case Number",
       ]),

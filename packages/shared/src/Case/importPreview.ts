@@ -97,6 +97,26 @@ const moveErrorColumnLast = (row: FailedRow): FailedRow => {
   };
 };
 
+const buildRowObjectFromHeaders = (
+  headerRow: string[],
+  row: unknown[],
+): Record<string, unknown> => {
+  const mapped: Record<string, unknown> = {};
+  const maxCols = Math.max(headerRow.length, row.length);
+
+  for (let index = 0; index < maxCols; index += 1) {
+    const header =
+      typeof headerRow[index] === "string" ? headerRow[index].trim() : "";
+    const baseKey = header || `__EMPTY_${index}`;
+    const key = Object.prototype.hasOwnProperty.call(mapped, baseKey)
+      ? `${baseKey}_${index}`
+      : baseKey;
+    mapped[key] = row[index];
+  }
+
+  return mapped;
+};
+
 const buildFailedExcelData = (
   failedRowsBySheet: Map<string, FailedRow[]>,
 ): ExportExcelData | undefined => {
@@ -155,13 +175,14 @@ const processExcelPreview = async <
     ].filter((value): value is string => typeof value === "string");
 
     const headerInfo = getHeaderRowInfo(worksheet, expectedHeaders);
-    const rawSheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-      worksheet,
-      {
-        header: headerInfo.headerRow,
-        range: headerInfo.headerRowIndex + 1,
-        blankrows: false,
-      },
+    const rawSheetRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      header: 1,
+      range: headerInfo.headerRowIndex + 1,
+      blankrows: false,
+      defval: null,
+    }) as unknown[][];
+    const rawSheetData = rawSheetRows.map((row) =>
+      buildRowObjectFromHeaders(headerInfo.headerRow, row),
     );
 
     const sheetData = skipRowsWithoutCell
@@ -321,6 +342,318 @@ const convertReceivingCaseType = (value: string | undefined): CaseType => {
   return caseTypeMap[normalized] ?? directMatch ?? CaseType.UNKNOWN;
 };
 
+const PETITION_CASE_NUMBER_HEADERS = [
+  "Case Number",
+  "Case No",
+  "Petition No",
+  "Petition No.",
+  "Petition Number",
+];
+
+const PETITION_YEAR_HEADERS = ["Year", "Case Year"];
+const SPECIAL_PROCEEDING_CASE_NUMBER_HEADERS = [
+  "Case Number",
+  "Case no.",
+  "Case No.",
+  "Case No",
+  "CaseNumber",
+  "SPC. Case Number",
+  "SPC Case No.",
+  "SPC. Number",
+  "SPC Number",
+  "SPC. No.",
+  "SPC No.",
+];
+
+const toTrimmedString = (value: unknown): string => {
+  if (value == null) {
+    return "";
+  }
+
+  return String(value).trim();
+};
+
+const getOrderedRowValues = (row: Record<string, unknown>): string[] =>
+  Object.values(row)
+    .map(toTrimmedString)
+    .filter((value) => value.length > 0);
+
+const normalizeComparableCellText = (value: unknown): string =>
+  toTrimmedString(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+const parseCaseYear = (value: unknown): number | null => {
+  const text = toTrimmedString(value);
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/(\d{4})/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number.parseInt(match[1], 10);
+  return Number.isNaN(year) ? null : year;
+};
+
+const normalizeAreaFragment = (value: unknown): string => {
+  const cleaned = toTrimmedString(value).replace(/[^A-Za-z]/g, "").toUpperCase();
+  return cleaned;
+};
+
+const formatPetitionCaseNumber = (number: number, year: number): string =>
+  `P-${String(number).padStart(2, "0")}-${year}`;
+
+const formatSpecialProceedingCaseNumber = (
+  number: number,
+  area: string,
+  year: number,
+): string => `${String(number).padStart(2, "0")}-${area.toUpperCase()}-${year}`;
+
+const buildPetitionCaseNumberFromRowFragments = (
+  row: Record<string, unknown>,
+): string | null => {
+  const values = getOrderedRowValues(row);
+
+  for (let index = 0; index < values.length; index += 1) {
+    const current = values[index];
+    const next = values[index + 1] ?? "";
+    const third = values[index + 2] ?? "";
+
+    const combined = [current, next, third].join(" ").trim();
+    const combinedMatch = combined.match(
+      /^P\s*-\s*(\d+)\s*-\s*(\d{4})$/i,
+    );
+    if (combinedMatch) {
+      const number = Number.parseInt(combinedMatch[1], 10);
+      const year = Number.parseInt(combinedMatch[2], 10);
+      if (!Number.isNaN(number) && !Number.isNaN(year)) {
+        return formatPetitionCaseNumber(number, year);
+      }
+    }
+
+    if (
+      /^P-?$/i.test(current) &&
+      /^\d+$/.test(next) &&
+      /^-?\d{4}$/.test(third)
+    ) {
+      const number = Number.parseInt(next, 10);
+      const year = Number.parseInt(third.replace(/^-/, ""), 10);
+      if (!Number.isNaN(number) && !Number.isNaN(year)) {
+        return formatPetitionCaseNumber(number, year);
+      }
+    }
+
+    const currentAndNext = `${current} ${next}`.trim();
+    const prefixPlusNumberMatch = currentAndNext.match(/^P\s*-\s*(\d+)$/i);
+    if (prefixPlusNumberMatch && /^-?\d{4}$/.test(third)) {
+      const number = Number.parseInt(prefixPlusNumberMatch[1], 10);
+      const year = Number.parseInt(third.replace(/^-/, ""), 10);
+      if (!Number.isNaN(number) && !Number.isNaN(year)) {
+        return formatPetitionCaseNumber(number, year);
+      }
+    }
+  }
+
+  return null;
+};
+
+const isLikelyPetitionHeaderRow = (row: Record<string, unknown>): boolean => {
+  const values = getOrderedRowValues(row).map(normalizeComparableCellText);
+  const headerTokens = [
+    "petitionno",
+    "petitionnumber",
+    "branch",
+    "petitioner",
+    "petitioners",
+    "petitionerss",
+    "nature",
+    "year",
+  ];
+
+  const matchCount = values.filter((value) =>
+    headerTokens.some(
+      (token) => value === token || value.includes(token) || token.includes(value),
+    ),
+  ).length;
+
+  return matchCount >= 2;
+};
+
+const buildSpecialProceedingCaseNumberFromRowFragments = (
+  row: Record<string, unknown>,
+): string | null => {
+  const values = getOrderedRowValues(row);
+
+  for (let index = 0; index < values.length; index += 1) {
+    const current = values[index];
+    const next = values[index + 1] ?? "";
+    const third = values[index + 2] ?? "";
+
+    const combined = [current, next, third].join(" ").trim();
+    const numberFirstMatch = combined.match(
+      /^(\d+)\s*-\s*([A-Za-z]+)\s*-\s*(\d{4})$/i,
+    );
+    if (numberFirstMatch) {
+      const number = Number.parseInt(numberFirstMatch[1], 10);
+      const year = Number.parseInt(numberFirstMatch[3], 10);
+      const area = normalizeAreaFragment(numberFirstMatch[2]);
+      if (!Number.isNaN(number) && !Number.isNaN(year) && area) {
+        return formatSpecialProceedingCaseNumber(number, area, year);
+      }
+    }
+
+    if (/^\d+$/.test(current) && normalizeAreaFragment(next) && /^\d{4}$/.test(third)) {
+      const number = Number.parseInt(current, 10);
+      const year = Number.parseInt(third, 10);
+      const area = normalizeAreaFragment(next);
+      if (!Number.isNaN(number) && !Number.isNaN(year) && area) {
+        return formatSpecialProceedingCaseNumber(number, area, year);
+      }
+    }
+
+    if (
+      /^\d+$/.test(current) &&
+      normalizeAreaFragment(next) &&
+      /^-?\d{4}$/.test(third)
+    ) {
+      const number = Number.parseInt(current, 10);
+      const year = Number.parseInt(third.replace(/^-/, ""), 10);
+      const area = normalizeAreaFragment(next);
+      if (!Number.isNaN(number) && !Number.isNaN(year) && area) {
+        return formatSpecialProceedingCaseNumber(number, area, year);
+      }
+    }
+  }
+
+  return null;
+};
+
+const isLikelySpecialProceedingHeaderRow = (
+  row: Record<string, unknown>,
+): boolean => {
+  const values = getOrderedRowValues(row).map(normalizeComparableCellText);
+  const headerTokens = [
+    "spcno",
+    "spccasenumber",
+    "raffledto",
+    "raffledtobranch",
+    "raffled",
+    "branch",
+    "petitioner",
+    "petitioners",
+    "nature",
+    "respondent",
+    "date",
+  ];
+
+  const matchCount = values.filter((value) =>
+    headerTokens.some(
+      (token) => value === token || value.includes(token) || token.includes(value),
+    ),
+  ).length;
+
+  return matchCount >= 2;
+};
+
+const normalizePetitionImportedCaseNumber = (
+  row: Record<string, unknown>,
+  fallbackValue: unknown,
+): string => {
+  const reconstructedFromFragments =
+    buildPetitionCaseNumberFromRowFragments(row);
+  if (reconstructedFromFragments) {
+    return reconstructedFromFragments;
+  }
+
+  const rawCaseNumber =
+    findColumnValue(row, PETITION_CASE_NUMBER_HEADERS) ?? fallbackValue;
+  const caseNumberText = toTrimmedString(rawCaseNumber);
+  const yearFromColumn = parseCaseYear(
+    findColumnValue(row, PETITION_YEAR_HEADERS),
+  );
+
+  if (!caseNumberText) {
+    return "";
+  }
+
+  const prefixedMatch = caseNumberText.match(
+    /^([A-Za-z]+)\s*-\s*(\d+)\s*-\s*(\d{4})$/,
+  );
+  if (prefixedMatch) {
+    const number = Number.parseInt(prefixedMatch[2], 10);
+    const year = Number.parseInt(prefixedMatch[3], 10);
+    if (!Number.isNaN(number) && !Number.isNaN(year)) {
+      return formatPetitionCaseNumber(number, year);
+    }
+  }
+
+  const numberYearMatch = caseNumberText.match(/^(\d+)\s*-\s*(\d{4})$/);
+  if (numberYearMatch) {
+    const number = Number.parseInt(numberYearMatch[1], 10);
+    const year = Number.parseInt(numberYearMatch[2], 10);
+    if (!Number.isNaN(number) && !Number.isNaN(year)) {
+      return formatPetitionCaseNumber(number, year);
+    }
+  }
+
+  const numberOnlyMatch = caseNumberText.match(/^\d+$/);
+  if (numberOnlyMatch && yearFromColumn != null) {
+    const number = Number.parseInt(caseNumberText, 10);
+    if (!Number.isNaN(number)) {
+      return formatPetitionCaseNumber(number, yearFromColumn);
+    }
+  }
+
+  return caseNumberText.replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+};
+
+const normalizeSpecialProceedingImportedCaseNumber = (
+  row: Record<string, unknown>,
+  fallbackValue: unknown,
+): string => {
+  const reconstructedFromFragments =
+    buildSpecialProceedingCaseNumberFromRowFragments(row);
+  if (reconstructedFromFragments) {
+    return reconstructedFromFragments;
+  }
+
+  const rawCaseNumber =
+    findColumnValue(row, SPECIAL_PROCEEDING_CASE_NUMBER_HEADERS) ??
+    fallbackValue;
+  const caseNumberText = toTrimmedString(rawCaseNumber);
+
+  if (!caseNumberText) {
+    return "";
+  }
+
+  const numberFirstMatch = caseNumberText.match(
+    /^(\d+)\s*-\s*([A-Za-z]+)\s*-\s*(\d{4})$/,
+  );
+  if (numberFirstMatch) {
+    const number = Number.parseInt(numberFirstMatch[1], 10);
+    const year = Number.parseInt(numberFirstMatch[3], 10);
+    const area = normalizeAreaFragment(numberFirstMatch[2]);
+    if (!Number.isNaN(number) && !Number.isNaN(year) && area) {
+      return formatSpecialProceedingCaseNumber(number, area, year);
+    }
+  }
+
+  const areaFirstMatch = caseNumberText.match(
+    /^([A-Za-z]+)\s*-\s*(\d+)\s*-\s*(\d{4})$/,
+  );
+  if (areaFirstMatch) {
+    const number = Number.parseInt(areaFirstMatch[2], 10);
+    const year = Number.parseInt(areaFirstMatch[3], 10);
+    const area = normalizeAreaFragment(areaFirstMatch[1]);
+    if (!Number.isNaN(number) && !Number.isNaN(year) && area) {
+      return formatSpecialProceedingCaseNumber(number, area, year);
+    }
+  }
+
+  return caseNumberText.replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+};
+
 const isValidWorkbookFile = (file: File): boolean => {
   const fileName = file.name.toLowerCase();
   return fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
@@ -440,9 +773,19 @@ export const previewPetitionCaseImport = async (
   }
 
   const headerMap = getExcelHeaderMap(PetitionCaseSchema);
-  const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
-  const getMappedCells = (row: Record<string, unknown>) =>
-    normalizeRowBySchema(PetitionCaseSchema, row);
+  const caseNumberHeaders = Array.from(
+    new Set([
+      ...(headerMap.caseNumber ?? ["Case Number"]),
+      ...PETITION_CASE_NUMBER_HEADERS,
+    ]),
+  );
+  const getMappedCells = (row: Record<string, unknown>) => {
+    const cells = normalizeRowBySchema(PetitionCaseSchema, row);
+    return {
+      ...cells,
+      caseNumber: normalizePetitionImportedCaseNumber(row, cells.caseNumber),
+    };
+  };
 
   return processExcelPreview({
     file,
@@ -451,6 +794,10 @@ export const previewPetitionCaseImport = async (
     getCells: getMappedCells,
     skipRowsWithoutCell: ["caseNumber"],
     mapRow: (row) => {
+      if (isLikelyPetitionHeaderRow(row)) {
+        return { skip: true };
+      }
+
       const cells = getMappedCells(row);
 
       if (isMappedRowEmpty(cells, ["caseNumber"])) {
@@ -460,6 +807,7 @@ export const previewPetitionCaseImport = async (
       return {
         mapped: {
           ...cells,
+          caseNumber: normalizePetitionImportedCaseNumber(row, cells.caseNumber),
           caseType: CaseType.PETITION,
           dateFiled: cells.dateFiled ?? cells.date ?? null,
           branch: cells.branch ?? cells.raffledTo ?? null,
@@ -589,9 +937,22 @@ export const previewSpecialProceedingImport = async (
   }
 
   const headerMap = getExcelHeaderMap(SpecialProceedingSchema);
-  const caseNumberHeaders = headerMap.caseNumber ?? ["Case Number"];
-  const getMappedCells = (row: Record<string, unknown>) =>
-    normalizeRowBySchema(SpecialProceedingSchema, row);
+  const caseNumberHeaders = Array.from(
+    new Set([
+      ...(headerMap.caseNumber ?? ["Case Number"]),
+      ...SPECIAL_PROCEEDING_CASE_NUMBER_HEADERS,
+    ]),
+  );
+  const getMappedCells = (row: Record<string, unknown>) => {
+    const cells = normalizeRowBySchema(SpecialProceedingSchema, row);
+    return {
+      ...cells,
+      caseNumber: normalizeSpecialProceedingImportedCaseNumber(
+        row,
+        cells.caseNumber,
+      ),
+    };
+  };
 
   return processExcelPreview({
     file,
@@ -600,6 +961,10 @@ export const previewSpecialProceedingImport = async (
     getCells: getMappedCells,
     skipRowsWithoutCell: ["caseNumber"],
     mapRow: (row) => {
+      if (isLikelySpecialProceedingHeaderRow(row)) {
+        return { skip: true };
+      }
+
       const cells = getMappedCells(row);
 
       if (isMappedRowEmpty(cells, ["caseNumber"])) {
@@ -609,6 +974,10 @@ export const previewSpecialProceedingImport = async (
       return {
         mapped: {
           ...cells,
+          caseNumber: normalizeSpecialProceedingImportedCaseNumber(
+            row,
+            cells.caseNumber,
+          ),
           caseType: CaseType.SCA,
           dateFiled: cells.dateFiled ?? cells.date ?? null,
           branch: cells.branch ?? cells.raffledTo ?? null,

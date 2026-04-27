@@ -165,12 +165,19 @@ export const findColumnValue = (
   // Generate all variations with periods
   const allVariations: string[] = [];
   for (const name of possibleNames) {
-    allVariations.push(...generatePeriodVariations(name));
+    const trimmedName = name.trim();
+    if (!trimmedName) continue;
+    allVariations.push(...generatePeriodVariations(trimmedName));
   }
+
+  const rowKeys = Object.keys(row).filter((key) => key.trim().length > 0);
 
   // First try exact match (case-insensitive)
   for (const name of allVariations) {
-    for (const key of Object.keys(row)) {
+    const normalizedName = name.toLowerCase().trim();
+    if (!normalizedName) continue;
+
+    for (const key of rowKeys) {
       if (key.toLowerCase().trim() === name.toLowerCase().trim()) {
         return row[key];
       }
@@ -179,9 +186,12 @@ export const findColumnValue = (
 
   // Then try partial match
   for (const name of allVariations) {
-    for (const key of Object.keys(row)) {
+    const nameLower = name.toLowerCase().trim();
+    if (!nameLower) continue;
+
+    for (const key of rowKeys) {
       const keyLower = key.toLowerCase().trim();
-      const nameLower = name.toLowerCase().trim();
+      if (!keyLower) continue;
       if (keyLower.includes(nameLower) || nameLower.includes(keyLower)) {
         return row[key];
       }
@@ -262,23 +272,22 @@ const buildCompositeHeaderRow = (
   ];
   const maxCols = Math.max(...rowLengths);
 
-  const nonEmptyCounts = rows.map(
-    (row) => row.filter((cell) => toCellText(cell) !== "").length,
-  );
-
   return Array.from({ length: maxCols }).map((_, colIndex) => {
     const parts: string[] = [];
 
     for (let offset = 2; offset >= 1; offset -= 1) {
       const rowIndex = headerRowIndex - offset;
       if (rowIndex < 0) continue;
-      if (nonEmptyCounts[rowIndex] < 2) continue;
       const value = toCellText(rows[rowIndex]?.[colIndex]);
-      if (value) parts.push(value);
+      if (value && parts[parts.length - 1] !== value) {
+        parts.push(value);
+      }
     }
 
     const headerValue = toCellText(rows[headerRowIndex]?.[colIndex]);
-    if (headerValue) parts.push(headerValue);
+    if (headerValue && parts[parts.length - 1] !== headerValue) {
+      parts.push(headerValue);
+    }
 
     return parts.join(" ").trim();
   });
@@ -304,13 +313,12 @@ export const getHeaderRowInfo = (
   let bestNonEmpty = -1;
 
   for (let i = 0; i < maxScan; i += 1) {
-    const row = rows[i] ?? [];
-    const normalized = row.map((cell) => toCellText(cell));
-    const nonEmptyCount = normalized.filter((cell) => cell !== "").length;
+    const compositeRow = buildCompositeHeaderRow(rows, i);
+    const nonEmptyCount = compositeRow.filter((cell) => cell !== "").length;
     let matchScore = 0;
 
     if (normalizedExpected.length > 0) {
-      const normalizedRow = normalized.map(normalizeHeader);
+      const normalizedRow = compositeRow.map(normalizeHeader);
       normalizedExpected.forEach((expected) => {
         if (!expected) return;
         const hasMatch = normalizedRow.some(
@@ -359,11 +367,13 @@ export const hasRequiredHeaders = (
     const found = resolvedHeaderRow.some((cell) => {
       if (typeof cell !== "string") return false;
       const normalized = normalizeHeader(cell);
+      if (!normalized) return false;
       return targets.some(
         (target) =>
-          normalized === target ||
-          normalized.includes(target) ||
-          target.includes(normalized),
+          Boolean(target) &&
+          (normalized === target ||
+            normalized.includes(target) ||
+            target.includes(normalized)),
       );
     });
 
