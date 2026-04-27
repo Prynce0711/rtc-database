@@ -22,8 +22,15 @@ import {
   saveSessionUserSnapshot,
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
+import {
+  inspectBackendTrust,
+  savePinnedRelayCertificatePin,
+} from "./relayTrust";
 import { getOrCreateDeviceId } from "./Sync/SettingsManager";
 import { formatError, resolveSafePath } from "./utils";
+
+const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
+const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
 
 const bringWindowToFront = (window: BrowserWindow | null): void => {
   if (!window || window.isDestroyed()) {
@@ -46,6 +53,81 @@ const bringWindowToFront = (window: BrowserWindow | null): void => {
 
 ipcMain.handle(IPC_CHANNELS.CASE_DOES_EXIST, async (_event, args) => {
   return doesCaseExist(args.caseNumbers, args.caseType);
+});
+
+ipcMain.handle(RELAY_INSPECT_BACKEND_CHANNEL, async (_event, args: unknown) => {
+  try {
+    if (!isRecord(args) || typeof args.url !== "string" || !args.url.trim()) {
+      return {
+        success: false,
+        error: "Server URL is required.",
+      };
+    }
+
+    return {
+      success: true,
+      result: await inspectBackendTrust(args.url),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
+});
+
+ipcMain.handle(RELAY_TRUST_BACKEND_CHANNEL, async (_event, args: unknown) => {
+  try {
+    if (!isRecord(args)) {
+      return {
+        success: false,
+        error: "Server approval details are required.",
+      };
+    }
+
+    if (
+      typeof args.url !== "string" ||
+      !args.url.trim() ||
+      typeof args.relayFingerprint256 !== "string" ||
+      !args.relayFingerprint256.trim()
+    ) {
+      return {
+        success: false,
+        error: "The server identity details are incomplete.",
+      };
+    }
+
+    const parsedUrl = new URL(args.url);
+    const port =
+      Number(parsedUrl.port) || (parsedUrl.protocol === "https:" ? 443 : 80);
+
+    const pinnedRelay = savePinnedRelayCertificatePin({
+      fingerprint256: args.relayFingerprint256,
+      hostname: parsedUrl.hostname,
+      port,
+      establishedAt: new Date().toISOString(),
+      subjectName:
+        typeof args.relaySubjectName === "string"
+          ? args.relaySubjectName
+          : undefined,
+      issuerName:
+        typeof args.relayIssuerName === "string" ? args.relayIssuerName : undefined,
+    });
+
+    return {
+      success: true,
+      result: {
+        fingerprint256: pinnedRelay.fingerprint256,
+        hostname: pinnedRelay.hostname ?? parsedUrl.hostname,
+        port: pinnedRelay.port ?? port,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
 });
 
 ipcMain.handle(IPC_CHANNELS.CASE_GETS, async (_event, options) => {

@@ -13,21 +13,178 @@ interface BackendInfo {
   ip: string;
   port: number;
   lastSeen: number;
+  relayFingerprint256?: string | null;
+  relaySubjectName?: string | null;
+  relayIssuerName?: string | null;
+  pinnedRelayFingerprint256?: string | null;
+  usualRelayHostname?: string | null;
+  usualRelayPort?: number | null;
+  relayTrustState?: "trusted" | "new" | "changed" | "unverified";
+  relayWarningKind?:
+    | "certificate-changed"
+    | "different-backend"
+    | "unverified"
+    | null;
+  isPreferred?: boolean;
 }
 
 type BackendStatus = "locating" | "located" | "loading";
 type AppMode = "connecting" | "local";
 type AutoOfflineReason = "disconnected" | "not-found" | null;
+type RelayInspectBackendResponse = {
+  success: boolean;
+  result?: Partial<BackendInfo>;
+  error?: string;
+};
+type RelayTrustUpdateResponse = {
+  success: boolean;
+  error?: string;
+};
 
 const HEALTH_PATH = "/api/health";
 const HEALTH_TIMEOUT_MS = 5000;
 const AUTO_OFFLINE_SECONDS = 10;
 const AUTO_OFFLINE_MS = AUTO_OFFLINE_SECONDS * 1000;
 const OFFLINE_REASON_QUERY_KEY = "offlineReason";
+const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
+const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const DEFAULT_HTTP_PORT = 80;
+const DEFAULT_HTTPS_PORT = 443;
 // Flip this back to true when we want to restore the offline client flow.
 const OFFLINE_MODE_ENABLED = false;
 
 const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, "");
+
+const getBackendKey = (backend: BackendInfo): string =>
+  normalizeBaseUrl(backend.url);
+
+const buildBackendInfoFromUrl = (url: string): BackendInfo => {
+  try {
+    const parsedUrl = new URL(url);
+    const defaultPort =
+      parsedUrl.protocol === "https:" ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+
+    return {
+      url: normalizeBaseUrl(url),
+      ip: parsedUrl.hostname,
+      port: Number(parsedUrl.port) || defaultPort,
+      lastSeen: Date.now(),
+    };
+  } catch {
+    return {
+      url: normalizeBaseUrl(url),
+      ip: "",
+      port: 0,
+      lastSeen: Date.now(),
+    };
+  }
+};
+
+const sortDiscoveredBackends = (backends: BackendInfo[]): BackendInfo[] =>
+  [...backends].sort((left, right) => {
+    const preferredDifference =
+      Number(Boolean(right.isPreferred)) - Number(Boolean(left.isPreferred));
+
+    if (preferredDifference !== 0) {
+      return preferredDifference;
+    }
+
+    return right.lastSeen - left.lastSeen;
+  });
+
+const upsertDiscoveredBackend = (
+  backends: BackendInfo[],
+  nextBackend: BackendInfo,
+): BackendInfo[] => {
+  const backendKey = getBackendKey(nextBackend);
+  const existingIndex = backends.findIndex(
+    (backend) => getBackendKey(backend) === backendKey,
+  );
+
+  if (existingIndex === -1) {
+    return sortDiscoveredBackends([...backends, nextBackend]);
+  }
+
+  const updatedBackends = [...backends];
+  updatedBackends[existingIndex] = {
+    ...updatedBackends[existingIndex],
+    ...nextBackend,
+  };
+
+  return sortDiscoveredBackends(updatedBackends);
+};
+
+const formatFingerprint = (value?: string | null): string => {
+  if (!value) {
+    return "Unavailable";
+  }
+
+  return (
+    value
+      .toUpperCase()
+      .match(/.{1,4}/g)
+      ?.join(" ") ?? value.toUpperCase()
+  );
+};
+
+const getFoundBackendLabel = (backend: BackendInfo): string => {
+  try {
+    return new URL(backend.url).host;
+  } catch {
+    return backend.url;
+  }
+};
+
+const getUsualBackendLabel = (backend: BackendInfo): string | null => {
+  if (!backend.usualRelayHostname) {
+    return null;
+  }
+
+  const defaultPort =
+    backend.url.startsWith("https://") ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+  const usualPort = backend.usualRelayPort ?? defaultPort;
+  return `${backend.usualRelayHostname}:${String(usualPort)}`;
+};
+
+const getUnexpectedBackendCopy = (backend: BackendInfo) => {
+  const foundBackendLabel = getFoundBackendLabel(backend);
+  const usualBackendLabel = getUsualBackendLabel(backend);
+  const actionLabel = backend.relayFingerprint256
+    ? "Yes, Connect"
+    : "Yes, Connect Anyway";
+
+  if (backend.relayWarningKind === "certificate-changed") {
+    return {
+      title: "This server looks different from the one you usually use",
+      description: `We found ${foundBackendLabel}, but its saved security record does not match what this device remembers.`,
+      helpText:
+        "If your admin told you the server was replaced or updated, choose Yes to connect and save the new security record. If not, choose No and wait for the usual server.",
+      actionLabel,
+    };
+  }
+
+  if (backend.relayWarningKind === "different-backend") {
+    return {
+      title: "This is not the usual server for this device",
+      description: usualBackendLabel
+        ? `This device usually connects to ${usualBackendLabel}, but ${foundBackendLabel} answered instead.`
+        : `The server that answered was not the usual one for this device.`,
+      helpText:
+        "If this is the correct replacement server, choose Yes to connect and remember it next time. Otherwise, choose No and keep waiting.",
+      actionLabel,
+    };
+  }
+
+  return {
+    title: "We found a server, but we could not confirm it yet",
+    description: usualBackendLabel
+      ? `This device usually connects to ${usualBackendLabel}, but we could not verify that ${foundBackendLabel} is the same secured server.`
+      : `We found ${foundBackendLabel}, but we could not verify its saved secure ID.`,
+    helpText:
+      "If you expected a server change, choose Yes to continue. If not, choose No and check with your admin first.",
+    actionLabel,
+  };
+};
 
 const parseInitialOfflineReason = (): AutoOfflineReason => {
   if (typeof window === "undefined") {
@@ -103,15 +260,27 @@ export default function App() {
   >(null);
   const [availableOfflineBackend, setAvailableOfflineBackend] =
     useState<BackendInfo | null>(null);
+  const [discoveredBackends, setDiscoveredBackends] = useState<BackendInfo[]>(
+    [],
+  );
+  const [approvingBackendKey, setApprovingBackendKey] = useState<string | null>(
+    null,
+  );
+  const [dismissedUnexpectedBackendKeys, setDismissedUnexpectedBackendKeys] =
+    useState<string[]>([]);
+  const [backendApprovalError, setBackendApprovalError] = useState<
+    string | null
+  >(null);
   const [isDevMode] = useState(() => import.meta.env.MODE === "development");
   const backendDevUrl = normalizeBaseUrl(
     import.meta.env.VITE_DEV_SERVER_URL || "http://localhost:3000",
   );
   const modeRef = useRef<AppMode>("connecting");
   const redirectTimerRef = useRef<number | null>(null);
+  const pendingRedirectUrlRef = useRef<string | null>(null);
   const autoOfflineTimeoutRef = useRef<number | null>(null);
   const autoOfflineIntervalRef = useRef<number | null>(null);
-  const offlineBackendListenerAttachedRef = useRef(false);
+  const backendListenerAttachedRef = useRef(false);
 
   const clearAutoOfflineTimers = () => {
     if (typeof window === "undefined") {
@@ -178,29 +347,147 @@ export default function App() {
     modeRef.current = mode;
   }, [mode]);
 
+  const inspectBackendBeforeConnect = async (
+    targetUrl: string,
+  ): Promise<BackendInfo> => {
+    const baseBackend = buildBackendInfoFromUrl(targetUrl);
+
+    if (typeof window === "undefined" || !window.ipcRenderer?.invoke) {
+      return {
+        ...baseBackend,
+        isPreferred: true,
+      };
+    }
+
+    try {
+      const result = (await window.ipcRenderer.invoke(
+        RELAY_INSPECT_BACKEND_CHANNEL,
+        { url: targetUrl },
+      )) as RelayInspectBackendResponse;
+
+      if (!result.success) {
+        return {
+          ...baseBackend,
+          relayTrustState: "unverified",
+          relayWarningKind: "unverified",
+          isPreferred: false,
+        };
+      }
+
+      return {
+        ...baseBackend,
+        ...result.result,
+        lastSeen: Date.now(),
+      };
+    } catch {
+      return {
+        ...baseBackend,
+        relayTrustState: "unverified",
+        relayWarningKind: "unverified",
+        isPreferred: false,
+      };
+    }
+  };
+
+  const redirectToBackend = (targetUrl: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const normalizedTargetUrl = normalizeBaseUrl(targetUrl);
+
+    if (pendingRedirectUrlRef.current === normalizedTargetUrl) {
+      return;
+    }
+
+    setAvailableOfflineBackend((previousBackend) => {
+      if (
+        previousBackend &&
+        normalizeBaseUrl(previousBackend.url) === normalizedTargetUrl
+      ) {
+        return previousBackend;
+      }
+
+      return {
+        url: normalizedTargetUrl,
+        ip: previousBackend?.ip ?? "",
+        port: previousBackend?.port ?? 0,
+        lastSeen: Date.now(),
+      };
+    });
+
+    try {
+      const currentOrigin = normalizeBaseUrl(
+        new URL(window.location.href).origin,
+      );
+      if (currentOrigin === normalizedTargetUrl) {
+        return;
+      }
+    } catch {
+      // Ignore URL parsing errors and proceed with redirect attempt.
+    }
+
+    if (modeRef.current !== "connecting") {
+      return;
+    }
+
+    pendingRedirectUrlRef.current = normalizedTargetUrl;
+    setBackendApprovalError(null);
+    stopAutoOfflineCountdown();
+    setStatus("located");
+
+    if (redirectTimerRef.current !== null) {
+      window.clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+
+    redirectTimerRef.current = window.setTimeout(() => {
+      if (modeRef.current !== "connecting") {
+        return;
+      }
+
+      setStatus("loading");
+      window.location.href = normalizedTargetUrl;
+    }, 1200);
+  };
+
   useEffect(() => {
     if (
-      !OFFLINE_MODE_ENABLED ||
-      mode !== "local" ||
       typeof window === "undefined" ||
       !window.ipcRenderer?.onBackend ||
-      offlineBackendListenerAttachedRef.current
+      backendListenerAttachedRef.current
     ) {
       return;
     }
 
-    offlineBackendListenerAttachedRef.current = true;
+    backendListenerAttachedRef.current = true;
 
     window.ipcRenderer.onBackend((backend: BackendInfo) => {
       setAvailableOfflineBackend(backend);
+      setDiscoveredBackends((previousBackends) =>
+        upsertDiscoveredBackend(previousBackends, backend),
+      );
 
       if (modeRef.current === "local") {
         console.log(
           `[offline] Backend detected while in local mode: ${backend.url}`,
         );
+        return;
+      }
+
+      if (modeRef.current !== "connecting") {
+        return;
+      }
+
+      console.log(
+        `[startup] Backend discovered via UDP: ${backend.url} (${backend.relayTrustState ?? "unknown"})`,
+      );
+
+      if (backend.isPreferred) {
+        redirectToBackend(backend.url);
       }
     });
-  }, [mode]);
+  }, []);
 
   useEffect(() => {
     if (mode !== "connecting") {
@@ -215,61 +502,6 @@ export default function App() {
       );
       startAutoOfflineCountdown("disconnected");
     }
-
-    const redirectToBackend = (targetUrl: string) => {
-      if (typeof window === "undefined") {
-        return;
-      }
-
-      const normalizedTargetUrl = normalizeBaseUrl(targetUrl);
-      setAvailableOfflineBackend((previousBackend) => {
-        if (
-          previousBackend &&
-          normalizeBaseUrl(previousBackend.url) === normalizedTargetUrl
-        ) {
-          return previousBackend;
-        }
-
-        return {
-          url: normalizedTargetUrl,
-          ip: previousBackend?.ip ?? "",
-          port: previousBackend?.port ?? 0,
-          lastSeen: Date.now(),
-        };
-      });
-
-      try {
-        const currentOrigin = normalizeBaseUrl(
-          new URL(window.location.href).origin,
-        );
-        if (currentOrigin === normalizedTargetUrl) {
-          return;
-        }
-      } catch {
-        // Ignore URL parsing errors and proceed with redirect attempt.
-      }
-
-      if (!isSubscribed || modeRef.current !== "connecting") {
-        return;
-      }
-
-      stopAutoOfflineCountdown();
-      setStatus("located");
-
-      if (redirectTimerRef.current !== null) {
-        window.clearTimeout(redirectTimerRef.current);
-        redirectTimerRef.current = null;
-      }
-
-      redirectTimerRef.current = window.setTimeout(() => {
-        if (!isSubscribed || modeRef.current !== "connecting") {
-          return;
-        }
-
-        setStatus("loading");
-        window.location.href = normalizedTargetUrl;
-      }, 1200);
-    };
 
     const tryDevelopmentBackend = async (): Promise<boolean> => {
       if (!isDevMode) {
@@ -296,10 +528,23 @@ export default function App() {
           return false;
         }
 
+        const inspectedBackend = await inspectBackendBeforeConnect(backendDevUrl);
+        setAvailableOfflineBackend(inspectedBackend);
+        setDiscoveredBackends((previousBackends) =>
+          upsertDiscoveredBackend(previousBackends, inspectedBackend),
+        );
+
+        if (!inspectedBackend.isPreferred) {
+          console.warn(
+            `[startup] Dev backend is healthy but blocked pending approval: ${backendDevUrl} (${inspectedBackend.relayTrustState ?? "unknown"}).`,
+          );
+          return false;
+        }
+
         console.log(
           `[startup] Dev backend healthy. Redirecting to ${backendDevUrl}.`,
         );
-        redirectToBackend(backendDevUrl);
+        redirectToBackend(inspectedBackend.url);
         return true;
       } catch (error) {
         clearTimeout(timeoutId);
@@ -310,19 +555,6 @@ export default function App() {
         return false;
       }
     };
-
-    if (typeof window !== "undefined" && window.ipcRenderer?.onBackend) {
-      window.ipcRenderer.onBackend((backend: BackendInfo) => {
-        setAvailableOfflineBackend(backend);
-
-        if (!isSubscribed || modeRef.current !== "connecting") {
-          return;
-        }
-
-        console.log(`[startup] Backend discovered via UDP: ${backend.url}`);
-        redirectToBackend(backend.url);
-      });
-    }
 
     void (async () => {
       const connectedInDev = await tryDevelopmentBackend();
@@ -352,6 +584,7 @@ export default function App() {
       isSubscribed = false;
 
       clearAutoOfflineTimers();
+      pendingRedirectUrlRef.current = null;
 
       if (redirectTimerRef.current !== null) {
         window.clearTimeout(redirectTimerRef.current);
@@ -370,6 +603,74 @@ export default function App() {
     window.location.href = targetUrl;
   };
 
+  const reviewBackends = discoveredBackends.filter(
+    (backend) =>
+      !dismissedUnexpectedBackendKeys.includes(getBackendKey(backend)) &&
+      !backend.isPreferred &&
+      (backend.relayTrustState === "changed" ||
+        backend.relayTrustState === "unverified"),
+  );
+
+  const hasDismissedUnexpectedBackend = discoveredBackends.some(
+    (backend) =>
+      dismissedUnexpectedBackendKeys.includes(getBackendKey(backend)) &&
+      !backend.isPreferred &&
+      (backend.relayTrustState === "changed" ||
+        backend.relayTrustState === "unverified"),
+  );
+
+  const declineUnexpectedBackend = (backend: BackendInfo) => {
+    const backendKey = getBackendKey(backend);
+
+    setBackendApprovalError(null);
+    setDismissedUnexpectedBackendKeys((previousKeys) =>
+      previousKeys.includes(backendKey)
+        ? previousKeys
+        : [...previousKeys, backendKey],
+    );
+  };
+
+  const approveAndConnectToBackend = async (backend: BackendInfo) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const backendKey = getBackendKey(backend);
+    setBackendApprovalError(null);
+    setApprovingBackendKey(backendKey);
+    setDismissedUnexpectedBackendKeys((previousKeys) =>
+      previousKeys.filter((key) => key !== backendKey),
+    );
+
+    try {
+      if (backend.relayFingerprint256) {
+        const result = (await window.ipcRenderer?.invoke?.(
+          RELAY_TRUST_BACKEND_CHANNEL,
+          {
+            url: backend.url,
+            relayFingerprint256: backend.relayFingerprint256,
+            relaySubjectName: backend.relaySubjectName,
+            relayIssuerName: backend.relayIssuerName,
+          },
+        )) as RelayTrustUpdateResponse | undefined;
+
+        if (!result?.success) {
+          throw new Error(result?.error || "Unable to save this server.");
+        }
+      }
+
+      redirectToBackend(backend.url);
+    } catch (error) {
+      setBackendApprovalError(
+        error instanceof Error
+          ? error.message
+          : "Unable to connect to this server right now.",
+      );
+    } finally {
+      setApprovingBackendKey(null);
+    }
+  };
+
   if (OFFLINE_MODE_ENABLED && mode === "local") {
     return (
       <LocalModeApp
@@ -379,31 +680,134 @@ export default function App() {
     );
   }
 
-  const connectionHint = OFFLINE_MODE_ENABLED
-    ? autoOfflineReason === "disconnected"
-      ? "Connection to backend was lost. Waiting for it to come back."
-      : autoOfflineReason === "not-found"
-        ? "Backend not found yet. Waiting for health check or UDP discovery response."
-        : isDevMode
-          ? "Checking dev backend health, then sending UDP discovery"
-          : "Sending UDP discovery and waiting for gateway response"
-    : isDevMode
-      ? "Checking dev backend health, then waiting for a backend response"
-      : "Sending UDP discovery and waiting for gateway response";
+  const connectionHint = reviewBackends.length > 0
+    ? "A different server was found. Please choose Yes or No before this device connects."
+    : hasDismissedUnexpectedBackend
+      ? "You chose not to connect to the different server. Still waiting for the usual server."
+      : OFFLINE_MODE_ENABLED
+      ? autoOfflineReason === "disconnected"
+        ? "Connection to backend was lost. Waiting for it to come back."
+        : autoOfflineReason === "not-found"
+          ? "Backend not found yet. Waiting for health check or UDP discovery response."
+          : isDevMode
+            ? "Checking dev backend health, then sending UDP discovery"
+            : "Sending UDP discovery and waiting for gateway response"
+      : isDevMode
+        ? "Checking dev backend health, then waiting for a backend response"
+        : "Sending UDP discovery and waiting for gateway response";
+
+  const shouldHideLoaderForWarning =
+    status === "locating" && reviewBackends.length > 0;
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center gap-6 animate-fade-in px-4">
-      <SpeederLoader />
+      {!shouldHideLoaderForWarning && <SpeederLoader />}
 
-      <div className="text-center space-y-2 max-w-md">
+      <div className="text-center space-y-2 w-full max-w-3xl">
         {status === "locating" && (
           <>
-            <p className="text-xl font-semibold">Locating backend...</p>
-            <p className="text-sm opacity-70">{connectionHint}</p>
-            {OFFLINE_MODE_ENABLED && autoOfflineCountdown !== null && (
-              <p className="text-sm text-warning font-medium">
-                Auto-switching to offline mode in {autoOfflineCountdown}s...
-              </p>
+            {reviewBackends.length === 0 && (
+              <>
+                <p className="text-xl font-semibold">Locating backend...</p>
+                <p className="text-sm opacity-70">{connectionHint}</p>
+                {OFFLINE_MODE_ENABLED && autoOfflineCountdown !== null && (
+                  <p className="text-sm text-warning font-medium">
+                    Auto-switching to offline mode in {autoOfflineCountdown}s...
+                  </p>
+                )}
+              </>
+            )}
+
+            {reviewBackends.length > 0 && (
+              <div className="mx-auto mt-5 w-full max-w-2xl space-y-3 text-left">
+                {reviewBackends.map((backend) => {
+                  const backendKey = getBackendKey(backend);
+                  const noticeCopy = getUnexpectedBackendCopy(backend);
+                  const usualBackendLabel = getUsualBackendLabel(backend);
+                  const isApproving = approvingBackendKey === backendKey;
+
+                  return (
+                    <div
+                      key={backendKey}
+                      className="rounded-2xl border border-warning/30 bg-base-100 p-5 shadow-lg space-y-3"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-base font-semibold text-warning">
+                          {noticeCopy.title}
+                        </p>
+                        <p className="text-sm opacity-80">
+                          {noticeCopy.description}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-base-200/80 px-4 py-3 text-xs space-y-2">
+                        <p className="font-medium">
+                          Server found:
+                          <span className="ml-1 break-all font-semibold">
+                            {backend.url}
+                          </span>
+                        </p>
+
+                        {usualBackendLabel && (
+                          <p className="font-medium">
+                            Usual server on this device:
+                            <span className="ml-1 font-semibold">
+                              {usualBackendLabel}
+                            </span>
+                          </p>
+                        )}
+
+                        {backend.relayFingerprint256 && (
+                          <p className="font-medium">
+                            New secure ID:
+                            <span className="ml-1 break-all font-mono text-[11px]">
+                              {formatFingerprint(backend.relayFingerprint256)}
+                            </span>
+                          </p>
+                        )}
+
+                        {backend.pinnedRelayFingerprint256 && (
+                          <p className="font-medium">
+                            Saved secure ID:
+                            <span className="ml-1 break-all font-mono text-[11px]">
+                              {formatFingerprint(
+                                backend.pinnedRelayFingerprint256,
+                              )}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+
+                      <p className="text-xs opacity-70">{noticeCopy.helpText}</p>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-warning btn-sm"
+                          onClick={() => void approveAndConnectToBackend(backend)}
+                          disabled={isApproving}
+                        >
+                          {isApproving ? "Saving..." : noticeCopy.actionLabel}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => declineUnexpectedBackend(backend)}
+                          disabled={isApproving}
+                        >
+                          No, Keep Waiting
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {backendApprovalError && (
+                  <p className="text-sm font-medium text-error">
+                    {backendApprovalError}
+                  </p>
+                )}
+              </div>
             )}
           </>
         )}

@@ -7,6 +7,7 @@ import {
 } from "@rtc-database/shared/src/UdpData";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
+import { inspectBackendTrust } from "./relayTrust";
 
 const UDP_PORT = 41234;
 const BROADCAST_ADDR = "255.255.255.255";
@@ -41,6 +42,11 @@ const buildBackendInfo = (
     lastSeen: Date.now(),
   };
 };
+
+const enrichBackendTrust = async (backend: BackendInfo): Promise<BackendInfo> => ({
+  ...backend,
+  ...(await inspectBackendTrust(backend.url)),
+});
 
 const sendDiscoveryRequest = (): void => {
   if (!socket) {
@@ -118,10 +124,17 @@ export function startUdpListener(mainWindow: BrowserWindow) {
 
     const backend = buildBackendInfo(response.data, rinfo.address);
 
-    console.log(
-      `[udp] Received discovery response from ${rinfo.address}:${rinfo.port} -> ${backend.url}`,
-    );
-    mainWindow.webContents.send("udp:backend", backend);
+    void (async () => {
+      const enrichedBackend = await enrichBackendTrust(backend);
+
+      console.log(
+        `[udp] Received discovery response from ${rinfo.address}:${rinfo.port} -> ${backend.url} (${enrichedBackend.relayTrustState ?? "unknown"})`,
+      );
+
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("udp:backend", enrichedBackend);
+      }
+    })();
   });
 
   socket.on("error", (err) => {

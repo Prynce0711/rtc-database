@@ -25,9 +25,30 @@ export type UdpDiscoveryResponse = z.infer<typeof UdpDiscoveryResponse>;
 export const UdpData = UdpDiscoveryResponse;
 export type UdpData = UdpDiscoveryResponse;
 
+export type RelayTrustState =
+  | "trusted"
+  | "new"
+  | "changed"
+  | "unverified";
+
+export type RelayWarningKind =
+  | "certificate-changed"
+  | "different-backend"
+  | "unverified"
+  | null;
+
 export type BackendInfo = {
   url: string;
   ip: string;
   port: number;
   lastSeen: number;
+  relayFingerprint256?: string | null;
+  relaySubjectName?: string | null;
+  relayIssuerName?: string | null;
+  pinnedRelayFingerprint256?: string | null;
+  usualRelayHostname?: string | null;
+  usualRelayPort?: number | null;
+  relayTrustState?: RelayTrustState;
+  relayWarningKind?: RelayWarningKind;
+  isPreferred?: boolean;
 };
