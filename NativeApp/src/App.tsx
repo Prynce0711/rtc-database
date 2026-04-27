@@ -24,6 +24,8 @@ const HEALTH_TIMEOUT_MS = 5000;
 const AUTO_OFFLINE_SECONDS = 10;
 const AUTO_OFFLINE_MS = AUTO_OFFLINE_SECONDS * 1000;
 const OFFLINE_REASON_QUERY_KEY = "offlineReason";
+// Flip this back to true when we want to restore the offline client flow.
+const OFFLINE_MODE_ENABLED = false;
 
 const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, "");
 
@@ -178,6 +180,7 @@ export default function App() {
 
   useEffect(() => {
     if (
+      !OFFLINE_MODE_ENABLED ||
       mode !== "local" ||
       typeof window === "undefined" ||
       !window.ipcRenderer?.onBackend ||
@@ -206,7 +209,7 @@ export default function App() {
 
     let isSubscribed = true;
 
-    if (autoOfflineReason === "disconnected") {
+    if (OFFLINE_MODE_ENABLED && autoOfflineReason === "disconnected") {
       console.warn(
         "[startup] Backend disconnected. Waiting for reconnect before switching to offline mode.",
       );
@@ -333,7 +336,10 @@ export default function App() {
           );
         }
 
-        if (autoOfflineReason !== "disconnected") {
+        if (
+          OFFLINE_MODE_ENABLED &&
+          autoOfflineReason !== "disconnected"
+        ) {
           console.warn(
             "[startup] Backend not found. Waiting before switching to offline mode.",
           );
@@ -364,7 +370,7 @@ export default function App() {
     window.location.href = targetUrl;
   };
 
-  if (mode === "local") {
+  if (OFFLINE_MODE_ENABLED && mode === "local") {
     return (
       <LocalModeApp
         availableBackend={availableOfflineBackend}
@@ -373,14 +379,17 @@ export default function App() {
     );
   }
 
-  const connectionHint =
-    autoOfflineReason === "disconnected"
+  const connectionHint = OFFLINE_MODE_ENABLED
+    ? autoOfflineReason === "disconnected"
       ? "Connection to backend was lost. Waiting for it to come back."
       : autoOfflineReason === "not-found"
         ? "Backend not found yet. Waiting for health check or UDP discovery response."
         : isDevMode
           ? "Checking dev backend health, then sending UDP discovery"
-          : "Sending UDP discovery and waiting for gateway response";
+          : "Sending UDP discovery and waiting for gateway response"
+    : isDevMode
+      ? "Checking dev backend health, then waiting for a backend response"
+      : "Sending UDP discovery and waiting for gateway response";
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center gap-6 animate-fade-in px-4">
@@ -391,7 +400,7 @@ export default function App() {
           <>
             <p className="text-xl font-semibold">Locating backend...</p>
             <p className="text-sm opacity-70">{connectionHint}</p>
-            {autoOfflineCountdown !== null && (
+            {OFFLINE_MODE_ENABLED && autoOfflineCountdown !== null && (
               <p className="text-sm text-warning font-medium">
                 Auto-switching to offline mode in {autoOfflineCountdown}s...
               </p>
@@ -413,15 +422,17 @@ export default function App() {
           </>
         )}
 
-        <div className="pt-2">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setMode("local")}
-          >
-            Switch to offline mode
-          </button>
-        </div>
+        {OFFLINE_MODE_ENABLED && (
+          <div className="pt-2">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setMode("local")}
+            >
+              Switch to offline mode
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
