@@ -31,6 +31,7 @@ const CriminalCaseRow = ({
   caseItem,
   handleDeleteCase,
   onEdit,
+  onView,
   selected = false,
   isSelecting = false,
   onToggleSelect,
@@ -39,6 +40,7 @@ const CriminalCaseRow = ({
   caseItem: CriminalCaseData;
   handleDeleteCase: (caseId: number) => void;
   onEdit: (caseItem: CriminalCaseData) => void;
+  onView?: (caseItem: CriminalCaseData) => void;
   selected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (caseId: number, checked: boolean) => void;
@@ -46,6 +48,7 @@ const CriminalCaseRow = ({
 }) => {
   const router = useAdaptiveNavigation();
   const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
+  const isClickable = typeof onView === "function";
   const detentionStatus =
     caseItem.detained && caseItem.detained.trim()
       ? caseItem.detained
@@ -53,7 +56,7 @@ const CriminalCaseRow = ({
 
   return (
     <tr
-      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-xs ${
+      className={`border-b border-base-200/60 transition-colors hover:bg-base-200/30 ${isClickable ? "cursor-pointer" : ""} text-xs ${
         isSelecting && selected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
@@ -61,7 +64,10 @@ const CriminalCaseRow = ({
           onToggleSelect?.(caseItem.id, !selected);
           return;
         }
-        console.log(caseItem);
+        if (onView) {
+          onView(caseItem);
+          return;
+        }
         router.push(`/user/cases/criminal/${caseItem.id}`);
       }}
     >

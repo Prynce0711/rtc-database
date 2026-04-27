@@ -19,14 +19,15 @@ const SherriffCaseRow = ({
   onToggleSelect,
 }: {
   record: SheriffCaseData;
-  onRowClick: (r: SheriffCaseData) => void;
+  onRowClick?: (r: SheriffCaseData) => void;
   selected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
+  const isClickable = typeof onRowClick === "function";
   return (
     <tr
-      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-sm ${
+      className={`bg-base-100 hover:bg-base-200 transition-colors ${isClickable ? "cursor-pointer" : ""} text-sm ${
         isSelecting && selected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
@@ -34,7 +35,7 @@ const SherriffCaseRow = ({
           onToggleSelect?.(record.id, !selected);
           return;
         }
-        onRowClick(record);
+        onRowClick?.(record);
       }}
     >
       {isSelecting && (

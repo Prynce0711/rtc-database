@@ -10,7 +10,6 @@ import React, {
 } from "react";
 import {
   FiBarChart2,
-  FiCalendar,
   FiCheck,
   FiDownload,
   FiEdit2,
@@ -52,6 +51,7 @@ import {
   previewCriminalCaseImport,
   saveCaseImportDraft,
 } from "../importPreview";
+import CaseSectionHeader from "../CaseSectionHeader";
 import CriminalCaseRow from "./CriminalCaseRow";
 
 type CaseFilterValues = CriminalCaseFilters;
@@ -61,7 +61,9 @@ type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
 const CriminalCasePage: React.FC<{
   role: Roles;
   adapter: CriminalCaseAdapter;
-}> = ({ role, adapter }) => {
+  mode?: "case" | "transmittal";
+  headerNavigation?: React.ReactNode;
+}> = ({ role, adapter, mode = "case", headerNavigation }) => {
   const [cases, setCases] = useState<CriminalCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,9 @@ const CriminalCasePage: React.FC<{
     recentlyFiled: 0,
   });
 
-  const isAdminOrAtty = role === "admin" || role === "atty";
+  const isTransmittal = mode === "transmittal";
+  const isAdminOrAtty =
+    !isTransmittal && (role === "admin" || role === "atty");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -519,49 +523,34 @@ const CriminalCasePage: React.FC<{
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="card bg-base-100 shadow-xl">
-        <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                <span>Cases</span>
-                <span className="text-base-content/30">/</span>
-                <span className="text-base-content/70 font-medium">
-                  Criminal
-                </span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                Criminal Cases
-              </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/50">
-                <FiCalendar className="shrink-0" />
-                <span>Manage criminal cases and filings</span>
-              </p>
-            </div>
+      <CaseSectionHeader
+        sectionLabel="Criminal"
+        title="Criminal Cases"
+        description="Manage criminal cases and filings"
+        navigation={headerNavigation}
+        actions={
+          <>
+            <button
+              className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+              onClick={handleExportExcel}
+              disabled={exporting}
+            >
+              <FiDownload className="h-5 w-5" />
+              {exporting ? "Exporting..." : "Export Excel"}
+            </button>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            {isAdminOrAtty && (
               <button
-                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
-                onClick={handleExportExcel}
-                disabled={exporting}
+                className={ButtonStyles.primary}
+                onClick={() => router.push("/user/cases/criminal/add")}
               >
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
+                <FiFileText className="h-5 w-5" />
+                Add Record
               </button>
-
-              {isAdminOrAtty && (
-                <button
-                  className={ButtonStyles.primary}
-                  onClick={() => router.push("/user/cases/criminal/add")}
-                >
-                  <FiFileText className="h-5 w-5" />
-                  Add Record
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+            )}
+          </>
+        }
+      />
 
       {/* Search and Filter Toolbar */}
       <div className="relative">
@@ -849,6 +838,7 @@ const CriminalCasePage: React.FC<{
               key={caseItem.id}
               caseItem={caseItem}
               handleDeleteCase={handleDeleteCase}
+              onView={isTransmittal ? () => {} : undefined}
               onEdit={(item) => {
                 router.push(`/user/cases/criminal/edit?id=${item.id}`);
               }}

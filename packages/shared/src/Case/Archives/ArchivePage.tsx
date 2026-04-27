@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FiCalendar,
   FiChevronRight,
   FiDownload,
   FiFilePlus,
@@ -23,6 +22,7 @@ import StatsCard from "../../Stats/StatsCard";
 import Pagination from "../../Table/Pagination";
 import Table from "../../Table/Table";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
+import CaseSectionHeader from "../CaseSectionHeader";
 import type { ArchiveAdapter } from "./ArchiveAdapter";
 import ArchiveRow from "./ArchiveRow";
 import {
@@ -38,22 +38,33 @@ const getCurrentQueryPath = (): string => {
   return normalizeArchivePath(params.get("path"));
 };
 
-const buildArchiveHref = (path: string): string => {
+const buildArchiveHref = (path: string, basePath: string): string => {
   const normalized = normalizeArchivePath(path);
   return normalized
-    ? `/user/cases/archive?path=${encodeURIComponent(normalized)}`
-    : "/user/cases/archive";
+    ? `${basePath}?path=${encodeURIComponent(normalized)}`
+    : basePath;
 };
 
 const ArchivePage: React.FC<{
   role: Roles;
   adapter: ArchiveAdapter;
-}> = ({ role, adapter }) => {
+  mode?: "case" | "transmittal";
+  basePath?: string;
+  headerNavigation?: React.ReactNode;
+}> = ({
+  role,
+  adapter,
+  mode = "case",
+  basePath = "/user/cases/archive",
+  headerNavigation,
+}) => {
   const router = useAdaptiveNavigation();
   const pathname = useAdaptivePathname();
   const statusPopup = usePopup();
+  const isTransmittal = mode === "transmittal";
   const canManage =
-    role === Roles.ADMIN || role === Roles.ATTY || role === Roles.ARCHIVE;
+    !isTransmittal &&
+    (role === Roles.ADMIN || role === Roles.ATTY || role === Roles.ARCHIVE);
 
   const [entries, setEntries] = useState<ArchiveEntryData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -160,7 +171,12 @@ const ArchivePage: React.FC<{
 
   const handleOpen = (entry: ArchiveEntryData) => {
     if (entry.entryType === ArchiveEntryType.FOLDER) {
-      router.push(buildArchiveHref(entry.fullPath));
+      router.push(buildArchiveHref(entry.fullPath, basePath));
+      return;
+    }
+
+    if (isTransmittal) {
+      void handleDownload(entry);
       return;
     }
 
@@ -235,80 +251,62 @@ const ArchivePage: React.FC<{
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="card bg-base-100 shadow-xl">
-        <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                <span>Cases</span>
-                <span className="text-base-content/30">/</span>
-                <span className="text-base-content/70 font-medium">
-                  Archive Explorer
-                </span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                Archive Explorer
-              </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/50">
-                <FiCalendar className="shrink-0" />
-                <span>
-                  Manage folders, uploaded files, editable documents, and
-                  spreadsheets
-                </span>
-              </p>
-            </div>
-
-            {canManage && (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  className={ButtonStyles.secondary}
-                  onClick={() =>
-                    router.push(
-                      `/user/cases/archive/add?template=folder&path=${encodeURIComponent(currentPath)}`,
-                    )
-                  }
-                >
-                  <FiFolderPlus className="h-5 w-5" />
-                  New Folder
-                </button>
-                <button
-                  className={ButtonStyles.info}
-                  onClick={() =>
-                    router.push(
-                      `/user/cases/archive/add?template=document&path=${encodeURIComponent(currentPath)}`,
-                    )
-                  }
-                >
-                  <FiFilePlus className="h-5 w-5" />
-                  New Document
-                </button>
-                <button
-                  className="btn btn-md btn-outline btn-success gap-2"
-                  onClick={() =>
-                    router.push(
-                      `/user/cases/archive/add?template=spreadsheet&path=${encodeURIComponent(currentPath)}`,
-                    )
-                  }
-                >
-                  <FiGrid className="h-5 w-5" />
-                  New Spreadsheet
-                </button>
-                <button
-                  className={ButtonStyles.primary}
-                  onClick={() =>
-                    router.push(
-                      `/user/cases/archive/add?template=file&path=${encodeURIComponent(currentPath)}`,
-                    )
-                  }
-                >
-                  <FiUpload className="h-5 w-5" />
-                  Upload File
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <CaseSectionHeader
+        sectionLabel="Archive Explorer"
+        title="Archive Explorer"
+        description="Manage folders, uploaded files, editable documents, and spreadsheets"
+        navigation={headerNavigation}
+        actions={
+          canManage ? (
+            <>
+              <button
+                className={ButtonStyles.secondary}
+                onClick={() =>
+                  router.push(
+                    `/user/cases/archive/add?template=folder&path=${encodeURIComponent(currentPath)}`,
+                  )
+                }
+              >
+                <FiFolderPlus className="h-5 w-5" />
+                New Folder
+              </button>
+              <button
+                className={ButtonStyles.info}
+                onClick={() =>
+                  router.push(
+                    `/user/cases/archive/add?template=document&path=${encodeURIComponent(currentPath)}`,
+                  )
+                }
+              >
+                <FiFilePlus className="h-5 w-5" />
+                New Document
+              </button>
+              <button
+                className="btn btn-md btn-outline btn-success gap-2"
+                onClick={() =>
+                  router.push(
+                    `/user/cases/archive/add?template=spreadsheet&path=${encodeURIComponent(currentPath)}`,
+                  )
+                }
+              >
+                <FiGrid className="h-5 w-5" />
+                New Spreadsheet
+              </button>
+              <button
+                className={ButtonStyles.primary}
+                onClick={() =>
+                  router.push(
+                    `/user/cases/archive/add?template=file&path=${encodeURIComponent(currentPath)}`,
+                  )
+                }
+              >
+                <FiUpload className="h-5 w-5" />
+                Upload File
+              </button>
+            </>
+          ) : undefined
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatsCard
@@ -387,7 +385,7 @@ const ArchivePage: React.FC<{
           <button
             type="button"
             className="btn btn-md btn-outline"
-            onClick={() => router.push("/user/cases/archive")}
+            onClick={() => router.push(basePath)}
             disabled={!currentPath}
           >
             Root
@@ -398,7 +396,10 @@ const ArchivePage: React.FC<{
             className="btn btn-md btn-outline"
             onClick={() =>
               router.push(
-                buildArchiveHref(currentPath.split("/").slice(0, -1).join("/")),
+                buildArchiveHref(
+                  currentPath.split("/").slice(0, -1).join("/"),
+                  basePath,
+                ),
               )
             }
             disabled={!currentPath}
@@ -415,7 +416,7 @@ const ArchivePage: React.FC<{
             <button
               type="button"
               className="btn btn-xs btn-ghost"
-              onClick={() => router.push("/user/cases/archive")}
+              onClick={() => router.push(basePath)}
             >
               Root
             </button>
@@ -425,7 +426,9 @@ const ArchivePage: React.FC<{
                 <button
                   type="button"
                   className="btn btn-xs btn-ghost"
-                  onClick={() => router.push(buildArchiveHref(segment.path))}
+                  onClick={() =>
+                    router.push(buildArchiveHref(segment.path, basePath))
+                  }
                 >
                   {segment.label}
                 </button>

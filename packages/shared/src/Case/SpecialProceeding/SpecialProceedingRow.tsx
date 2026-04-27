@@ -21,14 +21,15 @@ const SpecialProceedingRow = ({
   onToggleSelect,
 }: {
   caseItem: SpecialProceedingData;
-  onRowClick: (c: SpecialProceedingData) => void;
+  onRowClick?: (c: SpecialProceedingData) => void;
   isSelected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }) => {
+  const isClickable = typeof onRowClick === "function";
   return (
     <tr
-      className={`bg-base-100 hover:bg-base-200 transition-colors cursor-pointer text-xs ${
+      className={`bg-base-100 hover:bg-base-200 transition-colors ${isClickable ? "cursor-pointer" : ""} text-xs ${
         isSelecting && isSelected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
@@ -36,7 +37,7 @@ const SpecialProceedingRow = ({
           onToggleSelect(caseItem.id, !Boolean(isSelected));
           return;
         }
-        onRowClick(caseItem);
+        onRowClick?.(caseItem);
       }}
     >
       {isSelecting && (

@@ -192,6 +192,105 @@ export const buildCaseFind = <T extends z.ZodType>(
   return { where: { AND: conditions }, orderBy: sortBy };
 };
 
+export const buildStandaloneFind = <T extends z.ZodType>(
+  schema: T,
+  options?: FilterOptions<z.infer<T>>,
+): {
+  where?: Record<string, unknown>;
+  orderBy?: Record<string, "asc" | "desc">;
+} => {
+  const conditions: Record<string, unknown>[] = [];
+  const sortBy: Record<string, "asc" | "desc"> = {};
+  const filters = options?.filters;
+  const exactMatchMap = options?.exactMatchMap ?? {};
+
+  const getSearchTokens = (value: string): string[] =>
+    value
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
+  type Filters = FilterOptions<z.infer<T>>["filters"];
+
+  const fieldKeys = getSchemaFieldKeys(schema, {
+    all: ["id", "createdAt", "updatedAt"],
+  });
+  const stringKeys = fieldKeys.stringKeys.filter(
+    (key) => !fieldKeys.enumKeys.includes(key),
+  );
+
+  const addStringFilter = (key: keyof Filters, value?: string) => {
+    if (!value) return;
+    const isExact = exactMatchMap[key] ?? false;
+
+    if (isExact) {
+      conditions.push({
+        [key]: { equals: value },
+      });
+      return;
+    }
+
+    const tokens = getSearchTokens(value);
+    tokens.forEach((token) => {
+      conditions.push({
+        [key]: { contains: token },
+      });
+    });
+  };
+
+  stringKeys.forEach((field) => {
+    const value = filters?.[field as keyof Filters];
+    addStringFilter(
+      field as keyof Filters,
+      typeof value === "string" ? value : undefined,
+    );
+  });
+
+  fieldKeys.enumKeys.forEach((field) => {
+    const value = filters?.[field as keyof Filters];
+    if (!value) return;
+    conditions.push({ [field]: value });
+  });
+
+  fieldKeys.numberKeys.forEach((field) => {
+    const value = filters?.[field as keyof Filters];
+    if (value === undefined || value === null) return;
+    conditions.push({ [field]: value });
+  });
+
+  fieldKeys.dateKeys.forEach((field) => {
+    const range = filters?.[field as keyof Filters] as
+      | { start?: string; end?: string }
+      | undefined;
+    if (!range?.start && !range?.end) return;
+    conditions.push({
+      [field]: {
+        gte: range.start ? new Date(range.start) : undefined,
+        lte: range.end ? new Date(range.end) : undefined,
+      },
+    });
+  });
+
+  if (
+    options?.sortKey &&
+    (fieldKeys.allKeys.includes(options.sortKey as string) ||
+      options.sortKey === "createdAt" ||
+      options.sortKey === "updatedAt")
+  ) {
+    sortBy[options.sortKey as string] = options.sortOrder ?? "desc";
+  }
+
+  if (conditions.length === 0) {
+    return Object.keys(sortBy).length > 0 ? { orderBy: sortBy } : {};
+  }
+
+  return {
+    where: { AND: conditions },
+    orderBy: Object.keys(sortBy).length > 0 ? sortBy : undefined,
+  };
+};
+
 type BaseCaseData = Omit<BaseCaseSchemaType, "id">;
 
 const baseCaseFieldKeys = getSchemaFieldKeys(BaseCaseSchema, { all: ["id"] });

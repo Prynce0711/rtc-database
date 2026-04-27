@@ -20,7 +20,6 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FiBarChart2,
-  FiCalendar,
   FiCheck,
   FiDownload,
   FiEdit2,
@@ -40,6 +39,7 @@ import {
   previewSpecialProceedingImport,
   saveCaseImportDraft,
 } from "../importPreview";
+import CaseSectionHeader from "../CaseSectionHeader";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 
 type SPFilterValues = {
@@ -66,11 +66,15 @@ const SP_FILTER_OPTIONS: FilterOption[] = [
 
 const PAGE_SIZE = 10;
 
-const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
-  adapter,
-}) => {
+const Proceedings: React.FC<{
+  adapter: SpecialProceedingAdapter;
+  mode?: "case" | "transmittal";
+  headerNavigation?: React.ReactNode;
+}> = ({ adapter, mode = "case", headerNavigation }) => {
   const router = useAdaptiveNavigation();
   const popup = usePopup();
+  const isTransmittal = mode === "transmittal";
+  const canManage = !isTransmittal;
   const [cases, setCases] = useState<SpecialProceedingData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -91,7 +95,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const isSelecting = selectionMode !== null;
+  const isSelecting = canManage && selectionMode !== null;
   const [stats, setStats] = useState<SpecialProceedingStats>({
     totalCases: 0,
     thisMonth: 0,
@@ -403,47 +407,34 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   return (
     <div className="min-h-screen bg-base-100">
       <main className="w-full">
-        {/* Header */}
-        <header className="card bg-base-100 shadow-xl mb-8">
-          <div className="card-body p-4 sm:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">
-                  <span>Cases</span>
-                  <span className="text-base-content/30">/</span>
-                  <span className="text-base-content/70 font-medium">
-                    Special Proceedings
-                  </span>
-                </div>
-                <h2 className="text-4xl lg:text-5xl font-bold text-base-content">
-                  Special Proceedings Cases
-                </h2>
-                <p className="flex text-base items-center gap-2 text-base-content/50 mt-1.5">
-                  <FiCalendar className="shrink-0 w-4 h-4" />
-                  <span>Manage all special proceedings and case filings</span>
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-3">
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  <button
-                    className={ButtonStyles.info}
-                    onClick={handleExportExcel}
-                    disabled={exporting || cases.length === 0}
-                    aria-busy={exporting}
-                    aria-label="Export data to Excel"
-                  >
-                    {exporting ? (
-                      <>
-                        <span className="loading loading-spinner loading-sm" />
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        <FiDownload className="h-5 w-5" />
-                        Export Excel
-                      </>
-                    )}
-                  </button>
+        <div className="mb-8">
+          <CaseSectionHeader
+            sectionLabel="Special Proceedings"
+            title="Special Proceedings Cases"
+            description="Manage all special proceedings and case filings"
+            navigation={headerNavigation}
+            actions={
+              <>
+                <button
+                  className={ButtonStyles.info}
+                  onClick={handleExportExcel}
+                  disabled={exporting || cases.length === 0}
+                  aria-busy={exporting}
+                  aria-label="Export data to Excel"
+                >
+                  {exporting ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload className="h-5 w-5" />
+                      Export Excel
+                    </>
+                  )}
+                </button>
+                {canManage && (
                   <button
                     className={ButtonStyles.primary}
                     onClick={() => {
@@ -465,30 +456,32 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                     </svg>
                     Add Case
                   </button>
-                </div>
+                )}
+              </>
+            }
+            footer={
+              <div className="inline-flex items-center gap-2 rounded-lg border border-info/20 bg-info/10 px-3 py-1.5 text-xs font-medium text-info select-none">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Hover over table cells to see full details</span>
               </div>
-            </div>
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-info/10 border border-info/20 text-info text-xs font-medium select-none">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <span>Hover over table cells to see full details</span>
-            </div>
-          </div>
-        </header>
+            }
+          />
+        </div>
 
         {/* Search and Actions */}
         <div className="relative mb-6">
@@ -538,7 +531,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
               )}
             </button>
 
-            {isSelecting ? (
+            {canManage ? (isSelecting ? (
               <div className="flex items-center gap-2 ml-3">
                 <span className="text-xs text-base-content/40 tabular-nums">
                   {selectedCaseIds.length} selected
@@ -593,7 +586,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                   Delete rows
                 </button>
               </div>
-            )}
+            )) : null}
           </div>
 
           <FilterDropdown
@@ -643,7 +636,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         <div className="bg-base-100 rounded-lg shadow overflow-hidden">
           <Table
             headers={[
-              ...(isSelecting
+              ...(canManage && isSelecting
                 ? [
                     {
                       key: "select",
@@ -692,8 +685,10 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
               <SpecialProceedingRow
                 key={c.id}
                 caseItem={c}
-                onRowClick={(item) =>
-                  router.push(`/user/cases/proceedings/${item.id}`)
+                onRowClick={
+                  isTransmittal
+                    ? undefined
+                    : (item) => router.push(`/user/cases/proceedings/${item.id}`)
                 }
                 isSelected={selectedCaseIds.includes(c.id)}
                 isSelecting={isSelecting}
