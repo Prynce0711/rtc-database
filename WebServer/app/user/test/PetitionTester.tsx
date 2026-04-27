@@ -12,6 +12,7 @@ import {
 } from "@/app/components/Case/Petition/PetitionActions";
 import { PetitionCaseData } from "@rtc-database/shared";
 import { useEffect, useState } from "react";
+import { deleteAllPetitions } from "./TestActions";
 
 type PetitionFormEntry = {
   caseNumber: string;
@@ -146,6 +147,24 @@ export default function PetitionTester() {
       setMessage({
         type: "error",
         text: result.error || "Failed to delete petition",
+      });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL petitions? This cannot be undone."))
+      return;
+
+    setLoading(true);
+    const result = await deleteAllPetitions();
+    if (result.success) {
+      setMessage({ type: "success", text: "All petitions deleted successfully" });
+      await loadPetitions();
+    } else {
+      setMessage({
+        type: "error",
+        text: result.error || "Failed to delete all petitions",
       });
     }
     setLoading(false);
@@ -356,6 +375,13 @@ export default function PetitionTester() {
                   className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 disabled:opacity-50"
                 >
                   Export Excel
+                </button>
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={loading}
+                  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 disabled:opacity-50"
+                >
+                  Delete All
                 </button>
                 <label className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 cursor-pointer">
                   Import Excel

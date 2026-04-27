@@ -110,3 +110,23 @@ export async function deleteAllSpecialProceedings(): Promise<
     return { success: false, error: "Error deleting special proceedings" };
   }
 }
+
+export async function deleteAllPetitions(): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    await prisma.case.deleteMany({
+      where: {
+        caseType: CaseType.PETITION,
+      },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error deleting petitions:", error);
+    return { success: false, error: "Error deleting petitions" };
+  }
+}
