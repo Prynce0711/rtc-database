@@ -379,7 +379,9 @@ const getOrderedRowValues = (row: Record<string, unknown>): string[] =>
     .filter((value) => value.length > 0);
 
 const normalizeComparableCellText = (value: unknown): string =>
-  toTrimmedString(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  toTrimmedString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 
 const parseCaseYear = (value: unknown): number | null => {
   const text = toTrimmedString(value);
@@ -397,7 +399,9 @@ const parseCaseYear = (value: unknown): number | null => {
 };
 
 const normalizeAreaFragment = (value: unknown): string => {
-  const cleaned = toTrimmedString(value).replace(/[^A-Za-z]/g, "").toUpperCase();
+  const cleaned = toTrimmedString(value)
+    .replace(/[^A-Za-z]/g, "")
+    .toUpperCase();
   return cleaned;
 };
 
@@ -421,9 +425,7 @@ const buildPetitionCaseNumberFromRowFragments = (
     const third = values[index + 2] ?? "";
 
     const combined = [current, next, third].join(" ").trim();
-    const combinedMatch = combined.match(
-      /^P\s*-\s*(\d+)\s*-\s*(\d{4})$/i,
-    );
+    const combinedMatch = combined.match(/^P\s*-\s*(\d+)\s*-\s*(\d{4})$/i);
     if (combinedMatch) {
       const number = Number.parseInt(combinedMatch[1], 10);
       const year = Number.parseInt(combinedMatch[2], 10);
@@ -473,7 +475,8 @@ const isLikelyPetitionHeaderRow = (row: Record<string, unknown>): boolean => {
 
   const matchCount = values.filter((value) =>
     headerTokens.some(
-      (token) => value === token || value.includes(token) || token.includes(value),
+      (token) =>
+        value === token || value.includes(token) || token.includes(value),
     ),
   ).length;
 
@@ -503,7 +506,11 @@ const buildSpecialProceedingCaseNumberFromRowFragments = (
       }
     }
 
-    if (/^\d+$/.test(current) && normalizeAreaFragment(next) && /^\d{4}$/.test(third)) {
+    if (
+      /^\d+$/.test(current) &&
+      normalizeAreaFragment(next) &&
+      /^\d{4}$/.test(third)
+    ) {
       const number = Number.parseInt(current, 10);
       const year = Number.parseInt(third, 10);
       const area = normalizeAreaFragment(next);
@@ -549,7 +556,8 @@ const isLikelySpecialProceedingHeaderRow = (
 
   const matchCount = values.filter((value) =>
     headerTokens.some(
-      (token) => value === token || value.includes(token) || token.includes(value),
+      (token) =>
+        value === token || value.includes(token) || token.includes(value),
     ),
   ).length;
 
@@ -605,7 +613,10 @@ const normalizePetitionImportedCaseNumber = (
     }
   }
 
-  return caseNumberText.replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+  return caseNumberText
+    .replace(/\s*-\s*/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const normalizeSpecialProceedingImportedCaseNumber = (
@@ -651,7 +662,10 @@ const normalizeSpecialProceedingImportedCaseNumber = (
     }
   }
 
-  return caseNumberText.replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+  return caseNumberText
+    .replace(/\s*-\s*/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const isValidWorkbookFile = (file: File): boolean => {
@@ -807,7 +821,10 @@ export const previewPetitionCaseImport = async (
       return {
         mapped: {
           ...cells,
-          caseNumber: normalizePetitionImportedCaseNumber(row, cells.caseNumber),
+          caseNumber: normalizePetitionImportedCaseNumber(
+            row,
+            cells.caseNumber,
+          ),
           caseType: CaseType.PETITION,
           dateFiled: cells.dateFiled ?? cells.date ?? null,
           branch: cells.branch ?? cells.raffledTo ?? null,

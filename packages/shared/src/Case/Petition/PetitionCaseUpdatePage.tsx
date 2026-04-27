@@ -161,6 +161,55 @@ const applyAreaToCaseNumber = (
   return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
 };
 
+const hydrateStoredCaseNumber = ({
+  caseNumber,
+  area,
+  number,
+  year,
+}: {
+  caseNumber?: string | null;
+  area?: string | null;
+  number?: number | null;
+  year?: number | null;
+}): string => {
+  const normalizedCaseNumber = caseNumber?.trim() ?? "";
+  const parsed = parseCaseNumberParts(normalizedCaseNumber);
+  if (parsed?.area) {
+    return normalizedCaseNumber;
+  }
+
+  const normalizedArea = normalizeAreaCode(area ?? "");
+  if (
+    normalizedArea &&
+    typeof number === "number" &&
+    !Number.isNaN(number) &&
+    typeof year === "number" &&
+    !Number.isNaN(year)
+  ) {
+    return formatCaseNumber(normalizedArea, number, year);
+  }
+
+  return normalizedCaseNumber;
+};
+
+const withResolvedAutoCaseNumber = (
+  entry: EntryForm,
+  fallbackArea: string,
+): EntryForm => {
+  if (entry.isManual) {
+    return entry;
+  }
+
+  return {
+    ...entry,
+    caseNumber: applyAreaToCaseNumber(
+      entry.caseNumber,
+      getAreaFromCaseNumber(entry.caseNumber, fallbackArea),
+      getYearFromDateField(entry.dateFiled),
+    ),
+  };
+};
+
 const toEntryDate = (value?: string | Date | null): string =>
   value ? new Date(value).toISOString().slice(0, 10) : today;
 
@@ -200,7 +249,7 @@ const FROZEN_COLS: ColDef[] = [
     label: "Case Number",
     placeholder: "SPC-2026-0001",
     type: "text",
-    width: 180,
+    width: 220,
     required: true,
     mono: true,
   },
@@ -462,18 +511,23 @@ const PetitionCaseUpdatePage = ({
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
     if (isEdit && editCases.length > 0) {
-      return editCases.map((log) => ({
-        ...emptyEntry(uid()),
-        caseNumber: log.caseNumber ?? "",
-        isManual: Boolean(log.isManual),
-        raffledToBranch: log.raffledTo ?? "",
-        dateFiled: log.date
-          ? new Date(log.date).toISOString().slice(0, 10)
-          : today,
-        petitioners: log.petitioner ?? "",
-        titleNo: "",
-        nature: log.nature ?? "",
-      }));
+      return editCases.map((log) =>
+        withResolvedAutoCaseNumber(
+          {
+            ...emptyEntry(uid()),
+            caseNumber: hydrateStoredCaseNumber(log),
+            isManual: Boolean(log.isManual),
+            raffledToBranch: log.raffledTo ?? "",
+            dateFiled: log.date
+              ? new Date(log.date).toISOString().slice(0, 10)
+              : today,
+            petitioners: log.petitioner ?? "",
+            titleNo: "",
+            nature: log.nature ?? "",
+          },
+          AUTO_DEFAULT_AREA,
+        ),
+      );
     }
     return [emptyEntry(uid(), AUTO_DEFAULT_AREA)];
   });
@@ -485,18 +539,23 @@ const PetitionCaseUpdatePage = ({
     if (isEdit) {
       if (editCases.length > 0) {
         setEntries(
-          editCases.map((log) => ({
-            ...emptyEntry(uid()),
-            caseNumber: log.caseNumber ?? "",
-            isManual: Boolean(log.isManual),
-            raffledToBranch: log.raffledTo ?? "",
-            dateFiled: log.date
-              ? new Date(log.date).toISOString().slice(0, 10)
-              : today,
-            petitioners: log.petitioner ?? "",
-            titleNo: "",
-            nature: log.nature ?? "",
-          })),
+          editCases.map((log) =>
+            withResolvedAutoCaseNumber(
+              {
+                ...emptyEntry(uid()),
+                caseNumber: hydrateStoredCaseNumber(log),
+                isManual: Boolean(log.isManual),
+                raffledToBranch: log.raffledTo ?? "",
+                dateFiled: log.date
+                  ? new Date(log.date).toISOString().slice(0, 10)
+                  : today,
+                petitioners: log.petitioner ?? "",
+                titleNo: "",
+                nature: log.nature ?? "",
+              },
+              AUTO_DEFAULT_AREA,
+            ),
+          ),
         );
       }
       return;
@@ -606,7 +665,7 @@ const PetitionCaseUpdatePage = ({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [entries, isEdit]);
+  }, [adapter, defaultArea, entries, isEdit]);
 
   const handleAreaChange = useCallback((id: string, areaInput: string) => {
     const normalizedArea = normalizeAreaCode(areaInput);
@@ -653,7 +712,14 @@ const PetitionCaseUpdatePage = ({
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
-          ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
+          ? withResolvedAutoCaseNumber(
+              {
+                ...e,
+                [field]: value,
+                errors: { ...e.errors, [field]: "" },
+              },
+              defaultArea,
+            )
           : e,
       ),
     );
@@ -949,7 +1015,7 @@ const PetitionCaseUpdatePage = ({
       !isEdit && !entry.isManual
         ? autoCaseNumbersByRow[entry.id] ||
           formatCaseNumber(
-            getAreaFromCaseNumber(entry.caseNumber, ""),
+            getAreaFromCaseNumber(entry.caseNumber, defaultArea),
             1,
             getYearFromDateField(entry.dateFiled),
           )
@@ -1530,7 +1596,7 @@ const PetitionCaseUpdatePage = ({
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           entry.caseNumber,
-                          "",
+                          defaultArea,
                         );
                         const autoAreaMissing = !autoAreaValue;
                         const rowHasExistingCase =
@@ -1570,7 +1636,7 @@ const PetitionCaseUpdatePage = ({
                             {/* Frozen cols */}
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                {!isEdit && col.key === "caseNumber" ? (
+                                {col.key === "caseNumber" ? (
                                   <div style={{ display: "grid", gap: 6 }}>
                                     <div style={{ display: "grid", gap: 6 }}>
                                       <select
@@ -1617,7 +1683,11 @@ const PetitionCaseUpdatePage = ({
                                         >
                                           <input
                                             className="xls-input xls-mono"
-                                            style={{ width: "100%" }}
+                                            style={{
+                                              width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
+                                            }}
                                             value={`${autoNumberPart}-`}
                                             readOnly
                                             title="Auto sequence"
@@ -1626,6 +1696,8 @@ const PetitionCaseUpdatePage = ({
                                             className={`xls-input xls-mono${autoAreaMissing ? " xls-input-err" : ""}`}
                                             style={{
                                               width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
                                               textAlign: "center",
                                             }}
                                             value={autoAreaValue}
@@ -1640,7 +1712,11 @@ const PetitionCaseUpdatePage = ({
                                           />
                                           <input
                                             className="xls-input xls-mono"
-                                            style={{ width: "100%" }}
+                                            style={{
+                                              width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
+                                            }}
                                             value={`-${autoYearPart}`}
                                             readOnly
                                             title="Auto year"

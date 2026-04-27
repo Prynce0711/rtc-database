@@ -75,7 +75,7 @@ const FROZEN_COLS: ColDef[] = [
     label: "Case Number",
     placeholder: "SPC-2026-0001",
     type: "text",
-    width: 160,
+    width: 220,
     required: true,
     mono: true,
   },
@@ -196,6 +196,55 @@ const applyAreaToCaseNumber = (
   const parsed = parseCaseNumberParts(value);
 
   return formatCaseNumber(normalizedArea, parsed?.number ?? 1, year);
+};
+
+const hydrateStoredCaseNumber = ({
+  caseNumber,
+  area,
+  number,
+  year,
+}: {
+  caseNumber?: string | null;
+  area?: string | null;
+  number?: number | null;
+  year?: number | null;
+}): string => {
+  const normalizedCaseNumber = String(caseNumber ?? "").trim();
+  const parsed = parseCaseNumberParts(normalizedCaseNumber);
+  if (parsed?.area) {
+    return normalizedCaseNumber;
+  }
+
+  const normalizedArea = normalizeAreaCode(area ?? "");
+  if (
+    normalizedArea &&
+    typeof number === "number" &&
+    !Number.isNaN(number) &&
+    typeof year === "number" &&
+    !Number.isNaN(year)
+  ) {
+    return formatCaseNumber(normalizedArea, number, year);
+  }
+
+  return normalizedCaseNumber;
+};
+
+const withResolvedAutoCaseNumber = (
+  entry: SpecialProceedingEntry,
+  fallbackArea: string,
+): SpecialProceedingEntry => {
+  if (entry.isManual) {
+    return entry;
+  }
+
+  return {
+    ...entry,
+    caseNumber: applyAreaToCaseNumber(
+      String(entry.caseNumber ?? ""),
+      getAreaFromCaseNumber(String(entry.caseNumber ?? ""), fallbackArea),
+      getYearFromDateField(entry.date),
+    ),
+  };
 };
 
 const importedSpecialProceedingRowToEntry = (
@@ -432,12 +481,18 @@ const SpecialProceedingUpdatePage = ({
 
   const [entries, setEntries] = useState<SpecialProceedingEntry[]>(() => {
     if (isEdit && editCases.length > 0) {
-      return editCases.map((item) => ({
-        ...item,
-        errors: {},
-        collapsed: false,
-        saved: false,
-      }));
+      return editCases.map((item) =>
+        withResolvedAutoCaseNumber(
+          {
+            ...item,
+            caseNumber: hydrateStoredCaseNumber(item),
+            errors: {},
+            collapsed: false,
+            saved: false,
+          },
+          AUTO_DEFAULT_AREA,
+        ),
+      );
     }
     return [
       {
@@ -461,12 +516,18 @@ const SpecialProceedingUpdatePage = ({
     if (isEdit) {
       if (editCases.length > 0) {
         setEntries(
-          editCases.map((item) => ({
-            ...item,
-            errors: {},
-            collapsed: false,
-            saved: false,
-          })),
+          editCases.map((item) =>
+            withResolvedAutoCaseNumber(
+              {
+                ...item,
+                caseNumber: hydrateStoredCaseNumber(item),
+                errors: {},
+                collapsed: false,
+                saved: false,
+              },
+              AUTO_DEFAULT_AREA,
+            ),
+          ),
         );
       }
       return;
@@ -591,7 +652,7 @@ const SpecialProceedingUpdatePage = ({
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [adapter, entries, isEdit]);
+  }, [adapter, defaultArea, entries, isEdit]);
 
   const getExistingCasesByCaseNumber = useCallback(async () => {
     if (isEdit) {
@@ -671,7 +732,14 @@ const SpecialProceedingUpdatePage = ({
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
-          ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
+          ? withResolvedAutoCaseNumber(
+              {
+                ...e,
+                [field]: value,
+                errors: { ...e.errors, [field]: "" },
+              },
+              defaultArea,
+            )
           : e,
       ),
     );
@@ -956,7 +1024,10 @@ const SpecialProceedingUpdatePage = ({
       !isEdit && !entry.isManual
         ? autoCaseNumbersByRow[entry.id] ||
           formatCaseNumber(
-            getAreaFromCaseNumber(String(entry.caseNumber ?? ""), ""),
+            getAreaFromCaseNumber(
+              String(entry.caseNumber ?? ""),
+              defaultArea,
+            ),
             1,
             getYearFromDateField(entry.date),
           )
@@ -1524,7 +1595,7 @@ const SpecialProceedingUpdatePage = ({
                         );
                         const autoAreaValue = getAreaFromCaseNumber(
                           String(entry.caseNumber ?? ""),
-                          "",
+                          defaultArea,
                         );
                         const autoAreaMissing = !autoAreaValue;
                         const rowHasExistingCase =
@@ -1558,7 +1629,7 @@ const SpecialProceedingUpdatePage = ({
                             </td>
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                {!isEdit && col.key === "caseNumber" ? (
+                                {col.key === "caseNumber" ? (
                                   <div style={{ display: "grid", gap: 6 }}>
                                     <div style={{ display: "grid", gap: 6 }}>
                                       <select
@@ -1605,7 +1676,11 @@ const SpecialProceedingUpdatePage = ({
                                         >
                                           <input
                                             className="xls-input xls-mono"
-                                            style={{ width: "100%" }}
+                                            style={{
+                                              width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
+                                            }}
                                             value={`${autoNumberPart}-`}
                                             readOnly
                                             title="Auto sequence"
@@ -1614,6 +1689,8 @@ const SpecialProceedingUpdatePage = ({
                                             className={`xls-input xls-mono${autoAreaMissing ? " xls-input-err" : ""}`}
                                             style={{
                                               width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
                                               textAlign: "center",
                                             }}
                                             value={autoAreaValue}
@@ -1628,7 +1705,11 @@ const SpecialProceedingUpdatePage = ({
                                           />
                                           <input
                                             className="xls-input xls-mono"
-                                            style={{ width: "100%" }}
+                                            style={{
+                                              width: "100%",
+                                              minWidth: 0,
+                                              padding: "0 8px",
+                                            }}
                                             value={`-${autoYearPart}`}
                                             readOnly
                                             title="Auto year"
