@@ -153,13 +153,20 @@ export default function PetitionTester() {
   };
 
   const handleDeleteAll = async () => {
-    if (!window.confirm("Are you sure you want to delete ALL petitions? This cannot be undone."))
+    if (
+      !window.confirm(
+        "Are you sure you want to delete ALL petitions? This cannot be undone.",
+      )
+    )
       return;
 
     setLoading(true);
     const result = await deleteAllPetitions();
     if (result.success) {
-      setMessage({ type: "success", text: "All petitions deleted successfully" });
+      setMessage({
+        type: "success",
+        text: "All petitions deleted successfully",
+      });
       await loadPetitions();
     } else {
       setMessage({
