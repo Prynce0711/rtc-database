@@ -421,6 +421,81 @@ model RecievingLog {
   updatedAt    DateTime? @updatedAt
 }
 
+model CriminalTransmittal {
+  id            Int       @id @default(autoincrement())
+  sourceRecordId Int
+  caseNumber    String?
+  branchLabel   String?
+  transmittedAt DateTime  @default(now())
+  payload       Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  @@unique([sourceRecordId])
+  @@index([transmittedAt])
+  @@unique([updatedAt, id])
+}
+
+model CivilTransmittal {
+  id            Int       @id @default(autoincrement())
+  sourceRecordId Int
+  caseNumber    String?
+  branchLabel   String?
+  transmittedAt DateTime  @default(now())
+  payload       Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  @@unique([sourceRecordId])
+  @@index([transmittedAt])
+  @@unique([updatedAt, id])
+}
+
+model RecievingLogTransmittal {
+  id            Int       @id @default(autoincrement())
+  sourceRecordId Int
+  caseNumber    String?
+  branchLabel   String?
+  transmittedAt DateTime  @default(now())
+  payload       Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  @@unique([sourceRecordId])
+  @@index([transmittedAt])
+  @@unique([updatedAt, id])
+}
+
+model SheriffTransmittal {
+  id            Int       @id @default(autoincrement())
+  sourceRecordId Int
+  caseNumber    String?
+  branchLabel   String?
+  transmittedAt DateTime  @default(now())
+  payload       Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  @@unique([sourceRecordId])
+  @@index([transmittedAt])
+  @@unique([updatedAt, id])
+}
+
+model SpecialProceedingTransmittal {
+  id            Int       @id @default(autoincrement())
+  sourceRecordId Int
+  caseNumber    String?
+  branchLabel   String?
+  transmittedAt DateTime  @default(now())
+  payload       Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  @@unique([sourceRecordId])
+  @@index([transmittedAt])
+  @@unique([updatedAt, id])
+}
+
 model Notarial {
   id       Int       @id @default(autoincrement())
   title    String?

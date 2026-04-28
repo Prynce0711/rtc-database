@@ -379,6 +379,7 @@ const caseNavItems: NavItem[] = [
       { label: "Special Proceedings", href: "proceedings" },
       { label: "Receiving Logs", href: "receiving" },
       { label: "Sheriff", href: "sheriff" },
+      { label: "Diversion", href: "diversion" },
     ],
   },
   {
