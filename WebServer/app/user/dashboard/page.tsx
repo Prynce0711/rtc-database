@@ -1,6 +1,6 @@
 import AdminDashboard from "@/app/components/Dashboard/AdminDashboard";
 import ArchiveDashboard from "@/app/components/Dashboard/ArchiveDashboard";
-import AttorneyDashboard from "@/app/components/Dashboard/Attorney/AttorneyDashboard";
+import CriminalCaseDashboard from "@/app/components/Dashboard/CriminalCase/CriminalCaseDashboard";
 import NotarialDashboard from "@/app/components/Dashboard/NotarialDashboard";
 import StaffDashboard from "@/app/components/Dashboard/StaffDashboard";
 import StatisticsDashboard from "@/app/components/Dashboard/StatisticsDashboard";
@@ -51,8 +51,8 @@ const page = async () => {
 
   if (session.user.role === Roles.ADMIN) {
     return <AdminDashboard />;
-  } else if (session.user.role === Roles.ATTY) {
-    return <AttorneyDashboard />;
+  } else if (session.user.role === Roles.CRIMINAL) {
+    return <CriminalCaseDashboard />;
   } else if (session.user.role === Roles.STATISTICS) {
     return <StatisticsDashboard />;
   } else if (session.user.role === Roles.NOTARIAL) {
@@ -67,3 +67,4 @@ const page = async () => {
 };
 
 export default page;
+

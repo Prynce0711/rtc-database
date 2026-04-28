@@ -174,7 +174,7 @@ export default function ChatTest() {
             >
               <option value="admin">admin</option>
               <option value="user">user</option>
-              <option value="atty">atty</option>
+              <option value="criminal">criminal</option>
               <option value="statistics">statistics</option>
             </select>
           </div>
@@ -263,3 +263,4 @@ export default function ChatTest() {
     </div>
   );
 }
+

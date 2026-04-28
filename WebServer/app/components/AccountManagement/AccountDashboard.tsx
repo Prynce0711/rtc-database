@@ -48,8 +48,8 @@ const roleToText = (role: User["role"] | Roles) => {
   switch (role) {
     case Roles.ADMIN:
       return "Admin";
-    case Roles.ATTY:
-      return "Attorney";
+    case Roles.CRIMINAL:
+      return "Criminal Section";
     case Roles.USER:
       return "Staff";
     case Roles.STATISTICS:
@@ -150,7 +150,7 @@ const AccountDashboard = () => {
   // ── Role change ────────────────────────────────────────────────────────────
   const handleRoleChange = async (user: User, newRole: Roles) => {
     const confirm = await statusPopup.showConfirm(
-      `Change ${user.name}'s role to ${newRole}?`,
+      `Change ${user.name}'s role to ${roleToText(newRole)}?`,
     );
     if (!confirm) return;
     const result = await updateRole([user.id], newRole);
@@ -311,7 +311,7 @@ const AccountDashboard = () => {
           >
             <option value="ALL">All Roles</option>
             <option value={Roles.USER}>Staff</option>
-            <option value={Roles.ATTY}>Attorney</option>
+            <option value={Roles.CRIMINAL}>Criminal Section</option>
             <option value={Roles.STATISTICS}>Statistics</option>
             <option value={Roles.NOTARIAL}>Notarial</option>
             <option value={Roles.ARCHIVE}>Archive</option>
@@ -428,7 +428,7 @@ const AccountDashboard = () => {
                         }
                       >
                         <option value={Roles.USER}>Staff</option>
-                        <option value={Roles.ATTY}>Attorney</option>
+                        <option value={Roles.CRIMINAL}>Criminal Section</option>
                         <option value={Roles.STATISTICS}>Statistics</option>
                         <option value={Roles.NOTARIAL}>Notarial</option>
                         <option value={Roles.ARCHIVE}>Archive</option>
@@ -478,3 +478,4 @@ const AccountDashboard = () => {
 };
 
 export default AccountDashboard;
+

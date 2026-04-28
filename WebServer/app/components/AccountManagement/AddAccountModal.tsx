@@ -6,6 +6,15 @@ import { useState } from "react";
 import { usePopup } from "@rtc-database/shared";
 import { createAccount } from "./AccountActions";
 
+const ROLE_LABELS: Record<Roles, string> = {
+  [Roles.ADMIN]: "Admin",
+  [Roles.CRIMINAL]: "Criminal Section",
+  [Roles.USER]: "Staff",
+  [Roles.STATISTICS]: "Statistics",
+  [Roles.NOTARIAL]: "Notarial",
+  [Roles.ARCHIVE]: "Archive",
+};
+
 const AddAccountModal = ({
   onClose,
   onCreate,
@@ -71,7 +80,7 @@ const AddAccountModal = ({
                 }
               >
                 <option value={Roles.USER}>Staff</option>
-                <option value={Roles.ATTY}>Atty</option>
+                <option value={Roles.CRIMINAL}>Criminal Section</option>
                 <option value={Roles.STATISTICS}>Statistics</option>
                 <option value={Roles.NOTARIAL}>Notarial</option>
                 <option value={Roles.ARCHIVE}>Archive</option>
@@ -104,7 +113,7 @@ const AddAccountModal = ({
                 <strong>Email:</strong> {form.email}
               </p>
               <p>
-                <strong>Role:</strong> {form.role}
+                <strong>Role:</strong> {ROLE_LABELS[form.role]}
               </p>
             </div>
 
@@ -128,4 +137,5 @@ const AddAccountModal = ({
 };
 
 export default AddAccountModal;
+
 

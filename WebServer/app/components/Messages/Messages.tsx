@@ -120,8 +120,8 @@ const getRoleBadge = (role?: Roles) => {
   switch (role) {
     case Roles.admin:
       return { label: "Admin", cls: "bg-error/15 text-error" };
-    case Roles.atty:
-      return { label: "Attorney", cls: "bg-info/15 text-info" };
+    case Roles.criminal:
+      return { label: "Criminal Section", cls: "bg-info/15 text-info" };
     default:
       return { label: "Staff", cls: "bg-success/15 text-success" };
   }
@@ -2068,3 +2068,4 @@ const Messages: React.FC = () => {
 };
 
 export default Messages;
+

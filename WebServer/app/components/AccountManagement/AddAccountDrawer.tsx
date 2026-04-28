@@ -22,6 +22,15 @@ import { getEmployees } from "../Employee/EmployeeActions";
 import { createAccount } from "./AccountActions";
 import { NewUserSchema } from "./schema";
 
+const ROLE_LABELS: Record<Roles, string> = {
+  [Roles.ADMIN]: "Admin",
+  [Roles.CRIMINAL]: "Criminal Section",
+  [Roles.USER]: "Staff",
+  [Roles.STATISTICS]: "Statistics",
+  [Roles.NOTARIAL]: "Notarial",
+  [Roles.ARCHIVE]: "Archive",
+};
+
 type AccountType = "EXISTING" | "NEW" | null;
 type Step = "SELECT_TYPE" | "FORM" | "REVIEW";
 
@@ -409,7 +418,7 @@ const AddAccountDrawer = ({
                   }
                 >
                   <option value={Roles.USER}>Staff</option>
-                  <option value={Roles.ATTY}>Attorney</option>
+                  <option value={Roles.CRIMINAL}>Criminal Section</option>
                   <option value={Roles.STATISTICS}>Statistics</option>
                   <option value={Roles.NOTARIAL}>Notarial</option>
                   <option value={Roles.ARCHIVE}>Archive</option>
@@ -501,7 +510,7 @@ const AddAccountDrawer = ({
                     </div>
                     <div className="rv-hero-badges">
                       <span className="rv-badge rv-badge-court">
-                        {form.role}
+                        {ROLE_LABELS[form.role]}
                       </span>
                     </div>
                   </div>
@@ -539,7 +548,9 @@ const AddAccountDrawer = ({
                           </div>
                           <div className="rv-field">
                             <div className="rv-field-label">Account Role</div>
-                            <div className="rv-field-value">{form.role}</div>
+                            <div className="rv-field-value">
+                              {ROLE_LABELS[form.role]}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -614,3 +625,4 @@ const AddAccountDrawer = ({
 };
 
 export default AddAccountDrawer;
+

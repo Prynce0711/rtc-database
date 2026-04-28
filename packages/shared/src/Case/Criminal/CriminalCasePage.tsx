@@ -78,7 +78,7 @@ const CriminalCasePage: React.FC<{
     recentlyFiled: 0,
   });
 
-  const isAdminOrAtty = role === "admin" || role === "atty";
+  const canManageCases = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -549,7 +549,7 @@ const CriminalCasePage: React.FC<{
                 {exporting ? "Exporting..." : "Export Excel"}
               </button>
 
-              {isAdminOrAtty && (
+              {canManageCases && (
                 <button
                   className={ButtonStyles.primary}
                   onClick={() => router.push("/user/cases/criminal/add")}
@@ -608,7 +608,7 @@ const CriminalCasePage: React.FC<{
             )}
           </button>
 
-          {isAdminOrAtty &&
+          {canManageCases &&
             (isSelecting ? (
               <div className="flex items-center gap-2 sm:ml-3">
                 <span className="text-sm text-base-content/60 whitespace-nowrap">
@@ -729,7 +729,7 @@ const CriminalCasePage: React.FC<{
 
       {/* Cases Table */}
       {/* Selected Cases Bar */}
-      {isAdminOrAtty && isSelecting && (
+      {canManageCases && isSelecting && (
         <AnimatePresence>
           {selectedCaseIds.length > 0 && (
             <motion.div
@@ -760,7 +760,7 @@ const CriminalCasePage: React.FC<{
       <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
         <Table
           headers={[
-            ...(isAdminOrAtty && isSelecting
+            ...(canManageCases && isSelecting
               ? [
                   {
                     key: "select",
@@ -881,3 +881,4 @@ const CriminalCasePage: React.FC<{
 };
 
 export default CriminalCasePage;
+

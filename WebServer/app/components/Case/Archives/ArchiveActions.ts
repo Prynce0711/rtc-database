@@ -31,7 +31,7 @@ import { Prisma } from "@rtc-database/shared/prisma/client";
 import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 
-const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.ATTY];
+const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.CRIMINAL];
 const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
@@ -1160,3 +1160,4 @@ export async function getRecentArchiveItems(
     return { success: false, error: "Failed to fetch recent archive items" };
   }
 }
+

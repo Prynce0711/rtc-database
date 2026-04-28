@@ -50,21 +50,21 @@ const ProfileTab = ({ role }: { role: string }) => {
           />
         </SettingsRow>
 
-        {role === Roles.ATTY && (
+        {role === Roles.CRIMINAL && (
           <>
             <SettingsRow
-              label="Roll / Bar Number"
-              description="Your IBP or Supreme Court roll number."
+              label="Section / Desk Code"
+              description="Internal code used for the criminal section account."
             >
               <InputField
                 value={barNumber}
                 onChange={setBarNumber}
-                placeholder="e.g. 12345"
+                placeholder="e.g. CRIM-01"
               />
             </SettingsRow>
             <SettingsRow
-              label="Sala / Branch"
-              description="Assigned court branch or sala."
+              label="Assigned Branch"
+              description="Primary branch handled by this criminal section account."
             >
               <SelectField
                 value={branch}
@@ -83,10 +83,10 @@ const ProfileTab = ({ role }: { role: string }) => {
         )}
       </SettingsCard>
 
-      {role === Roles.ATTY && (
+      {role === Roles.CRIMINAL && (
         <SettingsCard
-          title="Digital Signature"
-          description="Upload your signature for orders and decisions."
+          title="Section Signature"
+          description="Upload the signature asset used by the criminal section."
         >
           <div className="px-7 py-6">
             <div className="border-2 border-dashed border-base-300/70 rounded-2xl p-10 flex flex-col items-center justify-center text-center hover:border-primary/30 transition-colors cursor-pointer group">
@@ -116,3 +116,4 @@ const ProfileTab = ({ role }: { role: string }) => {
 };
 
 export default ProfileTab;
+

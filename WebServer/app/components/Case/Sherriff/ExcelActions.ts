@@ -27,7 +27,7 @@ export async function uploadSheriffExcel(
   overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -60,7 +60,7 @@ export async function exportSheriffExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -137,3 +137,4 @@ export async function exportSheriffExcel(): Promise<
     return { success: false, error: "Export failed" };
   }
 }
+

@@ -28,7 +28,7 @@ export async function uploadExcel(
   overrideTemplateValidation = false,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -67,7 +67,7 @@ export async function exportCasesExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -140,3 +140,4 @@ export async function exportCasesExcel(): Promise<
     return { success: false, error: "Export failed" };
   }
 }
+

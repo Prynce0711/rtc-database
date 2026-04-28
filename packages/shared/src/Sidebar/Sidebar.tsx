@@ -562,7 +562,7 @@ function adminSidebar({
   );
 }
 
-function attySidebar({
+function criminalSidebar({
   isExpanded,
   activeView,
   openDropdown,
@@ -609,22 +609,12 @@ function attySidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
-        <NavBtn
-          item={caseNavItems[1]}
-          isExpanded={isExpanded}
-          activeView={activeView}
-          openDropdown={openDropdown}
-          setOpenDropdown={setOpenDropdown}
-          onExpandSidebar={onExpandSidebar}
-        />
-      </div>
 
       {/* Communication */}
-      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <SectionLabel label="Communication" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "150ms" }}>
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
@@ -633,7 +623,7 @@ function attySidebar({
           onClick={onOpenMessages}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "180ms" }}>
         <ActionBtn
           icon={<FiBell />}
           label="Notifications"
@@ -644,10 +634,10 @@ function attySidebar({
       </div>
 
       {/* Settings */}
-      <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
         <SectionLabel label="Settings" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
         <ActionBtn
           icon={<FiSettings />}
           label="Settings"
@@ -655,7 +645,7 @@ function attySidebar({
           onClick={onOpenSettings}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
         <ActionBtn
           icon={theme === "winter" ? <FiMoon /> : <FiSun />}
           label={theme === "winter" ? "Dark Mode" : "Light Mode"}
@@ -1309,8 +1299,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {normalizedRole === "admin"
             ? adminSidebar(menuProps)
-            : normalizedRole === "atty" || normalizedRole === "attorney"
-              ? attySidebar(menuProps)
+            : normalizedRole === "criminal" ||
+                normalizedRole === "atty" ||
+                normalizedRole === "attorney"
+              ? criminalSidebar(menuProps)
               : normalizedRole === "statistics" || normalizedRole === "stats"
                 ? statsSidebar(menuProps)
                 : normalizedRole === "archive" || normalizedRole === "archives"
@@ -1358,3 +1350,4 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
+
