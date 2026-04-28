@@ -389,6 +389,7 @@ const caseNavItems: NavItem[] = [
       { label: "Monthly Reports", href: "monthly" },
       { label: "Annual Reports", href: "annual" },
       { label: "Judgment Day", href: "judgement" },
+      { label: "Summary", href: "summary" },
     ],
   },
 

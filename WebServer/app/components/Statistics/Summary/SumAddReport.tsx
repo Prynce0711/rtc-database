@@ -182,6 +182,30 @@ const NUMERIC_FIELDS: Array<{
   { key: "total", label: "Total", group: "total" },
 ];
 
+const SUMMARY_EDIT_COLUMN_WIDTHS = {
+  select: 44,
+  rowNumber: 44,
+  branch: 176,
+  raffleDate: 168,
+  total: 108,
+} as const;
+
+const SUMMARY_EDIT_NUMERIC_COLUMN_WIDTHS: Record<string, number> = {
+  civilFamily: 108,
+  civilOrdinary: 108,
+  civilReceivedViaReraffled: 148,
+  civilUnloaded: 112,
+  lrcPetition: 108,
+  lrcSpProc: 108,
+  lrcReceivedViaReraffled: 148,
+  lrcUnloaded: 112,
+  criminalFamily: 108,
+  criminalDrugs: 108,
+  criminalOrdinary: 108,
+  criminalReceivedViaReraffled: 148,
+  criminalUnloaded: 112,
+};
+
 const toRowTotal = (row: EditableSummaryRow): number =>
   computeSummaryTotal(row);
 
@@ -769,10 +793,33 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-base-200 bg-base-100">
-            <table className="table table-xs sm:table-sm w-max min-w-full">
+            <table
+              className="table table-pin-rows table-xs sm:table-sm w-max min-w-full"
+              style={{ tableLayout: "fixed" }}
+            >
+              <colgroup>
+                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.select }} />
+                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.rowNumber }} />
+                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.branch }} />
+                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.raffleDate }} />
+                {NUMERIC_FIELDS.filter((field) => field.group !== "total").map(
+                  (field) => (
+                    <col
+                      key={field.key}
+                      style={{
+                        width: SUMMARY_EDIT_NUMERIC_COLUMN_WIDTHS[field.key] ?? 108,
+                      }}
+                    />
+                  ),
+                )}
+                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.total }} />
+              </colgroup>
               <thead>
                 <tr className="bg-base-200/70">
-                  <th rowSpan={2} className="text-center align-middle">
+                  <th
+                    rowSpan={2}
+                    className="text-center align-middle overflow-hidden whitespace-nowrap"
+                  >
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
@@ -783,13 +830,22 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                       onChange={toggleSelectAllVisible}
                     />
                   </th>
-                  <th rowSpan={2} className="text-center align-middle">
+                  <th
+                    rowSpan={2}
+                    className="text-center align-middle overflow-hidden whitespace-nowrap"
+                  >
                     #
                   </th>
-                  <th rowSpan={2} className="text-center align-middle">
+                  <th
+                    rowSpan={2}
+                    className="text-center align-middle overflow-hidden whitespace-nowrap"
+                  >
                     Branch
                   </th>
-                  <th rowSpan={2} className="text-center align-middle">
+                  <th
+                    rowSpan={2}
+                    className="text-center align-middle overflow-hidden whitespace-nowrap"
+                  >
                     Raffle Date
                   </th>
                   <th colSpan={4} className="text-center text-primary">
@@ -814,9 +870,9 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                   ).map((field) => (
                     <th
                       key={field.key}
-                      className="text-center whitespace-nowrap"
+                      className="text-center overflow-hidden whitespace-nowrap"
                     >
-                      {field.label}
+                      <span className="block truncate">{field.label}</span>
                     </th>
                   ))}
                 </tr>
@@ -849,10 +905,10 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                           {index + 1}
                         </td>
 
-                        <td>
+                        <td className="min-w-0">
                           <input
                             type="text"
-                            className="input input-bordered input-xs sm:input-sm w-40"
+                            className="input input-bordered input-xs sm:input-sm w-full min-w-0"
                             value={row.branch}
                             placeholder="Branch"
                             onChange={(event) =>
@@ -861,10 +917,10 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                           />
                         </td>
 
-                        <td>
+                        <td className="min-w-0">
                           <input
                             type="date"
-                            className="input input-bordered input-xs sm:input-sm w-40"
+                            className="input input-bordered input-xs sm:input-sm w-full min-w-0"
                             value={row.raffleDate}
                             onChange={(event) =>
                               updateRow(
@@ -879,11 +935,11 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
                         {NUMERIC_FIELDS.filter(
                           (field) => field.group !== "total",
                         ).map((field) => (
-                          <td key={field.key} className="text-center">
+                          <td key={field.key} className="text-center min-w-0">
                             <input
                               type="number"
                               min={0}
-                              className="input input-bordered input-xs sm:input-sm w-24 text-center"
+                              className="input input-bordered input-xs sm:input-sm w-full min-w-0 text-center"
                               value={row[field.key] || ""}
                               onChange={(event) =>
                                 updateRow(
