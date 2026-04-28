@@ -5,7 +5,6 @@ import React, { ReactNode, useEffect, useState } from "react";
 import { FaHistory, FaUserCog } from "react-icons/fa";
 import {
   FiBarChart2,
-  FiBell,
   FiChevronDown,
   FiChevronsLeft,
   FiChevronsRight,
@@ -454,9 +453,9 @@ function adminSidebar({
 }: SidebarMenuProps) {
   return (
     <>
-      <Link href="/user/test" className="btn">
+      {/* <Link href="/user/test" className="btn">
         Test
-      </Link>
+      </Link> */}
       {/* Main */}
       <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
         <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
