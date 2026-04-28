@@ -329,8 +329,23 @@ const Messages: React.FC = () => {
   }, [statusPopup]);
 
   useEffect(() => {
-    void loadChats();
-  }, [loadChats]);
+    let isMounted = true;
+
+    (async () => {
+      const result = await getChats();
+      if (isMounted) {
+        if (!result.success) {
+          statusPopup.showError(result.error || "Failed to load chats");
+          return;
+        }
+        setConversations(result.result);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [statusPopup]);
 
   const activeConvo = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
