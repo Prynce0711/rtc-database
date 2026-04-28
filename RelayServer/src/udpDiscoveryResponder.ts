@@ -27,30 +27,15 @@ const ADVERTISED_PROTOCOL =
 let socket: dgram.Socket | null = null;
 let joinedMulticastInterfaces: string[] = [];
 
-const getAdvertisedHost = (): string => {
-  const configuredHost = process.env.UDP_ADVERTISED_HOST?.trim();
-  console.log(`[udp] Configured advertised host: ${configuredHost || "none"}`);
-  if (configuredHost) {
-    return configuredHost;
+const normalizeAdvertisedHost = (
+  value: string | null | undefined,
+): string | null => {
+  const normalized = value?.trim();
+  if (!normalized || normalized === "0.0.0.0") {
+    return null;
   }
 
-  const interfaces = networkInterfaces();
-
-  for (const ifaceList of Object.values(interfaces)) {
-    if (!ifaceList) {
-      continue;
-    }
-
-    const activeIpv4 = ifaceList.find(
-      (iface) => iface.family === "IPv4" && !iface.internal,
-    );
-
-    if (activeIpv4?.address) {
-      return activeIpv4.address;
-    }
-  }
-
-  return "127.0.0.1";
+  return normalized;
 };
 
 const getActiveIpv4Addresses = (): string[] => {
@@ -70,6 +55,37 @@ const getActiveIpv4Addresses = (): string[] => {
   }
 
   return [...addresses];
+};
+
+const getAdvertisedHosts = (): string[] => {
+  const configuredHost = normalizeAdvertisedHost(
+    process.env.UDP_ADVERTISED_HOST,
+  );
+  const activeIpv4Addresses = getActiveIpv4Addresses();
+  const advertisedHosts: string[] = [];
+  const seenHosts = new Set<string>();
+
+  const appendHost = (value: string | null | undefined): void => {
+    const normalized = normalizeAdvertisedHost(value);
+    if (!normalized || seenHosts.has(normalized)) {
+      return;
+    }
+
+    seenHosts.add(normalized);
+    advertisedHosts.push(normalized);
+  };
+
+  for (const address of activeIpv4Addresses) {
+    appendHost(address);
+  }
+
+  appendHost(configuredHost);
+
+  if (advertisedHosts.length === 0) {
+    appendHost("127.0.0.1");
+  }
+
+  return advertisedHosts;
 };
 
 const joinDiscoveryMulticastGroup = (): void => {
@@ -115,7 +131,10 @@ export function startUdpDiscoveryResponder(): void {
     return;
   }
 
-  const advertisedHost = getAdvertisedHost();
+  console.log(
+    `[udp] Configured advertised host: ${process.env.UDP_ADVERTISED_HOST?.trim() || "none"}`,
+  );
+  const initialAdvertisedHosts = getAdvertisedHosts();
 
   socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
@@ -126,7 +145,7 @@ export function startUdpDiscoveryResponder(): void {
 
     const address = socket!.address();
     console.log(
-      `[udp] Discovery responder listening on ${address.address}:${address.port} (multicast=${UDP_MULTICAST_GROUP}, backend=${advertisedHost}:${ADVERTISED_PORT})`,
+      `[udp] Discovery responder listening on ${address.address}:${address.port} (multicast=${UDP_MULTICAST_GROUP}, backends=${initialAdvertisedHosts.join(", ")}:${ADVERTISED_PORT})`,
     );
   });
 
@@ -144,11 +163,13 @@ export function startUdpDiscoveryResponder(): void {
       return;
     }
 
+    const advertisedHosts = getAdvertisedHosts();
     const response: UdpDiscoveryResponse = {
       type: UDP_DISCOVERY_RESPONSE_TYPE,
       service: UDP_SERVICE_NAME,
       protocol: ADVERTISED_PROTOCOL,
-      host: advertisedHost,
+      host: advertisedHosts[0] ?? "127.0.0.1",
+      hosts: advertisedHosts,
       port: ADVERTISED_PORT,
       timestamp: Date.now(),
     };

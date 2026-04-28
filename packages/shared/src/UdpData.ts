@@ -19,6 +19,7 @@ export const UdpDiscoveryResponse = z.object({
   service: z.literal(UDP_SERVICE_NAME),
   protocol: z.enum(["http", "https"]).optional(),
   host: z.string().min(1),
+  hosts: z.array(z.string().min(1)).min(1).optional(),
   port: z.number().int().min(1).max(65535),
   timestamp: z.number().int().min(0),
 });
