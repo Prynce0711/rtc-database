@@ -14,7 +14,7 @@ export async function exportNotarialExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
-    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.NOTARIAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }

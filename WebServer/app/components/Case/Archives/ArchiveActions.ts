@@ -31,7 +31,7 @@ import { Prisma } from "@rtc-database/shared/prisma/client";
 import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 
-const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.CRIMINAL];
+const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.NOTARIAL];
 const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
@@ -86,7 +86,10 @@ const defaultExtensionForType = (entryType: ArchiveEntryType): string => {
   }
 };
 
-const ensureFileExtension = (name: string, extension?: string | null): string => {
+const ensureFileExtension = (
+  name: string,
+  extension?: string | null,
+): string => {
   const normalizedName = normalizeArchiveName(name);
   const normalizedExtension = (extension ?? "").trim().replace(/^\./, "");
 
@@ -94,7 +97,9 @@ const ensureFileExtension = (name: string, extension?: string | null): string =>
     return normalizedName;
   }
 
-  return normalizedName.toLowerCase().endsWith(`.${normalizedExtension.toLowerCase()}`)
+  return normalizedName
+    .toLowerCase()
+    .endsWith(`.${normalizedExtension.toLowerCase()}`)
     ? normalizedName
     : `${normalizedName}.${normalizedExtension}`;
 };
@@ -223,7 +228,9 @@ const parseSpreadsheetUpload = async (
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheetName = workbook.SheetNames[0];
-  const firstSheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined;
+  const firstSheet = firstSheetName
+    ? workbook.Sheets[firstSheetName]
+    : undefined;
   const rows = firstSheet
     ? (XLSX.utils.sheet_to_json(firstSheet, {
         header: 1,
@@ -392,7 +399,9 @@ const prepareArchiveEntry = async (
 
     if (input.entryType === ArchiveEntryType.DOCUMENT) {
       const textContent =
-        parsedUpload.textContent ?? normalizeNullableString(input.textContent) ?? "";
+        parsedUpload.textContent ??
+        normalizeNullableString(input.textContent) ??
+        "";
       const resolvedName = resolveArchiveEntryName(
         input.name || input.file.name,
         ArchiveEntryType.DOCUMENT,
@@ -625,10 +634,7 @@ export async function getArchiveStats(
               where,
               {
                 entryType: {
-                  in: [
-                    ArchiveEntryType.DOCUMENT,
-                    ArchiveEntryType.SPREADSHEET,
-                  ],
+                  in: [ArchiveEntryType.DOCUMENT, ArchiveEntryType.SPREADSHEET],
                 },
               },
             ],
@@ -978,7 +984,9 @@ export async function updateArchiveEntry(
         });
 
         for (const descendant of descendants) {
-          const suffix = descendant.fullPath.slice(existingEntry.fullPath.length);
+          const suffix = descendant.fullPath.slice(
+            existingEntry.fullPath.length,
+          );
           const nextFullPath = `${fullPath}${suffix}`;
 
           await tx.archiveEntry.update({
@@ -1023,7 +1031,10 @@ export async function updateArchiveEntry(
             key: existingEntry.file.key,
           }
         : null;
-    } else if (prepared.result.entryType === ArchiveEntryType.FILE && !nextFileId) {
+    } else if (
+      prepared.result.entryType === ArchiveEntryType.FILE &&
+      !nextFileId
+    ) {
       return {
         success: false,
         error: "A file is required for file archive entries",
@@ -1160,4 +1171,3 @@ export async function getRecentArchiveItems(
     return { success: false, error: "Failed to fetch recent archive items" };
   }
 }
-

@@ -1,25 +1,19 @@
-"use client";
-
 import archiveAdapter from "@/app/components/Case/Archives/ArchiveAdapter";
-import { useSession } from "@/app/lib/authClient";
-import { ArchivePage, RedirectingUI, Roles } from "@rtc-database/shared";
-import { redirect } from "next/navigation";
+import { requireUserRole } from "@/app/lib/requireUserRole";
+import AppRoles from "@/app/lib/Roles";
+import { ArchivePage, Roles as SharedRoles } from "@rtc-database/shared";
 
-export default function Page() {
-  const session = useSession();
-
-  if (session.isPending) {
-    return <RedirectingUI titleText="Loading archive explorer..." />;
-  }
-
-  if (!session.data?.user?.role) {
-    redirect("/");
-  }
+export default async function Page() {
+  const role = await requireUserRole([
+    AppRoles.ADMIN,
+    AppRoles.NOTARIAL,
+    AppRoles.ARCHIVE,
+  ]);
 
   return (
     <ArchivePage
       adapter={archiveAdapter}
-      role={session.data.user.role as Roles}
+      role={role as SharedRoles}
     />
   );
 }

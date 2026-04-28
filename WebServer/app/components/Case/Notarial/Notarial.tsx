@@ -9,6 +9,7 @@ import {
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
+import Roles from "@/app/lib/Roles";
 import {
   ExactMatchMap,
   FileViewerModal,
@@ -106,7 +107,7 @@ const SortTh = ({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const NotarialPage: React.FC = () => {
+const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const router = useRouter();
   const statusPopup = usePopup();
   const toast = useToast();
@@ -131,7 +132,8 @@ const NotarialPage: React.FC = () => {
   );
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const isAdminOrAtty = true;
+  const canManageNotarial =
+    role === Roles.ADMIN || role === Roles.NOTARIAL;
   const isSelecting = selectionMode !== null;
   const [exporting, setExporting] = useState(false);
   const [stats, setStats] = useState({
@@ -633,7 +635,7 @@ const NotarialPage: React.FC = () => {
             )}
           </button>
 
-          {isAdminOrAtty &&
+          {canManageNotarial &&
             (isSelecting ? (
               <div className="flex items-center gap-2 sm:ml-3">
                 <span className="text-sm text-base-content/60 whitespace-nowrap">
@@ -769,7 +771,7 @@ const NotarialPage: React.FC = () => {
           <table className="table table-sm w-full text-center">
             <thead>
               <tr className="bg-base-200/50 border-b border-base-200">
-                {isAdminOrAtty && isSelecting && (
+                {canManageNotarial && isSelecting && (
                   <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
                     <label className="inline-flex items-center justify-center gap-2">
                       <span>Select</span>
@@ -820,7 +822,7 @@ const NotarialPage: React.FC = () => {
               {records.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5 + (isAdminOrAtty && isSelecting ? 1 : 0)}
+                    colSpan={5 + (canManageNotarial && isSelecting ? 1 : 0)}
                     className="py-16"
                   >
                     <div className="flex flex-col items-center justify-center py-12 text-base-content/40">

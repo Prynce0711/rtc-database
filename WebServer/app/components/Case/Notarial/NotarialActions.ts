@@ -48,6 +48,8 @@ export type NotarialRecentFile = {
   uploadedAt: Date;
 };
 
+const NOTARIAL_ACCESS_ROLES = [Roles.ADMIN, Roles.NOTARIAL] as const;
+
 function buildNotarialWhere(
   options?: NotarialFilterOptions,
 ): Prisma.NotarialWhereInput {
@@ -97,7 +99,7 @@ async function deleteFileIfUnreferenced(fileId: number, key: string) {
 
 export async function getNotarial(): Promise<ActionResult<NotarialData[]>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.NOTARIAL]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -119,7 +121,7 @@ export async function getNotarialById(
   id: number,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.NOTARIAL]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -144,7 +146,7 @@ export async function getNotarialByIds(
   ids: Array<number | string>,
 ): Promise<ActionResult<NotarialData[]>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -182,7 +184,7 @@ export async function getNotarialPage(
   options?: NotarialFilterOptions,
 ): Promise<ActionResult<PaginatedResult<NotarialData>>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -225,7 +227,7 @@ export async function getNotarialStats(
   options?: NotarialFilterOptions,
 ): Promise<ActionResult<NotarialStats>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -282,7 +284,7 @@ export async function createNotarial(
   data: Record<string, unknown>,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -363,7 +365,7 @@ export async function updateNotarial(
   data: Record<string, unknown>,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -495,7 +497,7 @@ export async function updateNotarial(
 
 export async function deleteNotarial(id: number): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -527,7 +529,7 @@ export async function getNotarialFileUrl(
   options?: GetFileOptions,
 ): Promise<ActionResult<string>> {
   try {
-    const sessionResult = await validateSession();
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -564,11 +566,7 @@ export async function getRecentNotarialFiles(
   limit = 5,
 ): Promise<ActionResult<NotarialRecentFile[]>> {
   try {
-    const sessionResult = await validateSession([
-      Roles.NOTARIAL,
-      Roles.ADMIN,
-      Roles.CRIMINAL,
-    ]);
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
     if (!sessionResult.success) {
       return sessionResult;
     }
