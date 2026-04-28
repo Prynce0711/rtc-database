@@ -121,6 +121,7 @@ export * from "./lib/utils";
 export * from "./Sidebar/SidebarAdapter";
 
 export {
+  UDP_DISCOVERY_PORT,
   RELAY_HEALTH_PATH,
   UDP_DISCOVERY_MULTICAST_GROUP,
   UDP_DISCOVERY_MULTICAST_TTL,

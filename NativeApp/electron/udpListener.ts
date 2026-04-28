@@ -1,32 +1,13 @@
 import {
   type BackendInfo,
-  UDP_DISCOVERY_MULTICAST_GROUP,
-  UDP_DISCOVERY_MULTICAST_TTL,
-  UDP_DISCOVERY_REQUEST_TYPE,
-  UDP_SERVICE_NAME,
-  UdpDiscoveryRequest,
+  UDP_DISCOVERY_PORT,
   UdpDiscoveryResponse,
 } from "@rtc-database/shared/src/UdpData";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
 import { inspectBackendTrust, probeRelayReachability } from "./relayTrust";
 
-const UDP_PORT = 41234;
-const DISCOVERY_BURST_COUNT = 3;
-const DISCOVERY_BURST_INTERVAL_MS = 200;
-const DISCOVERY_RETRY_INTERVAL_MS = 10000;
-
 let socket: dgram.Socket | null = null;
-let discoveryInterval: NodeJS.Timeout | null = null;
-let discoveryBurstTimers: NodeJS.Timeout[] = [];
-
-const clearDiscoveryBurstTimers = (): void => {
-  for (const timer of discoveryBurstTimers) {
-    clearTimeout(timer);
-  }
-
-  discoveryBurstTimers = [];
-};
 
 const resolveAdvertisedHost = (
   candidateHost: string | undefined,
@@ -135,63 +116,20 @@ const resolveReachableBackend = async (
   return enrichBackendTrust(reachableBackend);
 };
 
-const sendDiscoveryRequest = (): void => {
-  if (!socket) {
-    return;
-  }
-
-  const payload: UdpDiscoveryRequest = {
-    type: UDP_DISCOVERY_REQUEST_TYPE,
-    service: UDP_SERVICE_NAME,
-    timestamp: Date.now(),
-  };
-
-  socket.send(
-    Buffer.from(JSON.stringify(payload)),
-    UDP_PORT,
-    UDP_DISCOVERY_MULTICAST_GROUP,
-    (error) => {
-      if (error) {
-        console.error("[udp] Failed to send discovery request:", error);
-      }
-    },
-  );
-};
-
-const sendDiscoveryBurst = (): void => {
-  clearDiscoveryBurstTimers();
-
-  for (let index = 0; index < DISCOVERY_BURST_COUNT; index += 1) {
-    const timer = setTimeout(() => {
-      sendDiscoveryRequest();
-    }, index * DISCOVERY_BURST_INTERVAL_MS);
-
-    discoveryBurstTimers.push(timer);
-  }
-};
-
 export function startUdpListener(mainWindow: BrowserWindow) {
   if (socket) {
     return;
   }
 
-  console.log("[udp] Starting discovery client...");
+  console.log("[udp] Starting discovery listener...");
 
   socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("listening", () => {
     const addr = socket!.address();
-    socket!.setMulticastTTL(UDP_DISCOVERY_MULTICAST_TTL);
-    socket!.setMulticastLoopback(true);
     console.log(
-      `[udp] Discovery client bound on ${addr.address}:${addr.port} (multicast=${UDP_DISCOVERY_MULTICAST_GROUP}:${UDP_PORT})`,
+      `[udp] Discovery listener bound on ${addr.address}:${addr.port} (waiting for relay announcements on UDP ${UDP_DISCOVERY_PORT})`,
     );
-
-    sendDiscoveryBurst();
-
-    discoveryInterval = setInterval(() => {
-      sendDiscoveryBurst();
-    }, DISCOVERY_RETRY_INTERVAL_MS);
   });
 
   socket.on("message", (msg, rinfo) => {
@@ -219,13 +157,13 @@ export function startUdpListener(mainWindow: BrowserWindow) {
       );
       if (!resolvedBackend) {
         console.warn(
-          `[udp] Discovery response from ${rinfo.address}:${rinfo.port} did not produce a reachable relay candidate.`,
+          `[udp] Relay announcement from ${rinfo.address}:${rinfo.port} did not produce a reachable relay candidate.`,
         );
         return;
       }
 
       console.log(
-        `[udp] Received discovery response from ${rinfo.address}:${rinfo.port} -> ${resolvedBackend.url} (${resolvedBackend.relayTrustState ?? "unknown"})`,
+        `[udp] Received relay announcement from ${rinfo.address}:${rinfo.port} -> ${resolvedBackend.url} (${resolvedBackend.relayTrustState ?? "unknown"})`,
       );
 
       if (!mainWindow.isDestroyed()) {
@@ -235,22 +173,15 @@ export function startUdpListener(mainWindow: BrowserWindow) {
   });
 
   socket.on("error", (err) => {
-    console.error("[udp] Discovery client socket error:", err);
+    console.error("[udp] Discovery listener socket error:", err);
     stopUdpListener();
   });
 
-  // Bind to an ephemeral client port so each app instance can discover independently.
-  socket.bind(0, "0.0.0.0");
+  // Bind to the shared discovery port so app instances can receive relay broadcasts.
+  socket.bind(UDP_DISCOVERY_PORT, "0.0.0.0");
 }
 
 export function stopUdpListener() {
-  clearDiscoveryBurstTimers();
-
-  if (discoveryInterval) {
-    clearInterval(discoveryInterval);
-    discoveryInterval = null;
-  }
-
   if (socket) {
     socket.close();
     socket = null;

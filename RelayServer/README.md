@@ -4,8 +4,8 @@ Standalone LAN relay service for RTC Database.
 
 ## What It Does
 
-- Listens for `DISCOVER_BACKEND` UDP requests.
-- Responds with the relay host and port that clients should use.
+- Broadcasts `BACKEND_AVAILABLE` UDP announcements on the LAN.
+- Lets clients listen passively for the relay host and port they should use.
 - Reverse proxies HTTP and WebSocket traffic to an upstream server (for example via Tailscale).
 - Designed to run on a LAN relay/proxy machine.
 
@@ -22,8 +22,8 @@ Standalone LAN relay service for RTC Database.
 - `RELAY_TLS_AUTO_GENERATE`: auto-generate self-signed cert/key when missing (default `true`)
 - `RELAY_TLS_CERT_HOSTS`: comma-separated SAN hosts/IPs for generated cert
 
-- `UDP_PORT`: UDP discovery port to listen on (default `41234`)
-- `UDP_ADVERTISED_HOST`: optional extra hostname/IP to include in discovery responses
+- `UDP_PORT`: UDP discovery port to broadcast on and for clients to listen on (default `41234`)
+- `UDP_ADVERTISED_HOST`: optional extra hostname/IP to include in discovery announcements
 - `UDP_ADVERTISED_PORT`: port advertised to clients (defaults to `RELAY_PORT`)
 - `UDP_ADVERTISED_PROTOCOL`: protocol advertised to clients (`http`/`https`). Defaults to `https` when `RELAY_USE_HTTPS=true`, otherwise `http`.
 

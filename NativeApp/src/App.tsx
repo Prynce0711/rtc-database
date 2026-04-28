@@ -892,7 +892,7 @@ export default function App() {
       } catch (error) {
         clearTimeout(timeoutId);
         console.warn(
-          "[startup] Dev backend health check failed. Waiting for UDP discovery response.",
+          "[startup] Dev backend health check failed. Waiting for a UDP relay announcement.",
           error,
         );
         return false;
@@ -907,10 +907,10 @@ export default function App() {
 
       if (!handledBySavedRelay && !connectedInDev && isSubscribed) {
         if (isDevMode) {
-          console.log("[startup] Waiting for UDP discovery responses...");
+          console.log("[startup] Waiting for UDP relay announcements...");
         } else {
           console.log(
-            "[startup] Production mode: waiting for UDP discovery responses...",
+            "[startup] Production mode: waiting for UDP relay announcements...",
           );
         }
 
@@ -1134,13 +1134,13 @@ export default function App() {
               ? autoOfflineReason === "disconnected"
                 ? "Connection to backend was lost. Waiting for it to come back."
                 : autoOfflineReason === "not-found"
-                  ? "Backend not found yet. Waiting for health check or UDP discovery response."
+                  ? "Backend not found yet. Waiting for a health check or UDP relay announcement."
                   : isDevMode
-                    ? "Checking dev backend health, then sending UDP discovery"
-                    : "Sending UDP discovery and waiting for gateway response"
+                    ? "Checking the dev backend, then listening for a UDP relay announcement."
+                    : "Listening for a UDP relay announcement from the gateway."
               : isDevMode
-                ? "Checking dev backend health, then waiting for a backend response"
-                : "Sending UDP discovery and waiting for gateway response";
+                ? "Checking the dev backend, then waiting for a relay announcement."
+                : "Listening for a UDP relay announcement from the gateway.";
 
   const shouldHideLoaderForWarning =
     status === "locating" && reviewBackends.length > 0;
