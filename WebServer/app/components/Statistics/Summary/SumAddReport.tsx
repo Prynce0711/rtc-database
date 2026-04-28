@@ -2,24 +2,26 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    FiArrowLeft,
-    FiChevronRight,
-    FiEye,
-    FiSave,
-    FiTrash2,
-    FiUpload,
+  FiArrowLeft,
+  FiCheck,
+  FiChevronRight,
+  FiEdit3,
+  FiEye,
+  FiSave,
+  FiTrash2,
+  FiUpload,
 } from "react-icons/fi";
 import AddRowsToolbar from "../Shared/AddRowsToolbar";
 import type { SummaryRow } from "./Schema";
 import {
-    SUMMARY_COURT_TYPES,
-    SUMMARY_MONTH_OPTIONS,
-    type SummaryCourtType,
+  SUMMARY_COURT_TYPES,
+  SUMMARY_MONTH_OPTIONS,
+  type SummaryCourtType,
 } from "./SummaryConstants";
 import {
-    computeSummaryTotal,
-    parseSummaryWorkbook,
-    toMonthKey,
+  computeSummaryTotal,
+  parseSummaryWorkbook,
+  toMonthKey,
 } from "./SummaryImportUtils";
 
 type EditableSummaryRow = Omit<SummaryRow, "id"> & {
@@ -669,17 +671,23 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
               </nav>
             </div>
 
-            <div className="flex items-center gap-2 text-xs sm:text-sm">
-              <span
-                className={`badge badge-lg ${step === "edit" ? "badge-primary" : "badge-success"}`}
-              >
-                {step === "edit" ? "1. Edit" : "1. Edit ✓"}
-              </span>
-              <span
-                className={`badge badge-lg ${step === "review" ? "badge-primary" : "badge-ghost"}`}
-              >
-                2. Review
-              </span>
+            <div className="xls-stepper">
+              <div className={`xls-step ${step === "edit" ? "active" : "done"}`}>
+                <span className="xls-step-dot">
+                  {step === "review" ? (
+                    <FiCheck size={10} strokeWidth={3} />
+                  ) : (
+                    <FiEdit3 size={10} />
+                  )}
+                </span>
+                Data Entry
+              </div>
+              <div className={`xls-step ${step === "review" ? "active" : ""}`}>
+                <span className="xls-step-dot">
+                  <FiEye size={10} />
+                </span>
+                Review
+              </div>
             </div>
           </div>
 
@@ -771,196 +779,199 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
             </div>
           )}
 
-          <div className="card bg-base-100 border border-base-200">
-            <div className="card-body p-3 sm:p-4">
-              <div className="flex flex-wrap gap-2">
-                {SUMMARY_COURT_TYPES.map((courtType) => {
-                  const active = selectedCourtType === courtType.value;
-                  return (
-                    <button
-                      key={courtType.value}
-                      type="button"
-                      className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
-                      onClick={() => setSelectedCourtType(courtType.value)}
-                      title={courtType.description}
-                    >
-                      {courtType.shortLabel}
-                    </button>
-                  );
-                })}
-              </div>
+          <div className="xls-sheet-wrap">
+            <div className="xls-tab-bar">
+              {SUMMARY_COURT_TYPES.map((courtType) => {
+                const active = selectedCourtType === courtType.value;
+                return (
+                  <button
+                    key={courtType.value}
+                    type="button"
+                    className={`xls-tab${active ? " active" : ""}`}
+                    onClick={() => setSelectedCourtType(courtType.value)}
+                    title={courtType.description}
+                  >
+                    {courtType.shortLabel}
+                  </button>
+                );
+              })}
             </div>
-          </div>
 
-          <div className="overflow-x-auto rounded-xl border border-base-200 bg-base-100">
-            <table
-              className="table table-pin-rows table-xs sm:table-sm w-max min-w-full"
-              style={{ tableLayout: "fixed" }}
-            >
-              <colgroup>
-                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.select }} />
-                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.rowNumber }} />
-                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.branch }} />
-                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.raffleDate }} />
-                {NUMERIC_FIELDS.filter((field) => field.group !== "total").map(
-                  (field) => (
-                    <col
-                      key={field.key}
-                      style={{
-                        width: SUMMARY_EDIT_NUMERIC_COLUMN_WIDTHS[field.key] ?? 108,
-                      }}
-                    />
-                  ),
-                )}
-                <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.total }} />
-              </colgroup>
-              <thead>
-                <tr className="bg-base-200/70">
-                  <th
-                    rowSpan={2}
-                    className="text-center align-middle overflow-hidden whitespace-nowrap"
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={
-                        displayedRows.length > 0 &&
-                        displayedRows.every((row) => selectedRows.has(row.id))
-                      }
-                      onChange={toggleSelectAllVisible}
-                    />
-                  </th>
-                  <th
-                    rowSpan={2}
-                    className="text-center align-middle overflow-hidden whitespace-nowrap"
-                  >
-                    #
-                  </th>
-                  <th
-                    rowSpan={2}
-                    className="text-center align-middle overflow-hidden whitespace-nowrap"
-                  >
-                    Branch
-                  </th>
-                  <th
-                    rowSpan={2}
-                    className="text-center align-middle overflow-hidden whitespace-nowrap"
-                  >
-                    Raffle Date
-                  </th>
-                  <th colSpan={4} className="text-center text-primary">
-                    Civil
-                  </th>
-                  <th colSpan={4} className="text-center text-info">
-                    LRC / PET. / SPC.
-                  </th>
-                  <th colSpan={5} className="text-center text-success">
-                    Criminal
-                  </th>
-                  <th
-                    rowSpan={2}
-                    className="text-center align-middle text-warning"
-                  >
-                    Total
-                  </th>
-                </tr>
-                <tr className="bg-base-200/40">
+            <div className="overflow-x-auto rounded-xl border border-base-200 bg-base-100">
+              <table
+                className="table table-pin-rows table-xs sm:table-sm w-max min-w-full"
+                style={{ tableLayout: "fixed" }}
+              >
+                <colgroup>
+                  <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.select }} />
+                  <col
+                    style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.rowNumber }}
+                  />
+                  <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.branch }} />
+                  <col
+                    style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.raffleDate }}
+                  />
                   {NUMERIC_FIELDS.filter(
                     (field) => field.group !== "total",
                   ).map((field) => (
-                    <th
+                    <col
                       key={field.key}
-                      className="text-center overflow-hidden whitespace-nowrap"
-                    >
-                      <span className="block truncate">{field.label}</span>
-                    </th>
+                      style={{
+                        width:
+                          SUMMARY_EDIT_NUMERIC_COLUMN_WIDTHS[field.key] ?? 108,
+                      }}
+                    />
                   ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {displayedRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={18}
-                      className="py-12 text-center text-base-content/45"
+                  <col style={{ width: SUMMARY_EDIT_COLUMN_WIDTHS.total }} />
+                </colgroup>
+                <thead>
+                  <tr className="bg-base-200/70">
+                    <th
+                      rowSpan={2}
+                      className="text-center align-middle overflow-hidden whitespace-nowrap"
                     >
-                      No rows for {periodLabel} in {selectedCourtType}.
-                    </td>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={
+                          displayedRows.length > 0 &&
+                          displayedRows.every((row) => selectedRows.has(row.id))
+                        }
+                        onChange={toggleSelectAllVisible}
+                      />
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="text-center align-middle overflow-hidden whitespace-nowrap"
+                    >
+                      #
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="text-center align-middle overflow-hidden whitespace-nowrap"
+                    >
+                      Branch
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="text-center align-middle overflow-hidden whitespace-nowrap"
+                    >
+                      Raffle Date
+                    </th>
+                    <th colSpan={4} className="text-center text-primary">
+                      Civil
+                    </th>
+                    <th colSpan={4} className="text-center text-info">
+                      LRC / PET. / SPC.
+                    </th>
+                    <th colSpan={5} className="text-center text-success">
+                      Criminal
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="text-center align-middle text-warning"
+                    >
+                      Total
+                    </th>
                   </tr>
-                ) : (
-                  displayedRows.map((row, index) => {
-                    const computedTotal = toRowTotal(row);
-                    return (
-                      <tr key={row.id} className="hover:bg-base-200/30">
-                        <td className="text-center">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm"
-                            checked={selectedRows.has(row.id)}
-                            onChange={() => toggleSelectRow(row.id)}
-                          />
-                        </td>
-                        <td className="text-center tabular-nums">
-                          {index + 1}
-                        </td>
+                  <tr className="bg-base-200/40">
+                    {NUMERIC_FIELDS.filter(
+                      (field) => field.group !== "total",
+                    ).map((field) => (
+                      <th
+                        key={field.key}
+                        className="text-center overflow-hidden whitespace-nowrap"
+                      >
+                        <span className="block truncate">{field.label}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
 
-                        <td className="min-w-0">
-                          <input
-                            type="text"
-                            className="input input-bordered input-xs sm:input-sm w-full min-w-0"
-                            value={row.branch}
-                            placeholder="Branch"
-                            onChange={(event) =>
-                              updateRow(row.id, "branch", event.target.value)
-                            }
-                          />
-                        </td>
-
-                        <td className="min-w-0">
-                          <input
-                            type="date"
-                            className="input input-bordered input-xs sm:input-sm w-full min-w-0"
-                            value={row.raffleDate}
-                            onChange={(event) =>
-                              updateRow(
-                                row.id,
-                                "raffleDate",
-                                event.target.value,
-                              )
-                            }
-                          />
-                        </td>
-
-                        {NUMERIC_FIELDS.filter(
-                          (field) => field.group !== "total",
-                        ).map((field) => (
-                          <td key={field.key} className="text-center min-w-0">
+                <tbody>
+                  {displayedRows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={18}
+                        className="py-12 text-center text-base-content/45"
+                      >
+                        No rows for {periodLabel} in {selectedCourtType}.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedRows.map((row, index) => {
+                      const computedTotal = toRowTotal(row);
+                      return (
+                        <tr key={row.id} className="hover:bg-base-200/30">
+                          <td className="text-center">
                             <input
-                              type="number"
-                              min={0}
-                              className="input input-bordered input-xs sm:input-sm w-full min-w-0 text-center"
-                              value={row[field.key] || ""}
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={selectedRows.has(row.id)}
+                              onChange={() => toggleSelectRow(row.id)}
+                            />
+                          </td>
+                          <td className="text-center tabular-nums">
+                            {index + 1}
+                          </td>
+
+                          <td className="min-w-0">
+                            <input
+                              type="text"
+                              className="input input-bordered input-xs sm:input-sm w-full min-w-0"
+                              value={row.branch}
+                              placeholder="Branch"
+                              onChange={(event) =>
+                                updateRow(row.id, "branch", event.target.value)
+                              }
+                            />
+                          </td>
+
+                          <td className="min-w-0">
+                            <input
+                              type="date"
+                              className="input input-bordered input-xs sm:input-sm w-full min-w-0"
+                              value={row.raffleDate}
                               onChange={(event) =>
                                 updateRow(
                                   row.id,
-                                  field.key,
-                                  toNonNegativeInt(event.target.value),
+                                  "raffleDate",
+                                  event.target.value,
                                 )
                               }
                             />
                           </td>
-                        ))}
 
-                        <td className="text-center font-bold tabular-nums">
-                          {(row.total || computedTotal).toLocaleString()}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          {NUMERIC_FIELDS.filter(
+                            (field) => field.group !== "total",
+                          ).map((field) => (
+                            <td key={field.key} className="text-center min-w-0">
+                              <input
+                                type="number"
+                                min={0}
+                                className="input input-bordered input-xs sm:input-sm w-full min-w-0 text-center"
+                                value={row[field.key] || ""}
+                                onChange={(event) =>
+                                  updateRow(
+                                    row.id,
+                                    field.key,
+                                    toNonNegativeInt(event.target.value),
+                                  )
+                                }
+                              />
+                            </td>
+                          ))}
+
+                          <td className="text-center font-bold tabular-nums">
+                            {(row.total || computedTotal).toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-base-content/60">
