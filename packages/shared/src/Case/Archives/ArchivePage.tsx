@@ -53,7 +53,7 @@ const ArchivePage: React.FC<{
   const pathname = useAdaptivePathname();
   const statusPopup = usePopup();
   const canManage =
-    role === Roles.ADMIN || role === Roles.CRIMINAL || role === Roles.ARCHIVE;
+    role === Roles.ADMIN || role === Roles.NOTARIAL || role === Roles.ARCHIVE;
 
   const [entries, setEntries] = useState<ArchiveEntryData[]>([]);
   const [totalCount, setTotalCount] = useState(0);

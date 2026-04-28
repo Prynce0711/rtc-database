@@ -6,10 +6,28 @@ import {
   deleteNotarial,
 } from "@/app/components/Case/Notarial/NotarialActions";
 import NotarialEdit from "@/app/components/Case/Notarial/NotarialEdit";
-import { useRouter } from "next/navigation";
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
+import { RedirectingUI } from "@rtc-database/shared";
+import { redirect, useRouter } from "next/navigation";
 
 const NotarialAddPage = () => {
   const router = useRouter();
+  const session = useSession();
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading notarial access..." />;
+  }
+
+  const role = session.data?.user?.role;
+
+  if (!role) {
+    redirect("/");
+  }
+
+  if (role !== Roles.ADMIN && role !== Roles.NOTARIAL) {
+    redirect("/user/dashboard");
+  }
 
   return (
     <NotarialEdit

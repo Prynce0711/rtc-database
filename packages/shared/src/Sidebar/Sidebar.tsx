@@ -80,10 +80,18 @@ const NavBtn = ({
   onExpandSidebar: () => void;
 }) => {
   const pathname = usePathname();
-  const isActive =
-    activeView === item.href || pathname.startsWith(`/user/${item.href}`);
   const currentSub = pathname.split("/")[3] || "";
   const hasDropdowns = !!item.dropdowns?.length;
+  const itemBasePath = `/user/${item.href}`;
+  const isActive = hasDropdowns
+    ? pathname === itemBasePath ||
+      item.dropdowns!.some((dropdown) => {
+        const dropdownPath = `${itemBasePath}/${dropdown.href}`;
+        return (
+          pathname === dropdownPath || pathname.startsWith(`${dropdownPath}/`)
+        );
+      })
+    : activeView === item.href || pathname.startsWith(itemBasePath);
   const open = openDropdown === item.href;
   const [hovered, setHovered] = useState(false);
 
@@ -370,8 +378,6 @@ const caseNavItems: NavItem[] = [
       { label: "Petition", href: "petition" },
       { label: "Special Proceedings", href: "proceedings" },
       { label: "Receiving Logs", href: "receiving" },
-      { label: "Archive Explorer", href: "archive" },
-      { label: "Notarial", href: "notarial" },
       { label: "Sheriff", href: "sheriff" },
     ],
   },
@@ -485,6 +491,26 @@ function adminSidebar({
       </div>
       <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
+          item={archiveOnlyNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "150ms" }}>
+        <NavBtn
+          item={notarialOnlyNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "180ms" }}>
+        <NavBtn
           item={adminStatisticsNavItem}
           isExpanded={isExpanded}
           activeView={activeView}
@@ -495,14 +521,14 @@ function adminSidebar({
       </div>
 
       {/* Admin */}
-      <div className="sidebar-stagger" style={{ animationDelay: "150ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
         <SectionLabel label="Admin" isExpanded={isExpanded} />
       </div>
       {adminNavItems.map((item, i) => (
         <div
           key={item.href}
           className="sidebar-stagger"
-          style={{ animationDelay: `${180 + i * 30}ms` }}
+          style={{ animationDelay: `${240 + i * 30}ms` }}
         >
           <NavBtn
             item={item}
@@ -516,10 +542,10 @@ function adminSidebar({
       ))}
 
       {/* Communication */}
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
         <SectionLabel label="Communication" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
@@ -539,10 +565,10 @@ function adminSidebar({
       </div> */}
 
       {/* Settings */}
-      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "420ms" }}>
         <SectionLabel label="Settings" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "390ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "450ms" }}>
         <ActionBtn
           icon={<FiSettings />}
           label="Settings"
@@ -550,7 +576,7 @@ function adminSidebar({
           onClick={onOpenSettings}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "420ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "480ms" }}>
         <ActionBtn
           icon={theme === "winter" ? <FiMoon /> : <FiSun />}
           label={theme === "winter" ? "Dark Mode" : "Light Mode"}
@@ -799,7 +825,7 @@ function staffSidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+      {/* <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
           item={caseNavItems[1]}
           isExpanded={isExpanded}
@@ -808,7 +834,7 @@ function staffSidebar({
           setOpenDropdown={setOpenDropdown}
           onExpandSidebar={onExpandSidebar}
         />
-      </div>
+      </div> */}
 
       {/* Communication */}
       <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
@@ -992,7 +1018,7 @@ function notarialSidebar({
         <SectionLabel label="Cases" isExpanded={isExpanded} />
       </div>
 
-      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "90ms" }}>
         <NavBtn
           item={notarialOnlyNavItem}
           isExpanded={isExpanded}
@@ -1002,12 +1028,22 @@ function notarialSidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
+      {/* <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+        <NavBtn
+          item={archiveOnlyNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div> */}
 
       {/* Communication */}
-      <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
         <SectionLabel label="Communication" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
@@ -1028,10 +1064,10 @@ function notarialSidebar({
         </div> */}
 
       {/* Settings */}
-      <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
         <SectionLabel label="Settings" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
         <ActionBtn
           icon={<FiSettings />}
           label="Settings"
@@ -1039,7 +1075,7 @@ function notarialSidebar({
           onClick={onOpenSettings}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "390ms" }}>
         <ActionBtn
           icon={theme === "winter" ? <FiMoon /> : <FiSun />}
           label={theme === "winter" ? "Dark Mode" : "Light Mode"}
@@ -1351,4 +1387,3 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
-

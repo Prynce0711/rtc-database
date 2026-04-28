@@ -9,7 +9,10 @@ import {
 import NotarialEdit from "@/app/components/Case/Notarial/NotarialEdit";
 import type { NotarialRecord } from "@/app/components/Case/Notarial/NotarialRow";
 import type { NotarialData } from "@/app/components/Case/Notarial/schema";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "@/app/lib/authClient";
+import Roles from "@/app/lib/Roles";
+import { RedirectingUI } from "@rtc-database/shared";
+import { redirect, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const toRecord = (item: NotarialData): NotarialRecord => ({
@@ -26,6 +29,7 @@ const toRecord = (item: NotarialData): NotarialRecord => ({
 const NotarialEditPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const session = useSession();
 
   const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
     null,
@@ -33,8 +37,17 @@ const NotarialEditPage = () => {
   const [selectedRecords, setSelectedRecords] = useState<NotarialRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const role = session.data?.user?.role;
 
   useEffect(() => {
+    if (
+      session.isPending ||
+      !role ||
+      (role !== Roles.ADMIN && role !== Roles.NOTARIAL)
+    ) {
+      return;
+    }
+
     const idParam = searchParams.get("id");
     const idsParam = searchParams.get("ids");
 
@@ -100,7 +113,19 @@ const NotarialEditPage = () => {
     };
 
     void loadRecord();
-  }, [searchParams]);
+  }, [role, searchParams, session.isPending]);
+
+  if (session.isPending) {
+    return <RedirectingUI titleText="Loading notarial access..." />;
+  }
+
+  if (!role) {
+    redirect("/");
+  }
+
+  if (role !== Roles.ADMIN && role !== Roles.NOTARIAL) {
+    redirect("/user/dashboard");
+  }
 
   const goBack = () => router.push("/user/cases/notarial");
 
