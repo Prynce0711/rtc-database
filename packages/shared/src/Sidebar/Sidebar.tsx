@@ -825,7 +825,7 @@ function staffSidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+      {/* <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
           item={caseNavItems[1]}
           isExpanded={isExpanded}
@@ -834,7 +834,7 @@ function staffSidebar({
           setOpenDropdown={setOpenDropdown}
           onExpandSidebar={onExpandSidebar}
         />
-      </div>
+      </div> */}
 
       {/* Communication */}
       <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
@@ -1028,7 +1028,7 @@ function notarialSidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+      {/* <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
           item={archiveOnlyNavItem}
           isExpanded={isExpanded}
@@ -1037,7 +1037,7 @@ function notarialSidebar({
           setOpenDropdown={setOpenDropdown}
           onExpandSidebar={onExpandSidebar}
         />
-      </div>
+      </div> */}
 
       {/* Communication */}
       <div className="sidebar-stagger" style={{ animationDelay: "240ms" }}>
@@ -1387,4 +1387,3 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
 export default Sidebar;
-
