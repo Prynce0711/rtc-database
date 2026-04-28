@@ -1,6 +1,6 @@
 enum Roles {
   ADMIN = "admin",
-  ATTY = "atty",
+  CRIMINAL = "criminal",
   USER = "user",
   STATISTICS = "statistics",
   NOTARIAL = "notarial",
@@ -8,3 +8,4 @@ enum Roles {
 }
 
 export default Roles;
+

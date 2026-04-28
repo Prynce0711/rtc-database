@@ -27,26 +27,26 @@ async function main() {
     data: { role: "admin", status: Status.ACTIVE },
   });
 
-  // Create atty user
+  // Create criminal section account
   try {
-    const attyResult = await auth.api.signUpEmail({
+    const criminalResult = await auth.api.signUpEmail({
       body: {
-        email: "atty@atty.com",
-        password: "atty12345",
-        name: "Attorney",
+        email: "criminal@criminal.com",
+        password: "criminal12345",
+        name: "Criminal Section",
       },
     });
 
-    if (attyResult) {
-      console.log("Created attorney user successfully");
+    if (criminalResult) {
+      console.log("Created criminal section account successfully");
     }
   } catch (error: any) {
-    console.error(`Failed to create attorney user: ${error.message}`);
+    console.error(`Failed to create criminal section account: ${error.message}`);
   }
 
   await prisma.user.update({
-    where: { email: "atty@atty.com" },
-    data: { role: "atty", status: Status.ACTIVE },
+    where: { email: "criminal@criminal.com" },
+    data: { role: "criminal", status: Status.ACTIVE },
   });
 
   // Create Statistics Account
@@ -149,3 +149,4 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
+

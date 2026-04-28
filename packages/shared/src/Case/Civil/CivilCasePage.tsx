@@ -100,7 +100,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const canManage = role === Roles.ADMIN || role === Roles.ATTY;
+  const canManage = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const isSelecting = canManage && selectionMode !== null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -705,3 +705,4 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 };
 
 export default CivilCasePage;
+

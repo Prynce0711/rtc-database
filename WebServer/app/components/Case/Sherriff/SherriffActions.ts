@@ -144,7 +144,7 @@ export async function createSheriffCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -248,7 +248,7 @@ export async function getSheriffCaseNumberPreview(
   year: number,
 ): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -288,7 +288,7 @@ export async function updateSheriffCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -577,3 +577,4 @@ export async function getSheriffCasesByCaseNumbers(
     return { success: false, error: "Failed to fetch cases by case number" };
   }
 }
+

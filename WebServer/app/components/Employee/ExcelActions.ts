@@ -18,7 +18,7 @@ export async function uploadEmployeeExcel(
   file: File,
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -50,7 +50,7 @@ export async function exportEmployeesExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -154,3 +154,4 @@ export async function exportEmployeesExcel(): Promise<
     return { success: false, error: "Export failed" };
   }
 }
+

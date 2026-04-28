@@ -39,7 +39,7 @@ interface Notification {
   link?: string;
   actor?: {
     name: string;
-    role: "admin" | "atty" | "user";
+    role: "admin" | "criminal" | "user";
     avatar?: string;
   };
   metadata?: {
@@ -63,22 +63,22 @@ const mockNotifications: Notification[] = [
   {
     id: "n2",
     type: "message",
-    title: "New message from Atty. Maria Santos",
+    title: "New message from Criminal Section",
     description:
       '"Will do. Also, the hearing for Case No. 2026-0098 has been moved to March 5."',
     timestamp: "2026-02-27T08:10:00",
     isRead: false,
-    actor: { name: "Atty. Maria Santos", role: "atty" },
+    actor: { name: "Criminal Section", role: "criminal" },
   },
   {
     id: "n3",
     type: "case",
     title: "Case Status Updated",
     description:
-      'Civil Case No. 2026-0098 status changed from "Pending" to "Under Review" by Atty. Carlos Reyes.',
+      'Civil Case No. 2026-0098 status changed from "Pending" to "Under Review" by Criminal Section.',
     timestamp: "2026-02-27T07:45:00",
     isRead: false,
-    actor: { name: "Atty. Carlos Reyes", role: "atty" },
+    actor: { name: "Criminal Section", role: "criminal" },
     metadata: { caseNumber: "2026-0098", priority: "medium" },
   },
   {
@@ -147,7 +147,7 @@ const mockNotifications: Notification[] = [
     type: "assignment",
     title: "Case Reassigned",
     description:
-      "Civil Case No. 2026-0076 has been reassigned from Atty. Sofia Mendoza to you.",
+      "Civil Case No. 2026-0076 has been reassigned from Criminal Section to you.",
     timestamp: "2026-02-26T10:00:00",
     isRead: true,
     actor: { name: "Admin Rodriguez", role: "admin" },
@@ -734,8 +734,8 @@ const Notifications: React.FC = () => {
                           {selectedNotif.actor.name}
                         </p>
                         <p className="text-xs text-base-content/50 capitalize">
-                          {selectedNotif.actor.role === "atty"
-                            ? "Attorney"
+                          {selectedNotif.actor.role === "criminal"
+                            ? "Criminal Section"
                             : selectedNotif.actor.role}
                         </p>
                       </div>
@@ -772,3 +772,4 @@ const Notifications: React.FC = () => {
 };
 
 export default Notifications;
+

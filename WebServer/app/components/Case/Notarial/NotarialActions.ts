@@ -282,7 +282,7 @@ export async function createNotarial(
   data: Record<string, unknown>,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.ATTY]);
+    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -363,7 +363,7 @@ export async function updateNotarial(
   data: Record<string, unknown>,
 ): Promise<ActionResult<NotarialData>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.ATTY]);
+    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -495,7 +495,7 @@ export async function updateNotarial(
 
 export async function deleteNotarial(id: number): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ADMIN, Roles.ATTY]);
+    const sessionResult = await validateSession([Roles.ADMIN, Roles.CRIMINAL]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -567,7 +567,7 @@ export async function getRecentNotarialFiles(
     const sessionResult = await validateSession([
       Roles.NOTARIAL,
       Roles.ADMIN,
-      Roles.ATTY,
+      Roles.CRIMINAL,
     ]);
     if (!sessionResult.success) {
       return sessionResult;
@@ -612,3 +612,4 @@ export async function getRecentNotarialFiles(
     return { success: false, error: "Failed to fetch recent notarial files" };
   }
 }
+
