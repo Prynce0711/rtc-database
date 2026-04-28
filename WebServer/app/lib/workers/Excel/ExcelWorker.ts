@@ -1,4 +1,5 @@
 import {
+  BaseCaseSchema,
   CivilCaseSchema,
   CriminalCaseSchema,
   findColumnValue,
@@ -110,6 +111,17 @@ const HARD_CONFLICT_ALIASES: Partial<Record<ExcelTypes, string[][]>> = {
   ],
 };
 
+const BASE_CASE_HEADER_ALIASES = new Set(
+  Object.values(
+    getExcelHeaderMap(
+      BaseCaseSchema as unknown as z.ZodObject<z.ZodRawShape>,
+    ) as Record<string, string[]>,
+  )
+    .flat()
+    .map(normalizeHeader)
+    .filter((value) => value.length > 0),
+);
+
 const getDistinctiveFieldAliases = (
   config: TemplateConfig,
 ): TemplateFieldAliases => {
@@ -118,9 +130,13 @@ const getDistinctiveFieldAliases = (
   const fields = config.distinctiveKeys
     .map((key) => {
       const aliases = headerMap[key] ?? [];
-      return aliases.filter(
+      const uniqueAliases = aliases.filter(
         (value, index, array) => array.indexOf(value) === index,
       );
+      const nonBaseAliases = uniqueAliases.filter(
+        (alias) => !BASE_CASE_HEADER_ALIASES.has(normalizeHeader(alias)),
+      );
+      return nonBaseAliases.length > 0 ? nonBaseAliases : uniqueAliases;
     })
     .filter((aliases) => aliases.length > 0);
 
@@ -230,23 +246,23 @@ const validateCaseTemplateByHeaderMatch = async (
       .filter((value) => value.length > 0);
     const headerLookupRow = getHeaderLookupRow(headerInfo.headerRow);
 
-    const hardConflictRules = HARD_CONFLICT_ALIASES[selectedType] ?? [];
-    const hardConflictCount = countMatchedFields(
-      headerLookupRow,
-      normalizedHeaderRow,
-      hardConflictRules,
-    );
-    if (hardConflictCount > 0) {
-      const selectedLabel =
-        CASE_TEMPLATE_CONFIG.find((config) => config.type === selectedType)
-          ?.label ?? selectedType;
-      return {
-        valid: false,
-        error:
-          `${VALIDATION_ERROR_MARKER}: The uploaded file has header(s) incompatible with ${selectedLabel} template ` +
-          `(for example: petitioner/defendant). Please import it in the correct tab.`,
-      };
-    }
+    // const hardConflictRules = HARD_CONFLICT_ALIASES[selectedType] ?? [];
+    // const hardConflictCount = countMatchedFields(
+    //   headerLookupRow,
+    //   normalizedHeaderRow,
+    //   hardConflictRules,
+    // );
+    // if (hardConflictCount > 0) {
+    //   const selectedLabel =
+    //     CASE_TEMPLATE_CONFIG.find((config) => config.type === selectedType)
+    //       ?.label ?? selectedType;
+    //   return {
+    //     valid: false,
+    //     error:
+    //       `${VALIDATION_ERROR_MARKER}: The uploaded file has header(s) incompatible with ${selectedLabel} template ` +
+    //       `(for example: petitioner/defendant). Please import it in the correct tab.`,
+    //   };
+    // }
 
     for (const template of templateFieldAliases) {
       const matchedFieldCount = countMatchedFields(
