@@ -11,7 +11,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import { signIn } from "../../lib/authClient";
+import { authClient, signIn } from "../../lib/authClient";
 
 const MAGIC_CODE_LENGTH = 10;
 const MAGIC_CODE_GROUP_SIZE = 5;
@@ -185,18 +185,30 @@ const Login: React.FC = () => {
     setIsVerifyingMagicCode(true);
 
     try {
-      const verifyUrl = new URL(
-        "/api/auth/magic-link/verify",
-        window.location.origin,
-      );
-      verifyUrl.searchParams.set("token", normalizedMagicCode);
-      verifyUrl.searchParams.set("callbackURL", "/");
-      verifyUrl.searchParams.set("newUserCallbackURL", "/");
-      verifyUrl.searchParams.set("errorCallbackURL", "/");
+      const { error: verifyError } = await authClient.magicLink.verify({
+        query: {
+          token: normalizedMagicCode,
+        },
+      });
 
-      window.location.assign(verifyUrl.toString());
-    } catch {
+      if (verifyError) {
+        const errorCode = verifyError.code ?? "";
+        const errorMessage = errorCode
+          ? getMagicCodeErrorMessage(errorCode)
+          : (verifyError.message ??
+            "Magic code sign-in could not be completed. Please try again.");
+
+        console.error("Magic code verification failed:", verifyError);
+        setError(errorMessage);
+        setIsVerifyingMagicCode(false);
+        return;
+      }
+
       setIsVerifyingMagicCode(false);
+      router.push("/user/dashboard");
+    } catch (error) {
+      setIsVerifyingMagicCode(false);
+      console.error("Error during magic code verification:", error);
       setError("Unable to continue with that magic code right now.");
     }
   };
