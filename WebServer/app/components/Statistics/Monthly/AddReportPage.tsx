@@ -78,6 +78,160 @@ const isMonthValue = (value: string): boolean =>
 const normalizeMonthValue = (value?: string): string =>
   value && isMonthValue(value) ? value : CURRENT_MONTH;
 
+const MONTH_NAME_TO_VALUE: Record<string, string> = {
+  january: "01",
+  jan: "01",
+  february: "02",
+  feb: "02",
+  march: "03",
+  mar: "03",
+  april: "04",
+  apr: "04",
+  may: "05",
+  june: "06",
+  jun: "06",
+  july: "07",
+  jul: "07",
+  august: "08",
+  aug: "08",
+  september: "09",
+  sept: "09",
+  sep: "09",
+  october: "10",
+  oct: "10",
+  november: "11",
+  nov: "11",
+  december: "12",
+  dec: "12",
+};
+
+const MONTH_NAME_PATTERN = Object.keys(MONTH_NAME_TO_VALUE)
+  .sort((left, right) => right.length - left.length)
+  .join("|");
+
+const normalizeMonthCandidate = (
+  yearText: string,
+  monthText: string,
+): string | null => {
+  const normalizedMonth = monthText.padStart(2, "0");
+  const monthValue = `${yearText}-${normalizedMonth}`;
+  return isMonthValue(monthValue) ? monthValue : null;
+};
+
+const extractMonthCandidatesFromText = (value: string): string[] => {
+  if (!value) return [];
+
+  const candidates = new Set<string>();
+
+  const numericMonthPattern =
+    /\b((?:19|20)\d{2})[\s\-_/.,]+(0?[1-9]|1[0-2])\b/g;
+  for (const match of value.matchAll(numericMonthPattern)) {
+    const monthValue = normalizeMonthCandidate(match[1], match[2]);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  const monthYearPattern =
+    /\b(0?[1-9]|1[0-2])[\s\-_/.,]+((?:19|20)\d{2})\b/g;
+  for (const match of value.matchAll(monthYearPattern)) {
+    const monthValue = normalizeMonthCandidate(match[2], match[1]);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  const monthDayYearPattern =
+    /\b(0?[1-9]|1[0-2])[\s\-_/.,]+(?:0?[1-9]|[12]\d|3[01])[\s\-_/.,]+((?:19|20)\d{2})\b/g;
+  for (const match of value.matchAll(monthDayYearPattern)) {
+    const monthValue = normalizeMonthCandidate(match[2], match[1]);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  const yearMonthDayPattern =
+    /\b((?:19|20)\d{2})[\s\-_/.,]+(0?[1-9]|1[0-2])[\s\-_/.,]+(?:0?[1-9]|[12]\d|3[01])\b/g;
+  for (const match of value.matchAll(yearMonthDayPattern)) {
+    const monthValue = normalizeMonthCandidate(match[1], match[2]);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  const monthFirstPattern = new RegExp(
+    `\\b(${MONTH_NAME_PATTERN})\\s*,?\\s*((?:19|20)\\d{2})\\b`,
+    "gi",
+  );
+  for (const match of value.matchAll(monthFirstPattern)) {
+    const monthNumber = MONTH_NAME_TO_VALUE[match[1].toLowerCase()];
+    const monthValue = normalizeMonthCandidate(match[2], monthNumber);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  const yearFirstPattern = new RegExp(
+    `\\b((?:19|20)\\d{2})\\s*,?\\s*(${MONTH_NAME_PATTERN})\\b`,
+    "gi",
+  );
+  for (const match of value.matchAll(yearFirstPattern)) {
+    const monthNumber = MONTH_NAME_TO_VALUE[match[2].toLowerCase()];
+    const monthValue = normalizeMonthCandidate(match[1], monthNumber);
+    if (monthValue) candidates.add(monthValue);
+  }
+
+  return Array.from(candidates);
+};
+
+const resolvePreferredImportMonth = (monthCandidates: string[]): string | null => {
+  if (monthCandidates.length === 0) return null;
+
+  const counts = new Map<string, number>();
+  monthCandidates.forEach((candidate) => {
+    counts.set(candidate, (counts.get(candidate) ?? 0) + 1);
+  });
+
+  return [...counts.entries()].sort((left, right) => {
+    if (right[1] !== left[1]) return right[1] - left[1];
+    return right[0].localeCompare(left[0]);
+  })[0]?.[0] ?? null;
+};
+
+const detectImportMonth = (
+  workbook: XLSX.WorkBook,
+  fileName: string,
+): string | null => {
+  const fileNameCandidates = extractMonthCandidatesFromText(fileName);
+  const preferredFileNameMonth =
+    resolvePreferredImportMonth(fileNameCandidates);
+  if (preferredFileNameMonth) {
+    return preferredFileNameMonth;
+  }
+
+  const sheetNameCandidates = workbook.SheetNames.flatMap((sheetName) =>
+    extractMonthCandidatesFromText(sheetName),
+  );
+  const preferredSheetNameMonth =
+    resolvePreferredImportMonth(sheetNameCandidates);
+  if (preferredSheetNameMonth) {
+    return preferredSheetNameMonth;
+  }
+
+  const monthCandidates: string[] = [];
+
+  workbook.SheetNames.forEach((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) return;
+
+    const previewRows = XLSX.utils.sheet_to_json<SheetCell[]>(worksheet, {
+      header: 1,
+      range: 0,
+      raw: false,
+      defval: "",
+      blankrows: false,
+    }) as SheetCell[][];
+
+    previewRows.slice(0, 10).forEach((row) => {
+      row.slice(0, 10).forEach((cell) => {
+        monthCandidates.push(...extractMonthCandidatesFromText(toCellText(cell)));
+      });
+    });
+  });
+
+  return resolvePreferredImportMonth(monthCandidates);
+};
+
 const toMonthLabel = (value: string): string => {
   if (!isMonthValue(value)) return value;
   const [year, month] = value.split("-").map(Number);
@@ -408,6 +562,8 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
+      const detectedImportMonth =
+        detectImportMonth(wb, file.name) ?? activeMonthFilter;
       const expectedHeaders = [
         "Category",
         "Case Category",
@@ -536,7 +692,7 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
 
           importedRows.push({
             id: createRowId(),
-            reportMonth: activeMonthFilter,
+            reportMonth: detectedImportMonth,
             branch,
             criminal,
             civil,
@@ -545,6 +701,11 @@ const AddReportPage: React.FC<AddReportPageProps> = ({
       }
 
       if (importedRows.length > 0) {
+        if (detectedImportMonth !== activeMonthFilter) {
+          setSelectedYearFilter(detectedImportMonth.slice(0, 4));
+          setSelectedMonthFilter(detectedImportMonth.slice(5, 7));
+        }
+
         if (detectedCategories.size === 1) {
           setSelectedCategory(Array.from(detectedCategories)[0]);
         }

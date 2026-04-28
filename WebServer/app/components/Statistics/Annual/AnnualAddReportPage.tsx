@@ -128,6 +128,90 @@ const extractYearFromHeader = (value: string): number | undefined => {
   return Number.isInteger(year) ? year : undefined;
 };
 
+const extractYearsFromText = (value: string): number[] => {
+  const matches = value.match(/(?:19|20)\d{2}/g);
+  if (!matches) return [];
+
+  return Array.from(
+    new Set(
+      matches
+        .map((match) => Number(match))
+        .filter((year) => Number.isInteger(year)),
+    ),
+  );
+};
+
+const resolvePreferredImportYear = (yearCandidates: number[]): string | null => {
+  if (yearCandidates.length === 0) return null;
+
+  const counts = new Map<number, number>();
+  yearCandidates.forEach((year) => {
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  });
+
+  return (
+    [...counts.entries()].sort((left, right) => {
+      if (right[1] !== left[1]) return right[1] - left[1];
+      return right[0] - left[0];
+    })[0]?.[0].toString() ?? null
+  );
+};
+
+const detectImportYear = ({
+  workbook,
+  fileName,
+  headerRow,
+  formattedRawRows,
+  formattedDateColumnValues,
+  pendingYearCandidates,
+}: {
+  workbook: XLSX.WorkBook;
+  fileName: string;
+  headerRow: string[];
+  formattedRawRows: SheetCell[][];
+  formattedDateColumnValues: string[];
+  pendingYearCandidates: number[];
+}): string | null => {
+  const fileNameCandidates = extractYearsFromText(fileName);
+  const preferredFileNameYear =
+    resolvePreferredImportYear(fileNameCandidates);
+  if (preferredFileNameYear) {
+    return preferredFileNameYear;
+  }
+
+  const sheetNameCandidates = workbook.SheetNames.flatMap((sheetName) =>
+    extractYearsFromText(sheetName),
+  );
+  const preferredSheetNameYear =
+    resolvePreferredImportYear(sheetNameCandidates);
+  if (preferredSheetNameYear) {
+    return preferredSheetNameYear;
+  }
+
+  const yearCandidates: number[] = [...pendingYearCandidates];
+
+  const collectYears = (text: string) => {
+    yearCandidates.push(...extractYearsFromText(text));
+  };
+
+  headerRow.forEach(collectYears);
+
+  formattedRawRows.slice(0, 10).forEach((row) => {
+    row.slice(0, 10).forEach((cell) => {
+      collectYears(toCellText(cell));
+    });
+  });
+
+  formattedDateColumnValues.slice(0, 50).forEach((value) => {
+    const yearText = normalizeYearOnly(value);
+    if (/^\d{4}$/.test(yearText)) {
+      yearCandidates.push(Number(yearText));
+    }
+  });
+
+  return resolvePreferredImportYear(yearCandidates);
+};
+
 const isPercentageFieldName = (fieldName: string): boolean =>
   normalizeImportHeader(fieldName).includes("percentage");
 
@@ -1029,6 +1113,16 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         range: isJudgementLayout ? 0 : headerInfo.headerRowIndex + 1,
         blankrows: false,
       });
+      const formattedRawRows = XLSX.utils.sheet_to_json<SheetCell[]>(
+        worksheet,
+        {
+          header: 1,
+          range: isJudgementLayout ? 0 : headerInfo.headerRowIndex + 1,
+          raw: false,
+          defval: "",
+          blankrows: false,
+        },
+      );
 
       const normalizedHeaderRow = headerInfo.headerRow.map((header) =>
         normalizeImportHeader(header),
@@ -1124,6 +1218,34 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
 
         return bestIndex;
       };
+
+      const dateFieldColumnIndex = dateFilterField
+        ? resolveColumnIndex(
+            dateFilterField.name,
+            buildFieldAliases(dateFilterField),
+          )
+        : -1;
+      const formattedDateColumnValues =
+        dateFieldColumnIndex >= 0
+          ? formattedRawRows.map((row) => toCellText(row[dateFieldColumnIndex]))
+          : [];
+
+      const detectedImportYear =
+        detectImportYear({
+          workbook: wb,
+          fileName: file.name,
+          headerRow: headerInfo.headerRow,
+          formattedRawRows,
+          formattedDateColumnValues,
+          pendingYearCandidates: pendingYearColumns.map((item) => item.year),
+        }) ?? null;
+
+      const importYearFilter =
+        detectedImportYear && /^\d{4}$/.test(detectedImportYear)
+          ? detectedImportYear
+          : /^\d{4}$/.test(effectiveYearFilter)
+            ? effectiveYearFilter
+            : String(inferredReportYear);
 
       const fieldColumnIndex = new Map<string, number>();
       editableFields.forEach((field) => {
@@ -1484,7 +1606,8 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         (field) => normalizeImportHeader(field.name) === "branchno",
       );
 
-      for (const excelRow of rawRows) {
+      for (const [rowIndex, excelRow] of rawRows.entries()) {
+        const formattedExcelRow = formattedRawRows[rowIndex] ?? [];
         const normalizedRowValues = excelRow
           .map((cell) => normalizeImportHeader(toCellText(cell)))
           .filter((value) => value.length > 0);
@@ -1505,8 +1628,21 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
         }
 
         const row = buildEmptyRow(fields);
-        if (dateFilterField && effectiveYearFilter !== "") {
-          row[dateFilterField.name] = `${effectiveYearFilter}-01-01`;
+        if (dateFilterField) {
+          const importedDateText =
+            dateFieldColumnIndex >= 0
+              ? toCellText(formattedExcelRow[dateFieldColumnIndex])
+              : "";
+          const importedDate = normalizeDateOnly(importedDateText);
+          const importedDateYear = normalizeYearOnly(importedDateText);
+
+          if (importedDate) {
+            row[dateFilterField.name] = importedDate;
+          } else if (/^\d{4}$/.test(importedDateYear)) {
+            row[dateFilterField.name] = `${importedDateYear}-01-01`;
+          } else if (/^\d{4}$/.test(importYearFilter)) {
+            row[dateFilterField.name] = `${importYearFilter}-01-01`;
+          }
         }
         let matchedFieldCount = 0;
         let hasTextContent = false;
@@ -1586,6 +1722,13 @@ const AnnualAddReportPage: React.FC<AnnualAddReportPageProps> = ({
       }
 
       if (imported.length > 0) {
+        if (/^\d{4}$/.test(importYearFilter)) {
+          setDateFilter((prev) =>
+            prev === importYearFilter ? prev : importYearFilter,
+          );
+          onSelectedYearChange?.(importYearFilter);
+        }
+
         setRows((prev) => {
           const hasData = prev.some((r) =>
             editableFields.some((f) => {
