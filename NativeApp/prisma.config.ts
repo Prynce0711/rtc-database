@@ -7,7 +7,6 @@ export default defineConfig({
   schema: "node_modules/@rtc-database/shared/prisma/schema.prisma",
   migrations: {
     path: "node_modules/@rtc-database/shared/prisma/migrations",
-    seed: "tsx prisma/seed.ts",
   },
   datasource: {
     url: getPrismaDatabaseUrl(),

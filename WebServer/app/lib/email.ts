@@ -47,7 +47,7 @@ export async function sendEmail(
       to: to,
       subject: subject,
       text: text,
-      html: `<p>${escapeHtml(text)}</p>`,
+      html: `<p>${escapeHtml(text).replace(/\n/g, "<br />")}</p>`,
     });
 
     if (info.accepted.length > 0) {

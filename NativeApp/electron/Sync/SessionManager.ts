@@ -1,8 +1,6 @@
-import { deviceID } from "@rtc-database/shared";
 import { app } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { v4 as uuidv4 } from "uuid";
 
 const SESSION_USER_SNAPSHOT_FILE = "session-user.json";
 
@@ -17,7 +15,6 @@ export type ElectronSessionUser = {
 
 type SessionSnapshotState = {
   user: ElectronSessionUser | null;
-  deviceId?: string;
 };
 
 export const sessionUserSnapshotPath = (): string =>
@@ -87,12 +84,8 @@ const readSessionSnapshotState =
           ? null
           : sanitizeSessionUser(parsed.user);
 
-      const parsedDeviceId = deviceID.safeParse(parsed.deviceId);
-      const deviceId = parsedDeviceId.success ? parsedDeviceId.data : undefined;
-
       return {
         user,
-        deviceId,
       };
     } catch (error) {
       if (isRecord(error) && error.code === "ENOENT") {
@@ -119,7 +112,6 @@ const writeSessionSnapshotState = async (
       {
         savedAt: new Date().toISOString(),
         user: snapshot.user,
-        ...(snapshot.deviceId ? { deviceId: snapshot.deviceId } : {}),
       },
       null,
       2,
@@ -131,10 +123,7 @@ const writeSessionSnapshotState = async (
 export const saveSessionUserSnapshot = async (
   user: ElectronSessionUser | null,
 ): Promise<void> => {
-  const existingSnapshot = await readSessionSnapshotState();
-  const deviceId = existingSnapshot?.deviceId;
-
-  if (!user && !deviceId) {
+  if (!user) {
     const outputPath = sessionUserSnapshotPath();
 
     try {
@@ -148,21 +137,5 @@ export const saveSessionUserSnapshot = async (
     return;
   }
 
-  await writeSessionSnapshotState({ user, deviceId });
-};
-
-export const getOrCreateDeviceId = async (): Promise<string> => {
-  const existingSnapshot = await readSessionSnapshotState();
-  if (existingSnapshot?.deviceId) {
-    return existingSnapshot.deviceId;
-  }
-
-  const deviceId = uuidv4();
-
-  await writeSessionSnapshotState({
-    user: existingSnapshot?.user ?? null,
-    deviceId,
-  });
-
-  return deviceId;
+  await writeSessionSnapshotState({ user });
 };

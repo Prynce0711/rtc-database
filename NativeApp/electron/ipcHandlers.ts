@@ -17,13 +17,28 @@ import {
   upsertCriminalCasesInWorker,
 } from "./Sync/Case/CriminalCasesWorkerManager";
 import {
-  getOrCreateDeviceId,
   isRecord,
   sanitizeSessionUser,
   saveSessionUserSnapshot,
   sessionUserSnapshotPath,
 } from "./Sync/SessionManager";
+import {
+  getPinnedRelayBaseUrl,
+  inspectBackendTrust,
+  probeRelayReachability,
+  savePinnedRelayCertificatePin,
+} from "./relayTrust";
+import {
+  getAutoConnectPinnedRelayEnabled,
+  getOrCreateDeviceId,
+  saveAutoConnectPinnedRelayEnabled,
+} from "./Sync/SettingsManager";
 import { formatError, resolveSafePath } from "./utils";
+
+const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
+const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
+const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
 
 const bringWindowToFront = (window: BrowserWindow | null): void => {
   if (!window || window.isDestroyed()) {
@@ -46,6 +61,144 @@ const bringWindowToFront = (window: BrowserWindow | null): void => {
 
 ipcMain.handle(IPC_CHANNELS.CASE_DOES_EXIST, async (_event, args) => {
   return doesCaseExist(args.caseNumbers, args.caseType);
+});
+
+ipcMain.handle(RELAY_INSPECT_BACKEND_CHANNEL, async (_event, args: unknown) => {
+  try {
+    if (!isRecord(args) || typeof args.url !== "string" || !args.url.trim()) {
+      return {
+        success: false,
+        error: "Server URL is required.",
+      };
+    }
+
+    if (
+      args.requireReachable === true &&
+      !(await probeRelayReachability(args.url))
+    ) {
+      return {
+        success: false,
+        error:
+          "No server was found at that address and port. Check the address and port, then try again.",
+      };
+    }
+
+    return {
+      success: true,
+      result: await inspectBackendTrust(args.url),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
+});
+
+ipcMain.handle(RELAY_GET_STARTUP_SETTINGS_CHANNEL, async () => {
+  try {
+    return {
+      success: true,
+      result: {
+        autoConnectPinnedRelay: await getAutoConnectPinnedRelayEnabled(),
+        pinnedRelayUrl: getPinnedRelayBaseUrl(),
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
+});
+
+ipcMain.handle(
+  RELAY_SET_STARTUP_SETTINGS_CHANNEL,
+  async (_event, args: unknown) => {
+    try {
+      if (
+        !isRecord(args) ||
+        typeof args.autoConnectPinnedRelay !== "boolean"
+      ) {
+        return {
+          success: false,
+          error: "Startup preference is required.",
+        };
+      }
+
+      await saveAutoConnectPinnedRelayEnabled(args.autoConnectPinnedRelay);
+
+      return {
+        success: true,
+        result: {
+          autoConnectPinnedRelay: args.autoConnectPinnedRelay,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: formatError(error),
+      };
+    }
+  },
+);
+
+ipcMain.handle(RELAY_TRUST_BACKEND_CHANNEL, async (_event, args: unknown) => {
+  try {
+    if (!isRecord(args)) {
+      return {
+        success: false,
+        error: "Server approval details are required.",
+      };
+    }
+
+    if (
+      typeof args.url !== "string" ||
+      !args.url.trim() ||
+      typeof args.relayFingerprint256 !== "string" ||
+      !args.relayFingerprint256.trim()
+    ) {
+      return {
+        success: false,
+        error: "The server identity details are incomplete.",
+      };
+    }
+
+    const parsedUrl = new URL(args.url);
+    const port =
+      Number(parsedUrl.port) || (parsedUrl.protocol === "https:" ? 443 : 80);
+
+    const pinnedRelay = savePinnedRelayCertificatePin({
+      fingerprint256: args.relayFingerprint256,
+      protocol:
+        parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:"
+          ? (parsedUrl.protocol.slice(0, -1) as "http" | "https")
+          : "https",
+      hostname: parsedUrl.hostname,
+      port,
+      establishedAt: new Date().toISOString(),
+      subjectName:
+        typeof args.relaySubjectName === "string"
+          ? args.relaySubjectName
+          : undefined,
+      issuerName:
+        typeof args.relayIssuerName === "string" ? args.relayIssuerName : undefined,
+    });
+
+    return {
+      success: true,
+      result: {
+        fingerprint256: pinnedRelay.fingerprint256,
+        hostname: pinnedRelay.hostname ?? parsedUrl.hostname,
+        port: pinnedRelay.port ?? port,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: formatError(error),
+    };
+  }
 });
 
 ipcMain.handle(IPC_CHANNELS.CASE_GETS, async (_event, options) => {

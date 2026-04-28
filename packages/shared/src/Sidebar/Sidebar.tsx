@@ -618,20 +618,20 @@ function criminalSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "180ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
-        />
-      </div>
+      {/*    <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+          <ActionBtn
+            icon={<FiBell />}
+            label="Notifications"
+            badge={5}
+            isExpanded={isExpanded}
+            onClick={onOpenNotifications}
+          />
+        </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "210ms" }}>
@@ -713,20 +713,20 @@ function statsSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
-        />
-      </div>
+      {/*    <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+          <ActionBtn
+            icon={<FiBell />}
+            label="Notifications"
+            badge={5}
+            isExpanded={isExpanded}
+            onClick={onOpenNotifications}
+          />
+        </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
@@ -818,20 +818,20 @@ function staffSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
-        />
-      </div>
+      {/*    <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+          <ActionBtn
+            icon={<FiBell />}
+            label="Notifications"
+            badge={5}
+            isExpanded={isExpanded}
+            onClick={onOpenNotifications}
+          />
+        </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
@@ -914,11 +914,12 @@ function archiveSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
-        <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+
+        {/*    <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
           <ActionBtn
             icon={<FiBell />}
             label="Notifications"
@@ -926,7 +927,7 @@ function archiveSidebar({
             isExpanded={isExpanded}
             onClick={onOpenNotifications}
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Settings */}
@@ -1010,21 +1011,21 @@ function notarialSidebar({
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
-          badge={3}
+          // badge={3}
           isExpanded={isExpanded}
           onClick={onOpenMessages}
         />
       </div>
 
-      <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
-        />
-      </div>
+      {/*    <div className="sidebar-stagger" style={{ animationDelay: "270ms" }}>
+          <ActionBtn
+            icon={<FiBell />}
+            label="Notifications"
+            badge={5}
+            isExpanded={isExpanded}
+            onClick={onOpenNotifications}
+          />
+        </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "300ms" }}>
