@@ -23,13 +23,13 @@ import {
   YAxis,
 } from "recharts";
 import DashboardLayout from "../DashboardLayout";
-import { RecentCases } from "./AttorneyCard";
+import { RecentCases } from "./CriminalCaseCard";
 
 interface Props {
   onNavigate?: (view: string) => void;
 }
 
-const AttorneyDashboard: React.FC<Props> = () => {
+const CriminalCaseDashboard: React.FC<Props> = () => {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<UnifiedCaseData[]>([]);
   const [caseStats, setCaseStats] = useState<UnifiedCaseStats | null>(null);
@@ -181,7 +181,7 @@ const AttorneyDashboard: React.FC<Props> = () => {
               </div>
             </div>
             <h2 className="text-3xl font-bold text-base-content mb-2">
-              Loading Attorney Dashboard
+              Loading Criminal Case Dashboard
             </h2>
             <p className="text-lg text-base-content/60">Fetching cases...</p>
             <div className="flex items-center justify-center gap-2 mt-4">
@@ -211,10 +211,10 @@ const AttorneyDashboard: React.FC<Props> = () => {
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-base-content">
-                        Attorney Dashboard
+                        Criminal Case Dashboard
                       </h1>
                       <p className="text-base-content/60 text-base sm:text-lg flex items-center gap-2 mt-1">
-                        Legal case monitoring and performance insights
+                        Criminal section case monitoring and performance insights
                       </p>
                     </div>
                   </div>
@@ -440,4 +440,4 @@ const AttorneyDashboard: React.FC<Props> = () => {
   );
 };
 
-export default AttorneyDashboard;
+export default CriminalCaseDashboard;

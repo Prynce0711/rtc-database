@@ -5,7 +5,8 @@ export const NewUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.email("Invalid email address"),
   role: z.enum(Roles, {
-    message: "Role must be Admin, Staff, Notarial, Archive, or Atty",
+    message:
+      "Role must be Admin, Staff, Criminal Section, Statistics, Notarial, or Archive",
   }),
 });
 export type NewUserSchema = z.infer<typeof NewUserSchema>;

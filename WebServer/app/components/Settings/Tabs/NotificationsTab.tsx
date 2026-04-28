@@ -21,7 +21,7 @@ const NotificationsTab = ({ role }: { role: string }) => {
   const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [reminderLeadTime, setReminderLeadTime] = useState("24");
   const isAdmin = role === Roles.ADMIN;
-  const isAtty = role === Roles.ATTY;
+  const isCriminalSection = role === Roles.CRIMINAL;
 
   return (
     <div className="space-y-6">
@@ -65,7 +65,7 @@ const NotificationsTab = ({ role }: { role: string }) => {
         >
           <Toggle checked={deadlineReminders} onChange={setDeadlineReminders} />
         </SettingsRow>
-        {(isAtty || isAdmin) && (
+        {(isCriminalSection || isAdmin) && (
           <SettingsRow
             label="Hearing Reminders"
             description="Remind me before scheduled hearings."
@@ -121,3 +121,4 @@ const NotificationsTab = ({ role }: { role: string }) => {
 };
 
 export default NotificationsTab;
+

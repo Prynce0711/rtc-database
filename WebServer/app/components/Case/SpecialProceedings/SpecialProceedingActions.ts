@@ -179,7 +179,7 @@ export async function createSpecialProceeding(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -302,7 +302,7 @@ export async function getSpecialProceedingCaseNumberPreview(
   year: number,
 ): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -346,7 +346,7 @@ export async function updateSpecialProceeding(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -473,7 +473,7 @@ export async function deleteSpecialProceeding(
   caseId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -674,3 +674,4 @@ export async function getSpecialProceedingsByCaseNumbers(
     };
   }
 }
+

@@ -2,11 +2,14 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { RedirectingUI } from "@rtc-database/shared";
-import { useEffect, useMemo, useState } from "react";
+import { RadioButton, RedirectingUI } from "@rtc-database/shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  FiBarChart2,
   FiCalendar,
   FiDownload,
+  FiFileText,
+  FiGrid,
   FiPlus,
   FiSearch,
   FiTrash2,
@@ -189,6 +192,135 @@ export default function SummaryPage() {
     return aggregate;
   }, [filteredData]);
 
+  // ── Column resize logic ──────────────────────────────────────────────────
+  const COL_KEYS = [
+    "num",
+    "branch",
+    "raffleDate",
+    "civilFamily",
+    "civilOrdinary",
+    "civilRecViaReraffle",
+    "civilUnloaded",
+    "lrcPetition",
+    "lrcSpProc",
+    "lrcRecViaReraffle",
+    "lrcUnloaded",
+    "crimFamily",
+    "crimDrugs",
+    "crimOrdinary",
+    "crimRecViaReraffle",
+    "crimUnloaded",
+    "total",
+  ] as const;
+
+  const DEFAULT_WIDTHS: Record<string, number> = {
+    num: 40,
+    branch: 120,
+    raffleDate: 100,
+    civilFamily: 72,
+    civilOrdinary: 72,
+    civilRecViaReraffle: 110,
+    civilUnloaded: 80,
+    lrcPetition: 72,
+    lrcSpProc: 80,
+    lrcRecViaReraffle: 110,
+    lrcUnloaded: 80,
+    crimFamily: 72,
+    crimDrugs: 72,
+    crimOrdinary: 80,
+    crimRecViaReraffle: 110,
+    crimUnloaded: 80,
+    total: 72,
+  };
+
+  const [colWidths, setColWidths] =
+    useState<Record<string, number>>(DEFAULT_WIDTHS);
+  const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const activeResize = useRef<{
+    key: string;
+    startX: number;
+    startW: number;
+  } | null>(null);
+
+  const startResize = useCallback((e: React.MouseEvent, key: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = thRefs.current[key];
+    if (!th) return;
+    activeResize.current = {
+      key,
+      startX: e.clientX,
+      startW: th.getBoundingClientRect().width,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const a = activeResize.current;
+      if (!a) return;
+      const next = Math.max(48, Math.round(a.startW + (e.clientX - a.startX)));
+      const th = thRefs.current[a.key];
+      if (th) th.style.width = `${next}px`;
+    };
+    const onUp = (e: MouseEvent) => {
+      const a = activeResize.current;
+      if (!a) return;
+      const next = Math.max(48, Math.round(a.startW + (e.clientX - a.startX)));
+      setColWidths((prev) => ({ ...prev, [a.key]: next }));
+      activeResize.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
+
+  const courtTypeSnapshot = useMemo(() => {
+    const snapshot = new Map<SummaryCourtType, { rows: number; total: number }>(
+      SUMMARY_COURT_TYPES.map((courtType) => [
+        courtType.value,
+        { rows: 0, total: 0 },
+      ]),
+    );
+
+    summaryData.forEach((row) => {
+      if (!row.raffleDate.startsWith(activeMonthKey)) return;
+
+      const current = snapshot.get(row.courtType as SummaryCourtType);
+      if (!current) return;
+
+      current.rows += 1;
+      current.total += toNumber(row.total);
+    });
+
+    return snapshot;
+  }, [summaryData, activeMonthKey]);
+
+  const courtTypeViews = useMemo(
+    () =>
+      SUMMARY_COURT_TYPES.map((courtType) => ({
+        label: courtType.shortLabel,
+        value: courtType.value,
+        description: courtType.description,
+        icon: FiFileText,
+        count: courtTypeSnapshot.get(courtType.value)?.rows ?? 0,
+      })),
+    [courtTypeSnapshot],
+  );
+
+  const activeCourtSnapshot = courtTypeSnapshot.get(activeCourtType) ?? {
+    rows: 0,
+    total: 0,
+  };
+
   const allSelected =
     selectionMode === "delete" &&
     filteredData.length > 0 &&
@@ -307,61 +439,74 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <header className="card bg-base-100 shadow-xl">
+      <header className="card border border-base-200 bg-gradient-to-br from-base-100 via-base-100 to-info/5 shadow-xl">
         <div className="card-body p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-base-content">
-                Summary Reports
-              </h1>
-              <p className="mt-1 flex items-center gap-2 text-sm sm:text-base font-medium text-base-content/60">
-                <FiCalendar className="shrink-0" />
-                <span>Statistics overview for {monthLabel}</span>
-              </p>
-              {errorMessage && (
-                <p className="mt-2 text-sm font-medium text-error">
-                  {errorMessage}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
+              <span className="badge badge-outline badge-primary">
+                Statistics / Summary
+              </span>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-base-content sm:text-4xl lg:text-5xl">
+                  Summary Reports
+                </h1>
+                <p className="mt-1 flex items-center gap-2 text-sm font-medium text-base-content/60 sm:text-base">
+                  <FiCalendar className="shrink-0" />
+                  <span>Statistics overview for {monthLabel}</span>
                 </p>
+              </div>
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className="alert alert-error py-2 text-sm shadow-sm"
+                >
+                  <span>{errorMessage}</span>
+                </div>
               )}
             </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <div className="join">
-                <select
-                  className="select select-bordered join-item w-44"
-                  value={selectedMonth}
-                  onChange={(event) => setSelectedMonth(event.target.value)}
-                >
-                  {SUMMARY_MONTH_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  list="summary-year-page-options"
-                  className="input input-bordered join-item w-28"
-                  value={selectedYear}
-                  onChange={(event) =>
-                    setSelectedYear(
-                      event.target.value.replace(/\D/g, "").slice(0, 4),
-                    )
-                  }
-                  placeholder={CURRENT_YEAR}
-                />
-                <datalist id="summary-year-page-options">
-                  {yearOptions.map((yearOption) => (
-                    <option key={yearOption} value={yearOption}>
-                      {yearOption}
-                    </option>
-                  ))}
-                </datalist>
+            <div className="w-full max-w-md space-y-3">
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-base-content/45">
+                  Report Period
+                </p>
+                <div className="join w-full">
+                  <select
+                    className="select select-bordered join-item w-full"
+                    value={selectedMonth}
+                    onChange={(event) => setSelectedMonth(event.target.value)}
+                  >
+                    {SUMMARY_MONTH_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    list="summary-year-page-options"
+                    className="input input-bordered join-item w-28"
+                    value={selectedYear}
+                    onChange={(event) =>
+                      setSelectedYear(
+                        event.target.value.replace(/\D/g, "").slice(0, 4),
+                      )
+                    }
+                    placeholder={CURRENT_YEAR}
+                  />
+                  <datalist id="summary-year-page-options">
+                    {yearOptions.map((yearOption) => (
+                      <option key={yearOption} value={yearOption}>
+                        {yearOption}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-nowrap">
+              <div className="flex flex-wrap justify-end gap-2">
                 <button
                   className="btn btn-outline btn-info btn-md gap-2"
                   onClick={handleExport}
@@ -385,89 +530,149 @@ export default function SummaryPage() {
         </div>
       </header>
 
-      <div className="card bg-base-100 border border-base-200">
+      <div className="card border border-base-200 bg-base-100">
         <div className="card-body p-3 sm:p-4">
-          <div className="flex flex-wrap gap-2">
-            {SUMMARY_COURT_TYPES.map((courtType) => {
-              const active = courtType.value === activeCourtType;
-              return (
-                <button
-                  key={courtType.value}
-                  className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => {
-                    setActiveCourtType(courtType.value);
-                    setSelectionMode(null);
-                    setSelectedIds(new Set());
-                  }}
-                  title={courtType.description}
-                >
-                  {courtType.shortLabel}
-                </button>
-              );
-            })}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+                Court Type Scope
+              </p>
+              <h2 className="text-base font-bold text-base-content">
+                Switch summary lens
+              </h2>
+            </div>
+            <span className="badge badge-outline badge-neutral tabular-nums">
+              {summaryData.length.toLocaleString()} period rows
+            </span>
+          </div>
+
+          <div className="overflow-x-auto pb-1">
+            <RadioButton
+              options={courtTypeViews}
+              value={activeCourtType}
+              onChange={(value) => {
+                setActiveCourtType(value);
+                setSelectionMode(null);
+                setSelectedIds(new Set());
+              }}
+              className="min-w-max"
+            />
+          </div>
+
+          <div className="mt-3 rounded-xl border border-base-200 bg-base-100 px-3 py-2">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-semibold text-base-content/60">
+                Active scope
+              </span>
+              <span className="font-bold text-base-content">
+                {activeCourtType}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="text-base-content/50">Rows in period</span>
+              <span className="font-semibold tabular-nums text-base-content">
+                {activeCourtSnapshot.rows.toLocaleString()}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span className="text-base-content/50">Total in scope</span>
+              <span className="font-semibold tabular-nums text-base-content">
+                {activeCourtSnapshot.total.toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-          <input
-            type="text"
-            placeholder="Search branch, date, totals..."
-            className="input input-bordered w-full pl-11"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            disabled={selectionMode !== null}
-          />
-        </div>
-
-        {canManageStats &&
-          (selectionMode === "delete" ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-base-content/40 tabular-nums">
-                {selectedIds.size} selected
-              </span>
-              <button
-                className="btn btn-error btn-md gap-2"
-                disabled={selectedIds.size === 0}
-                onClick={confirmDelete}
-              >
-                <FiTrash2 className="h-4 w-4" />
-                Apply Delete
-              </button>
-              <button
-                className="btn btn-ghost btn-md"
-                onClick={cancelSelection}
-              >
-                <FiX className="h-4 w-4" />
-              </button>
+      <div className="card border border-base-200 bg-base-100">
+        <div className="card-body p-3 sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full max-w-xl">
+              <FiSearch className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-xl text-base-content/40" />
+              <input
+                type="text"
+                placeholder="Search branch, date, totals..."
+                className="input input-bordered w-full pl-11 pr-10"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                disabled={selectionMode !== null}
+              />
+              {selectionMode === null && search.trim().length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
+                  <FiX className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-          ) : (
-            <button
-              className="btn btn-outline btn-md gap-2 text-error hover:bg-error/10"
-              onClick={() => {
-                setSelectionMode("delete");
-                setSelectedIds(new Set());
-              }}
-              disabled={filteredData.length === 0}
-            >
-              <FiTrash2 className="h-4 w-4" />
-              Delete Rows
-            </button>
-          ))}
 
-        <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-          {filteredData.length} row{filteredData.length !== 1 && "s"}
-        </span>
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {canManageStats &&
+                (selectionMode === "delete" ? (
+                  <>
+                    <span className="badge badge-error badge-outline tabular-nums">
+                      {selectedIds.size} selected
+                    </span>
+                    <button
+                      className="btn btn-error btn-md gap-2"
+                      disabled={selectedIds.size === 0}
+                      onClick={confirmDelete}
+                    >
+                      <FiTrash2 className="h-4 w-4" />
+                      Apply Delete
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-md gap-1"
+                      onClick={cancelSelection}
+                    >
+                      <FiX className="h-4 w-4" />
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn btn-outline btn-md gap-2 text-error hover:bg-error/10"
+                    onClick={() => {
+                      setSelectionMode("delete");
+                      setSelectedIds(new Set());
+                    }}
+                    disabled={filteredData.length === 0}
+                  >
+                    <FiTrash2 className="h-4 w-4" />
+                    Delete Rows
+                  </button>
+                ))}
+
+              <span className="badge badge-neutral badge-outline tabular-nums">
+                {filteredData.length} row{filteredData.length !== 1 && "s"}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-base-200 bg-base-100">
-        <table className="table table-xs sm:table-sm w-max min-w-full">
+      <div className="overflow-x-auto rounded-2xl border border-base-200 bg-base-100 shadow-sm">
+        <table
+          className="table table-pin-rows table-xs w-max min-w-full sm:table-sm"
+          style={{ tableLayout: "fixed" }}
+        >
+          <colgroup>
+            {selectionMode === "delete" && <col style={{ width: 40 }} />}
+            {COL_KEYS.map((key) => (
+              <col key={key} style={{ width: colWidths[key] }} />
+            ))}
+          </colgroup>
           <thead>
-            <tr className="bg-base-200/70">
+            <tr className="bg-base-200/80 text-[11px] uppercase tracking-wide text-base-content/70">
               {selectionMode === "delete" && (
-                <th rowSpan={2} className="text-center align-middle">
+                <th
+                  rowSpan={2}
+                  className="text-center align-middle"
+                  style={{ width: 40 }}
+                >
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
@@ -476,14 +681,56 @@ export default function SummaryPage() {
                   />
                 </th>
               )}
-              <th rowSpan={2} className="text-center align-middle">
+              <th
+                rowSpan={2}
+                className="text-center align-middle overflow-hidden relative"
+                style={{ width: colWidths["num"] }}
+                ref={(n) => {
+                  thRefs.current["num"] = n;
+                }}
+              >
                 #
+                <div
+                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "num")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th rowSpan={2} className="text-center align-middle">
+              <th
+                rowSpan={2}
+                className="text-center align-middle overflow-hidden relative"
+                style={{ width: colWidths["branch"] }}
+                ref={(n) => {
+                  thRefs.current["branch"] = n;
+                }}
+              >
                 Branch
+                <div
+                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "branch")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th rowSpan={2} className="text-center align-middle">
+              <th
+                rowSpan={2}
+                className="text-center align-middle whitespace-nowrap overflow-hidden relative"
+                style={{ width: colWidths["raffleDate"] }}
+                ref={(n) => {
+                  thRefs.current["raffleDate"] = n;
+                }}
+              >
                 Raffle Date
+                <div
+                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "raffleDate")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
               <th colSpan={4} className="text-center text-primary">
                 Civil
@@ -494,24 +741,79 @@ export default function SummaryPage() {
               <th colSpan={5} className="text-center text-success">
                 Criminal
               </th>
-              <th rowSpan={2} className="text-center align-middle text-warning">
+              <th
+                rowSpan={2}
+                className="text-center align-middle text-warning overflow-hidden relative"
+                style={{ width: colWidths["total"] }}
+                ref={(n) => {
+                  thRefs.current["total"] = n;
+                }}
+              >
                 Total
+                <div
+                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "total")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
             </tr>
-            <tr className="bg-base-200/40">
-              <th className="text-center">Family</th>
-              <th className="text-center">Ordinary</th>
-              <th className="text-center">Rec&apos;d Via Re-Raffled</th>
-              <th className="text-center">UN Loaded</th>
-              <th className="text-center">Petition</th>
-              <th className="text-center">SP. PROC.</th>
-              <th className="text-center">Rec&apos;d Via Re-Raffled</th>
-              <th className="text-center">UN Loaded</th>
-              <th className="text-center">Family</th>
-              <th className="text-center">Drugs</th>
-              <th className="text-center">Ordinary</th>
-              <th className="text-center">Rec&apos;d Via Re-Raffled</th>
-              <th className="text-center">UN Loaded</th>
+            <tr className="bg-base-200/50 text-[11px] uppercase tracking-wide text-base-content/65">
+              {(
+                [
+                  "civilFamily",
+                  "civilOrdinary",
+                  "civilRecViaReraffle",
+                  "civilUnloaded",
+                  "lrcPetition",
+                  "lrcSpProc",
+                  "lrcRecViaReraffle",
+                  "lrcUnloaded",
+                  "crimFamily",
+                  "crimDrugs",
+                  "crimOrdinary",
+                  "crimRecViaReraffle",
+                  "crimUnloaded",
+                ] as const
+              ).map((key, i) => {
+                const labels: Record<string, string> = {
+                  civilFamily: "Family",
+                  civilOrdinary: "Ordinary",
+                  civilRecViaReraffle: "Rec'd Via Re-Raffled",
+                  civilUnloaded: "UN Loaded",
+                  lrcPetition: "Petition",
+                  lrcSpProc: "SP. PROC.",
+                  lrcRecViaReraffle: "Rec'd Via Re-Raffled",
+                  lrcUnloaded: "UN Loaded",
+                  crimFamily: "Family",
+                  crimDrugs: "Drugs",
+                  crimOrdinary: "Ordinary",
+                  crimRecViaReraffle: "Rec'd Via Re-Raffled",
+                  crimUnloaded: "UN Loaded",
+                };
+                return (
+                  <th
+                    key={key}
+                    className="text-center overflow-hidden whitespace-nowrap relative"
+                    style={{ width: colWidths[key] }}
+                    ref={(n) => {
+                      thRefs.current[key] = n;
+                    }}
+                  >
+                    <span className="block overflow-hidden text-ellipsis">
+                      {labels[key]}
+                    </span>
+                    <div
+                      className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                      onMouseDown={(e) => startResize(e, key)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -520,96 +822,126 @@ export default function SummaryPage() {
               <tr>
                 <td
                   colSpan={selectionMode === "delete" ? 19 : 18}
-                  className="py-12 text-center text-base-content/50"
+                  className="py-14 text-center text-base-content/50"
                 >
-                  Loading summary statistics...
+                  <div className="flex flex-col items-center gap-2">
+                    <FiBarChart2 className="h-5 w-5" />
+                    <span>Loading summary statistics...</span>
+                  </div>
                 </td>
               </tr>
             ) : filteredData.length === 0 ? (
               <tr>
                 <td
                   colSpan={selectionMode === "delete" ? 19 : 18}
-                  className="py-12 text-center text-base-content/45"
+                  className="py-14 text-center text-base-content/45"
                 >
-                  No rows for {activeCourtType} in {monthLabel}.
+                  <div className="flex flex-col items-center gap-2">
+                    <FiGrid className="h-5 w-5" />
+                    <span>
+                      No rows for {activeCourtType} in {monthLabel}.
+                    </span>
+                  </div>
                 </td>
               </tr>
             ) : (
-              filteredData.map((row, index) => (
-                <tr
-                  key={
-                    row.id ?? `${row.courtType}-${row.branch}-${row.raffleDate}`
-                  }
-                >
-                  {selectionMode === "delete" && (
-                    <td className="text-center">
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm checkbox-error"
-                        checked={row.id != null && selectedIds.has(row.id)}
-                        onChange={() => row.id != null && toggleSelect(row.id)}
-                        disabled={row.id == null}
-                      />
+              filteredData.map((row, index) => {
+                const isSelected =
+                  selectionMode === "delete" &&
+                  row.id != null &&
+                  selectedIds.has(row.id);
+
+                return (
+                  <tr
+                    key={
+                      row.id ??
+                      `${row.courtType}-${row.branch}-${row.raffleDate}`
+                    }
+                    className={[
+                      "transition-colors",
+                      isSelected
+                        ? "bg-error/10 hover:bg-error/15"
+                        : "hover:bg-base-200/40",
+                    ].join(" ")}
+                  >
+                    {selectionMode === "delete" && (
+                      <td className="text-center overflow-hidden">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm checkbox-error"
+                          checked={row.id != null && selectedIds.has(row.id)}
+                          onChange={() =>
+                            row.id != null && toggleSelect(row.id)
+                          }
+                          disabled={row.id == null}
+                        />
+                      </td>
+                    )}
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {index + 1}
                     </td>
-                  )}
-                  <td className="text-center tabular-nums">{index + 1}</td>
-                  <td className="font-medium">{row.branch}</td>
-                  <td className="tabular-nums">{row.raffleDate}</td>
-                  <td className="text-center tabular-nums">
-                    {row.civilFamily.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.civilOrdinary.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.civilReceivedViaReraffled.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.civilUnloaded.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.lrcPetition.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.lrcSpProc.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.lrcReceivedViaReraffled.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.lrcUnloaded.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.criminalFamily.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.criminalDrugs.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.criminalOrdinary.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.criminalReceivedViaReraffled.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums">
-                    {row.criminalUnloaded.toLocaleString()}
-                  </td>
-                  <td className="text-center tabular-nums font-bold">
-                    {row.total.toLocaleString()}
-                  </td>
-                </tr>
-              ))
+                    <td className="font-semibold overflow-hidden whitespace-nowrap text-ellipsis">
+                      {row.branch}
+                    </td>
+                    <td className="tabular-nums whitespace-nowrap overflow-hidden">
+                      {row.raffleDate}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.civilFamily.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.civilOrdinary.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.civilReceivedViaReraffled.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.civilUnloaded.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.lrcPetition.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.lrcSpProc.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.lrcReceivedViaReraffled.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.lrcUnloaded.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.criminalFamily.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.criminalDrugs.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.criminalOrdinary.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.criminalReceivedViaReraffled.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums overflow-hidden whitespace-nowrap">
+                      {row.criminalUnloaded.toLocaleString()}
+                    </td>
+                    <td className="text-center tabular-nums font-black text-base-content overflow-hidden whitespace-nowrap">
+                      {row.total.toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })
             )}
 
             {filteredData.length > 0 && (
-              <tr className="bg-primary/80 text-primary-content font-bold">
+              <tr className="bg-primary text-primary-content font-bold">
                 <td
                   colSpan={selectionMode === "delete" ? 4 : 3}
                   className="uppercase tracking-wider"
                 >
                   Grand Total
                 </td>
-                <td className="tabular-nums text-center">-</td>
+                <td className="text-center tabular-nums">-</td>
                 <td className="text-center tabular-nums">
                   {totals.civilFamily.toLocaleString()}
                 </td>
@@ -649,7 +981,7 @@ export default function SummaryPage() {
                 <td className="text-center tabular-nums">
                   {totals.criminalUnloaded.toLocaleString()}
                 </td>
-                <td className="text-center tabular-nums text-lg">
+                <td className="text-center text-lg tabular-nums">
                   {totals.total.toLocaleString()}
                 </td>
               </tr>

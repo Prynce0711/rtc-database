@@ -95,7 +95,7 @@ const PetitionCasePage: React.FC<{
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const canManage = role === Roles.ADMIN || role === Roles.ATTY;
+  const canManage = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -664,3 +664,4 @@ const PetitionCasePage: React.FC<{
 };
 
 export default PetitionCasePage;
+

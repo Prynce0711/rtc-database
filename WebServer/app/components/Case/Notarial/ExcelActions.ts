@@ -14,7 +14,7 @@ export async function exportNotarialExcel(): Promise<
   ActionResult<ExportExcelData>
 > {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -66,3 +66,4 @@ export async function exportNotarialExcel(): Promise<
     return { success: false, error: "Export failed" };
   }
 }
+

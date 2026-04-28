@@ -226,7 +226,7 @@ export async function createCriminalCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -335,7 +335,7 @@ export async function getCriminalCaseNumberPreview(
   year: number,
 ): Promise<ActionResult<{ caseNumber: string; nextNumber: number }>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -376,7 +376,7 @@ export async function updateCriminalCase(
   data: Record<string, unknown>,
 ): Promise<ActionResult<Case>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -492,7 +492,7 @@ export async function deleteCriminalCase(
   caseId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -663,3 +663,4 @@ export async function getCriminalCasesByCaseNumbers(
     return { success: false, error: "Failed to fetch cases by case number" };
   }
 }
+

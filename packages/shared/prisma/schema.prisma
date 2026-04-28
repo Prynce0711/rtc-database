@@ -25,7 +25,7 @@ enum ArchiveEntryType {
 enum Roles {
   admin
   user
-  atty
+  criminal
   statistics
   notarial
   archive
@@ -754,3 +754,4 @@ model SyncState {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+

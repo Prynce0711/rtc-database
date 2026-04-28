@@ -89,7 +89,7 @@ const Sherriff: React.FC<{
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
-  const isAdminOrAtty = role === "admin" || role === "atty";
+  const canManageCases = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -443,7 +443,7 @@ const Sherriff: React.FC<{
                   <span>Manage sheriff cases and filings</span>
                 </p>
               </div>
-              {isAdminOrAtty && (
+              {canManageCases && (
                 <div className="flex flex-col items-end gap-3">
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <button
@@ -542,7 +542,7 @@ const Sherriff: React.FC<{
               )}
             </button>
 
-            {isAdminOrAtty &&
+            {canManageCases &&
               (isSelecting ? (
                 <div className="flex items-center gap-2 ml-3">
                   <span className="text-xs text-base-content/40 tabular-nums">
@@ -665,7 +665,7 @@ const Sherriff: React.FC<{
         <div className="bg-base-100 rounded-lg shadow overflow-hidden">
           <Table
             headers={[
-              ...(isAdminOrAtty && isSelecting
+              ...(canManageCases && isSelecting
                 ? [
                     {
                       key: "select",
@@ -749,3 +749,4 @@ const Sherriff: React.FC<{
 };
 
 export default Sherriff;
+

@@ -45,7 +45,7 @@ const CriminalCaseRow = ({
   role: Roles;
 }) => {
   const router = useAdaptiveNavigation();
-  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
+  const canManageCases = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const detentionStatus =
     caseItem.detained && caseItem.detained.trim()
       ? caseItem.detained
@@ -57,7 +57,7 @@ const CriminalCaseRow = ({
         isSelecting && selected ? "bg-primary/10" : ""
       }`}
       onClick={() => {
-        if (isSelecting && isAdminOrAtty) {
+        if (isSelecting && canManageCases) {
           onToggleSelect?.(caseItem.id, !selected);
           return;
         }
@@ -65,7 +65,7 @@ const CriminalCaseRow = ({
         router.push(`/user/cases/criminal/${caseItem.id}`);
       }}
     >
-      {isAdminOrAtty && isSelecting && (
+      {canManageCases && isSelecting && (
         <td
           onClick={(e) => e.stopPropagation()}
           className="relative text-center px-4 py-3.5"
@@ -355,3 +355,4 @@ export const CaseTable = ({
 };
 
 export default CriminalCaseRow;
+

@@ -84,7 +84,7 @@ const ReceiveLogsPage: React.FC<{
   );
   const [deletingSelected, setDeletingSelected] = useState(false);
 
-  const isAdminOrAtty = role === Roles.ADMIN || role === Roles.ATTY;
+  const canManageLogs = role === Roles.ADMIN || role === Roles.CRIMINAL;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -436,7 +436,7 @@ const ReceiveLogsPage: React.FC<{
                   <span>Track all received documents and case filings</span>
                 </p>
               </div>
-              {isAdminOrAtty && (
+              {canManageLogs && (
                 <div className="flex flex-col items-end gap-3">
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <button
@@ -577,7 +577,7 @@ const ReceiveLogsPage: React.FC<{
               Filter
             </button>
 
-            {isAdminOrAtty &&
+            {canManageLogs &&
               (isSelecting ? (
                 <div className="flex items-center gap-2 sm:ml-3">
                   <span className="text-sm text-base-content/60 whitespace-nowrap">
@@ -683,7 +683,7 @@ const ReceiveLogsPage: React.FC<{
         <div className="bg-base-100 rounded-lg shadow overflow-x-auto">
           <Table
             headers={[
-              ...(isAdminOrAtty && isSelecting
+              ...(canManageLogs && isSelecting
                 ? [
                     {
                       key: "select",
@@ -763,7 +763,7 @@ const ReceiveLogsPage: React.FC<{
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
                 onView={(l) => router.push(`/user/cases/receiving/${l.id}`)}
-                isAdminOrAtty={isAdminOrAtty}
+                canManageLogs={canManageLogs}
                 isSelected={selectedLogIds.includes(
                   (log as unknown as ReceiveLog).id,
                 )}
@@ -793,3 +793,4 @@ const ReceiveLogsPage: React.FC<{
 };
 
 export default ReceiveLogsPage;
+

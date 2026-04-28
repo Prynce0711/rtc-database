@@ -85,7 +85,7 @@ export async function getRecievingLogs(): Promise<
   ActionResult<RecievingLog[]>
 > {
   try {
-    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionValidation = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -107,7 +107,7 @@ export async function getRecievingLogById(
   logId: string | number,
 ): Promise<ActionResult<RecievingLog>> {
   try {
-    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionValidation = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -136,7 +136,7 @@ export async function getRecievingLogsByIds(
   ids: Array<number | string>,
 ): Promise<ActionResult<RecievingLog[]>> {
   try {
-    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionValidation = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -174,7 +174,7 @@ export async function getRecievingLogsPage(
   options?: ReceivingLogFilterOptions,
 ): Promise<ActionResult<PaginatedResult<RecievingLog>>> {
   try {
-    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionValidation = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -215,7 +215,7 @@ export async function getRecievingLogsStats(
   options?: ReceivingLogFilterOptions,
 ): Promise<ActionResult<ReceivingLogStats>> {
   try {
-    const sessionValidation = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionValidation = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
@@ -289,7 +289,7 @@ export async function createRecievingLog(
   data: Record<string, unknown>,
 ): Promise<ActionResult<RecievingLog>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -322,7 +322,7 @@ export async function updateRecievingLog(
   data: Record<string, unknown>,
 ): Promise<ActionResult<RecievingLog>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -364,7 +364,7 @@ export async function deleteRecievingLog(
   logId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const sessionResult = await validateSession([Roles.ATTY, Roles.ADMIN]);
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
     if (!sessionResult.success) {
       return sessionResult;
     }
@@ -406,7 +406,7 @@ export async function getRecentArchiveFiles(
     const sessionValidation = await validateSession([
       Roles.ARCHIVE,
       Roles.ADMIN,
-      Roles.ATTY,
+      Roles.CRIMINAL,
     ]);
     if (!sessionValidation.success) {
       return sessionValidation;
@@ -450,3 +450,4 @@ export async function getRecentArchiveFiles(
     return { success: false, error: "Failed to fetch recent archive files" };
   }
 }
+

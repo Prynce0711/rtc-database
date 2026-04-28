@@ -58,8 +58,8 @@ const Settings = () => {
             <p className="text-sm font-semibold text-base-content/65 mt-1 capitalize">
               {role === Roles.ADMIN
                 ? "Administrator"
-                : role === Roles.ATTY
-                  ? "Attorney"
+                : role === Roles.CRIMINAL
+                  ? "Criminal Section"
                   : "Staff"}
             </p>
           </div>
@@ -84,3 +84,4 @@ const Settings = () => {
 };
 
 export default Settings;
+

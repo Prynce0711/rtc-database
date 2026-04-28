@@ -25,7 +25,7 @@ const ReceiveRow = ({
   log,
   onView,
   onRowClick,
-  isAdminOrAtty,
+  canManageLogs,
   isSelected,
   isSelecting = false,
   onToggleSelect,
@@ -34,16 +34,16 @@ const ReceiveRow = ({
   log: RecievingLog;
   onView?: (log: RecievingLog) => void;
   onRowClick?: (log: RecievingLog) => void;
-  isAdminOrAtty?: boolean;
+  canManageLogs?: boolean;
   isSelected?: boolean;
   isSelecting?: boolean;
   onToggleSelect?: (id: number, checked: boolean) => void;
   role?: Roles;
 }) => {
   const canManage =
-    typeof isAdminOrAtty === "boolean"
-      ? isAdminOrAtty
-      : role === Roles.ADMIN || role === Roles.ATTY;
+    typeof canManageLogs === "boolean"
+      ? canManageLogs
+      : role === Roles.ADMIN || role === Roles.CRIMINAL;
 
   const timeVal = extractTime(log.dateRecieved);
   const dateStr = formatDate(log.dateRecieved);
@@ -114,3 +114,4 @@ const ReceiveRow = ({
 };
 
 export default ReceiveRow;
+

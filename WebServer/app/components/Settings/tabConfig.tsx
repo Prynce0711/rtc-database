@@ -24,25 +24,25 @@ export const TABS: TabConfig[] = [
     id: "profile",
     label: "Profile",
     icon: <FiUser size={18} />,
-    roles: [Roles.ADMIN, Roles.ATTY, Roles.USER],
+    roles: [Roles.ADMIN, Roles.CRIMINAL, Roles.USER],
   },
   {
     id: "security",
     label: "Security",
     icon: <FiShield size={18} />,
-    roles: [Roles.ADMIN, Roles.ATTY, Roles.USER],
+    roles: [Roles.ADMIN, Roles.CRIMINAL, Roles.USER],
   },
   {
     id: "notifications",
     label: "Notifications",
     icon: <FiBell size={18} />,
-    roles: [Roles.ADMIN, Roles.ATTY, Roles.USER],
+    roles: [Roles.ADMIN, Roles.CRIMINAL, Roles.USER],
   },
   {
     id: "appearance",
     label: "Appearance",
     icon: <FiMonitor size={18} />,
-    roles: [Roles.ADMIN, Roles.ATTY, Roles.USER],
+    roles: [Roles.ADMIN, Roles.CRIMINAL, Roles.USER],
   },
   {
     id: "system",
@@ -60,6 +60,7 @@ export const TABS: TabConfig[] = [
     id: "calendar",
     label: "Calendar",
     icon: <FiCalendar size={18} />,
-    roles: [Roles.ATTY],
+    roles: [Roles.CRIMINAL],
   },
 ];
+
