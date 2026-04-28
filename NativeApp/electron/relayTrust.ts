@@ -85,6 +85,7 @@ export const isLocalRelayHost = (hostname: string): boolean => {
 
   const [first, second] = octets;
   if (first === 10) return true;
+  if (first === 100 && second >= 64 && second <= 127) return true;
   if (first === 172 && second >= 16 && second <= 31) return true;
   if (first === 192 && second === 168) return true;
   if (first === 169 && second === 254) return true;

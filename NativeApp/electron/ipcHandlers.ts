@@ -37,6 +37,7 @@ import { formatError, resolveSafePath } from "./utils";
 
 const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
 const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const RELAY_NAVIGATE_BACKEND_CHANNEL = "relay:navigate-backend";
 const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
 const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
 
@@ -200,6 +201,60 @@ ipcMain.handle(RELAY_TRUST_BACKEND_CHANNEL, async (_event, args: unknown) => {
     };
   }
 });
+
+ipcMain.handle(
+  RELAY_NAVIGATE_BACKEND_CHANNEL,
+  async (event, args: unknown) => {
+    let previousUrl = "";
+
+    try {
+      if (!isRecord(args) || typeof args.url !== "string" || !args.url.trim()) {
+        return {
+          success: false,
+          error: "Server URL is required.",
+        };
+      }
+
+      const browserWindow = BrowserWindow.fromWebContents(event.sender);
+      if (!browserWindow || browserWindow.isDestroyed()) {
+        return {
+          success: false,
+          error: "The app window is no longer available.",
+        };
+      }
+
+      previousUrl = browserWindow.webContents.getURL();
+      await browserWindow.loadURL(args.url);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      const browserWindow = BrowserWindow.fromWebContents(event.sender);
+      if (
+        browserWindow &&
+        !browserWindow.isDestroyed() &&
+        previousUrl &&
+        previousUrl !== browserWindow.webContents.getURL() &&
+        !previousUrl.startsWith("chrome-error://")
+      ) {
+        try {
+          await browserWindow.loadURL(previousUrl);
+        } catch (restoreError) {
+          console.warn(
+            "[relay-nav] Failed to restore previous page after navigation error:",
+            formatError(restoreError),
+          );
+        }
+      }
+
+      return {
+        success: false,
+        error: formatError(error),
+      };
+    }
+  },
+);
 
 ipcMain.handle(IPC_CHANNELS.CASE_GETS, async (_event, options) => {
   return getCases(options);

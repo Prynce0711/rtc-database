@@ -22,3 +22,4 @@ dist-ssr
 dev.db
 .env
 certificates/
+WebServer/dev - Copy.db

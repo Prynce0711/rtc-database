@@ -43,6 +43,10 @@ type RelayTrustUpdateResponse = {
   success: boolean;
   error?: string;
 };
+type RelayNavigateBackendResponse = {
+  success: boolean;
+  error?: string;
+};
 type RelayStartupSettingsResponse = {
   success: boolean;
   result?: {
@@ -70,6 +74,7 @@ const AUTO_OFFLINE_MS = AUTO_OFFLINE_SECONDS * 1000;
 const OFFLINE_REASON_QUERY_KEY = "offlineReason";
 const RELAY_INSPECT_BACKEND_CHANNEL = "relay:inspect-backend";
 const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
+const RELAY_NAVIGATE_BACKEND_CHANNEL = "relay:navigate-backend";
 const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
 const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
 const DEFAULT_HTTP_PORT = 80;
@@ -718,7 +723,35 @@ export default function App() {
       }
 
       setStatus("loading");
-      window.location.href = normalizedTargetUrl;
+      void (async () => {
+        try {
+          if (!window.ipcRenderer?.invoke) {
+            window.location.href = normalizedTargetUrl;
+            return;
+          }
+
+          const result = (await window.ipcRenderer.invoke(
+            RELAY_NAVIGATE_BACKEND_CHANNEL,
+            {
+              url: normalizedTargetUrl,
+            },
+          )) as RelayNavigateBackendResponse;
+
+          if (!result.success) {
+            throw new Error(
+              result.error || "Unable to open that server right now.",
+            );
+          }
+        } catch (error) {
+          pendingRedirectUrlRef.current = null;
+          setStatus("locating");
+          setBackendApprovalError(
+            error instanceof Error
+              ? error.message
+              : "Unable to open that server right now.",
+          );
+        }
+      })();
     }, 1200);
   };
 
@@ -951,7 +984,32 @@ export default function App() {
 
     const targetUrl = normalizeBaseUrl(availableOfflineBackend.url);
     console.log(`[offline] Reconnecting to backend ${targetUrl}.`);
-    window.location.href = targetUrl;
+    void (async () => {
+      try {
+        if (!window.ipcRenderer?.invoke) {
+          window.location.href = targetUrl;
+          return;
+        }
+
+        const result = (await window.ipcRenderer.invoke(
+          RELAY_NAVIGATE_BACKEND_CHANNEL,
+          {
+            url: targetUrl,
+          },
+        )) as RelayNavigateBackendResponse;
+
+        if (!result.success) {
+          throw new Error(
+            result.error || "Unable to reconnect to that server right now.",
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[offline] Failed to reconnect to backend:",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    })();
   };
 
   const reviewBackends = discoveredBackends.filter((backend) => {
