@@ -8,6 +8,7 @@ import { startExcelUpload } from "@/app/lib/workers/Excel/WorkerActions";
 import {
   ActionResult,
   BaseCaseSchema,
+  CaseImportConflictMode,
   Case,
   ExportExcelData,
   getExcelHeaderMap,
@@ -23,6 +24,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadPetitionExcel(
   file: File,
   overrideTemplateValidation = false,
+  conflictMode: CaseImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
@@ -34,6 +36,7 @@ export async function uploadPetitionExcel(
       type: ExcelTypes.PETITION_CASE,
       file,
       overrideTemplateValidation,
+      conflictMode,
     });
 
     if (!result.success) {

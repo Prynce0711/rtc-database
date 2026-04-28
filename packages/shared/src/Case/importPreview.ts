@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { prettifyError, z } from "zod";
 import { CaseType } from "../generated/prisma/enums";
 import {
+  type CaseImportConflictMode,
   ExportExcelData,
   findColumnValue,
   getExcelHeaderMap,
@@ -9,6 +10,7 @@ import {
   hasRequiredHeaders,
   isMappedRowEmpty,
   normalizeRowBySchema,
+  type ProcessExcelMeta,
 } from "../lib/excel";
 import { createTempId } from "../utils";
 import {
@@ -84,6 +86,62 @@ export const CASE_IMPORT_DRAFT_KEYS = {
   sheriff: "rtc.case-import-draft.sheriff",
   specialProceeding: "rtc.case-import-draft.specialProceeding",
 } as const;
+
+export const DIRECT_CASE_IMPORT_FILE_SIZE_THRESHOLD_BYTES = 3 * 1024 * 1024;
+export const DIRECT_CASE_IMPORT_ROW_THRESHOLD = 5000;
+
+export const shouldPreferDirectCaseImport = (file: File): boolean =>
+  file.size >= DIRECT_CASE_IMPORT_FILE_SIZE_THRESHOLD_BYTES;
+
+export const shouldPreferDirectCaseImportByRowCount = (
+  rowCount: number,
+): boolean => rowCount >= DIRECT_CASE_IMPORT_ROW_THRESHOLD;
+
+export const formatImportFileSize = (bytes: number): string =>
+  `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+
+export const getCaseImportConflictModeLabel = (
+  mode: CaseImportConflictMode,
+): string => (mode === "create" ? "Create duplicate" : "Update existing");
+
+const formatCaseCountLabel = (count: number): string =>
+  `${count} ${count === 1 ? "case" : "cases"}`;
+
+export const buildDirectCaseImportSuccessMessage = (
+  meta: Pick<
+    ProcessExcelMeta,
+    "createdCount" | "updatedCount" | "importedCount" | "errorCount"
+  >,
+): string => {
+  const createdCount = meta.createdCount ?? 0;
+  const updatedCount = meta.updatedCount ?? 0;
+  const importedCount = meta.importedCount;
+  const failedCount = meta.errorCount;
+
+  if (updatedCount > 0 && createdCount > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount)} and created ${formatCaseCountLabel(createdCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount)} and created ${formatCaseCountLabel(createdCount)} successfully.`;
+  }
+
+  if (updatedCount > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount)} successfully.`;
+  }
+
+  if (createdCount > 0) {
+    return failedCount > 0
+      ? `Created ${formatCaseCountLabel(createdCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Created ${formatCaseCountLabel(createdCount)} successfully.`;
+  }
+
+  if (failedCount > 0) {
+    return `Imported ${formatCaseCountLabel(importedCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`;
+  }
+
+  return `Imported ${formatCaseCountLabel(importedCount)} successfully.`;
+};
 
 const moveErrorColumnLast = (row: FailedRow): FailedRow => {
   if (!Object.prototype.hasOwnProperty.call(row, "__error")) {
@@ -162,18 +220,17 @@ const processExcelPreview = async <
   const failedRowsBySheet = new Map<string, FailedRow[]>();
   const rows: TValidated[] = [];
   const sheetSummary: PreviewSheetSummary[] = [];
+  const schemaHeaderMap =
+    schema instanceof z.ZodObject ? getExcelHeaderMap(schema) : {};
+  const expectedHeaders = [
+    ...Object.values(requiredHeaders).flat(),
+    ...Object.values(schemaHeaderMap).flat(),
+  ].filter((value): value is string => typeof value === "string");
   let errorCount = 0;
   let totalRows = 0;
 
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName];
-    const schemaHeaderMap =
-      schema instanceof z.ZodObject ? getExcelHeaderMap(schema) : {};
-    const expectedHeaders = [
-      ...Object.values(requiredHeaders).flat(),
-      ...Object.values(schemaHeaderMap).flat(),
-    ].filter((value): value is string => typeof value === "string");
-
     const headerInfo = getHeaderRowInfo(worksheet, expectedHeaders);
     const rawSheetRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
       header: 1,
@@ -181,15 +238,6 @@ const processExcelPreview = async <
       blankrows: false,
       defval: null,
     }) as unknown[][];
-    const rawSheetData = rawSheetRows.map((row) =>
-      buildRowObjectFromHeaders(headerInfo.headerRow, row),
-    );
-
-    const sheetData = skipRowsWithoutCell
-      ? rawSheetData.filter(
-          (row) => !isMappedRowEmpty(getCells(row), skipRowsWithoutCell),
-        )
-      : rawSheetData;
 
     const headerCheck = hasRequiredHeaders(
       requiredHeaders,
@@ -199,28 +247,54 @@ const processExcelPreview = async <
 
     if (headerCheck.success === false) {
       const errorMessage = `Sheet "${sheetName}" is missing required column(s): ${headerCheck.missingHeaders.join(", ")}.`;
-      const failedRows =
-        sheetData.length > 0
-          ? sheetData.map((row) => ({ ...row, __error: errorMessage }))
-          : [{ __error: errorMessage }];
+      const failedRows: FailedRow[] = [];
+      let sheetRows = 0;
 
-      failedRowsBySheet.set(sheetName, failedRows);
-      errorCount += failedRows.length;
-      totalRows += sheetData.length;
+      for (const rawRow of rawSheetRows) {
+        const row = buildRowObjectFromHeaders(headerInfo.headerRow, rawRow);
+
+        if (
+          skipRowsWithoutCell &&
+          isMappedRowEmpty(getCells(row), skipRowsWithoutCell)
+        ) {
+          continue;
+        }
+
+        sheetRows += 1;
+        failedRows.push({ ...row, __error: errorMessage });
+      }
+
+      const failedRowsToStore =
+        failedRows.length > 0 ? failedRows : [{ __error: errorMessage }];
+
+      failedRowsBySheet.set(sheetName, failedRowsToStore);
+      errorCount += failedRowsToStore.length;
+      totalRows += sheetRows;
       sheetSummary.push({
         sheet: sheetName,
-        rows: sheetData.length,
+        rows: sheetRows,
         valid: 0,
-        failed: failedRows.length,
+        failed: failedRowsToStore.length,
       });
       continue;
     }
 
     let sheetValid = 0;
     let sheetFailed = 0;
+    let sheetRows = 0;
     const failedRows: FailedRow[] = [];
 
-    for (const row of sheetData) {
+    for (const rawRow of rawSheetRows) {
+      const row = buildRowObjectFromHeaders(headerInfo.headerRow, rawRow);
+
+      if (
+        skipRowsWithoutCell &&
+        isMappedRowEmpty(getCells(row), skipRowsWithoutCell)
+      ) {
+        continue;
+      }
+
+      sheetRows += 1;
       const mapResult = mapRow(row);
 
       if (mapResult.skip) {
@@ -256,7 +330,7 @@ const processExcelPreview = async <
     errorCount += sheetFailed;
     sheetSummary.push({
       sheet: sheetName,
-      rows: sheetData.length,
+      rows: sheetRows,
       valid: sheetValid,
       failed: sheetFailed,
     });

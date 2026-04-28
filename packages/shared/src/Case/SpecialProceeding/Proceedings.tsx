@@ -35,10 +35,14 @@ import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
 import {
+  buildDirectCaseImportSuccessMessage,
   CASE_IMPORT_DRAFT_KEYS,
   downloadImportFailedExcel,
+  formatImportFileSize,
   previewSpecialProceedingImport,
   saveCaseImportDraft,
+  shouldPreferDirectCaseImport,
+  shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
 import SpecialProceedingRow from "./SpecialProceedingRow";
 
@@ -91,6 +95,8 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const supportsDirectExcelUpload =
+    adapter.supportsDirectExcelUpload === true;
   const isSelecting = selectionMode !== null;
   const [stats, setStats] = useState<SpecialProceedingStats>({
     totalCases: 0,
@@ -335,6 +341,66 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const runDirectExcelUpload = async (): Promise<boolean> => {
+      if (!supportsDirectExcelUpload) {
+        return false;
+      }
+
+      try {
+        popup.showLoading("Uploading Excel directly...");
+
+        const result = await adapter.uploadSpecialProceedingExcel(
+          file,
+          false,
+          "create",
+        );
+        const failedExcel = result.success
+          ? result.result?.failedExcel
+          : result.errorResult?.failedExcel;
+        const errorMessage = result.success ? undefined : result.error;
+
+        downloadImportFailedExcel(failedExcel);
+
+        if (!result.success || !result.result) {
+          popup.showError(
+            errorMessage ||
+              (failedExcel
+                ? "No rows were imported. Failed rows were downloaded for review."
+                : "Failed to upload Excel file."),
+          );
+          return true;
+        }
+
+        popup.showSuccess(
+          buildDirectCaseImportSuccessMessage(result.result.meta),
+        );
+        await fetchCases(currentPage);
+      } catch (error) {
+        console.error("Direct special proceeding Excel upload failed", error);
+        popup.showError("Failed to upload Excel file.");
+      }
+
+      return true;
+    };
+
+    if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
+      const shouldUploadDirectly = await popup.showConfirm(
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Create duplicate" mode instead?`,
+      );
+
+      if (shouldUploadDirectly) {
+        setUploading(true);
+        try {
+          await runDirectExcelUpload();
+        } finally {
+          setUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const result = await previewSpecialProceedingImport(file);
@@ -352,11 +418,36 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
       }
 
       if (
+        supportsDirectExcelUpload &&
+        shouldPreferDirectCaseImportByRowCount(result.rows.length)
+      ) {
+        const shouldUploadDirectly = await popup.showConfirm(
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Create duplicate" mode instead?`,
+        );
+
+        if (shouldUploadDirectly) {
+          await runDirectExcelUpload();
+          return;
+        }
+      }
+
+      if (
         !saveCaseImportDraft(
           CASE_IMPORT_DRAFT_KEYS.specialProceeding,
           result.rows,
         )
       ) {
+        if (supportsDirectExcelUpload) {
+          const shouldUploadDirectly = await popup.showConfirm(
+            'This import is too large to stage in the browser. Upload it directly to the database in "Create duplicate" mode instead?',
+          );
+
+          if (shouldUploadDirectly) {
+            await runDirectExcelUpload();
+            return;
+          }
+        }
+
         popup.showError("Failed to stage imported rows.");
         return;
       }

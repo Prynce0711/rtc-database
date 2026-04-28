@@ -3,6 +3,7 @@
 import { prisma } from "@/app/lib/prisma";
 import {
   ActionResult,
+  CaseImportConflictMode,
   CaseType,
   Prisma,
   ProcessExcelMeta,
@@ -14,7 +15,6 @@ import {
   normalizeRowBySchema,
   processExcelUpload,
   splitCaseDataBySchema,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import {
   parseSheriffCaseNumber,
@@ -26,6 +26,7 @@ import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadSheriffCaseExcel(
   file: File,
+  conflictMode: CaseImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -65,8 +66,7 @@ export async function uploadSheriffCaseExcel(
       );
     }
 
-    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
-    const exactMatchCache = new Map<string, boolean>();
+    const existingCaseIdByCaseNumber = new Map<string, number>();
 
     if (candidateCaseNumbers.size > 0) {
       const allCaseNumbers = Array.from(candidateCaseNumbers);
@@ -81,6 +81,9 @@ export async function uploadSheriffCaseExcel(
               in: caseNumberChunk,
             },
           },
+          orderBy: {
+            id: "asc",
+          },
           include: {
             sheriffCase: true,
           },
@@ -90,16 +93,8 @@ export async function uploadSheriffCaseExcel(
           if (!existingCase.sheriffCase || !existingCase.caseNumber) continue;
 
           const key = existingCase.caseNumber.trim();
-          if (!key) continue;
-
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.sheriffCase,
-          } as Record<string, unknown>;
-
-          const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(mergedCase);
-          existingByCaseNumber.set(key, bucket);
+          if (!key || existingCaseIdByCaseNumber.has(key)) continue;
+          existingCaseIdByCaseNumber.set(key, existingCase.id);
         }
       }
     }
@@ -120,53 +115,7 @@ export async function uploadSheriffCaseExcel(
       schema: SheriffCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const mappedEntries = Object.entries(mappedRow);
-
-        const cacheKey = JSON.stringify(
-          mappedEntries
-            .slice()
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              value instanceof Date
-                ? value.getTime()
-                : typeof value === "string"
-                  ? value.trim()
-                  : (value ?? null),
-            ]),
-        );
-
-        const cachedResult = exactMatchCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          return {
-            exists: cachedResult,
-            fields: cachedResult ? mappedEntries.map(([key]) => key) : [],
-          };
-        }
-
-        const caseNumberKey =
-          typeof mappedRow.caseNumber === "string"
-            ? mappedRow.caseNumber.trim()
-            : "";
-
-        const candidates = caseNumberKey
-          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
-          : [];
-
-        const hasExactMatch = candidates.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRow[key]),
-          ),
-        );
-
-        exactMatchCache.set(cacheKey, hasExactMatch);
-
-        return {
-          exists: hasExactMatch,
-          fields: hasExactMatch ? mappedEntries.map(([key]) => key) : [],
-        };
-      },
+      checkExactMatch: async () => ({ exists: false }),
       mapRow: (row) => {
         const cells = getMappedCells(row);
 
@@ -192,36 +141,121 @@ export async function uploadSheriffCaseExcel(
       },
       onBatchInsert: async (rows) => {
         return prisma.$transaction(async (tx) => {
-          const caseRows: Prisma.CaseCreateManyInput[] = [];
+          const rowsToUpdate: Array<{ row: SheriffCaseSchema; caseId: number }> =
+            [];
+          const rowsToCreate: SheriffCaseSchema[] = [];
+          const pendingCreateIndexByCaseNumber =
+            conflictMode === "update-existing"
+              ? new Map<string, number>()
+              : null;
 
           rows.forEach((row) => {
-            const { caseData } = splitCaseDataBySchema(row);
-            caseRows.push({
-              ...caseData,
-              caseType: CaseType.SHERRIFF,
-              isManual: true,
-              number: null,
-              area: null,
-              year: null,
+            const caseNumber = String(row.caseNumber ?? "").trim();
+            const existingCaseId =
+              conflictMode === "update-existing"
+                ? existingCaseIdByCaseNumber.get(caseNumber)
+                : undefined;
+
+            if (existingCaseId) {
+              rowsToUpdate.push({ row, caseId: existingCaseId });
+              return;
+            }
+
+            if (
+              conflictMode === "update-existing" &&
+              pendingCreateIndexByCaseNumber &&
+              caseNumber
+            ) {
+              const pendingIndex =
+                pendingCreateIndexByCaseNumber.get(caseNumber);
+              if (pendingIndex !== undefined) {
+                rowsToCreate[pendingIndex] = row;
+                return;
+              }
+
+              pendingCreateIndexByCaseNumber.set(
+                caseNumber,
+                rowsToCreate.length,
+              );
+            }
+
+            rowsToCreate.push(row);
+          });
+
+          const affectedIds: number[] = [];
+          let createdCount = 0;
+          let updatedCount = 0;
+
+          for (const { row, caseId } of rowsToUpdate) {
+            const { caseData, detailData } = splitCaseDataBySchema(row);
+            const caseNumber = String(caseData.caseNumber ?? "").trim();
+
+            await tx.case.update({
+              where: { id: caseId },
+              data: {
+                ...caseData,
+                caseNumber,
+                caseType: CaseType.SHERRIFF,
+                isManual: true,
+                number: null,
+                area: null,
+                year: null,
+              } satisfies Prisma.CaseUpdateInput,
             });
-          });
 
-          const created = await tx.case.createManyAndReturn({
-            data: caseRows,
-          });
+            await tx.sheriffCase.update({
+              where: { baseCaseID: caseId },
+              data: detailData as Prisma.SheriffCaseUpdateInput,
+            });
 
-          const sheriffRows: Prisma.SheriffCaseCreateManyInput[] = rows.map(
-            (row, index) => {
-              const { detailData } = splitCaseDataBySchema(row);
-              return {
-                ...(detailData as Prisma.SheriffCaseCreateWithoutCaseInput),
-                baseCaseID: created[index].id,
-              };
-            },
-          );
+            affectedIds.push(caseId);
+            updatedCount += 1;
+          }
 
-          if (sheriffRows.length > 0) {
-            await tx.sheriffCase.createMany({ data: sheriffRows });
+          if (rowsToCreate.length > 0) {
+            const caseRows: Prisma.CaseCreateManyInput[] = rowsToCreate.map(
+              (row) => {
+                const { caseData } = splitCaseDataBySchema(row);
+                return {
+                  ...caseData,
+                  caseNumber: String(caseData.caseNumber ?? "").trim(),
+                  caseType: CaseType.SHERRIFF,
+                  isManual: true,
+                  number: null,
+                  area: null,
+                  year: null,
+                };
+              },
+            );
+
+            const created = await tx.case.createManyAndReturn({
+              data: caseRows,
+            });
+
+            const sheriffRows: Prisma.SheriffCaseCreateManyInput[] =
+              rowsToCreate.map((row, index) => {
+                const { detailData } = splitCaseDataBySchema(row);
+                return {
+                  ...(detailData as Prisma.SheriffCaseCreateWithoutCaseInput),
+                  baseCaseID: created[index].id,
+                };
+              });
+
+            if (sheriffRows.length > 0) {
+              await tx.sheriffCase.createMany({ data: sheriffRows });
+            }
+
+            if (conflictMode === "update-existing") {
+              rowsToCreate.forEach((row, index) => {
+                const caseNumber = String(row.caseNumber ?? "").trim();
+                const createdCase = created[index];
+                if (!caseNumber || !createdCase) return;
+                existingCaseIdByCaseNumber.set(caseNumber, createdCase.id);
+              });
+            }
+
+            affectedIds.push(...created.map((item) => item.id));
+            createdCount = created.length;
           }
 
           const maxPerYear = new Map<number, number>();
@@ -240,7 +274,12 @@ export async function uploadSheriffCaseExcel(
             await syncSheriffCaseCounterToAtLeast(tx, year, number);
           }
 
-          return { ids: created.map((c) => c.id), count: created.length };
+          return {
+            ids: Array.from(new Set(affectedIds)),
+            count: createdCount + updatedCount,
+            createdCount,
+            updatedCount,
+          };
         });
       },
     });
@@ -248,11 +287,13 @@ export async function uploadSheriffCaseExcel(
     if (result.success) {
       const meta: ProcessExcelMeta = result.result?.meta;
       const imported = meta.importedCount;
+      const created = meta.createdCount ?? 0;
+      const updated = meta.updatedCount ?? 0;
       const errors = meta.errorCount;
       const sheets = meta.sheetSummary;
 
       console.log(
-        `OK Import completed: ${imported} sheriff cases imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} row(s) processed (${created} created, ${updated} updated), ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach((s) => {

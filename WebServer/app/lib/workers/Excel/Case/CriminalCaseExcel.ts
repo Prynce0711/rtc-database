@@ -4,13 +4,13 @@
 import { prisma } from "@/app/lib/prisma";
 import {
   getExcelHeaderMap,
+  getHeaderRowInfo,
   isMappedRowEmpty,
   normalizeRowBySchema,
   ProcessExcelMeta,
   processExcelUpload,
   QUERY_CHUNK_SIZE,
   UploadExcelResult,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import {
   parseCaseNumber,
@@ -18,6 +18,7 @@ import {
 } from "@rtc-database/shared/lib/caseNumbering";
 
 import {
+  CriminalImportConflictMode,
   ActionResult,
   CaseType,
   CriminalCaseSchema,
@@ -30,6 +31,7 @@ import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadCriminalCaseExcel(
   file: File,
+  conflictMode: CriminalImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -37,20 +39,36 @@ export async function uploadCriminalCaseExcel(
     }
     console.log(`OK Excel file received: ${file.name} (${file.size} bytes)`);
 
+    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
+    const branchHeaders = headerMap.branch ?? ["Branch"];
+    const nameHeaders = headerMap.name ?? ["Name"];
+    const expectedHeaders = [
+      ...branchHeaders,
+      ...nameHeaders,
+      ...Object.values(headerMap).flat(),
+    ].filter((value): value is string => typeof value === "string");
     const candidateCaseNumbers = new Set<string>();
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
 
     // Peek workbook to log sheet names and pre-collect case numbers for faster exact-match checks.
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
       console.log(
         `OK Found ${workbook.SheetNames.length} sheet(s): ${workbook.SheetNames.join(", ")}`,
       );
 
       for (const sheetName of workbook.SheetNames) {
         const worksheet = workbook.Sheets[sheetName];
-        const rows =
-          XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+        const headerInfo = getHeaderRowInfo(worksheet, expectedHeaders);
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+          worksheet,
+          {
+            header: headerInfo.headerRow,
+            range: headerInfo.headerRowIndex + 1,
+            blankrows: false,
+            defval: null,
+          },
+        );
 
         for (const row of rows) {
           const normalized = normalizeRowBySchema(CriminalCaseSchema, row);
@@ -66,8 +84,7 @@ export async function uploadCriminalCaseExcel(
       console.warn("WARN Unable to preview workbook for logging:", peekError);
     }
 
-    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
-    const exactMatchCache = new Map<string, boolean>();
+    const existingCaseIdByCaseNumber = new Map<string, number>();
 
     if (candidateCaseNumbers.size > 0) {
       const allCaseNumbers = Array.from(candidateCaseNumbers);
@@ -82,6 +99,9 @@ export async function uploadCriminalCaseExcel(
               in: caseNumberChunk,
             },
           },
+          orderBy: {
+            id: "asc",
+          },
           include: {
             criminalCase: true,
           },
@@ -91,23 +111,11 @@ export async function uploadCriminalCaseExcel(
           if (!existingCase.criminalCase || !existingCase.caseNumber) continue;
 
           const key = existingCase.caseNumber.trim();
-          if (!key) continue;
-
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.criminalCase,
-          } as Record<string, unknown>;
-
-          const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(mergedCase);
-          existingByCaseNumber.set(key, bucket);
+          if (!key || existingCaseIdByCaseNumber.has(key)) continue;
+          existingCaseIdByCaseNumber.set(key, existingCase.id);
         }
       }
     }
-
-    const headerMap = getExcelHeaderMap(CriminalCaseSchema);
-    const branchHeaders = headerMap.branch ?? ["Branch"];
-    const nameHeaders = headerMap.name ?? ["Name"];
 
     const getMappedCells = (row: Record<string, unknown>) => {
       const values = normalizeRowBySchema(CriminalCaseSchema, row);
@@ -122,6 +130,7 @@ export async function uploadCriminalCaseExcel(
       ReturnType<typeof getMappedCells>
     >({
       file,
+      workbook,
       requiredHeaders: {
         Branch: branchHeaders,
         Name: nameHeaders,
@@ -129,47 +138,7 @@ export async function uploadCriminalCaseExcel(
       schema: CriminalCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber", "name"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const mappedEntries = Object.entries(mappedRow);
-
-        const cacheKey = JSON.stringify(
-          mappedEntries
-            .slice()
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              value instanceof Date
-                ? value.getTime()
-                : typeof value === "string"
-                  ? value.trim()
-                  : (value ?? null),
-            ]),
-        );
-
-        const cachedResult = exactMatchCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          return { exists: cachedResult };
-        }
-
-        const caseNumberKey =
-          typeof mappedRow.caseNumber === "string"
-            ? mappedRow.caseNumber.trim()
-            : "";
-
-        const candidates = caseNumberKey
-          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
-          : [];
-
-        const hasExactMatch = candidates.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRow[key]),
-          ),
-        );
-
-        exactMatchCache.set(cacheKey, hasExactMatch);
-
-        return { exists: hasExactMatch };
-      },
+      checkExactMatch: async () => ({ exists: false }),
       mapRow: (row) => {
         const cells = getMappedCells(row);
 
@@ -202,36 +171,121 @@ export async function uploadCriminalCaseExcel(
       },
       onBatchInsert: async (rows) => {
         return prisma.$transaction(async (tx) => {
-          const caseRows: Prisma.CaseCreateManyInput[] = [];
+          const rowsToUpdate: Array<{ row: CriminalCaseSchema; caseId: number }> =
+            [];
+          const rowsToCreate: CriminalCaseSchema[] = [];
+          const pendingCreateIndexByCaseNumber =
+            conflictMode === "update-existing"
+              ? new Map<string, number>()
+              : null;
 
           rows.forEach((row) => {
-            const { caseData } = splitCaseDataBySchema(row);
-            caseRows.push({
-              ...caseData,
-              caseType: CaseType.CRIMINAL,
-              isManual: true,
-              number: null,
-              area: null,
-              year: null,
+            const caseNumber = String(row.caseNumber ?? "").trim();
+            const existingCaseId =
+              conflictMode === "update-existing"
+                ? existingCaseIdByCaseNumber.get(caseNumber)
+                : undefined;
+
+            if (existingCaseId) {
+              rowsToUpdate.push({ row, caseId: existingCaseId });
+              return;
+            }
+
+            if (
+              conflictMode === "update-existing" &&
+              pendingCreateIndexByCaseNumber &&
+              caseNumber
+            ) {
+              const pendingIndex =
+                pendingCreateIndexByCaseNumber.get(caseNumber);
+              if (pendingIndex !== undefined) {
+                rowsToCreate[pendingIndex] = row;
+                return;
+              }
+
+              pendingCreateIndexByCaseNumber.set(
+                caseNumber,
+                rowsToCreate.length,
+              );
+            }
+
+            rowsToCreate.push(row);
+          });
+
+          const affectedIds: number[] = [];
+          let createdCount = 0;
+          let updatedCount = 0;
+
+          for (const { row, caseId } of rowsToUpdate) {
+            const { caseData, detailData } = splitCaseDataBySchema(row);
+            const caseNumber = String(caseData.caseNumber ?? "").trim();
+
+            await tx.case.update({
+              where: { id: caseId },
+              data: {
+                ...caseData,
+                caseNumber,
+                caseType: CaseType.CRIMINAL,
+                isManual: true,
+                number: null,
+                area: null,
+                year: null,
+              } satisfies Prisma.CaseUpdateInput,
             });
-          });
 
-          const created = await tx.case.createManyAndReturn({
-            data: caseRows,
-          });
+            await tx.criminalCase.update({
+              where: { baseCaseID: caseId },
+              data: detailData as Prisma.CriminalCaseUpdateInput,
+            });
 
-          const criminalRows: Prisma.CriminalCaseCreateManyInput[] = rows.map(
-            (row, index) => {
-              const { detailData } = splitCaseDataBySchema(row);
-              return {
-                ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
-                baseCaseID: created[index].id,
-              };
-            },
-          );
+            affectedIds.push(caseId);
+            updatedCount += 1;
+          }
 
-          if (criminalRows.length > 0) {
-            await tx.criminalCase.createMany({ data: criminalRows });
+          if (rowsToCreate.length > 0) {
+            const caseRows: Prisma.CaseCreateManyInput[] = rowsToCreate.map(
+              (row) => {
+                const { caseData } = splitCaseDataBySchema(row);
+                return {
+                  ...caseData,
+                  caseNumber: String(caseData.caseNumber ?? "").trim(),
+                  caseType: CaseType.CRIMINAL,
+                  isManual: true,
+                  number: null,
+                  area: null,
+                  year: null,
+                };
+              },
+            );
+
+            const created = await tx.case.createManyAndReturn({
+              data: caseRows,
+            });
+
+            const criminalRows: Prisma.CriminalCaseCreateManyInput[] =
+              rowsToCreate.map((row, index) => {
+                const { detailData } = splitCaseDataBySchema(row);
+                return {
+                  ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
+                  baseCaseID: created[index].id,
+                };
+              });
+
+            if (criminalRows.length > 0) {
+              await tx.criminalCase.createMany({ data: criminalRows });
+            }
+
+            if (conflictMode === "update-existing") {
+              rowsToCreate.forEach((row, index) => {
+                const caseNumber = String(row.caseNumber ?? "").trim();
+                const createdCase = created[index];
+                if (!caseNumber || !createdCase) return;
+                existingCaseIdByCaseNumber.set(caseNumber, createdCase.id);
+              });
+            }
+
+            affectedIds.push(...created.map((item) => item.id));
+            createdCount = created.length;
           }
 
           const maxPerBucket = new Map<
@@ -264,7 +318,12 @@ export async function uploadCriminalCaseExcel(
             );
           }
 
-          return { ids: created.map((c) => c.id), count: created.length };
+          return {
+            ids: Array.from(new Set(affectedIds)),
+            count: createdCount + updatedCount,
+            createdCount,
+            updatedCount,
+          };
         });
       },
     });
@@ -272,11 +331,13 @@ export async function uploadCriminalCaseExcel(
     if (result.success) {
       const meta: ProcessExcelMeta = result.result?.meta;
       const imported = meta.importedCount;
+      const created = meta.createdCount ?? 0;
+      const updated = meta.updatedCount ?? 0;
       const errors = meta.errorCount;
       const sheets = meta.sheetSummary;
 
       console.log(
-        `OK Import completed: ${imported} cases imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} row(s) processed (${created} created, ${updated} updated), ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach(

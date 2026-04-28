@@ -3,6 +3,7 @@
 import { prisma } from "@/app/lib/prisma";
 import {
   ActionResult,
+  CaseImportConflictMode,
   CaseType,
   PetitionCaseSchema,
   Prisma,
@@ -14,7 +15,6 @@ import {
   normalizeRowBySchema,
   processExcelUpload,
   splitCaseDataBySchema,
-  valuesAreEqual,
 } from "@rtc-database/shared";
 import {
   parseCaseNumber,
@@ -26,6 +26,7 @@ import { IS_WORKER } from "../ExcelWorkerUtils";
 
 export async function uploadPetitionCaseExcel(
   file: File,
+  conflictMode: CaseImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     if (!IS_WORKER) {
@@ -64,8 +65,7 @@ export async function uploadPetitionCaseExcel(
       console.warn("WARN Unable to preview workbook for logging:", peekError);
     }
 
-    const existingByCaseNumber = new Map<string, Record<string, unknown>[]>();
-    const exactMatchCache = new Map<string, boolean>();
+    const existingCaseIdByCaseNumber = new Map<string, number>();
 
     if (candidateCaseNumbers.size > 0) {
       const allCaseNumbers = Array.from(candidateCaseNumbers);
@@ -80,6 +80,9 @@ export async function uploadPetitionCaseExcel(
               in: caseNumberChunk,
             },
           },
+          orderBy: {
+            id: "asc",
+          },
           include: {
             petition: true,
           },
@@ -89,16 +92,8 @@ export async function uploadPetitionCaseExcel(
           if (!existingCase.petition || !existingCase.caseNumber) continue;
 
           const key = existingCase.caseNumber.trim();
-          if (!key) continue;
-
-          const mergedCase = {
-            ...existingCase,
-            ...existingCase.petition,
-          } as Record<string, unknown>;
-
-          const bucket = existingByCaseNumber.get(key) ?? [];
-          bucket.push(mergedCase);
-          existingByCaseNumber.set(key, bucket);
+          if (!key || existingCaseIdByCaseNumber.has(key)) continue;
+          existingCaseIdByCaseNumber.set(key, existingCase.id);
         }
       }
     }
@@ -123,47 +118,7 @@ export async function uploadPetitionCaseExcel(
       schema: PetitionCaseSchema,
       getCells: getMappedCells,
       skipRowsWithoutCell: ["caseNumber"],
-      checkExactMatch: async (_cells, mappedRow) => {
-        const mappedEntries = Object.entries(mappedRow);
-
-        const cacheKey = JSON.stringify(
-          mappedEntries
-            .slice()
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              value instanceof Date
-                ? value.getTime()
-                : typeof value === "string"
-                  ? value.trim()
-                  : (value ?? null),
-            ]),
-        );
-
-        const cachedResult = exactMatchCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-          return { exists: cachedResult };
-        }
-
-        const caseNumberKey =
-          typeof mappedRow.caseNumber === "string"
-            ? mappedRow.caseNumber.trim()
-            : "";
-
-        const candidates = caseNumberKey
-          ? (existingByCaseNumber.get(caseNumberKey) ?? [])
-          : [];
-
-        const hasExactMatch = candidates.some((existingRow) =>
-          mappedEntries.every(([key, value]) =>
-            valuesAreEqual(value, existingRow[key]),
-          ),
-        );
-
-        exactMatchCache.set(cacheKey, hasExactMatch);
-
-        return { exists: hasExactMatch };
-      },
+      checkExactMatch: async () => ({ exists: false }),
       mapRow: (row) => {
         const cells = getMappedCells(row);
 
@@ -193,36 +148,123 @@ export async function uploadPetitionCaseExcel(
       },
       onBatchInsert: async (rows) => {
         return prisma.$transaction(async (tx) => {
-          const caseRows: Prisma.CaseCreateManyInput[] = [];
+          const rowsToUpdate: Array<{
+            row: PetitionCaseSchema;
+            caseId: number;
+          }> = [];
+          const rowsToCreate: PetitionCaseSchema[] = [];
+          const pendingCreateIndexByCaseNumber =
+            conflictMode === "update-existing"
+              ? new Map<string, number>()
+              : null;
 
           rows.forEach((row) => {
-            const { caseData } = splitCaseDataBySchema(row);
-            caseRows.push({
-              ...caseData,
-              caseType: CaseType.PETITION,
-              isManual: true,
-              number: null,
-              area: null,
-              year: null,
+            const caseNumber = String(row.caseNumber ?? "").trim();
+            const existingCaseId =
+              conflictMode === "update-existing"
+                ? existingCaseIdByCaseNumber.get(caseNumber)
+                : undefined;
+
+            if (existingCaseId) {
+              rowsToUpdate.push({ row, caseId: existingCaseId });
+              return;
+            }
+
+            if (
+              conflictMode === "update-existing" &&
+              pendingCreateIndexByCaseNumber &&
+              caseNumber
+            ) {
+              const pendingIndex =
+                pendingCreateIndexByCaseNumber.get(caseNumber);
+              if (pendingIndex !== undefined) {
+                rowsToCreate[pendingIndex] = row;
+                return;
+              }
+
+              pendingCreateIndexByCaseNumber.set(
+                caseNumber,
+                rowsToCreate.length,
+              );
+            }
+
+            rowsToCreate.push(row);
+          });
+
+          const affectedIds: number[] = [];
+          let createdCount = 0;
+          let updatedCount = 0;
+
+          for (const { row, caseId } of rowsToUpdate) {
+            const { caseData, detailData } = splitCaseDataBySchema(row);
+            const caseNumber = String(caseData.caseNumber ?? "").trim();
+
+            await tx.case.update({
+              where: { id: caseId },
+              data: {
+                ...caseData,
+                caseNumber,
+                caseType: CaseType.PETITION,
+                isManual: true,
+                number: null,
+                area: null,
+                year: null,
+              } satisfies Prisma.CaseUpdateInput,
             });
-          });
 
-          const created = await tx.case.createManyAndReturn({
-            data: caseRows,
-          });
+            await tx.petition.update({
+              where: { baseCaseID: caseId },
+              data: detailData as Prisma.PetitionUpdateInput,
+            });
 
-          const petitionRows: Prisma.PetitionCreateManyInput[] = rows.map(
-            (row, index) => {
-              const { detailData } = splitCaseDataBySchema(row);
-              return {
-                ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
-                baseCaseID: created[index].id,
-              };
-            },
-          );
+            affectedIds.push(caseId);
+            updatedCount += 1;
+          }
 
-          if (petitionRows.length > 0) {
-            await tx.petition.createMany({ data: petitionRows });
+          if (rowsToCreate.length > 0) {
+            const caseRows: Prisma.CaseCreateManyInput[] = rowsToCreate.map(
+              (row) => {
+                const { caseData } = splitCaseDataBySchema(row);
+                return {
+                  ...caseData,
+                  caseNumber: String(caseData.caseNumber ?? "").trim(),
+                  caseType: CaseType.PETITION,
+                  isManual: true,
+                  number: null,
+                  area: null,
+                  year: null,
+                };
+              },
+            );
+
+            const created = await tx.case.createManyAndReturn({
+              data: caseRows,
+            });
+
+            const petitionRows: Prisma.PetitionCreateManyInput[] =
+              rowsToCreate.map((row, index) => {
+                const { detailData } = splitCaseDataBySchema(row);
+                return {
+                  ...(detailData as Prisma.PetitionCreateWithoutCaseInput),
+                  baseCaseID: created[index].id,
+                };
+              });
+
+            if (petitionRows.length > 0) {
+              await tx.petition.createMany({ data: petitionRows });
+            }
+
+            if (conflictMode === "update-existing") {
+              rowsToCreate.forEach((row, index) => {
+                const caseNumber = String(row.caseNumber ?? "").trim();
+                const createdCase = created[index];
+                if (!caseNumber || !createdCase) return;
+                existingCaseIdByCaseNumber.set(caseNumber, createdCase.id);
+              });
+            }
+
+            affectedIds.push(...created.map((item) => item.id));
+            createdCount = created.length;
           }
 
           const maxPerBucket = new Map<
@@ -255,7 +297,12 @@ export async function uploadPetitionCaseExcel(
             );
           }
 
-          return { ids: created.map((c) => c.id), count: created.length };
+          return {
+            ids: Array.from(new Set(affectedIds)),
+            count: createdCount + updatedCount,
+            createdCount,
+            updatedCount,
+          };
         });
       },
     });
@@ -263,11 +310,13 @@ export async function uploadPetitionCaseExcel(
     if (result.success) {
       const meta: ProcessExcelMeta = result.result?.meta;
       const imported = meta.importedCount;
+      const created = meta.createdCount ?? 0;
+      const updated = meta.updatedCount ?? 0;
       const errors = meta.errorCount;
       const sheets = meta.sheetSummary;
 
       console.log(
-        `OK Import completed: ${imported} petitions imported, ${errors} row(s) failed validation`,
+        `OK Import completed: ${imported} row(s) processed (${created} created, ${updated} updated), ${errors} row(s) failed validation`,
       );
       if (sheets.length > 0) {
         sheets.forEach((s) => {

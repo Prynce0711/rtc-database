@@ -1,7 +1,11 @@
 import type ActionResult from "../../ActionResult";
 import type { PaginatedResult } from "../../Filter/FilterTypes";
 import type { Case } from "../../generated/prisma/browser";
-import type { ExportExcelData, UploadExcelResult } from "../../lib/excel";
+import type {
+  CaseImportConflictMode,
+  ExportExcelData,
+  UploadExcelResult,
+} from "../../lib/excel";
 import type { BaseCaseAdapter } from "../BaseCaseAdapter";
 import {
   SheriffCaseData,
@@ -10,6 +14,7 @@ import {
 } from "./SherriffSchema";
 
 export interface SherriffCaseAdapter extends BaseCaseAdapter {
+  supportsDirectExcelUpload?: boolean;
   getSheriffCases: (
     options?: SheriffCasesFilterOptions,
   ) => Promise<ActionResult<PaginatedResult<SheriffCaseData>>>;
@@ -39,6 +44,7 @@ export interface SherriffCaseAdapter extends BaseCaseAdapter {
   uploadSheriffExcel: (
     file: File,
     overrideValidation?: boolean,
+    conflictMode?: CaseImportConflictMode,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportSheriffExcel: () => Promise<ActionResult<ExportExcelData>>;
 }

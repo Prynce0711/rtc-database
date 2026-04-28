@@ -8,6 +8,16 @@ export const VALIDATION_ERROR_MARKER = "EXCEL_VALIDATION_ERROR";
 
 export const QUERY_CHUNK_SIZE = 750;
 
+const excelHeaderMapCache = new WeakMap<
+  z.ZodTypeAny,
+  Partial<Record<string, string[]>>
+>();
+const columnVariationCache = new Map<string, string[]>();
+const rowLookupCache = new WeakMap<
+  Record<string, unknown>,
+  Array<{ normalizedKey: string; value: unknown }>
+>();
+
 export const excelHeaders = (headers: string[]): string =>
   `${EXCEL_HEADERS_PREFIX}${JSON.stringify(headers)}`;
 
@@ -30,6 +40,11 @@ const parseExcelHeaders = (description?: string): string[] | undefined => {
 export const getExcelHeaderMap = <T extends z.ZodRawShape>(
   schema: z.ZodObject<T>,
 ): Partial<Record<keyof T, string[]>> => {
+  const cached = excelHeaderMapCache.get(schema);
+  if (cached) {
+    return cached as Partial<Record<keyof T, string[]>>;
+  }
+
   const shape = schema.shape;
   const headers: Partial<Record<keyof T, string[]>> = {};
 
@@ -41,6 +56,10 @@ export const getExcelHeaderMap = <T extends z.ZodRawShape>(
     }
   }
 
+  excelHeaderMapCache.set(
+    schema,
+    headers as Partial<Record<string, string[]>>,
+  );
   return headers;
 };
 
@@ -80,6 +99,8 @@ export type ExportExcelData = {
   fileName: string;
   base64: string;
 };
+
+export type CaseImportConflictMode = "create" | "update-existing";
 
 // Helper to convert Excel serial date to JS Date
 export const excelDateToJSDate = (serial: number): Date => {
@@ -157,43 +178,71 @@ const generatePeriodVariations = (text: string): string[] => {
   return variations;
 };
 
+const getNormalizedNameVariations = (possibleNames: string[]): string[] => {
+  const cacheKey = possibleNames.join("\u0000");
+  const cached = columnVariationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const variations = Array.from(
+    new Set(
+      possibleNames.flatMap((name) =>
+        generatePeriodVariations(name.trim())
+          .map((variation) => variation.toLowerCase().trim())
+          .filter((variation) => variation.length > 0),
+      ),
+    ),
+  );
+
+  columnVariationCache.set(cacheKey, variations);
+  return variations;
+};
+
+const getRowLookup = (
+  row: Record<string, unknown>,
+): Array<{ normalizedKey: string; value: unknown }> => {
+  const cached = rowLookupCache.get(row);
+  if (cached) {
+    return cached;
+  }
+
+  const lookup = Object.entries(row)
+    .map(([key, value]) => ({
+      normalizedKey: key.toLowerCase().trim(),
+      value,
+    }))
+    .filter(({ normalizedKey }) => normalizedKey.length > 0);
+
+  rowLookupCache.set(row, lookup);
+  return lookup;
+};
+
 // Fuzzy column name matcher
 export const findColumnValue = (
   row: Record<string, unknown>,
   possibleNames: string[],
 ): unknown => {
-  // Generate all variations with periods
-  const allVariations: string[] = [];
-  for (const name of possibleNames) {
-    const trimmedName = name.trim();
-    if (!trimmedName) continue;
-    allVariations.push(...generatePeriodVariations(trimmedName));
-  }
-
-  const rowKeys = Object.keys(row).filter((key) => key.trim().length > 0);
+  const allVariations = getNormalizedNameVariations(possibleNames);
+  const rowLookup = getRowLookup(row);
 
   // First try exact match (case-insensitive)
-  for (const name of allVariations) {
-    const normalizedName = name.toLowerCase().trim();
-    if (!normalizedName) continue;
-
-    for (const key of rowKeys) {
-      if (key.toLowerCase().trim() === name.toLowerCase().trim()) {
-        return row[key];
+  for (const normalizedName of allVariations) {
+    for (const entry of rowLookup) {
+      if (entry.normalizedKey === normalizedName) {
+        return entry.value;
       }
     }
   }
 
   // Then try partial match
-  for (const name of allVariations) {
-    const nameLower = name.toLowerCase().trim();
-    if (!nameLower) continue;
-
-    for (const key of rowKeys) {
-      const keyLower = key.toLowerCase().trim();
-      if (!keyLower) continue;
-      if (keyLower.includes(nameLower) || nameLower.includes(keyLower)) {
-        return row[key];
+  for (const normalizedName of allVariations) {
+    for (const entry of rowLookup) {
+      if (
+        entry.normalizedKey.includes(normalizedName) ||
+        normalizedName.includes(entry.normalizedKey)
+      ) {
+        return entry.value;
       }
     }
   }
@@ -223,8 +272,12 @@ export async function isExcel(file: File): Promise<boolean> {
       return false;
     }
 
-    const buffer = await file.arrayBuffer();
+    const buffer = await file.slice(0, 8).arrayBuffer();
     const bytes = new Uint8Array(buffer);
+
+    if (bytes.length < 4) {
+      return false;
+    }
 
     const isXlsx =
       bytes[0] === 0x50 &&
@@ -425,6 +478,8 @@ const moveErrorColumnLast = (row: FailedRow): FailedRow => {
 export type ProcessExcelMeta = {
   importedIds: number[];
   importedCount: number;
+  createdCount?: number;
+  updatedCount?: number;
   errorCount: number;
   sheetSummary: Array<{
     sheet: string;
@@ -438,6 +493,7 @@ export type ProcessExcelMeta = {
 
 type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
   file: File;
+  workbook?: XLSX.WorkBook;
   requiredHeaders: Record<string, string[]>;
   schema: z.ZodType<T>;
   getCells: (row: Record<string, unknown>) => TCells;
@@ -451,7 +507,12 @@ type ProcessExcelOptions<T, TCells extends Record<string, unknown>> = {
     errorMessage?: string;
     uniqueKey?: string;
   };
-  onBatchInsert: (rows: T[]) => Promise<{ ids?: number[]; count?: number }>;
+  onBatchInsert: (rows: T[]) => Promise<{
+    ids?: number[];
+    count?: number;
+    createdCount?: number;
+    updatedCount?: number;
+  }>;
 } & (
   | {
       uniqueKeys: Array<keyof TCells>;
@@ -520,14 +581,19 @@ export async function processExcelUpload<
     return { success: false, error: "File is not a valid Excel document" };
   }
 
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const workbook =
+    options.workbook ??
+    XLSX.read(await file.arrayBuffer(), {
+      type: "array",
+    });
 
   const validationResults = {
     total: 0,
     valid: 0,
     imported: 0,
     importedIds: [] as number[],
+    created: 0,
+    updated: 0,
     errors: [] as Array<{
       row: number;
       sheet: string;
@@ -753,6 +819,8 @@ export async function processExcelUpload<
         const insertResult = await onBatchInsert(sheetValidRows);
         const ids = insertResult.ids ?? [];
         validationResults.imported += insertResult.count ?? ids.length;
+        validationResults.created += insertResult.createdCount ?? 0;
+        validationResults.updated += insertResult.updatedCount ?? 0;
         validationResults.importedIds.push(...ids);
         console.log(
           `✓ Sheet "${sheetName}": imported ${insertResult.count ?? ids.length} row(s)`,
@@ -828,6 +896,8 @@ export async function processExcelUpload<
             meta: {
               importedIds: validationResults.importedIds,
               importedCount: validationResults.imported,
+              createdCount: validationResults.created,
+              updatedCount: validationResults.updated,
               errorCount: validationResults.errors.length,
               sheetSummary: validationResults.sheetSummary,
               totalRows: validationResults.total,
@@ -845,6 +915,8 @@ export async function processExcelUpload<
       meta: {
         importedIds: validationResults.importedIds,
         importedCount: validationResults.imported,
+        createdCount: validationResults.created,
+        updatedCount: validationResults.updated,
         errorCount: validationResults.errors.length,
         sheetSummary: validationResults.sheetSummary,
         totalRows: validationResults.total,

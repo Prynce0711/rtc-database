@@ -16,6 +16,7 @@ import {
 } from "./SherriffActions";
 
 export const sherriffCaseAdapter: SherriffCaseAdapter = {
+  supportsDirectExcelUpload: true,
   doesCaseExist,
   getCases,
   getCaseStats,
@@ -28,7 +29,8 @@ export const sherriffCaseAdapter: SherriffCaseAdapter = {
   getSheriffCaseById,
   getSheriffCasesByIds,
   getSheriffCasesByCaseNumbers,
-  uploadSheriffExcel,
+  uploadSheriffExcel: (file, overrideValidation, conflictMode) =>
+    uploadSheriffExcel(file, overrideValidation, conflictMode),
   exportSheriffExcel,
 };
 

@@ -17,6 +17,7 @@ import {
 import { exportCasesExcel, uploadExcel } from "./ExcelActions";
 
 export const civilCaseAdapter: CivilCaseAdapter = {
+  supportsDirectExcelUpload: true,
   doesCaseExist,
   getCases,
   getCaseStats,
@@ -29,7 +30,8 @@ export const civilCaseAdapter: CivilCaseAdapter = {
   getCivilCaseById,
   getCivilCasesByIds,
   getCivilCasesByCaseNumbers,
-  uploadExcel: (file) => uploadExcel(file, CaseType.CIVIL),
+  uploadExcel: (file, overrideValidation, conflictMode) =>
+    uploadExcel(file, CaseType.CIVIL, overrideValidation, conflictMode),
   exportCasesExcel,
 };
 

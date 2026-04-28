@@ -24,6 +24,7 @@ const invokeIpc = async <T>(
 };
 
 const criminalCaseAdapter: CriminalCaseAdapter = {
+  supportsDirectExcelUpload: false,
   doesCaseExist: (caseNumbers, caseType) =>
     invokeIpc<ActionResult<string[]>>(IPC_CHANNELS.CASE_DOES_EXIST, {
       caseNumbers,

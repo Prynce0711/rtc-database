@@ -1,7 +1,11 @@
 import type ActionResult from "../../ActionResult";
 import type { PaginatedResult } from "../../Filter/FilterTypes";
 import type { Case } from "../../generated/prisma/browser";
-import type { ExportExcelData, UploadExcelResult } from "../../lib/excel";
+import type {
+  CaseImportConflictMode,
+  ExportExcelData,
+  UploadExcelResult,
+} from "../../lib/excel";
 import type { BaseCaseAdapter } from "../BaseCaseAdapter";
 import type {
   PetitionCaseData,
@@ -10,6 +14,7 @@ import type {
 } from "./PetitionCaseSchema";
 
 export interface PetitionCaseAdapter extends BaseCaseAdapter {
+  supportsDirectExcelUpload?: boolean;
   getPetitions: (
     options?: PetitionCasesFilterOptions,
   ) => Promise<ActionResult<PaginatedResult<PetitionCaseData>>>;
@@ -40,6 +45,7 @@ export interface PetitionCaseAdapter extends BaseCaseAdapter {
   uploadPetitionExcel: (
     file: File,
     overrideValidation?: boolean,
+    conflictMode?: CaseImportConflictMode,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportPetitionsExcel: () => Promise<ActionResult<ExportExcelData>>;
 }

@@ -30,10 +30,15 @@ import { usePopup } from "../../Popup/PopupProvider";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import {
+  buildDirectCaseImportSuccessMessage,
   CASE_IMPORT_DRAFT_KEYS,
   consumeCaseImportDraft,
   downloadImportFailedExcel,
+  formatImportFileSize,
+  getCaseImportConflictModeLabel,
   previewCivilCaseImport,
+  shouldPreferDirectCaseImport,
+  shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
 } from "../importPreview";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
@@ -635,6 +640,8 @@ export const CivilCaseUpdatePage = ({
   const [importConflictMode, setImportConflictMode] =
     useState<ImportConflictMode>("create");
   const [uploading, setUploading] = useState(false);
+  const supportsDirectExcelUpload =
+    !isEdit && adapter.supportsDirectExcelUpload === true;
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -865,6 +872,66 @@ export const CivilCaseUpdatePage = ({
     const file = input.files?.[0];
     if (!file) return;
 
+    const runDirectExcelUpload = async (): Promise<boolean> => {
+      if (!supportsDirectExcelUpload) {
+        return false;
+      }
+
+      try {
+        statusPopup.showLoading("Uploading Excel directly...");
+
+        const result = await adapter.uploadExcel(
+          file,
+          false,
+          importConflictMode,
+        );
+        const failedExcel = result.success
+          ? result.result?.failedExcel
+          : result.errorResult?.failedExcel;
+        const errorMessage = result.success ? undefined : result.error;
+
+        downloadImportFailedExcel(failedExcel);
+
+        if (!result.success || !result.result) {
+          statusPopup.showError(
+            errorMessage ||
+              (failedExcel
+                ? "No rows were imported. Failed rows were downloaded for review."
+                : "Failed to upload Excel file."),
+          );
+          return true;
+        }
+
+        onCreate?.();
+        statusPopup.showSuccess(
+          buildDirectCaseImportSuccessMessage(result.result.meta),
+        );
+        handleClose();
+      } catch (error) {
+        console.error("Direct civil Excel upload failed", error);
+        statusPopup.showError("Failed to upload Excel file.");
+      }
+
+      return true;
+    };
+
+    if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
+      const shouldUploadDirectly = await statusPopup.showConfirm(
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the editor may be slow. Upload it directly to the database in "${getCaseImportConflictModeLabel(importConflictMode)}" mode instead?`,
+      );
+
+      if (shouldUploadDirectly) {
+        setUploading(true);
+        try {
+          await runDirectExcelUpload();
+        } finally {
+          setUploading(false);
+          input.value = "";
+        }
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const result = await previewCivilCaseImport(file);
@@ -879,6 +946,20 @@ export const CivilCaseUpdatePage = ({
               : "No valid rows were loaded."),
         );
         return;
+      }
+
+      if (
+        supportsDirectExcelUpload &&
+        shouldPreferDirectCaseImportByRowCount(result.rows.length)
+      ) {
+        const shouldUploadDirectly = await statusPopup.showConfirm(
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the editor may still be slow. Upload them directly to the database in "${getCaseImportConflictModeLabel(importConflictMode)}" mode instead?`,
+        );
+
+        if (shouldUploadDirectly) {
+          await runDirectExcelUpload();
+          return;
+        }
       }
 
       setEntries(result.rows.map(importedCivilRowToEntry));

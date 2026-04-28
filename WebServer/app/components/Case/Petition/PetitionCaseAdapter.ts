@@ -16,6 +16,7 @@ import {
 } from "./PetitionActions";
 
 export const petitionCaseAdapter: PetitionCaseAdapter = {
+  supportsDirectExcelUpload: true,
   doesCaseExist,
   getCases,
   getCaseStats,
@@ -28,7 +29,8 @@ export const petitionCaseAdapter: PetitionCaseAdapter = {
   getPetitionById,
   getPetitionsByIds,
   getPetitionsByCaseNumbers,
-  uploadPetitionExcel,
+  uploadPetitionExcel: (file, overrideValidation, conflictMode) =>
+    uploadPetitionExcel(file, overrideValidation, conflictMode),
   exportPetitionsExcel,
 };
 

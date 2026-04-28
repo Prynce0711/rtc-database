@@ -1,4 +1,8 @@
-import { ActionResult, UploadExcelResult } from "@rtc-database/shared";
+import {
+  ActionResult,
+  CaseImportConflictMode,
+  UploadExcelResult,
+} from "@rtc-database/shared";
 import { Job } from "bullmq";
 
 export type ExcelUploadActionResult = ActionResult<
@@ -29,6 +33,7 @@ export enum ExcelTypes {
 type ExcelJobPayload<TFile> = {
   type: ExcelTypes;
   file: TFile;
+  conflictMode?: CaseImportConflictMode;
   fallbackMonth?: string;
   fallbackYear?: number;
   overrideTemplateValidation?: boolean;

@@ -49,14 +49,51 @@ import { ButtonStyles } from "../../Utils/ButtonStyles";
 import {
   CASE_IMPORT_DRAFT_KEYS,
   downloadImportFailedExcel,
+  formatImportFileSize,
   previewCriminalCaseImport,
   saveCaseImportDraft,
+  shouldPreferDirectCaseImport,
+  shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
 import CriminalCaseRow from "./CriminalCaseRow";
 
 type CaseFilterValues = CriminalCaseFilters;
 type SortKey = NonNullable<CriminalCasesFilterOptions["sortKey"]>;
 type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
+
+const formatCaseCountLabel = (count: number): string =>
+  `${count} ${count === 1 ? "case" : "cases"}`;
+
+const buildDirectImportSuccessMessage = (
+  createdCount: number | undefined,
+  updatedCount: number | undefined,
+  importedCount: number,
+  failedCount: number,
+): string => {
+  if ((updatedCount ?? 0) > 0 && (createdCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount ?? 0)} and created ${formatCaseCountLabel(createdCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount ?? 0)} and created ${formatCaseCountLabel(createdCount ?? 0)} successfully.`;
+  }
+
+  if ((updatedCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount ?? 0)} successfully.`;
+  }
+
+  if ((createdCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Created ${formatCaseCountLabel(createdCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Created ${formatCaseCountLabel(createdCount ?? 0)} successfully.`;
+  }
+
+  if (failedCount > 0) {
+    return `Imported ${formatCaseCountLabel(importedCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`;
+  }
+
+  return `Imported ${formatCaseCountLabel(importedCount)} successfully.`;
+};
 
 const CriminalCasePage: React.FC<{
   role: Roles;
@@ -79,6 +116,8 @@ const CriminalCasePage: React.FC<{
   });
 
   const canManageCases = role === Roles.ADMIN || role === Roles.CRIMINAL;
+  const supportsDirectExcelUpload =
+    adapter.supportsDirectExcelUpload === true && canManageCases;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -244,6 +283,52 @@ const CriminalCasePage: React.FC<{
       sortConfig,
       statusPopup,
     ],
+  );
+
+  const runDirectExcelUpload = useCallback(
+    async (file: File): Promise<boolean> => {
+      if (!supportsDirectExcelUpload) {
+        return false;
+      }
+
+      try {
+        statusPopup.showLoading("Uploading Excel directly...");
+
+        const result = await adapter.uploadExcel(file, false, "create");
+        const failedExcel = result.success
+          ? result.result?.failedExcel
+          : result.errorResult?.failedExcel;
+        const errorMessage = result.success ? undefined : result.error;
+
+        downloadImportFailedExcel(failedExcel);
+
+        if (!result.success || !result.result) {
+          statusPopup.showError(
+            errorMessage ||
+              (failedExcel
+                ? "No rows were imported. Failed rows were downloaded for review."
+                : "Failed to upload Excel file."),
+          );
+          return true;
+        }
+
+        statusPopup.showSuccess(
+          buildDirectImportSuccessMessage(
+            result.result.meta.createdCount,
+            result.result.meta.updatedCount,
+            result.result.meta.importedCount,
+            result.result.meta.errorCount,
+          ),
+        );
+        await fetchCases();
+      } catch (error) {
+        console.error("Direct criminal Excel upload failed", error);
+        statusPopup.showError("Failed to upload Excel file.");
+      }
+
+      return true;
+    },
+    [adapter, fetchCases, statusPopup, supportsDirectExcelUpload],
   );
 
   useEffect(() => {
@@ -429,6 +514,23 @@ const CriminalCasePage: React.FC<{
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
+      const shouldUploadDirectly = await statusPopup.showConfirm(
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Create duplicate" mode instead?`,
+      );
+
+      if (shouldUploadDirectly) {
+        setUploading(true);
+        try {
+          await runDirectExcelUpload(file);
+        } finally {
+          setUploading(false);
+          e.target.value = "";
+        }
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const result = await previewCriminalCaseImport(file);
@@ -445,7 +547,31 @@ const CriminalCasePage: React.FC<{
         return;
       }
 
+      if (supportsDirectExcelUpload) {
+        const shouldUploadDirectlyByRowCount =
+          shouldPreferDirectCaseImportByRowCount(result.rows.length) &&
+          (await statusPopup.showConfirm(
+            `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Create duplicate" mode instead?`,
+          ));
+
+        if (shouldUploadDirectlyByRowCount) {
+          await runDirectExcelUpload(file);
+          return;
+        }
+      }
+
       if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.criminal, result.rows)) {
+        if (supportsDirectExcelUpload) {
+          const shouldUploadDirectly = await statusPopup.showConfirm(
+            'This import is too large to stage in the browser. Upload it directly to the database in "Create duplicate" mode instead?',
+          );
+
+          if (shouldUploadDirectly) {
+            await runDirectExcelUpload(file);
+            return;
+          }
+        }
+
         statusPopup.showError("Failed to stage imported rows.");
         return;
       }

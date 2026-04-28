@@ -9,6 +9,7 @@ import {
   ActionResult,
   BaseCaseSchema,
   Case,
+  CaseImportConflictMode,
   CaseType,
   CivilCase,
   CivilCaseData,
@@ -26,6 +27,7 @@ export async function uploadExcel(
   file: File,
   caseType: CaseType,
   overrideTemplateValidation = false,
+  conflictMode: CaseImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
@@ -43,6 +45,7 @@ export async function uploadExcel(
       type: ExcelTypes.CIVIL_CASE,
       file,
       overrideTemplateValidation,
+      conflictMode,
     });
 
     if (!result.success) {

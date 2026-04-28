@@ -37,10 +37,14 @@ import { useAdaptiveRouter } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
 import { ButtonStyles } from "../../Utils/ButtonStyles";
 import {
+  buildDirectCaseImportSuccessMessage,
   CASE_IMPORT_DRAFT_KEYS,
   downloadImportFailedExcel,
+  formatImportFileSize,
   previewSheriffCaseImport,
   saveCaseImportDraft,
+  shouldPreferDirectCaseImport,
+  shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
 import SherriffCaseRow from "./SherriffCaseRow";
 
@@ -90,6 +94,8 @@ const Sherriff: React.FC<{
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
 
   const canManageCases = role === Roles.ADMIN || role === Roles.CRIMINAL;
+  const supportsDirectExcelUpload =
+    adapter.supportsDirectExcelUpload === true && canManageCases;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -336,6 +342,63 @@ const Sherriff: React.FC<{
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const runDirectExcelUpload = async (): Promise<boolean> => {
+      if (!supportsDirectExcelUpload) {
+        return false;
+      }
+
+      try {
+        statusPopup.showLoading("Uploading Excel directly...");
+
+        const result = await adapter.uploadSheriffExcel(file, false, "create");
+        const failedExcel = result.success
+          ? result.result?.failedExcel
+          : result.errorResult?.failedExcel;
+        const errorMessage = result.success ? undefined : result.error;
+
+        downloadImportFailedExcel(failedExcel);
+
+        if (!result.success || !result.result) {
+          statusPopup.showError(
+            errorMessage ||
+              (failedExcel
+                ? "No rows were imported. Failed rows were downloaded for review."
+                : "Failed to upload Excel file."),
+          );
+          return true;
+        }
+
+        statusPopup.showSuccess(
+          buildDirectCaseImportSuccessMessage(result.result.meta),
+        );
+        await fetchCases();
+      } catch (error) {
+        console.error("Direct sheriff Excel upload failed", error);
+        statusPopup.showError("Failed to upload Excel file.");
+      }
+
+      return true;
+    };
+
+    if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
+      const shouldUploadDirectly = await statusPopup.showConfirm(
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Create duplicate" mode instead?`,
+      );
+
+      if (shouldUploadDirectly) {
+        setUploading(true);
+        try {
+          await runDirectExcelUpload();
+        } finally {
+          setUploading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+        }
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const result = await previewSheriffCaseImport(file);
@@ -352,7 +415,32 @@ const Sherriff: React.FC<{
         return;
       }
 
+      if (
+        supportsDirectExcelUpload &&
+        shouldPreferDirectCaseImportByRowCount(result.rows.length)
+      ) {
+        const shouldUploadDirectly = await statusPopup.showConfirm(
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Create duplicate" mode instead?`,
+        );
+
+        if (shouldUploadDirectly) {
+          await runDirectExcelUpload();
+          return;
+        }
+      }
+
       if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.sheriff, result.rows)) {
+        if (supportsDirectExcelUpload) {
+          const shouldUploadDirectly = await statusPopup.showConfirm(
+            'This import is too large to stage in the browser. Upload it directly to the database in "Create duplicate" mode instead?',
+          );
+
+          if (shouldUploadDirectly) {
+            await runDirectExcelUpload();
+            return;
+          }
+        }
+
         statusPopup.showError("Failed to stage imported rows.");
         return;
       }

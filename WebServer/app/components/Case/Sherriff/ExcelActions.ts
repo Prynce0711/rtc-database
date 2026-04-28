@@ -9,6 +9,7 @@ import {
   ActionResult,
   BaseCaseSchema,
   Case,
+  CaseImportConflictMode,
   CaseType,
   ExportExcelData,
   getExcelHeaderMap,
@@ -25,6 +26,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadSheriffExcel(
   file: File,
   overrideTemplateValidation = false,
+  conflictMode: CaseImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
@@ -36,6 +38,7 @@ export async function uploadSheriffExcel(
       type: ExcelTypes.SHERIFF_CASE,
       file,
       overrideTemplateValidation,
+      conflictMode,
     });
 
     if (!result.success) {

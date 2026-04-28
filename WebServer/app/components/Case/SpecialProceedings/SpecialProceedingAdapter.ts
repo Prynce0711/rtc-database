@@ -20,6 +20,7 @@ import {
 } from "./SpecialProceedingActions";
 
 export const specialProceedingAdapter: SpecialProceedingAdapter = {
+  supportsDirectExcelUpload: true,
   doesCaseExist,
   getCases,
   getCaseStats,
@@ -33,7 +34,8 @@ export const specialProceedingAdapter: SpecialProceedingAdapter = {
   getSpecialProceedingsByIds,
   getSpecialProceedingsByCaseNumbers,
   getSpecialProceedingByCaseNumber,
-  uploadSpecialProceedingExcel,
+  uploadSpecialProceedingExcel: (file, overrideValidation, conflictMode) =>
+    uploadSpecialProceedingExcel(file, overrideValidation, conflictMode),
   exportSpecialProceedingsExcel,
 };
 

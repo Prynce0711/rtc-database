@@ -6,6 +6,7 @@ import {
   CriminalCaseAdapter,
   CriminalCaseData,
   CriminalCaseEntry,
+  CriminalImportConflictMode,
   CriminalCaseSchema,
   criminalCaseToEntry,
   usePopup,
@@ -43,7 +44,10 @@ import {
   CASE_IMPORT_DRAFT_KEYS,
   consumeCaseImportDraft,
   downloadImportFailedExcel,
+  formatImportFileSize,
   previewCriminalCaseImport,
+  shouldPreferDirectCaseImport,
+  shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
 } from "../importPreview";
 
@@ -53,11 +57,43 @@ export enum CriminalCaseUpdateType {
 }
 
 type Step = "entry" | "review";
-type ImportConflictMode = "create" | "update-existing";
+type ImportConflictMode = CriminalImportConflictMode;
 
 const REQUIRED_FIELDS = ["name", "caseNumber"] as const;
 const normalizeCaseNumber = (value: string) => value.trim();
 const AUTO_DEFAULT_AREA = "M";
+const formatCaseCountLabel = (count: number): string =>
+  `${count} ${count === 1 ? "case" : "cases"}`;
+const buildDirectImportSuccessMessage = (
+  createdCount: number | undefined,
+  updatedCount: number | undefined,
+  importedCount: number,
+  failedCount: number,
+): string => {
+  if ((updatedCount ?? 0) > 0 && (createdCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount ?? 0)} and created ${formatCaseCountLabel(createdCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount ?? 0)} and created ${formatCaseCountLabel(createdCount ?? 0)} successfully.`;
+  }
+
+  if ((updatedCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Updated ${formatCaseCountLabel(updatedCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Updated ${formatCaseCountLabel(updatedCount ?? 0)} successfully.`;
+  }
+
+  if ((createdCount ?? 0) > 0) {
+    return failedCount > 0
+      ? `Created ${formatCaseCountLabel(createdCount ?? 0)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`
+      : `Created ${formatCaseCountLabel(createdCount ?? 0)} successfully.`;
+  }
+
+  if (failedCount > 0) {
+    return `Imported ${formatCaseCountLabel(importedCount)}. ${failedCount} row${failedCount === 1 ? "" : "s"} failed and were downloaded for review.`;
+  }
+
+  return `Imported ${formatCaseCountLabel(importedCount)} successfully.`;
+};
 const AUTO_DEFAULT_YEAR = new Date().getFullYear();
 const getAutoYearFromDate = (
   value: string | Date | null | undefined,
@@ -846,6 +882,8 @@ const CriminalCaseUpdatePage = ({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const router = useAdaptiveNavigation();
+  const supportsDirectExcelUpload =
+    !isEdit && adapter.supportsDirectExcelUpload === true;
 
   const makeFromCase = (sc: CriminalCaseData): CriminalCaseEntry =>
     criminalCaseToEntry({ ...sc, id: sc.id ?? createTempId() });
@@ -1104,6 +1142,76 @@ const CriminalCaseUpdatePage = ({
     const file = input.files?.[0];
     if (!file) return;
 
+    const runDirectExcelUpload = async (): Promise<boolean> => {
+      if (!supportsDirectExcelUpload) {
+        return false;
+      }
+
+      try {
+        statusPopup.showLoading("Uploading Excel directly...");
+
+        const result = await adapter.uploadExcel(
+          file,
+          false,
+          importConflictMode,
+        );
+        const failedExcel = result.success
+          ? result.result?.failedExcel
+          : result.errorResult?.failedExcel;
+        const errorMessage = result.success ? undefined : result.error;
+
+        downloadImportFailedExcel(failedExcel);
+
+        if (!result.success || !result.result) {
+          statusPopup.showError(
+            errorMessage ||
+              (failedExcel
+                ? "No rows were imported. Failed rows were downloaded for review."
+                : "Failed to upload Excel file."),
+          );
+          return true;
+        }
+
+        statusPopup.hidePopup();
+        toast.success(
+          buildDirectImportSuccessMessage(
+            result.result.meta.createdCount,
+            result.result.meta.updatedCount,
+            result.result.meta.importedCount,
+            result.result.meta.errorCount,
+          ),
+        );
+        onCreate?.();
+        if (onClose) {
+          onClose();
+        } else {
+          router.back();
+        }
+      } catch (error) {
+        console.error("Direct criminal Excel upload failed", error);
+        statusPopup.showError("Failed to upload Excel file.");
+      }
+
+      return true;
+    };
+
+    if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
+      const shouldUploadDirectly = await statusPopup.showConfirm(
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the editor may be slow. Upload it directly to the database in ${importConflictMode === "create" ? '"Create duplicate"' : '"Update existing"'} mode instead?`,
+      );
+
+      if (shouldUploadDirectly) {
+        setUploading(true);
+        try {
+          await runDirectExcelUpload();
+        } finally {
+          setUploading(false);
+          input.value = "";
+        }
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const result = await previewCriminalCaseImport(file);
@@ -1118,6 +1226,20 @@ const CriminalCaseUpdatePage = ({
               : "No valid rows were loaded."),
         );
         return;
+      }
+
+      if (
+        supportsDirectExcelUpload &&
+        shouldPreferDirectCaseImportByRowCount(result.rows.length)
+      ) {
+        const shouldUploadDirectly = await statusPopup.showConfirm(
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the editor may still be slow. Upload them directly to the database in ${importConflictMode === "create" ? '"Create duplicate"' : '"Update existing"'} mode instead?`,
+        );
+
+        if (shouldUploadDirectly) {
+          await runDirectExcelUpload();
+          return;
+        }
       }
 
       setEntries(result.rows.map(importedCriminalRowToEntry));

@@ -16,6 +16,7 @@ import {
 import { exportCasesExcel, uploadCriminalCaseExcel } from "./ExcelActions";
 
 export const criminalCaseAdapter: CriminalCaseAdapter = {
+  supportsDirectExcelUpload: true,
   doesCaseExist,
   getCases,
   getCaseStats,

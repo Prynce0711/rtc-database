@@ -17,6 +17,7 @@ import {
   Case,
   CriminalCase,
   CriminalCaseData,
+  CriminalImportConflictMode,
   CriminalCaseSchema,
   getSchemaFieldKeys,
   LogAction,
@@ -27,6 +28,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadCriminalCaseExcel(
   file: File,
   overrideTemplateValidation = false,
+  conflictMode: CriminalImportConflictMode = "create",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
@@ -40,6 +42,7 @@ export async function uploadCriminalCaseExcel(
       type: ExcelTypes.CRIMINAL_CASE,
       file,
       overrideTemplateValidation,
+      conflictMode,
     });
 
     if (!result.success) {

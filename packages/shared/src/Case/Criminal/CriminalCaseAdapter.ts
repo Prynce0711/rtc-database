@@ -1,7 +1,11 @@
 import type ActionResult from "../../ActionResult";
 import type { PaginatedResult } from "../../Filter/FilterTypes";
 import type { Case } from "../../generated/prisma/browser";
-import type { ExportExcelData, UploadExcelResult } from "../../lib/excel";
+import type {
+  CaseImportConflictMode,
+  ExportExcelData,
+  UploadExcelResult,
+} from "../../lib/excel";
 import type { BaseCaseAdapter } from "../BaseCaseAdapter";
 import type {
   CriminalCaseData,
@@ -9,7 +13,10 @@ import type {
   CriminalCaseStats,
 } from "./CriminalCaseSchema";
 
+export type CriminalImportConflictMode = CaseImportConflictMode;
+
 export interface CriminalCaseAdapter extends BaseCaseAdapter {
+  supportsDirectExcelUpload?: boolean;
   getCriminalCases: (
     options?: CriminalCasesFilterOptions,
   ) => Promise<ActionResult<PaginatedResult<CriminalCaseData>>>;
@@ -40,6 +47,7 @@ export interface CriminalCaseAdapter extends BaseCaseAdapter {
   uploadExcel: (
     file: File,
     overrideValidation?: boolean,
+    conflictMode?: CriminalImportConflictMode,
   ) => Promise<ActionResult<UploadExcelResult, UploadExcelResult>>;
   exportCasesExcel: () => Promise<ActionResult<ExportExcelData>>;
 }
