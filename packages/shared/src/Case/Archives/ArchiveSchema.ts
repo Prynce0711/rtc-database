@@ -34,6 +34,7 @@ export type ArchiveStats = {
   folders: number;
   editableItems: number;
   uploadedFiles: number;
+  storageUsedBytes: number;
 };
 
 export type ArchiveSpreadsheetData = string[][];
