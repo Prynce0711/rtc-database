@@ -388,3 +388,74 @@ export async function moveGarageFile(
     };
   }
 }
+
+export async function createGarageFolder(
+  name: string,
+  parentPath: string = "",
+): Promise<ActionResult<{
+  id: number;
+  name: string;
+  parentPath: string;
+  fullPath: string;
+}>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const folderName = String(name || "").trim();
+    if (!folderName) {
+      return { success: false, error: "Folder name is required" };
+    }
+
+    const cleanedParent = String(parentPath || "").trim().replace(/^\/+|\/+$/g, "");
+    const fullPath = cleanedParent ? `${cleanedParent}/${folderName}` : folderName;
+
+    // check for existing archive entry with same fullPath
+    const existing = await prisma.archiveEntry.findUnique({
+      where: { fullPath },
+    });
+    if (existing) {
+      return { success: false, error: "A file or folder already exists at that path" };
+    }
+
+    const bucket = await getGarageBucket();
+    const garageClient = await getGarageClient();
+
+    // Create a zero-byte object with trailing slash to represent folder
+    await garageClient.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: `${fullPath}/`,
+        Body: new Uint8Array(0),
+        ContentType: "application/x-directory",
+      }),
+    );
+
+    const created = await prisma.archiveEntry.create({
+      data: {
+        name: folderName,
+        parentPath: cleanedParent,
+        fullPath,
+        entryType: "FOLDER",
+      },
+    });
+
+    return {
+      success: true,
+      result: {
+        id: created.id,
+        name: created.name,
+        parentPath: created.parentPath,
+        fullPath: created.fullPath,
+      },
+    };
+  } catch (err) {
+    console.error("Create folder error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to create folder",
+    };
+  }
+}

@@ -1,15 +1,13 @@
 "use client";
-
-import { exportNotarialExcel } from "@/app/components/Case/Notarial/ExcelActions";
 import {
   createNotarial,
   deleteNotarial,
   getNotarialByIds,
   getNotarialFileUrl,
   getNotarialPage,
-  getNotarialStats,
+  createGarageFolder,
 } from "@/app/components/Case/Notarial/NotarialActions";
-import NotarialExcelUploader from "@/app/components/Case/Notarial/NotarialExcelUploader";
+
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import Roles from "@/app/lib/Roles";
 import {
@@ -29,27 +27,24 @@ import React, {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   FiChevronRight,
-  FiClock,
+  FiChevronLeft,
   FiDownload,
-  FiEdit2,
   FiFileText,
   FiFilter,
   FiFolder,
   FiGrid,
-  FiHardDrive,
   FiImage,
   FiList,
   FiLock,
-  FiRefreshCw,
   FiSearch,
   FiShield,
   FiTrash2,
   FiUpload,
-  FiUsers,
   FiX,
   FiChevronsDown,
   FiCheck,
@@ -108,8 +103,8 @@ const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
 ];
 
 const PAGE_SIZE = 10;
-const ACCEPTED_NOTARIAL_UPLOAD_TYPES =
-  ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff";
+// Allow all file types by leaving this empty; inputs will omit `accept` when falsy
+const ACCEPTED_NOTARIAL_UPLOAD_TYPES = "";
 
 const initialUploadForm = (): UploadFormState => ({
   title: "",
@@ -136,9 +131,6 @@ const downloadCsv = (fileName: string, headers: string[], rows: string[][]) => {
   anchor.click();
   URL.revokeObjectURL(url);
 };
-
-const statsCardClassName =
-  "group overflow-hidden rounded-[28px] border border-base-300/70 bg-base-100/95 p-5 shadow-[0_18px_55px_-28px_rgba(15,23,42,0.42)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_-30px_rgba(14,116,144,0.36)]";
 
 const mapBackendRecord = (item: NotarialData): NotarialRecord => ({
   id: item.id,
@@ -171,19 +163,6 @@ const getPreviewType = (record: NotarialRecord): "pdf" | "image" | null => {
   return null;
 };
 
-const getSortLabel = (sortConfig: SortConfig) => {
-  const base =
-    sortConfig.key === "title"
-      ? "Document Title"
-      : sortConfig.key === "name"
-        ? "Client Name"
-        : sortConfig.key === "atty"
-          ? "Attorney"
-          : "Filing Date";
-
-  return `${base} · ${sortConfig.order === "asc" ? "Ascending" : "Descending"}`;
-};
-
 const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const router = useRouter();
   const statusPopup = usePopup();
@@ -213,20 +192,22 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const [fileTypeFilter, setFileTypeFilter] =
     useState<NotarialFileTypeFilter>("ALL");
   const [searchInput, setSearchInput] = useState("");
-  const [exporting, setExporting] = useState(false);
+  
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadForm, setUploadForm] =
     useState<UploadFormState>(initialUploadForm());
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [stats, setStats] = useState({
-    total: 0,
-    thisMonth: 0,
-    attorneys: 0,
-    noDate: 0,
-    storedFiles: 0,
-    storageUsedBytes: 0,
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [folderForm, setFolderForm] = useState({
+    name: "",
+    parentPath: "",
+    description: "",
   });
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  // Prevent 'assigned but never used' TypeScript warnings for optional toolbar states
+  void refreshing;
+  const [isOpen, setIsOpen] = useState(false);
   const [previewState, setPreviewState] = useState<{
     open: boolean;
     loading: boolean;
@@ -263,20 +244,14 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     async (page = currentPage) => {
       try {
         const serverFilters = toServerFilters(appliedFilters);
-        const [listResult, statsResult] = await Promise.all([
-          getNotarialPage({
-            page,
-            pageSize: PAGE_SIZE,
-            filters: serverFilters,
-            sortKey: sortConfig.key,
-            sortOrder: sortConfig.order,
-            exactMatchMap,
-          }),
-          getNotarialStats({
-            filters: serverFilters,
-            exactMatchMap,
-          }),
-        ]);
+        const listResult = await getNotarialPage({
+          page,
+          pageSize: PAGE_SIZE,
+          filters: serverFilters,
+          sortKey: sortConfig.key,
+          sortOrder: sortConfig.order,
+          exactMatchMap,
+        });
 
         if (!listResult.success) {
           setError(listResult.error || "Failed to fetch notarial files");
@@ -289,17 +264,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         setRecords(mapped);
         setTotalCount(listResult.result.total ?? mapped.length);
         setError(null);
-
-        if (statsResult.success && statsResult.result) {
-          setStats({
-            total: statsResult.result.totalRecords,
-            thisMonth: statsResult.result.thisMonth,
-            attorneys: statsResult.result.uniqueAttorneys,
-            noDate: statsResult.result.noDate,
-            storedFiles: statsResult.result.storedFiles,
-            storageUsedBytes: statsResult.result.storageUsedBytes,
-          });
-        }
       } catch (fetchError) {
         setError(
           fetchError instanceof Error
@@ -338,6 +302,26 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     });
   }, [records]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = isOpen ? "hidden" : "";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
   const activeFilterCount =
     Object.keys(appliedFilters).length +
     (deferredSearch ? 1 : 0) +
@@ -349,11 +333,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     visibleRecordIds.length > 0 &&
     visibleRecordIds.every((recordId) => selectedRecordIds.includes(recordId));
   const selectedCount = selectedRecordIds.length;
-
-  const selectedRecordsOnPage = useMemo(
-    () => records.filter((record) => selectedRecordIds.includes(record.id)),
-    [records, selectedRecordIds],
-  );
 
   const detailPathSegments = useMemo(() => {
     const detailPath = selectedRecord?.filePath || selectedRecord?.link || "";
@@ -371,6 +350,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     if (!trimmedAttorney) {
       return "Generated after attorney and filing date are entered";
     }
+
     return year
       ? `${trimmedAttorney}/${year}`
       : `${trimmedAttorney}/unknown-year`;
@@ -522,28 +502,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     await refreshFromBackend();
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refreshFromBackend(currentPage);
-    toast.success("Notarial Explorer refreshed.");
-  };
-
-  const handleExport = async () => {
-    setExporting(true);
-    const result = await exportNotarialExcel();
-    setExporting(false);
-
-    if (!result.success) {
-      statusPopup.showError(result.error || "Export failed");
-      return;
-    }
-
-    const anchor = document.createElement("a");
-    anchor.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.result.base64}`;
-    anchor.download = result.result.fileName;
-    anchor.click();
-    toast.success("Notarial records exported.");
-  };
+  // Refresh and export handlers removed (toolbar controls are currently disabled)
 
   const handleApplyFilters = (
     filters: FilterValues,
@@ -704,6 +663,116 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     await refreshFromBackend(1);
   };
 
+  // Detect Excel-like files by mime or extension
+  const isExcelRecord = (record: NotarialRecord) => {
+    const mime = (record.mimeType ?? "").toLowerCase();
+    if (mime.includes("excel") || mime.includes("spreadsheetml")) return true;
+    const name = (record.fileName ?? record.link ?? "").toLowerCase();
+    return (
+      name.endsWith(".xls") ||
+      name.endsWith(".xlsx") ||
+      name.endsWith(".xlsm") ||
+      name.endsWith(".csv") ||
+      name.endsWith(".ods")
+    );
+  };
+
+  // Folder upload input ref — attribute added after mount for cross-browser support
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (folderInputRef.current) {
+      try {
+        folderInputRef.current.setAttribute("webkitdirectory", "");
+        folderInputRef.current.setAttribute("directory", "");
+      } catch {
+        // ignore if not supported
+      }
+    }
+  }, []);
+
+  const handleUploadFolderFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (
+      !(await statusPopup.showConfirm(
+        `Upload ${files.length} file${files.length > 1 ? "s" : ""} from folder?`,
+      ))
+    ) {
+      return;
+    }
+
+    statusPopup.showLoading(`Uploading ${files.length} files...`);
+    let successCount = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const title = (file as unknown as { webkitRelativePath?: string }).webkitRelativePath || file.name;
+        // Upload sequentially to avoid overwhelming the backend
+        const result = await createNotarial({ title, file });
+        if (result.success) successCount++;
+      } catch {
+        // continue to next file
+      }
+    }
+
+    statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    await refreshFromBackend(1);
+  };
+
+    // Garage drop upload handler: accepts a single File and uploads immediately
+    const handleGarageDrop = async (file: File | null) => {
+      if (!file) return;
+      try {
+        setUploading(true);
+        setUploadProgress(12);
+
+        const result = await createNotarial({
+          title: file.name,
+          file,
+        });
+
+        setUploadProgress(result.success ? 100 : 0);
+
+        if (!result.success) {
+          statusPopup.showError(result.error || "Upload failed");
+          return;
+        }
+
+        toast.success("Notarial file uploaded.");
+        setUploadForm(initialUploadForm());
+        clearSelection();
+        setCurrentPage(1);
+        await refreshFromBackend(1);
+      } catch (err) {
+        statusPopup.showError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    const handleCreateFolder = async () => {
+      if (!folderForm.name.trim()) {
+        statusPopup.showError("Folder name is required.");
+        return;
+      }
+
+      setCreatingFolder(true);
+      const result = await createGarageFolder({
+        name: folderForm.name.trim(),
+        parentPath: folderForm.parentPath?.trim() || "",
+      });
+      setCreatingFolder(false);
+
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to create folder");
+        return;
+      }
+
+      setShowFolderModal(false);
+      setFolderForm({ name: "", parentPath: "", description: "" });
+      statusPopup.showSuccess("Archive folder created.");
+      await refreshFromBackend(1);
+    };
+
   const handleUnsupportedAction = (action: string) => {
     statusPopup.showError(
       `${action} is not wired for Notarial Explorer yet. Use the edit flow for single-file changes.`,
@@ -787,7 +856,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
               <div className="space-y-4">
                 <div
-                  className={`rounded-[24px] border-2 border-dashed p-6 transition-all ${
+                  className={`rounded-3xl border-2 border-dashed p-6 transition-all ${
                     uploadForm.file
                       ? "border-primary/40 bg-primary/6"
                       : "border-base-300 bg-base-200/20 hover:border-primary/35"
@@ -821,7 +890,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       Select File
                       <input
                         type="file"
-                        accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES}
+                        accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
                         className="hidden"
                         onChange={(event) =>
                           setUploadForm((previous) => ({
@@ -925,7 +994,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-[24px] border border-base-300 bg-base-200/25 p-5">
+                <div className="rounded-3xl border border-base-300 bg-base-200/25 p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
                     Folder Destination Preview
                   </p>
@@ -939,7 +1008,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </p>
                 </div>
 
-                <div className="rounded-[24px] border border-base-300 bg-base-100 p-5 shadow-sm">
+                <div className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold text-base-content/70">
                       Upload Progress
@@ -960,7 +1029,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-base-300 bg-base-100 p-5 shadow-sm">
+                <div className="rounded-3xl border border-base-300 bg-base-100 p-5 shadow-sm">
                   <p className="text-sm font-semibold text-base-content">
                     Accepted File Types
                   </p>
@@ -1002,7 +1071,60 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         </ModalBase>
       )}
 
-      <header className="relative overflow-hidden rounded-[34px] border border-base-300/70 bg-gradient-to-br from-base-100 via-base-100 to-primary/8 p-6 shadow-[0_24px_80px_-38px_rgba(15,23,42,0.55)]">
+      {showFolderModal && (
+        <ModalBase onClose={() => setShowFolderModal(false)}>
+          <div className="w-[90vw] max-w-md rounded-[20px] border border-base-300 bg-base-100 p-6 shadow-lg">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">New Folder</p>
+                <h2 className="mt-2 text-lg font-bold">Create Archive Folder</h2>
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFolderModal(false)}>
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <label className="form-control">
+                <span className="label-text text-sm font-semibold">Folder Name</span>
+                <input
+                  type="text"
+                  className="input input-bordered mt-1"
+                  value={folderForm.name}
+                  onChange={(e) => setFolderForm((p) => ({ ...p, name: e.target.value }))}
+                />
+              </label>
+
+              <label className="form-control">
+                <span className="label-text text-sm font-semibold">Parent Path (optional)</span>
+                <input
+                  type="text"
+                  className="input input-bordered mt-1"
+                  placeholder="subfolder/or/parent"
+                  value={folderForm.parentPath}
+                  onChange={(e) => setFolderForm((p) => ({ ...p, parentPath: e.target.value }))}
+                />
+              </label>
+
+              <div className="flex items-center justify-end gap-2 mt-2">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFolderModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => void handleCreateFolder()}
+                  disabled={creatingFolder}
+                >
+                  {creatingFolder ? "Creating..." : "Create Folder"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalBase>
+      )}
+
+      <header className="relative overflow-hidden rounded-[34px] border border-base-300/70 bg-linear-to-br from-base-100 via-base-100 to-primary/8 p-6 shadow-[0_24px_80px_-38px_rgba(15,23,42,0.55)]">
         <div className="absolute inset-y-0 right-0 hidden w-72 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_55%)] lg:block" />
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
@@ -1014,397 +1136,19 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             <h1 className="mt-3 text-3xl font-black tracking-tight text-base-content md:text-5xl">
               Notarial Explorer
             </h1>
-            {/* <p className="mt-3 max-w-2xl text-sm leading-6 text-base-content/62 md:text-base">
-              Clean, secure file handling for sworn records, scanned legal
-              documents, and office-ready exports. Search, preview, organize,
-              and retrieve notarial files from one efficient workspace.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100/80 px-3 py-1.5 text-xs font-semibold text-base-content/70">
-                <FiShield className="h-3.5 w-3.5 text-primary" />
-                Role-based access
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100/80 px-3 py-1.5 text-xs font-semibold text-base-content/70">
-                <FiLock className="h-3.5 w-3.5 text-primary" />
-                Secure file delivery
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100/80 px-3 py-1.5 text-xs font-semibold text-base-content/70">
-                <FiHardDrive className="h-3.5 w-3.5 text-primary" />
-                {stats.storedFiles.toLocaleString()} stored file
-                {stats.storedFiles !== 1 ? "s" : ""}
-              </span>
-            </div> */}
+
           </div>
 
-          {/* <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[29rem]">
-            <div className={statsCardClassName}>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
-                Total Files
-              </p>
-              <p className="mt-3 text-3xl font-black text-base-content">
-                {stats.storedFiles.toLocaleString()}
-              </p>
-              <p className="mt-2 text-sm text-base-content/55">
-                {stats.total.toLocaleString()} records tracked
-              </p>
-            </div>
-            <div className={statsCardClassName}>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
-                Storage Used
-              </p>
-              <p className="mt-3 text-3xl font-black text-base-content">
-                {formatExplorerBytes(stats.storageUsedBytes)}
-              </p>
-              <p className="mt-2 text-sm text-base-content/55">
-                Organized by attorney/year
-              </p>
-            </div>
-            <div className={statsCardClassName}>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
-                Active Attorneys
-              </p>
-              <p className="mt-3 text-3xl font-black text-base-content">
-                {stats.attorneys.toLocaleString()}
-              </p>
-              <p className="mt-2 text-sm text-base-content/55">
-                {stats.thisMonth.toLocaleString()} filed this month
-              </p>
-            </div>
-          </div> */}
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[17rem_minmax(0,1fr)_21rem]">
-        <aside className="space-y-5">
-          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-              Workspace
-            </p>
-            <div className="mt-4 space-y-2">
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost justify-start"
-                onClick={() => {
-                  setSearchInput("");
-                  setAppliedFilters({});
-                  setExactMatchMap({});
-                  setFileTypeFilter("ALL");
-                }}
-              >
-                <FiFileText className="h-4 w-4" />
-                All Records
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost justify-start"
-                onClick={() => setFileTypeFilter("pdf")}
-              >
-                <FiFileText className="h-4 w-4 text-error" />
-                PDF Files
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost justify-start"
-                onClick={() => setFileTypeFilter("image")}
-              >
-                <FiImage className="h-4 w-4 text-secondary" />
-                Scanned Images
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost justify-start"
-                onClick={() =>
-                  setSortConfig({
-                    key: "date",
-                    order: "desc",
-                  })
-                }
-              >
-                <FiClock className="h-4 w-4" />
-                Recent Activity
-              </button>
-            </div>
-          </div> */}
-
-          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-              Secure Controls
-            </p>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="rounded-2xl border border-base-300 bg-base-200/20 p-3">
-                <p className="font-semibold text-base-content">Role-based access</p>
-                <p className="mt-1 text-base-content/55">
-                  {canManageNotarial
-                    ? "This account can upload, edit, export, and delete notarial files."
-                    : "This account can search, preview, and download approved files."}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-base-300 bg-base-200/20 p-3">
-                <p className="font-semibold text-base-content">Permissions-aware actions</p>
-                <p className="mt-1 text-base-content/55">
-                  Row menus surface only the actions available to the current role.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-base-300 bg-base-200/20 p-3">
-                <p className="font-semibold text-base-content">Protected file delivery</p>
-                <p className="mt-1 text-base-content/55">
-                  Downloads and previews use secure generated access links.
-                </p>
-              </div>
-            </div>
-          </div> */}
-
-          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-                Upload Tools
-              </p>
-            </div>
-            <div className="mt-4 space-y-3">
-              <button
-                type="button"
-                className="btn btn-primary w-full justify-start gap-2"
-                onClick={() => setShowUploadModal(true)}
-              >
-                <FiUpload className="h-4 w-4" />
-                Upload File
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline w-full justify-start gap-2"
-                onClick={() => router.push("/user/cases/notarial/add")}
-              >
-                <FiEdit2 className="h-4 w-4" />
-                New Record
-              </button>
-              <div className="pt-1">
-                <NotarialExcelUploader
-                  onUploadCompleted={async () => await refreshFromBackend()}
-                />
-              </div>
-            </div>
-          </div> */}
-
-          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-              Supported Types
-            </p>
-            <div className="mt-4 grid gap-2">
-              {fileTypeLegend.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center gap-3 rounded-2xl border border-base-300 bg-base-200/15 px-3 py-2.5 text-sm font-semibold"
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div> */}
+      <div className="grid gap-6">
+        <aside className="hidden space-y-5">
+         
         </aside>
 
-        <main className="space-y-5">
-          {/* <div className="rounded-[30px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
-                <div className="relative flex-1">
-                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/35" />
-                  <input
-                    type="text"
-                    placeholder="Search files, folders, client names, case numbers..."
-                    className="input input-bordered h-12 w-full rounded-2xl pl-11"
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary gap-2"
-                    onClick={() => setShowUploadModal(true)}
-                  >
-                    <FiUpload className="h-4 w-4" />
-                    Upload File
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline gap-2"
-                    onClick={() => router.push("/user/cases/notarial/add")}
-                  >
-                    <FiEdit2 className="h-4 w-4" />
-                    New Record
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-outline gap-2 ${refreshing ? "loading" : ""}`}
-                    onClick={() => void handleRefresh()}
-                    disabled={refreshing}
-                  >
-                    <FiRefreshCw className="h-4 w-4" />
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-outline btn-info gap-2 ${exporting ? "loading" : ""}`}
-                    onClick={() => void handleExport()}
-                    disabled={exporting}
-                  >
-                    <FiDownload className="h-4 w-4" />
-                    Export
-                  </button>
-
-                  <div className="dropdown dropdown-end">
-                    <button
-                      type="button"
-                      tabIndex={0}
-                      className="btn btn-outline gap-2"
-                    >
-                      <FiList className="h-4 w-4" />
-                      Sort
-                    </button>
-                    <ul
-                      tabIndex={0}
-                      className="menu dropdown-content z-[4] mt-2 w-64 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
-                    >
-                      {[
-                        {
-                          label: "Newest first",
-                          config: { key: "date", order: "desc" } as SortConfig,
-                        },
-                        {
-                          label: "Oldest first",
-                          config: { key: "date", order: "asc" } as SortConfig,
-                        },
-                        {
-                          label: "Title A-Z",
-                          config: { key: "title", order: "asc" } as SortConfig,
-                        },
-                        {
-                          label: "Client A-Z",
-                          config: { key: "name", order: "asc" } as SortConfig,
-                        },
-                        {
-                          label: "Attorney A-Z",
-                          config: { key: "atty", order: "asc" } as SortConfig,
-                        },
-                      ].map((item) => (
-                        <li key={item.label}>
-                          <button
-                            type="button"
-                            className={
-                              sortConfig.key === item.config.key &&
-                              sortConfig.order === item.config.order
-                                ? "active"
-                                : ""
-                            }
-                            onClick={() => setSortConfig(item.config)}
-                          >
-                            {item.label}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <button
-                    type="button"
-                    className={`btn btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-                    onClick={() => setFilterModalOpen((previous) => !previous)}
-                  >
-                    <FiFilter className="h-4 w-4" />
-                    Filter
-                    {activeFilterCount > 0 && (
-                      <span className="badge badge-sm badge-primary">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-base-content/55">
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-ghost"
-                    onClick={() => {
-                      setSelectedRecord(null);
-                    }}
-                  >
-                    Root Directory
-                  </button>
-                  <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                  <span className="rounded-full bg-base-200/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">
-                    Notarial Records
-                  </span>
-                  {detailPathSegments.map((segment) => (
-                    <React.Fragment key={segment.path}>
-                      <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                        {segment.label}
-                      </span>
-                    </React.Fragment>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="join rounded-2xl border border-base-300 bg-base-100 p-1">
-                    <button
-                      type="button"
-                      className={`join-item btn btn-sm ${viewMode === "grid" ? "btn-primary" : "btn-ghost"}`}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      <FiGrid className="h-4 w-4" />
-                      Grid
-                    </button>
-                    <button
-                      type="button"
-                      className={`join-item btn btn-sm ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                      onClick={() => setViewMode("list")}
-                    >
-                      <FiList className="h-4 w-4" />
-                      List
-                    </button>
-                  </div>
-
-                  <select
-                    className="select select-bordered select-sm rounded-2xl"
-                    value={fileTypeFilter}
-                    onChange={(event) =>
-                      setFileTypeFilter(
-                        event.target.value as NotarialFileTypeFilter,
-                      )
-                    }
-                  >
-                    <option value="ALL">All file types</option>
-                    <option value="pdf">PDF</option>
-                    <option value="word">Word</option>
-                    <option value="excel">Excel</option>
-                    <option value="image">Images</option>
-                    <option value="other">Other</option>
-                  </select>
-
-                  <span className="rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                    {getSortLabel(sortConfig)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <FilterDropdown
-                isOpen={filterModalOpen}
-                onClose={() => setFilterModalOpen(false)}
-                options={NOTARIAL_FILTER_OPTIONS}
-                onApply={handleApplyFilters}
-                searchValue={appliedFilters}
-                getSuggestions={getSuggestions}
-              />
-            </div>
-          </div> */}
-
-          <div className="w-full rounded-[30px] border border-base-300 bg-base-100 p-6 shadow-lg">
+        <main className="w-full space-y-5">
+          <div className="w-full rounded-none border-x-0 border-t-0 border-b border-base-300 bg-base-100 p-6">
             <div className="flex flex-col gap-4">
               {/* Row 1 — Search */}
               <div className="relative">
@@ -1420,14 +1164,14 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
               {/* Row 2 — Action buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                {/* <button
                   type="button"
                   className="btn btn-primary btn-sm gap-2"
                   onClick={() => setShowUploadModal(true)}
                 >
                   <FiUpload className="h-4 w-4" />
                   Upload file
-                </button>
+                </button> 
 
                 <button
                   type="button"
@@ -1456,10 +1200,10 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 >
                   <FiDownload className="h-4 w-4" />
                   Export
-                </button>
+                </button> */}
 
                 {/* Sort — pushed to the right */}
-                <div className="dropdown dropdown-end ml-auto">
+                {/* <div className="dropdown dropdown-end ml-auto">
                   <button
                     type="button"
                     tabIndex={0}
@@ -1471,7 +1215,111 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </button>
                   <ul
                     tabIndex={0}
-                    className="menu dropdown-content z-[4] mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-1.5 shadow-xl"
+                    className="menu dropdown-content z-4 mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-1.5 shadow-xl"
+                  >
+                    {[
+                      {
+                        label: "Newest first",
+                        config: { key: "date", order: "desc" } as SortConfig,
+                      },
+                      {
+                        label: "Oldest first",
+                        config: { key: "date", order: "asc" } as SortConfig,
+                      },
+                      {
+                        label: "Title A–Z",
+                        config: { key: "title", order: "asc" } as SortConfig,
+                      },
+                      {
+                        label: "Client A–Z",
+                        config: { key: "name", order: "asc" } as SortConfig,
+                      },
+                      {
+                        label: "Attorney A–Z",
+                        config: { key: "atty", order: "asc" } as SortConfig,
+                      },
+                    ].map((item) => {
+                      const active =
+                        sortConfig.key === item.config.key &&
+                        sortConfig.order === item.config.order;
+                      return (
+                        <li key={item.label}>
+                          <button
+                            type="button"
+                            className={`flex items-center justify-between rounded-xl text-sm ${
+                              active ? "font-semibold text-primary" : ""
+                            }`}
+                            onClick={() => setSortConfig(item.config)}
+                          >
+                            {item.label}
+                            {active && <FiCheck className="h-3.5 w-3.5" />}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div> */}
+
+                {/* Filter
+                <button
+                  type="button"
+                  className={`btn btn-ghost btn-sm gap-1.5 font-normal ${
+                    activeFilterCount > 0
+                      ? "text-primary"
+                      : "text-base-content/70"
+                  }`}
+                  onClick={() => setFilterModalOpen((previous) => !previous)}
+                >
+                  <FiFilter className="h-4 w-4" />
+                  Filter
+                  {activeFilterCount > 0 && (
+                    <span className="badge badge-xs badge-primary">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button> */}
+              </div>
+
+              <div className="h-px bg-base-200" />
+
+              {/* Row 3 — Breadcrumb + view controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Breadcrumb */}
+                <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <button
+                    type="button"
+                    className="font-medium text-base-content/55 transition-colors hover:text-base-content"
+                    onClick={() => setSelectedRecord(null)}
+                  >
+                    Root directory
+                  </button>
+                  <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-base-content">
+                    Notarial Records
+                  </span>
+                  {detailPathSegments.map((segment) => (
+                    <React.Fragment key={segment.path}>
+                      <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                      <span className="text-xs font-semibold uppercase tracking-widest text-base-content/55">
+                        {segment.label}
+                      </span>
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                                <div className="dropdown dropdown-end ml-auto">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    className="btn btn-ghost btn-sm gap-1.5 font-normal text-base-content/70"
+                  >
+                    <FiList className="h-4 w-4" />
+                    Sort
+                    <FiChevronsDown className="h-3.5 w-3.5" />
+                  </button>
+                  <ul
+                    tabIndex={0}
+                    className="menu dropdown-content z-4 mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-1.5 shadow-xl"
                   >
                     {[
                       {
@@ -1534,34 +1382,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     </span>
                   )}
                 </button>
-              </div>
 
-              <div className="h-px bg-base-200" />
-
-              {/* Row 3 — Breadcrumb + view controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Breadcrumb */}
-                <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                  <button
-                    type="button"
-                    className="font-medium text-base-content/55 transition-colors hover:text-base-content"
-                    onClick={() => setSelectedRecord(null)}
-                  >
-                    Root directory
-                  </button>
-                  <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-base-content">
-                    Notarial Records
-                  </span>
-                  {detailPathSegments.map((segment) => (
-                    <React.Fragment key={segment.path}>
-                      <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                      <span className="text-xs font-semibold uppercase tracking-widest text-base-content/55">
-                        {segment.label}
-                      </span>
-                    </React.Fragment>
-                  ))}
-                </div>
+                
 
                 {/* Right controls */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -1612,9 +1434,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </select>
 
                   {/* Active sort label */}
-                  <span className="text-xs font-semibold uppercase tracking-widest text-base-content/45">
-                    {getSortLabel(sortConfig)}
-                  </span>
+
                 </div>
               </div>
             </div>
@@ -1691,7 +1511,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             </div>
           )}
 
-          <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
+          {/* TABLE/GRID LISTING DISABLED - replaced by File Garage UI below */}
+          {false && (
+            <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
             {records.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
                 <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
@@ -1878,6 +1700,144 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 })}
               </div>
             )}
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
+            <div className="flex items-center justify-between mb-4">
+              {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
+              <div className="flex items-center gap-2">
+                <label className="btn btn-sm btn-outline flex items-center gap-2">
+                  <FiUpload className="h-4 w-4" />
+                  Upload
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      if (f) void handleGarageDrop(f);
+                    }}
+                  />
+                </label>
+                <label className="btn btn-sm btn-outline flex items-center gap-2">
+                  <FiFolder className="h-4 w-4" />
+                  Upload Folder
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = e.currentTarget.files ?? null;
+                      void handleUploadFolderFiles(files);
+                      // reset so same folder can be chosen again
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline flex items-center gap-2"
+                  onClick={() => setShowFolderModal(true)}
+                >
+                  <FiChevronsDown className="h-4 w-4" />
+                  New Folder
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setShowUploadModal(true)}
+                >
+                  Metadata
+                </button>
+              </div>
+            </div>
+
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const f = e.dataTransfer.files?.[0] ?? null;
+                if (f) void handleGarageDrop(f);
+              }}
+              className="flex flex-col gap-3"
+            >
+              {/* <div className="rounded-md border border-dashed border-base-300 p-6 text-center">
+                <p className="text-sm text-base-content/70">
+                  Drag & drop files here to upload (all types accepted)
+                </p>
+                <p className="text-xs text-base-content/50 mt-2">
+                  Or click Upload to select files
+                </p>
+              </div> */}
+
+              <div className="mt-3 w-full">
+                <div className="w-full overflow-hidden">
+                  <div className="hidden sm:flex items-center gap-4 px-3 py-2 text-xs uppercase text-base-content/45 bg-base-200/40 rounded-t-md">
+                    <div className="w-6" />
+                    <div className="flex-1">File Name</div>
+                    <div className="w-36">Owner</div>
+                    <div className="w-24">Size</div>
+                    <div className="w-36">Modified</div>
+                  </div>
+                  <div className="divide-y">
+                    {records.map((record) => (
+                      <div
+                        key={record.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (isExcelRecord(record)) {
+                            void handleDownloadFile(record);
+                          } else {
+                            setSelectedRecord(record);
+                          }
+                        }}
+                        onDoubleClick={() => void handlePreviewFile(record)}
+                        className="flex items-center gap-3 px-3 py-3 hover:bg-base-200/40"
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedRecordIds.includes(record.id)}
+                          onChange={(e) =>
+                            toggleRecordSelection(record.id, e.target.checked)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${record.fileName || record.title || record.id}`}
+                        />
+                        <div className="flex-1 truncate">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-base-200">
+                              {getExplorerDescriptor({
+                                fileName: record.fileName ?? record.title,
+                                mimeType: record.mimeType,
+                              }).icon}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="truncate font-medium">
+                                {record.fileName || record.title || `Record #${record.id}`}
+                              </div>
+                              <div className="text-xs text-base-content/50 truncate">
+                                {record.name || ""}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-36 text-sm text-base-content/60">—</div>
+                        <div className="w-24 text-sm text-base-content/60">
+                          {formatExplorerBytes(record.fileSize)}
+                        </div>
+                        <div className="w-36 text-sm text-base-content/60">
+                          {formatExplorerDateTime(record.fileUpdatedAt || record.updatedAt)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1896,7 +1856,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           </div>
         </main>
 
-        <aside className="space-y-5">
+        {/* <aside className="space-y-5">
           <div className="sticky top-4 rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1997,6 +1957,224 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 </div>
 
                 <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                    Security
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-base-content/60">
+                    <p className="flex items-center gap-2">
+                      <FiShield className="h-4 w-4 text-primary" />
+                      Access scoped to the active role
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <FiLock className="h-4 w-4 text-primary" />
+                      Secure preview and download links
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm gap-2"
+                    onClick={() => void handlePreviewFile(selectedRecord)}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm gap-2"
+                    onClick={() => void handleDownloadFile(selectedRecord)}
+                  >
+                    Download
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm gap-2"
+                    onClick={() => void handlePrintFile(selectedRecord)}
+                  >
+                    Print
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm gap-2"
+                    onClick={() =>
+                      router.push(`/user/cases/notarial/${selectedRecord.id}`)
+                    }
+                  >
+                    Open Page
+                  </button>
+                  {canManageNotarial && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm gap-2"
+                      onClick={() =>
+                        router.push(
+                          `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
+                        )
+                      }
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {canManageNotarial && (
+                    <button
+                      type="button"
+                      className="btn btn-error btn-sm gap-2"
+                      onClick={() => void handleDeleteRecord(selectedRecord)}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </aside> */}
+
+        {/* Toggle tab — always visible on the right edge */}
+        <button
+          type="button"
+          onClick={() => setIsOpen((v) => !v)}
+          aria-label={isOpen ? "Close file details" : "Open file details"}
+          className="fixed right-0 top-1/2 z-50 -translate-y-1/2 flex flex-col items-center gap-2 rounded-l-xl border border-r-0 border-base-300 bg-base-100 px-2.5 py-4 shadow-md transition hover:bg-base-200"
+        >
+          {isOpen ? (
+            <FiChevronRight className="h-4 w-4 text-base-content/60" />
+          ) : (
+            <FiChevronLeft className="h-4 w-4 text-base-content/60" />
+          )}
+          <span className="[writing-mode:vertical-rl] rotate-180 text-[10px] font-semibold uppercase tracking-[0.18em] text-base-content/50">
+            Details
+          </span>
+        </button>
+
+        {/* Overlay */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+
+        {/* Drawer */}
+        <aside
+          className={`fixed right-0 top-0 z-50 h-full w-85 max-w-[92vw] overflow-y-auto border-l border-base-300 bg-base-100 shadow-xl transition-transform duration-300 ${
+            isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="p-5 pb-10">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
+                  File Details
+                </p>
+                <h2 className="mt-2 text-lg font-bold text-base-content">
+                  {selectedRecord?.fileName ??
+                    selectedRecord?.title ??
+                    "No file selected"}
+                </h2>
+              </div>
+              <div className="flex shrink-0 items-start gap-2">
+                {selectedRecord && (
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
+                      getExplorerDescriptor({
+                        fileName:
+                          selectedRecord.fileName ?? selectedRecord.title,
+                        mimeType: selectedRecord.mimeType,
+                      }).badgeClassName
+                    }`}
+                  >
+                    {
+                      getExplorerDescriptor({
+                        fileName:
+                          selectedRecord.fileName ?? selectedRecord.title,
+                        mimeType: selectedRecord.mimeType,
+                      }).label
+                    }
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-lg border border-base-300 p-1.5 text-base-content/50 hover:bg-base-200"
+                  aria-label="Close"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {!selectedRecord ? (
+              <div className="mt-6 rounded-3xl border border-dashed border-base-300 bg-base-200/15 p-5 text-sm text-base-content/55">
+                Select a file row or card to inspect its metadata, storage path,
+                timestamps, and quick actions.
+              </div>
+            ) : (
+              <>
+                <div className="mt-5 space-y-3">
+                  {[
+                    ["File Name", selectedRecord.fileName || "—"],
+                    [
+                      "File Type",
+                      getExplorerDescriptor({
+                        fileName:
+                          selectedRecord.fileName ?? selectedRecord.title,
+                        mimeType: selectedRecord.mimeType,
+                      }).label,
+                    ],
+                    ["Client / Signatory", selectedRecord.name || "—"],
+                    ["Attorney", selectedRecord.atty || "—"],
+                    [
+                      "Date Created",
+                      formatExplorerDateTime(
+                        selectedRecord.fileCreatedAt ??
+                          selectedRecord.createdAt,
+                      ),
+                    ],
+                    [
+                      "Last Modified",
+                      formatExplorerDateTime(
+                        selectedRecord.fileUpdatedAt ??
+                          selectedRecord.updatedAt,
+                      ),
+                    ],
+                    ["File Size", formatExplorerBytes(selectedRecord.fileSize)],
+                    ["Filing Date", selectedRecord.date || "—"],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-[22px] border border-base-300 bg-base-200/18 px-4 py-3"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                        {label}
+                      </p>
+                      <p className="mt-2 wrap-break-word text-sm font-semibold text-base-content">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 rounded-3xl border border-base-300 bg-base-200/15 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                    Folder Thread
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
+                    <span>Root Directory</span>
+                    <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                    <span>Notarial Records</span>
+                    {detailPathSegments.map((segment) => (
+                      <React.Fragment key={segment.path}>
+                        <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                        <span>{segment.label}</span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-3xl border border-base-300 bg-base-200/15 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
                     Security
                   </p>

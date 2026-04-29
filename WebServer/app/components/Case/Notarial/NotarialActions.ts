@@ -8,6 +8,7 @@ import {
   getGarageFileUrl,
   moveGarageFile,
   uploadFileToGarage,
+  createGarageFolder as createGarageFolderCore,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
@@ -792,6 +793,32 @@ export async function getRecentNotarialFiles(
   } catch (error) {
     console.error("Error fetching recent notarial files:", error);
     return { success: false, error: "Failed to fetch recent notarial files" };
+  }
+}
+
+export async function createGarageFolder(
+  data: Record<string, unknown>,
+): Promise<ActionResult<Record<string, unknown>>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const name = String(data?.name ?? "").trim();
+    const parentPath = String(data?.parentPath ?? "").trim();
+
+    if (!name) {
+      return { success: false, error: "Folder name is required" };
+    }
+
+    const result = await createGarageFolderCore(name, parentPath);
+    if (!result.success) return { success: false, error: result.error };
+
+    return { success: true, result: result.result as Record<string, unknown> };
+  } catch (error) {
+    console.error("Error creating garage folder:", error);
+    return { success: false, error: "Failed to create folder" };
   }
 }
 
