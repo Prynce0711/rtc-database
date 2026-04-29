@@ -6,9 +6,11 @@ import {
   deleteGarageFile,
   getFileHash,
   getGarageFileUrl,
+  listGarageFolder,
   moveGarageFile,
   uploadFileToGarage,
   createGarageFolder as createGarageFolderCore,
+  type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
@@ -54,6 +56,7 @@ export type NotarialRecentFile = {
 };
 
 const NOTARIAL_ACCESS_ROLES = [Roles.ADMIN, Roles.NOTARIAL] as const;
+const NOTARIAL_GARAGE_BUCKET = "rtc-bucket";
 
 function buildNotarialWhere(
   options?: NotarialFilterOptions,
@@ -747,6 +750,39 @@ export async function getNotarialFileUrl(
   }
 }
 
+export async function getNotarialGarageDirectoryItems(
+  folderPath = "",
+): Promise<ActionResult<GarageItem[]>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    return await listGarageFolder(folderPath, NOTARIAL_GARAGE_BUCKET);
+  } catch (error) {
+    console.error("Error fetching notarial garage directory:", error);
+    return { success: false, error: "Failed to fetch garage directory" };
+  }
+}
+
+export async function getNotarialGarageFileUrl(
+  key: string,
+  options?: GetFileOptions,
+): Promise<ActionResult<string>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    return await getGarageFileUrl(key, options, NOTARIAL_GARAGE_BUCKET);
+  } catch (error) {
+    console.error("Error getting notarial garage file URL:", error);
+    return { success: false, error: "Failed to get garage file URL" };
+  }
+}
+
 export async function getRecentNotarialFiles(
   limit = 5,
 ): Promise<ActionResult<NotarialRecentFile[]>> {
@@ -812,7 +848,11 @@ export async function createGarageFolder(
       return { success: false, error: "Folder name is required" };
     }
 
-    const result = await createGarageFolderCore(name, parentPath);
+    const result = await createGarageFolderCore(
+      name,
+      parentPath,
+      NOTARIAL_GARAGE_BUCKET,
+    );
     if (!result.success) return { success: false, error: result.error };
 
     return { success: true, result: result.result as Record<string, unknown> };

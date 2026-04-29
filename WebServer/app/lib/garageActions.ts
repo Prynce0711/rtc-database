@@ -217,6 +217,7 @@ export async function listGarageFiles(): Promise<
 export async function getGarageFileUrl(
   key: string,
   options?: GetFileOptions,
+  bucketParam?: string,
 ): Promise<ActionResult<string>> {
   try {
     const sessionValidation = await validateSession();
@@ -233,7 +234,7 @@ export async function getGarageFileUrl(
       .replace(/[\r\n"]/g, "")
       .trim();
 
-    const bucket = await getGarageBucket();
+    const bucket = bucketParam || (await getGarageBucket());
     const garageClient = await getGarageClient();
 
     const command = new GetObjectCommand({
@@ -392,6 +393,7 @@ export async function moveGarageFile(
 export async function createGarageFolder(
   name: string,
   parentPath: string = "",
+  bucketParam?: string,
 ): Promise<ActionResult<{
   id: number;
   name: string;
@@ -420,7 +422,7 @@ export async function createGarageFolder(
       return { success: false, error: "A file or folder already exists at that path" };
     }
 
-    const bucket = await getGarageBucket();
+    const bucket = bucketParam || (await getGarageBucket());
     const garageClient = await getGarageClient();
 
     // Create a zero-byte object with trailing slash to represent folder
@@ -456,6 +458,87 @@ export async function createGarageFolder(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to create folder",
+    };
+  }
+}
+
+export type GarageItem = {
+  key: string;
+  name: string;
+  size: number;
+  lastModified: Date | null;
+  isDirectory: boolean;
+};
+
+/**
+ * List contents of a folder (non-recursive). Returns both immediate subfolders
+ * (as isDirectory=true) and files. If `bucketParam` is provided it will be used
+ * instead of the configured garage bucket. `folderPath` may be empty to list
+ * the root of the bucket.
+ */
+export async function listGarageFolder(
+  folderPath: string = "",
+  bucketParam?: string,
+): Promise<ActionResult<GarageItem[]>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const bucket = bucketParam || (await getGarageBucket());
+    const garageClient = await getGarageClient();
+
+    const cleaned = String(folderPath || "").trim().replace(/^\/+|\/+$/g, "");
+    const prefix = cleaned ? `${cleaned}/` : "";
+
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      Delimiter: "/",
+    });
+
+    const response = await garageClient.send(command);
+
+    const dirs = (response.CommonPrefixes ?? []).map((cp) => {
+      const p = cp.Prefix || "";
+      const name = p.slice(prefix.length).replace(/\/$/, "");
+      return {
+        key: p,
+        name,
+        size: 0,
+        lastModified: null,
+        isDirectory: true,
+      } as GarageItem;
+    });
+
+    const files = (response.Contents ?? [])
+      .filter((item) => {
+        const key = item.Key || "";
+        if (!key) return false;
+        // skip the folder marker itself
+        if (key === prefix) return false;
+        return !key.endsWith("/");
+      })
+      .map((item) => ({
+        key: item.Key || "",
+        name: (item.Key || "").slice(prefix.length),
+        size: item.Size || 0,
+        lastModified: item.LastModified || null,
+        isDirectory: false,
+      } as GarageItem));
+
+    const items = [
+      ...dirs.sort((a, b) => a.name.localeCompare(b.name)),
+      ...files.sort((a, b) => a.name.localeCompare(b.name)),
+    ];
+
+    return { success: true, result: items };
+  } catch (err) {
+    console.error("List folder error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to list folder",
     };
   }
 }

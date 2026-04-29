@@ -6,7 +6,10 @@ import {
   getNotarialFileUrl,
   getNotarialPage,
   createGarageFolder,
+  getNotarialGarageDirectoryItems,
+  getNotarialGarageFileUrl,
 } from "@/app/components/Case/Notarial/NotarialActions";
+import { getArchiveFileUrl as getArchiveFileUrlArchive } from "@/app/components/Case/Archives/ArchiveActions";
 
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import Roles from "@/app/lib/Roles";
@@ -83,6 +86,14 @@ type UploadFormState = {
   file: File | null;
 };
 
+type GarageDirectoryItem = {
+  key: string;
+  name: string;
+  size: number;
+  lastModified: Date | string | null;
+  isDirectory: boolean;
+};
+
 export type NotarialFormEntry = {
   id: string;
   title: string;
@@ -105,6 +116,12 @@ const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
 const PAGE_SIZE = 10;
 // Allow all file types by leaving this empty; inputs will omit `accept` when falsy
 const ACCEPTED_NOTARIAL_UPLOAD_TYPES = "";
+
+const normalizeGaragePath = (path?: string | null): string =>
+  (path ?? "")
+    .replace(/\\/g, "/")
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
 
 const initialUploadForm = (): UploadFormState => ({
   title: "",
@@ -147,9 +164,43 @@ const mapBackendRecord = (item: NotarialData): NotarialRecord => ({
   fileCreatedAt: item.file?.createdAt?.toISOString(),
   fileUpdatedAt: item.file?.updatedAt?.toISOString(),
   filePath: item.file?.path ?? item.file?.key ?? "",
+  isDirectory: false,
 });
 
+const mapGarageItemToNotarialRecord = (
+  item: GarageDirectoryItem,
+  index: number,
+): NotarialRecord & { source?: "garage" } => {
+  const lastModified = item.lastModified ? new Date(item.lastModified) : null;
+  const lastModifiedIso =
+    lastModified && !Number.isNaN(lastModified.getTime())
+      ? lastModified.toISOString()
+      : undefined;
+
+  return {
+    id: -(index + 1),
+    title: item.name || item.key,
+    name: "",
+    atty: "",
+    date: lastModifiedIso ? lastModifiedIso.slice(0, 10) : "",
+    link: item.key,
+    fileName:
+      item.name || normalizeGaragePath(item.key).split("/").pop() || "",
+    mimeType: undefined,
+    fileSize: item.isDirectory ? undefined : item.size ?? undefined,
+    createdAt: lastModifiedIso,
+    updatedAt: lastModifiedIso,
+    fileCreatedAt: lastModifiedIso,
+    fileUpdatedAt: lastModifiedIso,
+    filePath: normalizeGaragePath(item.key),
+    isDirectory: item.isDirectory,
+    source: "garage",
+  } as NotarialRecord & { source: "garage" };
+};
+
 const getPreviewType = (record: NotarialRecord): "pdf" | "image" | null => {
+  if (record.isDirectory) return null;
+
   const mime = (record.mimeType ?? "").toLowerCase();
   if (mime === "application/pdf") return "pdf";
   if (mime.startsWith("image/")) return "image";
@@ -184,6 +235,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const [displayMode, setDisplayMode] = useState<"explorer" | "table">(
     "explorer",
   );
+  const [currentGaragePath, setCurrentGaragePath] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
@@ -249,6 +301,26 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     async (page = currentPage) => {
       try {
         const serverFilters = toServerFilters(appliedFilters);
+
+        if (displayMode === "explorer") {
+          const listResult =
+            await getNotarialGarageDirectoryItems(currentGaragePath);
+
+          if (!listResult.success) {
+            setError(listResult.error || "Failed to fetch garage files");
+            return;
+          }
+
+          const mapped = listResult.result.map(
+            (item: GarageDirectoryItem, idx: number) =>
+              mapGarageItemToNotarialRecord(item, idx),
+          );
+          setRecords(mapped);
+          setTotalCount(mapped.length);
+          setError(null);
+          return;
+        }
+
         const listResult = await getNotarialPage({
           page,
           pageSize: PAGE_SIZE,
@@ -280,7 +352,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         setRefreshing(false);
       }
     },
-    [appliedFilters, currentPage, exactMatchMap, sortConfig, toServerFilters],
+    [
+      appliedFilters,
+      currentGaragePath,
+      currentPage,
+      exactMatchMap,
+      sortConfig,
+      toServerFilters,
+      displayMode,
+    ],
   );
 
   useEffect(() => {
@@ -296,6 +376,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   useEffect(() => {
     void refreshFromBackend(currentPage);
   }, [currentPage, refreshFromBackend]);
+
+  useEffect(() => {
+    // When switching between explorer/table, reload backend data
+    setCurrentPage(1);
+    void refreshFromBackend(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMode]);
 
   useEffect(() => {
     setSelectedRecord((previous) => {
@@ -339,13 +426,39 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     visibleRecordIds.every((recordId) => selectedRecordIds.includes(recordId));
   const selectedCount = selectedRecordIds.length;
 
+  const garagePathSegments = useMemo(
+    () => getExplorerPathSegments(currentGaragePath),
+    [currentGaragePath],
+  );
+
   const detailPathSegments = useMemo(() => {
-    const detailPath = selectedRecord?.filePath || selectedRecord?.link || "";
-    const directory = detailPath.includes("/")
+    const detailPath = normalizeGaragePath(
+      selectedRecord?.filePath || selectedRecord?.link || "",
+    );
+    const directory = selectedRecord?.isDirectory
+      ? detailPath
+      : detailPath.includes("/")
       ? detailPath.split("/").slice(0, -1).join("/")
       : detailPath;
     return getExplorerPathSegments(directory);
   }, [selectedRecord]);
+
+  const navigateGaragePath = useCallback((path: string) => {
+    setCurrentGaragePath(normalizeGaragePath(path));
+    setSelectedRecord(null);
+    setSelectedRecordIds([]);
+    setCurrentPage(1);
+  }, []);
+
+  const openGarageDirectory = useCallback(
+    (record: NotarialRecord) => {
+      if (!record.isDirectory) return false;
+
+      navigateGaragePath(record.filePath || record.link);
+      return true;
+    },
+    [navigateGaragePath],
+  );
 
   const destinationPreview = useMemo(() => {
     const trimmedAttorney = uploadForm.atty.trim();
@@ -406,6 +519,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   };
 
   const handlePreviewFile = async (record: NotarialRecord) => {
+    if (openGarageDirectory(record)) return;
     if (!record.link) return;
 
     const previewType = getPreviewType(record);
@@ -424,11 +538,26 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       record,
     });
 
-    const result = await getNotarialFileUrl(record.id, {
-      inline: true,
-      fileName: record.fileName,
-      contentType: record.mimeType,
-    });
+    let result;
+    if (record.source === "archive") {
+      result = await getArchiveFileUrlArchive(record.id, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else if (record.source === "garage") {
+      result = await getNotarialGarageFileUrl(record.link, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else {
+      result = await getNotarialFileUrl(record.id, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    }
 
     if (!result.success) {
       setPreviewState((previous) => ({
@@ -448,13 +577,28 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   };
 
   const handleDownloadFile = async (record: NotarialRecord) => {
+    if (openGarageDirectory(record)) return;
     if (!record.link) return;
-
-    const result = await getNotarialFileUrl(record.id, {
-      inline: false,
-      fileName: record.fileName,
-      contentType: record.mimeType,
-    });
+    let result;
+    if (record.source === "archive") {
+      result = await getArchiveFileUrlArchive(record.id, {
+        inline: false,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else if (record.source === "garage") {
+      result = await getNotarialGarageFileUrl(record.link, {
+        inline: false,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else {
+      result = await getNotarialFileUrl(record.id, {
+        inline: false,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    }
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to download file");
       return;
@@ -467,11 +611,27 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   };
 
   const handlePrintFile = async (record: NotarialRecord) => {
-    const result = await getNotarialFileUrl(record.id, {
-      inline: true,
-      fileName: record.fileName,
-      contentType: record.mimeType,
-    });
+    if (openGarageDirectory(record)) return;
+    let result;
+    if (record.source === "archive") {
+      result = await getArchiveFileUrlArchive(record.id, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else if (record.source === "garage") {
+      result = await getNotarialGarageFileUrl(record.link, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    } else {
+      result = await getNotarialFileUrl(record.id, {
+        inline: true,
+        fileName: record.fileName,
+        contentType: record.mimeType,
+      });
+    }
 
     if (!result.success) {
       statusPopup.showError(result.error || "Unable to print this file");
@@ -488,6 +648,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         `Delete "${record.fileName || record.title || `record #${record.id}`}" from Notarial Explorer?`,
       ))
     ) {
+      return;
+    }
+
+    if (record.source === "archive" || record.source === "garage") {
+      statusPopup.showError(
+        "Deletion of archive/garage items is not supported from Notarial explorer. Use the Archive page to manage these files.",
+      );
       return;
     }
 
@@ -544,6 +711,12 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const fetchSelectedRecords = async () => {
     if (selectedRecordIds.length === 0) return [] as NotarialRecord[];
+    if (displayMode === "explorer") {
+      // For garage explorer mode the items are in local state (not DB-backed),
+      // so return the records that are currently selected.
+      return records.filter((r) => selectedRecordIds.includes(r.id));
+    }
+
     const result = await getNotarialByIds(selectedRecordIds);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to load selected files");
@@ -554,7 +727,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const handleDownloadSelected = async () => {
     const items = await fetchSelectedRecords();
-    for (const item of items.filter((record) => record.link)) {
+    for (const item of items.filter(
+      (record) => record.link && !record.isDirectory,
+    )) {
       await handleDownloadFile(item);
     }
   };
@@ -581,6 +756,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         const descriptor = getExplorerDescriptor({
           fileName: item.fileName ?? item.title,
           mimeType: item.mimeType,
+          isFolder: item.isDirectory,
         });
         return [
           item.title || "",
@@ -601,6 +777,12 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const handleDeleteSelected = async () => {
     if (selectedRecordIds.length === 0) return;
+    if (displayMode === "explorer") {
+      statusPopup.showError(
+        "Batch deletion of explorer items is not supported from Notarial explorer. Use the Archive page to manage archived files.",
+      );
+      return;
+    }
     if (
       !(await statusPopup.showConfirm(
         `Delete ${selectedRecordIds.length} selected notarial file${selectedRecordIds.length > 1 ? "s" : ""}?`,
@@ -761,9 +943,12 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       }
 
       setCreatingFolder(true);
+      const targetParentPath = normalizeGaragePath(
+        folderForm.parentPath?.trim() || currentGaragePath || "Notarial Records",
+      );
       const result = await createGarageFolder({
         name: folderForm.name.trim(),
-        parentPath: folderForm.parentPath?.trim() || "Notarial Records",
+        parentPath: targetParentPath,
       });
       setCreatingFolder(false);
 
@@ -773,10 +958,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       }
 
       setShowFolderModal(false);
-      setFolderForm({ name: "", parentPath: "Notarial Records", description: "" });
+      setFolderForm({
+        name: "",
+        parentPath: targetParentPath || "Notarial Records",
+        description: "",
+      });
       statusPopup.showSuccess("Notarial folder created.");
 
-      await refreshFromBackend(1);
+      if (targetParentPath !== currentGaragePath) {
+        navigateGaragePath(targetParentPath);
+      } else {
+        await refreshFromBackend(1);
+      }
     };
 
   const handleUnsupportedAction = (action: string) => {
@@ -1322,6 +1515,11 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     type="button"
                     className="font-medium text-base-content/55 transition-colors hover:text-base-content"
                     onClick={() => {
+                      if (displayMode === "explorer") {
+                        navigateGaragePath("");
+                        return;
+                      }
+
                       setSelectedRecord(null);
                       setAppliedFilters({});
                       setExactMatchMap({});
@@ -1333,16 +1531,25 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   >
                     Root directory
                   </button>
-                  <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-base-content">
-                    Notarial Records
-                  </span>
-                  {detailPathSegments.map((segment) => (
+                  {(displayMode === "explorer"
+                    ? garagePathSegments
+                    : detailPathSegments
+                  ).map((segment) => (
                     <React.Fragment key={segment.path}>
                       <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                      <span className="text-xs font-semibold uppercase tracking-widest text-base-content/55">
-                        {segment.label}
-                      </span>
+                      {displayMode === "explorer" ? (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold uppercase tracking-widest text-base-content/55 transition-colors hover:text-base-content"
+                          onClick={() => navigateGaragePath(segment.path)}
+                        >
+                          {segment.label}
+                        </button>
+                      ) : (
+                        <span className="text-xs font-semibold uppercase tracking-widest text-base-content/55">
+                          {segment.label}
+                        </span>
+                      )}
                     </React.Fragment>
                   ))}
                 </div>
@@ -1627,6 +1834,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   const descriptor = getExplorerDescriptor({
                     fileName: record.fileName ?? record.title,
                     mimeType: record.mimeType,
+                    isFolder: record.isDirectory,
                   });
                   return (
                     <div
@@ -1780,7 +1988,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 <button
                   type="button"
                   className="btn btn-sm btn-outline flex items-center gap-2"
-                  onClick={() => setShowFolderModal(true)}
+                  onClick={() => {
+                    setFolderForm((previous) => ({
+                      ...previous,
+                      parentPath: currentGaragePath || "Notarial Records",
+                    }));
+                    setShowFolderModal(true);
+                  }}
                 >
                   <FiChevronsDown className="h-4 w-4" />
                   New Folder
@@ -1829,14 +2043,32 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         role="button"
                         tabIndex={0}
                         onClick={() => {
-                          if (isExcelRecord(record)) {
+                          if (record.isDirectory) {
+                            setSelectedRecord(record);
+                          } else if (isExcelRecord(record)) {
                             void handleDownloadFile(record);
                           } else {
                             setSelectedRecord(record);
                           }
                         }}
-                        onDoubleClick={() => void handlePreviewFile(record)}
-                        className="flex items-center gap-3 px-3 py-3 hover:bg-base-200/40"
+                        onDoubleClick={() => {
+                          if (record.isDirectory) {
+                            openGarageDirectory(record);
+                          } else {
+                            void handlePreviewFile(record);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") return;
+                          if (record.isDirectory) {
+                            openGarageDirectory(record);
+                          } else {
+                            void handlePreviewFile(record);
+                          }
+                        }}
+                        className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
+                          selectedRecord?.id === record.id ? "bg-primary/7" : ""
+                        }`}
                       >
                         <input
                           type="checkbox"
@@ -1854,6 +2086,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                               {getExplorerDescriptor({
                                 fileName: record.fileName ?? record.title,
                                 mimeType: record.mimeType,
+                                isFolder: record.isDirectory,
                               }).icon}
                             </span>
                             <div className="min-w-0">
@@ -1914,17 +2147,19 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
               {selectedRecord && (
                 <span
                   className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                    getExplorerDescriptor({
-                      fileName: selectedRecord.fileName ?? selectedRecord.title,
-                      mimeType: selectedRecord.mimeType,
-                    }).badgeClassName
+                      getExplorerDescriptor({
+                        fileName: selectedRecord.fileName ?? selectedRecord.title,
+                        mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
+                      }).badgeClassName
                   }`}
                 >
                   {
-                    getExplorerDescriptor({
-                      fileName: selectedRecord.fileName ?? selectedRecord.title,
-                      mimeType: selectedRecord.mimeType,
-                    }).label
+                      getExplorerDescriptor({
+                        fileName: selectedRecord.fileName ?? selectedRecord.title,
+                        mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
+                      }).label
                   }
                 </span>
               )}
@@ -1946,6 +2181,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         fileName:
                           selectedRecord.fileName ?? selectedRecord.title,
                         mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
                       }).label,
                     ],
                     ["Client / Signatory", selectedRecord.name || "—"],
@@ -1987,8 +2223,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
                     <span>Root Directory</span>
-                    <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                    <span>Notarial Records</span>
                     {detailPathSegments.map((segment) => (
                       <React.Fragment key={segment.path}>
                         <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
@@ -2015,57 +2249,71 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm gap-2"
-                    onClick={() => void handlePreviewFile(selectedRecord)}
-                  >
-                    Preview
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() => void handleDownloadFile(selectedRecord)}
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() => void handlePrintFile(selectedRecord)}
-                  >
-                    Print
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() =>
-                      router.push(`/user/cases/notarial/${selectedRecord.id}`)
-                    }
-                  >
-                    Open Page
-                  </button>
-                  {canManageNotarial && (
+                  {selectedRecord.isDirectory ? (
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
-                        )
-                      }
+                      className="btn btn-primary btn-sm gap-2"
+                      onClick={() => openGarageDirectory(selectedRecord)}
                     >
-                      Edit
+                      Open Folder
                     </button>
-                  )}
-                  {canManageNotarial && (
-                    <button
-                      type="button"
-                      className="btn btn-error btn-sm gap-2"
-                      onClick={() => void handleDeleteRecord(selectedRecord)}
-                    >
-                      Delete
-                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm gap-2"
+                        onClick={() => void handlePreviewFile(selectedRecord)}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handleDownloadFile(selectedRecord)}
+                      >
+                        Download
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handlePrintFile(selectedRecord)}
+                      >
+                        Print
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() =>
+                          router.push(
+                            `/user/cases/notarial/${selectedRecord.id}`,
+                          )
+                        }
+                      >
+                        Open Page
+                      </button>
+                      {canManageNotarial && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm gap-2"
+                          onClick={() =>
+                            router.push(
+                              `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canManageNotarial && (
+                        <button
+                          type="button"
+                          className="btn btn-error btn-sm gap-2"
+                          onClick={() => void handleDeleteRecord(selectedRecord)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </>
@@ -2125,6 +2373,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         fileName:
                           selectedRecord.fileName ?? selectedRecord.title,
                         mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
                       }).badgeClassName
                     }`}
                   >
@@ -2133,6 +2382,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         fileName:
                           selectedRecord.fileName ?? selectedRecord.title,
                         mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
                       }).label
                     }
                   </span>
@@ -2164,6 +2414,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         fileName:
                           selectedRecord.fileName ?? selectedRecord.title,
                         mimeType: selectedRecord.mimeType,
+                        isFolder: selectedRecord.isDirectory,
                       }).label,
                     ],
                     ["Client / Signatory", selectedRecord.name || "—"],
@@ -2205,8 +2456,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
                     <span>Root Directory</span>
-                    <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                    <span>Notarial Records</span>
                     {detailPathSegments.map((segment) => (
                       <React.Fragment key={segment.path}>
                         <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
@@ -2233,57 +2482,71 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm gap-2"
-                    onClick={() => void handlePreviewFile(selectedRecord)}
-                  >
-                    Preview
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() => void handleDownloadFile(selectedRecord)}
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() => void handlePrintFile(selectedRecord)}
-                  >
-                    Print
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() =>
-                      router.push(`/user/cases/notarial/${selectedRecord.id}`)
-                    }
-                  >
-                    Open Page
-                  </button>
-                  {canManageNotarial && (
+                  {selectedRecord.isDirectory ? (
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() =>
-                        router.push(
-                          `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
-                        )
-                      }
+                      className="btn btn-primary btn-sm gap-2"
+                      onClick={() => openGarageDirectory(selectedRecord)}
                     >
-                      Edit
+                      Open Folder
                     </button>
-                  )}
-                  {canManageNotarial && (
-                    <button
-                      type="button"
-                      className="btn btn-error btn-sm gap-2"
-                      onClick={() => void handleDeleteRecord(selectedRecord)}
-                    >
-                      Delete
-                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm gap-2"
+                        onClick={() => void handlePreviewFile(selectedRecord)}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handleDownloadFile(selectedRecord)}
+                      >
+                        Download
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handlePrintFile(selectedRecord)}
+                      >
+                        Print
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() =>
+                          router.push(
+                            `/user/cases/notarial/${selectedRecord.id}`,
+                          )
+                        }
+                      >
+                        Open Page
+                      </button>
+                      {canManageNotarial && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm gap-2"
+                          onClick={() =>
+                            router.push(
+                              `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
+                            )
+                          }
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {canManageNotarial && (
+                        <button
+                          type="button"
+                          className="btn btn-error btn-sm gap-2"
+                          onClick={() => void handleDeleteRecord(selectedRecord)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </>
