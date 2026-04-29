@@ -17,7 +17,6 @@ import AddReportPage from "./AddReportPage";
 
 import MonthlyTable from "./MonthlyTable";
 import MonthlyToolbar from "./MonthlyToolbar";
-import ViewReportPage from "./ViewReportPage";
 
 type MonthlyCategoryView =
   | "Cases Disposed"
@@ -78,7 +77,6 @@ export default function MonthlyPage() {
     useState<MonthlyCategoryView>("New Cases Filed");
   const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
   const [showAddPage, setShowAddPage] = useState(false);
-  const [showViewPage, setShowViewPage] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
     null,
@@ -234,20 +232,10 @@ export default function MonthlyPage() {
     );
   }
 
-  if (showViewPage) {
-    return (
-      <ViewReportPage
-        data={filteredData}
-        month={selectedDate}
-        onBack={() => setShowViewPage(false)}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
-      {!showAddPage && !showViewPage && (
+      {!showAddPage && (
         <header className="card bg-base-100 shadow-xl">
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -266,46 +254,45 @@ export default function MonthlyPage() {
 
               <div className="flex flex-col items-end gap-3">
                 <div className="join">
-                    {/* MONTH */}
-                    <select
-                      className="select select-bordered join-item w-44"
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                    >
-                      {[
-                        { value: "01", label: "January" },
-                        { value: "02", label: "February" },
-                        { value: "03", label: "March" },
-                        { value: "04", label: "April" },
-                        { value: "05", label: "May" },
-                        { value: "06", label: "June" },
-                        { value: "07", label: "July" },
-                        { value: "08", label: "August" },
-                        { value: "09", label: "September" },
-                        { value: "10", label: "October" },
-                        { value: "11", label: "November" },
-                        { value: "12", label: "December" },
-                      ].map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
+                  {/* MONTH */}
+                  <select
+                    className="select select-bordered join-item w-44"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  >
+                    {[
+                      { value: "01", label: "January" },
+                      { value: "02", label: "February" },
+                      { value: "03", label: "March" },
+                      { value: "04", label: "April" },
+                      { value: "05", label: "May" },
+                      { value: "06", label: "June" },
+                      { value: "07", label: "July" },
+                      { value: "08", label: "August" },
+                      { value: "09", label: "September" },
+                      { value: "10", label: "October" },
+                      { value: "11", label: "November" },
+                      { value: "12", label: "December" },
+                    ].map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
 
-                    {/* YEAR */}
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      className="input input-bordered join-item w-28"
-                      value={selectedYear}
-                      onChange={(e) =>
-                        setSelectedYear(
-                          e.target.value.replace(/\D/g, "").slice(0, 4),
-                        )
-                      }
-                    />
-            
+                  {/* YEAR */}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="input input-bordered join-item w-28"
+                    value={selectedYear}
+                    onChange={(e) =>
+                      setSelectedYear(
+                        e.target.value.replace(/\D/g, "").slice(0, 4),
+                      )
+                    }
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 flex-nowrap">
@@ -375,7 +362,6 @@ export default function MonthlyPage() {
       {/* ── TABLE ── */}
       <MonthlyTable
         data={filteredData}
-        onViewData={selectionMode ? undefined : () => setShowViewPage(true)}
         selectionMode={selectionMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
