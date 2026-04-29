@@ -620,7 +620,7 @@ export async function getArchiveStats(
 
     const where = buildArchiveWhere(options);
 
-    const [totalItems, folders, editableItems, uploadedFiles] =
+    const [totalItems, folders, editableItems, uploadedFiles, fileSizes] =
       await prisma.$transaction([
         prisma.archiveEntry.count({ where }),
         prisma.archiveEntry.count({
@@ -645,7 +645,22 @@ export async function getArchiveStats(
             AND: [where, { entryType: ArchiveEntryType.FILE }],
           },
         }),
+        prisma.archiveEntry.findMany({
+          where,
+          select: {
+            file: {
+              select: {
+                size: true,
+              },
+            },
+          },
+        }),
       ]);
+
+    const storageUsedBytes = fileSizes.reduce(
+      (total, item) => total + (item.file?.size ?? 0),
+      0,
+    );
 
     return {
       success: true,
@@ -654,6 +669,7 @@ export async function getArchiveStats(
         folders,
         editableItems,
         uploadedFiles,
+        storageUsedBytes,
       },
     };
   } catch (error) {

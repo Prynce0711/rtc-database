@@ -8,6 +8,7 @@ import {
   getGarageFileUrl,
   moveGarageFile,
   uploadFileToGarage,
+  createGarageFolder as createGarageFolderCore,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
@@ -21,9 +22,11 @@ import { prettifyError } from "zod";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
 
 type NotarialListFilterShape = {
+  query?: string | null;
   title?: string | null;
   name?: string | null;
   atty?: string | null;
+  fileType?: string | null;
   date?: { start?: string; end?: string };
 };
 
@@ -36,6 +39,8 @@ export type NotarialStats = {
   thisMonth: number;
   uniqueAttorneys: number;
   noDate: number;
+  storedFiles: number;
+  storageUsedBytes: number;
 };
 
 export type NotarialRecentFile = {
@@ -56,6 +61,48 @@ function buildNotarialWhere(
   const filters = options?.filters;
   const exactMatchMap = options?.exactMatchMap ?? {};
   const conditions: Prisma.NotarialWhereInput[] = [];
+
+  const normalizedQuery = filters?.query?.trim();
+
+  if (normalizedQuery) {
+    conditions.push({
+      OR: [
+        {
+          title: {
+            contains: normalizedQuery,
+          },
+        },
+        {
+          name: {
+            contains: normalizedQuery,
+          },
+        },
+        {
+          attorney: {
+            contains: normalizedQuery,
+          },
+        },
+        {
+          file: {
+            is: {
+              fileName: {
+                contains: normalizedQuery,
+              },
+            },
+          },
+        },
+        {
+          file: {
+            is: {
+              path: {
+                contains: normalizedQuery,
+              },
+            },
+          },
+        },
+      ],
+    });
+  }
 
   const addStringFilter = (
     key: "title" | "name" | "attorney",
@@ -82,6 +129,125 @@ function buildNotarialWhere(
         lte: filters.date.end ? new Date(filters.date.end) : undefined,
       },
     });
+  }
+
+  if (filters?.fileType) {
+    const normalizedType = filters.fileType.trim().toLowerCase();
+    let fileTypeWhere: Prisma.FileDataWhereInput | null = null;
+
+    if (normalizedType === "pdf") {
+      fileTypeWhere = {
+        OR: [
+          {
+            mimeType: {
+              equals: "application/pdf",
+            },
+          },
+          {
+            fileName: {
+              endsWith: ".pdf",
+            },
+          },
+        ],
+      };
+    } else if (normalizedType === "word") {
+      fileTypeWhere = {
+        OR: [
+          {
+            mimeType: {
+              contains: "word",
+            },
+          },
+          {
+            mimeType: {
+              contains: "officedocument.wordprocessingml",
+            },
+          },
+          {
+            fileName: {
+              endsWith: ".doc",
+            },
+          },
+          {
+            fileName: {
+              endsWith: ".docx",
+            },
+          },
+        ],
+      };
+    } else if (normalizedType === "excel") {
+      fileTypeWhere = {
+        OR: [
+          {
+            mimeType: {
+              contains: "excel",
+            },
+          },
+          {
+            mimeType: {
+              contains: "spreadsheetml",
+            },
+          },
+          {
+            fileName: {
+              endsWith: ".xls",
+            },
+          },
+          {
+            fileName: {
+              endsWith: ".xlsx",
+            },
+          },
+        ],
+      };
+    } else if (normalizedType === "image") {
+      fileTypeWhere = {
+        mimeType: {
+          startsWith: "image/",
+        },
+      };
+    } else if (normalizedType === "other") {
+      fileTypeWhere = {
+        AND: [
+          {
+            NOT: {
+              mimeType: {
+                equals: "application/pdf",
+              },
+            },
+          },
+          {
+            NOT: {
+              mimeType: {
+                startsWith: "image/",
+              },
+            },
+          },
+          {
+            NOT: {
+              mimeType: {
+                contains: "word",
+              },
+            },
+          },
+          {
+            NOT: {
+              mimeType: {
+                contains: "spreadsheet",
+              },
+            },
+          },
+        ],
+      };
+    }
+
+    if (fileTypeWhere) {
+      conditions.push({
+        file: {
+          is: fileTypeWhere,
+        },
+      });
+    }
   }
 
   return conditions.length > 0 ? { AND: conditions } : {};
@@ -237,7 +403,7 @@ export async function getNotarialStats(
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const [totalRecords, thisMonth, noDate, attorneys] =
+    const [totalRecords, thisMonth, noDate, attorneys, fileStats] =
       await prisma.$transaction([
         prisma.notarial.count({ where }),
         prisma.notarial.count({
@@ -263,7 +429,24 @@ export async function getNotarialStats(
           select: { attorney: true },
           distinct: ["attorney"],
         }),
+        prisma.notarial.findMany({
+          where: {
+            AND: [where, { fileId: { not: null } }],
+          },
+          select: {
+            file: {
+              select: {
+                size: true,
+              },
+            },
+          },
+        }),
       ]);
+
+    const storageUsedBytes = fileStats.reduce(
+      (total, item) => total + (item.file?.size ?? 0),
+      0,
+    );
 
     return {
       success: true,
@@ -272,6 +455,8 @@ export async function getNotarialStats(
         thisMonth,
         uniqueAttorneys: attorneys.filter((a) => !!a.attorney).length,
         noDate,
+        storedFiles: fileStats.length,
+        storageUsedBytes,
       },
     };
   } catch (error) {
@@ -608,6 +793,32 @@ export async function getRecentNotarialFiles(
   } catch (error) {
     console.error("Error fetching recent notarial files:", error);
     return { success: false, error: "Failed to fetch recent notarial files" };
+  }
+}
+
+export async function createGarageFolder(
+  data: Record<string, unknown>,
+): Promise<ActionResult<Record<string, unknown>>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const name = String(data?.name ?? "").trim();
+    const parentPath = String(data?.parentPath ?? "").trim();
+
+    if (!name) {
+      return { success: false, error: "Folder name is required" };
+    }
+
+    const result = await createGarageFolderCore(name, parentPath);
+    if (!result.success) return { success: false, error: result.error };
+
+    return { success: true, result: result.result as Record<string, unknown> };
+  } catch (error) {
+    console.error("Error creating garage folder:", error);
+    return { success: false, error: "Failed to create folder" };
   }
 }
 

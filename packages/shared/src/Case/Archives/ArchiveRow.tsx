@@ -4,186 +4,261 @@ import { ArchiveEntryType } from "../../generated/prisma/enums";
 import TipCell from "../../Table/TipCell";
 import type { ArchiveEntryData } from "./ArchiveSchema";
 import {
+  FiCopy,
   FiDownload,
   FiEdit2,
   FiEye,
-  FiFile,
-  FiFileText,
-  FiFolder,
-  FiGrid,
+  FiExternalLink,
+  FiMoreHorizontal,
+  FiPrinter,
   FiTrash2,
 } from "react-icons/fi";
-
-const formatDateTime = (value?: Date | string | null): string => {
-  if (!value) return "—";
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleString("en-PH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-const formatBytes = (value?: number | null): string => {
-  if (!value || value <= 0) return "—";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-};
-
-const getArchiveTypeLabel = (entryType: ArchiveEntryType): string => {
-  switch (entryType) {
-    case ArchiveEntryType.FOLDER:
-      return "Folder";
-    case ArchiveEntryType.DOCUMENT:
-      return "Document";
-    case ArchiveEntryType.SPREADSHEET:
-      return "Spreadsheet";
-    default:
-      return "File";
-  }
-};
-
-const getArchiveIcon = (entryType: ArchiveEntryType) => {
-  switch (entryType) {
-    case ArchiveEntryType.FOLDER:
-      return <FiFolder className="h-4 w-4 text-warning" />;
-    case ArchiveEntryType.DOCUMENT:
-      return <FiFileText className="h-4 w-4 text-info" />;
-    case ArchiveEntryType.SPREADSHEET:
-      return <FiGrid className="h-4 w-4 text-success" />;
-    default:
-      return <FiFile className="h-4 w-4 text-base-content/70" />;
-  }
-};
+import {
+  formatArchiveBytes,
+  formatArchiveDateTime,
+  getArchiveDescriptor,
+} from "./archiveExplorerUtils";
 
 const ArchiveRow = ({
   entry,
   canManage,
+  isSelected,
+  onToggleSelect,
+  onSelectEntry,
   onOpen,
+  onPreview,
   onEdit,
   onDelete,
   onDownload,
+  onPrint,
+  onUnsupportedAction,
 }: {
   entry: ArchiveEntryData;
   canManage: boolean;
+  isSelected: boolean;
+  onToggleSelect: (id: number, checked: boolean) => void;
+  onSelectEntry: (entry: ArchiveEntryData) => void;
   onOpen: (entry: ArchiveEntryData) => void;
+  onPreview: (entry: ArchiveEntryData) => void;
   onEdit: (entry: ArchiveEntryData) => void;
   onDelete: (entry: ArchiveEntryData) => void;
   onDownload: (entry: ArchiveEntryData) => void;
+  onPrint: (entry: ArchiveEntryData) => void;
+  onUnsupportedAction: (action: string) => void;
 }) => {
-  const typeLabel = getArchiveTypeLabel(entry.entryType);
+  const descriptor = getArchiveDescriptor({
+    entryType: entry.entryType,
+    mimeType: entry.file?.mimeType,
+    name: entry.name,
+  });
+  const uploadedAt = entry.file?.createdAt ?? entry.createdAt;
+  const modifiedAt = entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt;
+  const sizeValue =
+    entry.entryType === ArchiveEntryType.FOLDER ? null : entry.file?.size;
 
   return (
     <tr
-      className="border-b border-base-200/60 transition-colors hover:bg-base-200/30 cursor-pointer text-sm"
-      onClick={() => onOpen(entry)}
+      className={`group border-b border-base-200/70 text-sm transition-all duration-200 hover:bg-base-200/25 ${
+        isSelected ? "bg-primary/8" : ""
+      }`}
+      onClick={() => onSelectEntry(entry)}
     >
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-base-200">
-            {getArchiveIcon(entry.entryType)}
+      <td
+        className="px-4 py-4 text-center"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={isSelected}
+          onChange={(event) => onToggleSelect(entry.id, event.target.checked)}
+          aria-label={`Select ${entry.name}`}
+        />
+      </td>
+
+      <td className="px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
+          >
+            {descriptor.icon}
           </span>
           <div className="min-w-0">
-            <p className="truncate font-semibold text-base-content">
+            <p className="truncate text-sm font-semibold text-base-content">
               {entry.name}
             </p>
-            <p className="truncate text-xs text-base-content/45">
-              {entry.parentPath || "Root"}
+            <p className="truncate text-xs text-base-content/50">
+              {entry.parentPath || "Root Directory"}
             </p>
           </div>
         </div>
       </td>
 
-      <td className="px-4 py-3 text-center">
+      <td className="px-4 py-4 text-center">
         <span
-          className={[
-            "badge badge-outline font-medium",
-            entry.entryType === ArchiveEntryType.FOLDER
-              ? "badge-warning"
-              : entry.entryType === ArchiveEntryType.DOCUMENT
-                ? "badge-info"
-                : entry.entryType === ArchiveEntryType.SPREADSHEET
-                  ? "badge-success"
-                  : "",
-          ].join(" ")}
+          className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${descriptor.badgeClassName}`}
         >
-          {typeLabel}
+          {descriptor.label}
         </span>
       </td>
 
       <TipCell
-        label="Description"
-        value={entry.description || "—"}
+        label="Location"
+        value={entry.parentPath || "Root Directory"}
         truncate
         clickHint={false}
       />
       <TipCell
-        label="Size"
-        value={formatBytes(entry.file?.size)}
+        label="Uploaded"
+        value={formatArchiveDateTime(uploadedAt)}
         className="text-base-content/70"
         clickHint={false}
       />
       <TipCell
-        label="Updated"
-        value={formatDateTime(entry.updatedAt || entry.createdAt)}
+        label="Modified"
+        value={formatArchiveDateTime(modifiedAt)}
+        className="text-base-content/70"
+        clickHint={false}
+      />
+      <TipCell
+        label="Size"
+        value={formatArchiveBytes(sizeValue)}
         className="text-base-content/70"
         clickHint={false}
       />
 
       <td
-        className="px-4 py-3 text-center"
+        className="px-4 py-4 text-center"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-center gap-2">
           <button
             type="button"
-            className="btn btn-xs btn-outline"
-            onClick={() => onOpen(entry)}
-            title={entry.entryType === ArchiveEntryType.FOLDER ? "Open" : "View"}
+            className="btn btn-xs btn-outline gap-1.5"
+            onClick={() => onSelectEntry(entry)}
+            title="Open details panel"
           >
             <FiEye size={12} />
-            {entry.entryType === ArchiveEntryType.FOLDER ? "Open" : "View"}
+            View
           </button>
 
-          {entry.file && (
+          {entry.entryType === ArchiveEntryType.FOLDER ? (
             <button
               type="button"
-              className="btn btn-xs btn-primary"
+              className="btn btn-xs btn-primary gap-1.5"
+              onClick={() => onOpen(entry)}
+              title="Open folder"
+            >
+              <FiExternalLink size={12} />
+              Open
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-xs btn-primary gap-1.5"
               onClick={() => onDownload(entry)}
               title="Download file"
+              disabled={!entry.file}
             >
               <FiDownload size={12} />
               Download
             </button>
           )}
 
-          {canManage && (
+          <div className="dropdown dropdown-end">
             <button
               type="button"
-              className="btn btn-xs btn-outline"
-              onClick={() => onEdit(entry)}
-              title="Edit archive entry"
+              tabIndex={0}
+              className="btn btn-xs btn-ghost"
+              title="More actions"
             >
-              <FiEdit2 size={12} />
-              Edit
+              <FiMoreHorizontal size={14} />
             </button>
-          )}
-
-          {canManage && (
-            <button
-              type="button"
-              className="btn btn-xs btn-outline btn-error"
-              onClick={() => onDelete(entry)}
-              title="Delete archive entry"
+            <ul
+              tabIndex={0}
+              className="menu dropdown-content z-[1] mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
             >
-              <FiTrash2 size={12} />
-            </button>
-          )}
+              <li>
+                <button type="button" onClick={() => onSelectEntry(entry)}>
+                  <FiEye size={14} />
+                  Details
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() =>
+                    entry.entryType === ArchiveEntryType.FOLDER
+                      ? onOpen(entry)
+                      : onPreview(entry)
+                  }
+                >
+                  <FiExternalLink size={14} />
+                  {entry.entryType === ArchiveEntryType.FOLDER
+                    ? "Open Folder"
+                    : "Preview"}
+                </button>
+              </li>
+              {entry.file && (
+                <li>
+                  <button type="button" onClick={() => onDownload(entry)}>
+                    <FiDownload size={14} />
+                    Download
+                  </button>
+                </li>
+              )}
+              {entry.file && (
+                <li>
+                  <button type="button" onClick={() => onPrint(entry)}>
+                    <FiPrinter size={14} />
+                    Print
+                  </button>
+                </li>
+              )}
+              {canManage && (
+                <li>
+                  <button type="button" onClick={() => onEdit(entry)}>
+                    <FiEdit2 size={14} />
+                    Rename / Edit
+                  </button>
+                </li>
+              )}
+              {canManage && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => onUnsupportedAction("Move")}
+                  >
+                    <FiCopy size={14} />
+                    Move
+                  </button>
+                </li>
+              )}
+              {canManage && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => onUnsupportedAction("Copy")}
+                  >
+                    <FiCopy size={14} />
+                    Copy
+                  </button>
+                </li>
+              )}
+              {canManage && (
+                <li>
+                  <button
+                    type="button"
+                    className="text-error"
+                    onClick={() => onDelete(entry)}
+                  >
+                    <FiTrash2 size={14} />
+                    Delete
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
         </div>
       </td>
     </tr>

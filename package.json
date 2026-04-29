@@ -27,6 +27,7 @@
     "concurrently": "^9.2.1"
   },
   "dependencies": {
+    "@prisma/client": "^7.8.0",
     "framer-motion": "^12.38.0"
   }
 }
