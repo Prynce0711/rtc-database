@@ -2,9 +2,15 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import {
+  createGarageFolderMarker,
   deleteGarageFile,
+  deleteGarageKeys,
   getGarageFileUrl,
+  listGarageFolder,
+  moveGarageKeys,
+  renameGarageKey,
   uploadFileToGarage,
+  type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
@@ -28,10 +34,10 @@ import {
   PaginatedResult,
 } from "@rtc-database/shared";
 import { Prisma } from "@rtc-database/shared/prisma/client";
-import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 
 const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.NOTARIAL];
+const ARCHIVE_GARAGE_BUCKET = "rtc-bucket";
 const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
@@ -51,6 +57,11 @@ const DOCUMENT_EXTENSIONS = new Set([
 type ArchiveFileReference = {
   id: number;
   key: string;
+};
+
+type GarageMovePair = {
+  oldKey: string;
+  newKey: string;
 };
 
 type PreparedArchiveEntry = {
@@ -122,27 +133,11 @@ const resolveArchiveEntryName = (
   return ensureFileExtension(normalizedName, resolvedExtension);
 };
 
-const sanitizeStorageSegment = (value: string): string => {
-  const normalized = value
-    .normalize("NFKD")
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-
-  return normalized || "item";
-};
-
 const buildArchiveStorageKey = (
   parentPath: string,
   fileName: string,
 ): string => {
-  const normalizedParent = normalizeArchivePath(parentPath);
-  const folderPrefix = normalizedParent
-    ? normalizedParent.split("/").map(sanitizeStorageSegment).join("/")
-    : "root";
-
-  return `archives/${folderPrefix}/${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizeStorageSegment(fileName)}`;
+  return joinArchivePath(parentPath, fileName);
 };
 
 const normalizeSheetData = (value: unknown): ArchiveSpreadsheetData => {
@@ -289,7 +284,12 @@ const uploadPreparedFile = async (
   file: File,
 ): Promise<ActionResult<ArchiveFileReference>> => {
   const key = buildArchiveStorageKey(parentPath, fileName);
-  const uploadResult = await uploadFileToGarage(file, key);
+  const uploadResult = await uploadFileToGarage(
+    file,
+    key,
+    "",
+    ARCHIVE_GARAGE_BUCKET,
+  );
 
   if (!uploadResult.success) {
     return {
@@ -317,7 +317,7 @@ const deleteFileIfUnreferenced = async (file?: ArchiveFileReference | null) => {
   ]);
 
   if (archiveRefs === 0 && notarialRefs === 0 && chatRefs === 0) {
-    await deleteGarageFile(file.key);
+    await deleteGarageFile(file.key, ARCHIVE_GARAGE_BUCKET);
   }
 };
 
@@ -570,6 +570,51 @@ const fetchArchiveEntry = (id: number) =>
     include: ARCHIVE_INCLUDE,
   });
 
+const syncArchiveMovedGarageKeys = async (movedKeys: GarageMovePair[]) => {
+  const normalizedPairs = movedKeys
+    .map((pair) => ({
+      oldPath: normalizeArchivePath(pair.oldKey.replace(/\/$/, "")),
+      newPath: normalizeArchivePath(pair.newKey.replace(/\/$/, "")),
+    }))
+    .filter((pair) => pair.oldPath && pair.newPath);
+
+  if (normalizedPairs.length === 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    for (const pair of normalizedPairs) {
+      const entries = await tx.archiveEntry.findMany({
+        where: {
+          OR: [
+            { fullPath: pair.oldPath },
+            {
+              fullPath: {
+                startsWith: `${pair.oldPath}/`,
+              },
+            },
+          ],
+        },
+        orderBy: {
+          fullPath: "asc",
+        },
+      });
+
+      for (const entry of entries) {
+        const suffix = entry.fullPath.slice(pair.oldPath.length);
+        const nextFullPath = `${pair.newPath}${suffix}`;
+
+        await tx.archiveEntry.update({
+          where: { id: entry.id },
+          data: {
+            fullPath: nextFullPath,
+            parentPath: getArchiveParentPath(nextFullPath),
+            name: getArchiveBaseName(nextFullPath),
+          },
+        });
+      }
+    }
+  });
+};
+
 export async function getArchiveEntriesPage(
   options?: ArchiveFilterOptions,
 ): Promise<ActionResult<PaginatedResult<ArchiveEntryData>>> {
@@ -779,14 +824,189 @@ export async function getArchiveFileUrl(
       return { success: false, error: "No file stored for this archive entry" };
     }
 
-    return await getGarageFileUrl(entry.file.key, {
-      inline: options?.inline,
-      fileName: options?.fileName || entry.name || entry.file.fileName,
-      contentType: options?.contentType || entry.file.mimeType,
-    });
+    return await getGarageFileUrl(
+      entry.file.key,
+      {
+        inline: options?.inline,
+        fileName: options?.fileName || entry.name || entry.file.fileName,
+        contentType: options?.contentType || entry.file.mimeType,
+      },
+      ARCHIVE_GARAGE_BUCKET,
+    );
   } catch (error) {
     console.error("Error getting archive file URL:", error);
     return { success: false, error: "Failed to get archive file URL" };
+  }
+}
+
+export async function getArchiveGarageDirectoryItems(
+  folderPath = "",
+): Promise<ActionResult<GarageItem[]>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    return await listGarageFolder(folderPath, ARCHIVE_GARAGE_BUCKET);
+  } catch (error) {
+    console.error("Error fetching archive garage directory:", error);
+    return { success: false, error: "Failed to fetch garage directory" };
+  }
+}
+
+export async function getArchiveGarageFileUrl(
+  key: string,
+  options?: {
+    inline?: boolean;
+    fileName?: string;
+    contentType?: string;
+  },
+): Promise<ActionResult<string>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    return await getGarageFileUrl(key, options, ARCHIVE_GARAGE_BUCKET);
+  } catch (error) {
+    console.error("Error getting archive garage file URL:", error);
+    return { success: false, error: "Failed to get garage file URL" };
+  }
+}
+
+export async function deleteArchiveGarageItems(
+  keys: string[],
+): Promise<ActionResult<{ deletedCount: number }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedKeys = Array.from(
+      new Set(
+        keys
+          .map((key) =>
+            String(key || "")
+              .replace(/\\/g, "/")
+              .trim()
+              .replace(/^\/+/, ""),
+          )
+          .filter((key) => key.length > 0),
+      ),
+    );
+
+    if (normalizedKeys.length === 0) {
+      return { success: false, error: "No archive items selected" };
+    }
+
+    const deleteResult = await deleteGarageKeys(
+      normalizedKeys,
+      ARCHIVE_GARAGE_BUCKET,
+    );
+    if (!deleteResult.success) {
+      return { success: false, error: deleteResult.error };
+    }
+
+    const exactPaths = normalizedKeys.map((key) => key.replace(/\/$/, ""));
+    const folderPrefixes = normalizedKeys
+      .filter((key) => key.endsWith("/"))
+      .map((key) => key.replace(/\/$/, ""));
+    const deleteConditions: Prisma.ArchiveEntryWhereInput[] = [
+      {
+        fullPath: {
+          in: exactPaths,
+        },
+      },
+    ];
+
+    for (const prefix of folderPrefixes) {
+      deleteConditions.push({
+        fullPath: {
+          startsWith: `${prefix}/`,
+        },
+      });
+    }
+
+    await prisma.archiveEntry.deleteMany({
+      where: {
+        OR: deleteConditions,
+      },
+    });
+
+    return {
+      success: true,
+      result: {
+        deletedCount: deleteResult.result.deletedCount,
+      },
+    };
+  } catch (error) {
+    console.error("Error deleting archive garage items:", error);
+    return { success: false, error: "Failed to delete archive Garage items" };
+  }
+}
+
+export async function moveArchiveGarageItems(
+  keys: string[],
+  targetFolderPath: string,
+): Promise<ActionResult<{ movedCount: number }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const result = await moveGarageKeys(
+      keys,
+      targetFolderPath,
+      ARCHIVE_GARAGE_BUCKET,
+    );
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    await syncArchiveMovedGarageKeys(result.result.movedKeys);
+
+    return {
+      success: true,
+      result: {
+        movedCount: result.result.movedCount,
+      },
+    };
+  } catch (error) {
+    console.error("Error moving archive garage items:", error);
+    return { success: false, error: "Failed to move archive Garage items" };
+  }
+}
+
+export async function renameArchiveGarageItem(
+  key: string,
+  newName: string,
+): Promise<ActionResult<{ movedCount: number }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const result = await renameGarageKey(key, newName, ARCHIVE_GARAGE_BUCKET);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    await syncArchiveMovedGarageKeys(result.result.movedKeys);
+
+    return {
+      success: true,
+      result: {
+        movedCount: result.result.movedCount,
+      },
+    };
+  } catch (error) {
+    console.error("Error renaming archive garage item:", error);
+    return { success: false, error: "Failed to rename archive Garage item" };
   }
 }
 
@@ -832,6 +1052,21 @@ export async function createArchiveEntry(
         success: false,
         error: "An archive entry with the same name already exists here",
       };
+    }
+
+    if (prepared.result.entryType === ArchiveEntryType.FOLDER) {
+      const folderMarkerResult = await createGarageFolderMarker(
+        fullPath,
+        ARCHIVE_GARAGE_BUCKET,
+      );
+      if (!folderMarkerResult.success) {
+        return {
+          success: false,
+          error:
+            folderMarkerResult.error ||
+            "Failed to create archive folder in Garage",
+        };
+      }
     }
 
     let fileId: number | null = null;
