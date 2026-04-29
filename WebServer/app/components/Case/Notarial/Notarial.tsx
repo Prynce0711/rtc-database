@@ -209,10 +209,9 @@ const mapGarageItemToNotarialRecord = (
     atty: "",
     date: lastModifiedIso ? lastModifiedIso.slice(0, 10) : "",
     link: item.key,
-    fileName:
-      item.name || normalizeGaragePath(item.key).split("/").pop() || "",
+    fileName: item.name || normalizeGaragePath(item.key).split("/").pop() || "",
     mimeType: undefined,
-    fileSize: item.isDirectory ? undefined : item.size ?? undefined,
+    fileSize: item.isDirectory ? undefined : (item.size ?? undefined),
     createdAt: lastModifiedIso,
     updatedAt: lastModifiedIso,
     fileCreatedAt: lastModifiedIso,
@@ -278,7 +277,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const [fileTypeFilter, setFileTypeFilter] =
     useState<NotarialFileTypeFilter>("ALL");
   const [searchInput, setSearchInput] = useState("");
-  
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadForm, setUploadForm] =
     useState<UploadFormState>(initialUploadForm());
@@ -480,8 +479,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     const directory = selectedRecord?.isDirectory
       ? detailPath
       : detailPath.includes("/")
-      ? detailPath.split("/").slice(0, -1).join("/")
-      : detailPath;
+        ? detailPath.split("/").slice(0, -1).join("/")
+        : detailPath;
     return getExplorerPathSegments(directory);
   }, [selectedRecord]);
 
@@ -686,7 +685,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const deleteGarageRecords = async (items: NotarialRecord[]) => {
     const keys = items
-      .map((item) => (item.isDirectory ? item.link : item.filePath || item.link))
+      .map((item) =>
+        item.isDirectory ? item.link : item.filePath || item.link,
+      )
       .filter((key): key is string => !!key);
 
     if (keys.length === 0) {
@@ -1011,7 +1012,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       }
     }
 
-    statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    statusPopup.showSuccess(
+      `Uploaded ${successCount} of ${files.length} files.`,
+    );
     setCurrentPage(1);
     await refreshFromBackend(1);
   };
@@ -1042,7 +1045,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       setCurrentPage(1);
       await refreshFromBackend(1);
     } catch (err) {
-      statusPopup.showError(err instanceof Error ? err.message : "Upload failed");
+      statusPopup.showError(
+        err instanceof Error ? err.message : "Upload failed",
+      );
     } finally {
       setUploading(false);
     }
@@ -1097,13 +1102,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   ) => {
     const garageItems = items.filter((item) => item.source === "garage");
     if (garageItems.length !== items.length) {
-      statusPopup.showError("Only Garage Explorer items can be moved by drag and drop.");
+      statusPopup.showError(
+        "Only Garage Explorer items can be moved by drag and drop.",
+      );
       return false;
     }
 
     const keys = garageItems
       .map(getGarageRecordKey)
-      .filter((key) => key && normalizeGaragePath(key) !== normalizeGaragePath(targetPath));
+      .filter(
+        (key) =>
+          key && normalizeGaragePath(key) !== normalizeGaragePath(targetPath),
+      );
 
     if (keys.length === 0) {
       return false;
@@ -1207,7 +1217,10 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     }
 
     const currentName =
-      record.fileName || record.title || normalizeGaragePath(record.link).split("/").pop() || "";
+      record.fileName ||
+      record.title ||
+      normalizeGaragePath(record.link).split("/").pop() ||
+      "";
     const nextName = window.prompt("Rename item", currentName);
     if (!nextName || nextName.trim() === currentName) return;
 
@@ -1612,38 +1625,58 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           <div className="w-[90vw] max-w-md rounded-[20px] border border-base-300 bg-base-100 p-6 shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">New Folder</p>
-                <h2 className="mt-2 text-lg font-bold">Create Notarial Folder</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">
+                  New Folder
+                </p>
+                <h2 className="mt-2 text-lg font-bold">
+                  Create Notarial Folder
+                </h2>
               </div>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFolderModal(false)}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowFolderModal(false)}
+              >
                 <FiX className="h-4 w-4" />
               </button>
             </div>
 
             <div className="mt-4 space-y-4">
               <label className="form-control">
-                <span className="label-text text-sm font-semibold">Folder Name</span>
+                <span className="label-text text-sm font-semibold">
+                  Folder Name
+                </span>
                 <input
                   type="text"
                   className="input input-bordered mt-1"
                   value={folderForm.name}
-                  onChange={(e) => setFolderForm((p) => ({ ...p, name: e.target.value }))}
+                  onChange={(e) =>
+                    setFolderForm((p) => ({ ...p, name: e.target.value }))
+                  }
                 />
               </label>
 
               <label className="form-control">
-                <span className="label-text text-sm font-semibold">Parent Path (optional)</span>
+                <span className="label-text text-sm font-semibold">
+                  Parent Path (optional)
+                </span>
                 <input
                   type="text"
                   className="input input-bordered mt-1"
                   placeholder="subfolder/or/parent"
                   value={folderForm.parentPath}
-                  onChange={(e) => setFolderForm((p) => ({ ...p, parentPath: e.target.value }))}
+                  onChange={(e) =>
+                    setFolderForm((p) => ({ ...p, parentPath: e.target.value }))
+                  }
                 />
               </label>
 
               <div className="flex items-center justify-end gap-2 mt-2">
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFolderModal(false)}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowFolderModal(false)}
+                >
                   Cancel
                 </button>
                 <button
@@ -1672,16 +1705,12 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             <h1 className="mt-3 text-3xl font-black tracking-tight text-base-content md:text-5xl">
               Notarial Explorer
             </h1>
-
           </div>
-
         </div>
       </header>
 
       <div className="grid gap-6">
-        <aside className="hidden space-y-5">
-         
-        </aside>
+        <aside className="hidden space-y-5"></aside>
 
         <main className="w-full space-y-5">
           <div className="rounded-[30px] border border-base-300 bg-base-100 p-5 shadow-lg">
@@ -1689,158 +1718,166 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
               {/* Row 1 — Search */}
               <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
                 <div className="relative flex-1">
-                <FiSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/35" />
-                <input
-                  type="text"
-                  placeholder="Search files, folders, client names, case numbers..."
-                  className="input input-bordered h-12 w-full rounded-2xl pl-11"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                />
+                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/35" />
+                  <input
+                    type="text"
+                    placeholder="Search files, folders, client names, case numbers..."
+                    className="input input-bordered h-12 w-full rounded-2xl pl-11"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                  />
                 </div>
 
-              {/* Row 2 — Action buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="btn-group mr-2" role="tablist" aria-label="Display mode">
+                {/* Row 2 — Action buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    className="btn-group mr-2"
+                    role="tablist"
+                    aria-label="Display mode"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={displayMode === "explorer"}
+                      className={`btn btn-sm ${
+                        displayMode === "explorer" ? "btn-primary" : "btn-ghost"
+                      }`}
+                      onClick={() => setDisplayMode("explorer")}
+                    >
+                      <FiGrid className="h-4 w-4" />
+                      <span className="ml-2 hidden sm:inline">Explorer</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={displayMode === "table"}
+                      className={`btn btn-sm ${
+                        displayMode === "table" ? "btn-primary" : "btn-ghost"
+                      }`}
+                      onClick={() => setDisplayMode("table")}
+                    >
+                      <FiList className="h-4 w-4" />
+                      <span className="ml-2 hidden sm:inline">Table</span>
+                    </button>
+                  </div>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                    <FiUpload className="h-4 w-4" />
+                    Upload
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null;
+                        if (file) void handleGarageDrop(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folder
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => {
+                        const files = event.currentTarget.files ?? null;
+                        void handleUploadFolderFiles(files);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
                   <button
                     type="button"
-                    role="tab"
-                    aria-selected={displayMode === "explorer"}
-                    className={`btn btn-sm ${
-                      displayMode === "explorer" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setDisplayMode("explorer")}
+                    className="btn btn-sm btn-outline gap-2"
+                    onClick={() => {
+                      setFolderForm((previous) => ({
+                        ...previous,
+                        parentPath: currentGaragePath,
+                      }));
+                      setShowFolderModal(true);
+                    }}
                   >
-                    <FiGrid className="h-4 w-4" />
-                    <span className="ml-2 hidden sm:inline">Explorer</span>
+                    <FiFolderPlus className="h-4 w-4" />
+                    New Folder
                   </button>
                   <button
                     type="button"
-                    role="tab"
-                    aria-selected={displayMode === "table"}
-                    className={`btn btn-sm ${
-                      displayMode === "table" ? "btn-primary" : "btn-ghost"
-                    }`}
-                    onClick={() => setDisplayMode("table")}
+                    className={`btn btn-sm btn-outline gap-2 ${refreshing ? "loading" : ""}`}
+                    onClick={() => void handleRefresh()}
+                    disabled={refreshing}
                   >
-                    <FiList className="h-4 w-4" />
-                    <span className="ml-2 hidden sm:inline">Table</span>
+                    <FiRefreshCw className="h-4 w-4" />
+                    Refresh
                   </button>
-                </div>
-                <label className="btn btn-sm btn-outline flex items-center gap-2">
-                  <FiUpload className="h-4 w-4" />
-                  Upload
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0] ?? null;
-                      if (file) void handleGarageDrop(file);
-                      event.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-                <label className="btn btn-sm btn-outline flex items-center gap-2">
-                  <FiFolder className="h-4 w-4" />
-                  Upload Folder
-                  <input
-                    ref={folderInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(event) => {
-                      const files = event.currentTarget.files ?? null;
-                      void handleUploadFolderFiles(files);
-                      event.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline gap-2"
-                  onClick={() => {
-                    setFolderForm((previous) => ({
-                      ...previous,
-                      parentPath: currentGaragePath,
-                    }));
-                    setShowFolderModal(true);
-                  }}
-                >
-                  <FiFolderPlus className="h-4 w-4" />
-                  New Folder
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm btn-outline gap-2 ${refreshing ? "loading" : ""}`}
-                  onClick={() => void handleRefresh()}
-                  disabled={refreshing}
-                >
-                  <FiRefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-                <div className="dropdown dropdown-end">
-                  <button type="button" tabIndex={0} className="btn btn-sm btn-outline gap-2">
-                    <FiList className="h-4 w-4" />
-                    Sort
-                  </button>
-                  <ul
-                    tabIndex={0}
-                    className="menu dropdown-content z-[4] mt-2 w-64 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
+                  <div className="dropdown dropdown-end">
+                    <button
+                      type="button"
+                      tabIndex={0}
+                      className="btn btn-sm btn-outline gap-2"
+                    >
+                      <FiList className="h-4 w-4" />
+                      Sort
+                    </button>
+                    <ul
+                      tabIndex={0}
+                      className="menu dropdown-content z-[4] mt-2 w-64 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
+                    >
+                      {[
+                        {
+                          label: "Newest first",
+                          config: { key: "date", order: "desc" } as SortConfig,
+                        },
+                        {
+                          label: "Oldest first",
+                          config: { key: "date", order: "asc" } as SortConfig,
+                        },
+                        {
+                          label: "Title A-Z",
+                          config: { key: "title", order: "asc" } as SortConfig,
+                        },
+                        {
+                          label: "Client A-Z",
+                          config: { key: "name", order: "asc" } as SortConfig,
+                        },
+                        {
+                          label: "Attorney A-Z",
+                          config: { key: "atty", order: "asc" } as SortConfig,
+                        },
+                      ].map((item) => (
+                        <li key={item.label}>
+                          <button
+                            type="button"
+                            className={
+                              sortConfig.key === item.config.key &&
+                              sortConfig.order === item.config.order
+                                ? "active"
+                                : ""
+                            }
+                            onClick={() => setSortConfig(item.config)}
+                          >
+                            {item.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    className={`btn btn-sm btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+                    onClick={() => setFilterModalOpen((previous) => !previous)}
                   >
-                    {[
-                      {
-                        label: "Newest first",
-                        config: { key: "date", order: "desc" } as SortConfig,
-                      },
-                      {
-                        label: "Oldest first",
-                        config: { key: "date", order: "asc" } as SortConfig,
-                      },
-                      {
-                        label: "Title A-Z",
-                        config: { key: "title", order: "asc" } as SortConfig,
-                      },
-                      {
-                        label: "Client A-Z",
-                        config: { key: "name", order: "asc" } as SortConfig,
-                      },
-                      {
-                        label: "Attorney A-Z",
-                        config: { key: "atty", order: "asc" } as SortConfig,
-                      },
-                    ].map((item) => (
-                      <li key={item.label}>
-                        <button
-                          type="button"
-                          className={
-                            sortConfig.key === item.config.key &&
-                            sortConfig.order === item.config.order
-                              ? "active"
-                              : ""
-                          }
-                          onClick={() => setSortConfig(item.config)}
-                        >
-                          {item.label}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <button
-                  type="button"
-                  className={`btn btn-sm btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-                  onClick={() => setFilterModalOpen((previous) => !previous)}
-                >
-                  <FiFilter className="h-4 w-4" />
-                  Filter
-                  {activeFilterCount > 0 && (
-                    <span className="badge badge-sm badge-primary">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-                {/* <button
+                    <FiFilter className="h-4 w-4" />
+                    Filter
+                    {activeFilterCount > 0 && (
+                      <span className="badge badge-sm badge-primary">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+                  {/* <button
                   type="button"
                   className="btn btn-primary btn-sm gap-2"
                   onClick={() => setShowUploadModal(true)}
@@ -1878,8 +1915,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   Export
                 </button> */}
 
-                {/* Sort — pushed to the right */}
-                {/* <div className="dropdown dropdown-end ml-auto">
+                  {/* Sort — pushed to the right */}
+                  {/* <div className="dropdown dropdown-end ml-auto">
                   <button
                     type="button"
                     tabIndex={0}
@@ -1936,7 +1973,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </ul>
                 </div> */}
 
-                {/* Filter
+                  {/* Filter
                 <button
                   type="button"
                   className={`btn btn-ghost btn-sm gap-1.5 font-normal ${
@@ -1954,7 +1991,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     </span>
                   )}
                 </button> */}
-              </div>
+                </div>
               </div>
 
               <div className="h-px bg-base-200" />
@@ -1993,7 +2030,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       void router.push("/user/cases/notarial");
                     }}
                   >
-                     <span className = "font-semibold"> Root Directory</span>
+                    <span className="font-semibold"> Root Directory</span>
                   </button>
                   {(displayMode === "explorer"
                     ? garagePathSegments
@@ -2094,8 +2131,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   )}
                 </button>
 
-                
-
                 {/* Right controls */}
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Grid / List toggle */}
@@ -2103,9 +2138,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     <button
                       type="button"
                       className={`join-item btn btn-sm ${
-                        viewMode === "grid"
-                          ? "btn-primary"
-                          : "btn-ghost"
+                        viewMode === "grid" ? "btn-primary" : "btn-ghost"
                       }`}
                       onClick={() => setViewMode("grid")}
                     >
@@ -2115,9 +2148,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     <button
                       type="button"
                       className={`join-item btn btn-sm ${
-                        viewMode === "list"
-                          ? "btn-primary"
-                          : "btn-ghost"
+                        viewMode === "list" ? "btn-primary" : "btn-ghost"
                       }`}
                       onClick={() => setViewMode("list")}
                     >
@@ -2166,7 +2197,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   {/* <span className="rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
                     {getNotarialSortLabel(sortConfig)}
                   </span> */}
-
                 </div>
               </div>
             </div>
@@ -2246,325 +2276,96 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           {/* TABLE/GRID LISTING - toggle via displayMode */}
           {displayMode === "table" && (
             <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
-            {records.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
-                  <FiFileText className="h-7 w-7 text-base-content/35" />
-                </span>
-                <h3 className="mt-5 text-lg font-semibold text-base-content">
-                  No notarial files match this view
-                </h3>
-                <p className="mt-2 max-w-md text-sm text-base-content/55">
-                  Adjust search terms, change filters, or upload a new file to
-                  start building this notarial folder thread.
-                </p>
-              </div>
-            ) : viewMode === "list" ? (
-              <div className="overflow-x-auto">
-                <table className="table w-full text-center">
-                  <thead>
-                    <tr className="bg-base-200/40 text-xs uppercase tracking-[0.16em] text-base-content/45">
-                      <th className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={allVisibleRecordsSelected}
-                          onChange={(event) =>
-                            toggleSelectAllVisible(event.target.checked)
+              {records.length === 0 ? (
+                <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                  <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
+                    <FiFileText className="h-7 w-7 text-base-content/35" />
+                  </span>
+                  <h3 className="mt-5 text-lg font-semibold text-base-content">
+                    No notarial files match this view
+                  </h3>
+                  <p className="mt-2 max-w-md text-sm text-base-content/55">
+                    Adjust search terms, change filters, or upload a new file to
+                    start building this notarial folder thread.
+                  </p>
+                </div>
+              ) : viewMode === "list" ? (
+                <div className="overflow-x-auto">
+                  <table className="table w-full text-center">
+                    <thead>
+                      <tr className="bg-base-200/40 text-xs uppercase tracking-[0.16em] text-base-content/45">
+                        <th className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={allVisibleRecordsSelected}
+                            onChange={(event) =>
+                              toggleSelectAllVisible(event.target.checked)
+                            }
+                            aria-label="Select all visible notarial records"
+                          />
+                        </th>
+                        <th className="px-4 py-4 text-left">File Name</th>
+                        <th className="px-4 py-4">File Type</th>
+                        <th className="px-4 py-4">Client / Signatory</th>
+                        <th className="px-4 py-4">Attorney</th>
+                        <th className="px-4 py-4">Date Uploaded</th>
+                        <th className="px-4 py-4">Last Modified</th>
+                        <th className="px-4 py-4">File Size</th>
+                        <th className="px-4 py-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {records.map((record) => (
+                        <NotarialRow
+                          key={record.id}
+                          record={record}
+                          canManage={canManageNotarial}
+                          canPreview={getPreviewType(record) !== null}
+                          isSelected={selectedRecordIds.includes(record.id)}
+                          onToggleSelect={toggleRecordSelection}
+                          onSelectRecord={setSelectedRecord}
+                          onPreviewFile={(item) => void handlePreviewFile(item)}
+                          onDownloadFile={(item) =>
+                            void handleDownloadFile(item)
                           }
-                          aria-label="Select all visible notarial records"
-                        />
-                      </th>
-                      <th className="px-4 py-4 text-left">File Name</th>
-                      <th className="px-4 py-4">File Type</th>
-                      <th className="px-4 py-4">Client / Signatory</th>
-                      <th className="px-4 py-4">Attorney</th>
-                      <th className="px-4 py-4">Date Uploaded</th>
-                      <th className="px-4 py-4">Last Modified</th>
-                      <th className="px-4 py-4">File Size</th>
-                      <th className="px-4 py-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.map((record) => (
-                      <NotarialRow
-                        key={record.id}
-                        record={record}
-                        canManage={canManageNotarial}
-                        canPreview={getPreviewType(record) !== null}
-                        isSelected={selectedRecordIds.includes(record.id)}
-                        onToggleSelect={toggleRecordSelection}
-                        onSelectRecord={setSelectedRecord}
-                        onPreviewFile={(item) => void handlePreviewFile(item)}
-                        onDownloadFile={(item) => void handleDownloadFile(item)}
-                        onOpenRecord={(item) =>
-                          router.push(`/user/cases/notarial/${item.id}`)
-                        }
-                        onEditRecord={(item) =>
-                          router.push(
-                            `/user/cases/notarial/edit?ids=${item.id}`,
-                          )
-                        }
-                        onDeleteRecord={(item) => void handleDeleteRecord(item)}
-                        onPrintRecord={(item) => void handlePrintFile(item)}
-                        onUnsupportedAction={handleUnsupportedAction}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
-                {records.map((record) => {
-                  const descriptor = getExplorerDescriptor({
-                    fileName: record.fileName ?? record.title,
-                    mimeType: record.mimeType,
-                    isFolder: record.isDirectory,
-                  });
-                  return (
-                    <div
-                      key={record.id}
-                      draggable={record.source === "garage"}
-                      className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-                        selectedRecord?.id === record.id
-                          ? "border-primary/35 bg-primary/7"
-                          : dragOverRecordId === record.id
-                            ? "border-primary/40 bg-primary/10"
-                            : "border-base-300 bg-base-100"
-                      }`}
-                      onContextMenu={(event) =>
-                        handleNotarialContextMenu(event, record)
-                      }
-                      onDragStart={(event) => {
-                        setDraggedRecordId(record.id);
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData(
-                          "application/x-rtc-notarial-record",
-                          String(record.id),
-                        );
-                      }}
-                      onDragEnd={() => {
-                        setDraggedRecordId(null);
-                        setDragOverRecordId(null);
-                      }}
-                      onDragOver={(event) => {
-                        if (!record.isDirectory) return;
-                        event.preventDefault();
-                        setDragOverRecordId(record.id);
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverRecordId === record.id) {
-                          setDragOverRecordId(null);
-                        }
-                      }}
-                      onDrop={(event) =>
-                        void handleNotarialDropOnFolder(event, record)
-                      }
-                      onClick={() => setSelectedRecord(record)}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <span
-                            className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
-                          >
-                            {descriptor.icon}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-base-content">
-                              {record.fileName ||
-                                record.title ||
-                                `Record #${record.id}`}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-base-content/50">
-                              {record.name || "No client name"}
-                            </p>
-                          </div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm mt-1"
-                          checked={selectedRecordIds.includes(record.id)}
-                          onChange={(event) =>
-                            toggleRecordSelection(
-                              record.id,
-                              event.target.checked,
+                          onOpenRecord={(item) =>
+                            router.push(`/user/cases/notarial/${item.id}`)
+                          }
+                          onEditRecord={(item) =>
+                            router.push(
+                              `/user/cases/notarial/edit?ids=${item.id}`,
                             )
                           }
-                          onClick={(event) => event.stopPropagation()}
-                          aria-label={`Select ${record.fileName || record.title || record.id}`}
+                          onDeleteRecord={(item) =>
+                            void handleDeleteRecord(item)
+                          }
+                          onPrintRecord={(item) => void handlePrintFile(item)}
+                          onUnsupportedAction={handleUnsupportedAction}
                         />
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${descriptor.badgeClassName}`}
-                        >
-                          {descriptor.label}
-                        </span>
-                        <span className="rounded-full bg-base-200/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                          {record.atty || "No attorney"}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-base-200/30 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                            Upload Date
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-base-content">
-                            {formatExplorerDateTime(
-                              record.fileCreatedAt || record.createdAt,
-                            )}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-base-200/30 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                            Size
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-base-content">
-                            {formatExplorerBytes(record.fileSize)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline gap-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedRecord(record);
-                          }}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline gap-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handlePreviewFile(record);
-                          }}
-                        >
-                          Preview
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-primary gap-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleDownloadFile(record);
-                          }}
-                        >
-                          Download
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            </div>
-          )}
-
-          {displayMode === "explorer" && (
-          <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
-            <div className="flex items-center justify-between mb-4">
-              {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline flex items-center gap-2"
-                  onClick={() => navigateGaragePath(parentGaragePath)}
-                  disabled={!currentGaragePath}
-                  title="Back to parent folder"
-                >
-                  <FiChevronLeft className="h-4 w-4" />
-                  Back
-                </button>
-                <label className="btn btn-sm btn-outline flex items-center gap-2">
-                  <FiUpload className="h-4 w-4" />
-                  Upload
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      if (f) void handleGarageDrop(f);
-                    }}
-                  />
-                </label>
-                <label className="btn btn-sm btn-outline flex items-center gap-2">
-                  <FiFolder className="h-4 w-4" />
-                  Upload Folder
-                  <input
-                    ref={folderInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = e.currentTarget.files ?? null;
-                      void handleUploadFolderFiles(files);
-                      // reset so same folder can be chosen again
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline flex items-center gap-2"
-                  onClick={() => {
-                    setFolderForm((previous) => ({
-                      ...previous,
-                      parentPath: currentGaragePath,
-                    }));
-                    setShowFolderModal(true);
-                  }}
-                >
-                  <FiChevronsDown className="h-4 w-4" />
-                  New Folder
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => setShowUploadModal(true)}
-                >
-                  Metadata
-                </button>
-              </div>
-            </div>
-
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(event) => void handleNotarialSurfaceDrop(event)}
-              className="flex flex-col gap-3"
-            >
-              {/* <div className="rounded-md border border-dashed border-base-300 p-6 text-center">
-                <p className="text-sm text-base-content/70">
-                  Drag & drop files here to upload (all types accepted)
-                </p>
-                <p className="text-xs text-base-content/50 mt-2">
-                  Or click Upload to select files
-                </p>
-              </div> */}
-
-              <div className="mt-3 w-full">
-                <div className="w-full overflow-hidden">
-                  <div className="hidden sm:flex items-center gap-4 px-3 py-2 text-xs uppercase text-base-content/45 bg-base-200/40 rounded-t-md">
-                    <div className="w-6" />
-                    <div className="flex-1">File Name</div>
-                    <div className="w-36">Owner</div>
-                    <div className="w-24">Size</div>
-                    <div className="w-36">Modified</div>
-                  </div>
-                  <div className="divide-y">
-                    {records.map((record) => (
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
+                  {records.map((record) => {
+                    const descriptor = getExplorerDescriptor({
+                      fileName: record.fileName ?? record.title,
+                      mimeType: record.mimeType,
+                      isFolder: record.isDirectory,
+                    });
+                    return (
                       <div
                         key={record.id}
-                        role="button"
-                        tabIndex={0}
-                        draggable
+                        draggable={record.source === "garage"}
+                        className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                          selectedRecord?.id === record.id
+                            ? "border-primary/35 bg-primary/7"
+                            : dragOverRecordId === record.id
+                              ? "border-primary/40 bg-primary/10"
+                              : "border-base-300 bg-base-100"
+                        }`}
                         onContextMenu={(event) =>
                           handleNotarialContextMenu(event, record)
                         }
@@ -2593,81 +2394,322 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         onDrop={(event) =>
                           void handleNotarialDropOnFolder(event, record)
                         }
-                        onClick={() => {
-                          if (record.isDirectory) {
-                            setSelectedRecord(record);
-                          } else if (isExcelRecord(record)) {
-                            void handleDownloadFile(record);
-                          } else {
-                            setSelectedRecord(record);
-                          }
-                        }}
-                        onDoubleClick={() => {
-                          if (record.isDirectory) {
-                            openGarageDirectory(record);
-                          } else {
-                            void handlePreviewFile(record);
-                          }
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter") return;
-                          if (record.isDirectory) {
-                            openGarageDirectory(record);
-                          } else {
-                            void handlePreviewFile(record);
-                          }
-                        }}
-                        className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
-                          selectedRecord?.id === record.id
-                            ? "bg-primary/7"
-                            : dragOverRecordId === record.id
-                              ? "bg-primary/10"
-                              : ""
-                        }`}
+                        onClick={() => setSelectedRecord(record)}
                       >
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={selectedRecordIds.includes(record.id)}
-                          onChange={(e) =>
-                            toggleRecordSelection(record.id, e.target.checked)
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Select ${record.fileName || record.title || record.id}`}
-                        />
-                        <div className="flex-1 truncate">
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-base-200">
-                              {getExplorerDescriptor({
-                                fileName: record.fileName ?? record.title,
-                                mimeType: record.mimeType,
-                                isFolder: record.isDirectory,
-                              }).icon}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span
+                              className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
+                            >
+                              {descriptor.icon}
                             </span>
                             <div className="min-w-0">
-                              <div className="truncate font-medium">
-                                {record.fileName || record.title || `Record #${record.id}`}
-                              </div>
-                              <div className="text-xs text-base-content/50 truncate">
-                                {record.name || ""}
+                              <p className="truncate text-sm font-semibold text-base-content">
+                                {record.fileName ||
+                                  record.title ||
+                                  `Record #${record.id}`}
+                              </p>
+                              <p className="mt-1 truncate text-xs text-base-content/50">
+                                {record.name || "No client name"}
+                              </p>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm mt-1"
+                            checked={selectedRecordIds.includes(record.id)}
+                            onChange={(event) =>
+                              toggleRecordSelection(
+                                record.id,
+                                event.target.checked,
+                              )
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Select ${record.fileName || record.title || record.id}`}
+                          />
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${descriptor.badgeClassName}`}
+                          >
+                            {descriptor.label}
+                          </span>
+                          <span className="rounded-full bg-base-200/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/55">
+                            {record.atty || "No attorney"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-2xl bg-base-200/30 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                              Upload Date
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-base-content">
+                              {formatExplorerDateTime(
+                                record.fileCreatedAt || record.createdAt,
+                              )}
+                            </p>
+                          </div>
+                          <div className="rounded-2xl bg-base-200/30 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                              Size
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-base-content">
+                              {formatExplorerBytes(record.fileSize)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline gap-2"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedRecord(record);
+                            }}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline gap-2"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handlePreviewFile(record);
+                            }}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-primary gap-2"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleDownloadFile(record);
+                            }}
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {displayMode === "explorer" && (
+            <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
+              <div className="flex items-center justify-between mb-4">
+                {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center gap-2"
+                    onClick={() => navigateGaragePath(parentGaragePath)}
+                    disabled={!currentGaragePath}
+                    title="Back to parent folder"
+                  >
+                    <FiChevronLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                    <FiUpload className="h-4 w-4" />
+                    Upload
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        if (f) void handleGarageDrop(f);
+                      }}
+                    />
+                  </label>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folder
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.currentTarget.files ?? null;
+                        void handleUploadFolderFiles(files);
+                        // reset so same folder can be chosen again
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center gap-2"
+                    onClick={() => {
+                      setFolderForm((previous) => ({
+                        ...previous,
+                        parentPath: currentGaragePath,
+                      }));
+                      setShowFolderModal(true);
+                    }}
+                  >
+                    <FiChevronsDown className="h-4 w-4" />
+                    New Folder
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setShowUploadModal(true)}
+                  >
+                    Metadata
+                  </button>
+                </div>
+              </div>
+
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(event) => void handleNotarialSurfaceDrop(event)}
+                className="flex flex-col gap-3"
+              >
+                {/* <div className="rounded-md border border-dashed border-base-300 p-6 text-center">
+                <p className="text-sm text-base-content/70">
+                  Drag & drop files here to upload (all types accepted)
+                </p>
+                <p className="text-xs text-base-content/50 mt-2">
+                  Or click Upload to select files
+                </p>
+              </div> */}
+
+                <div className="mt-3 w-full">
+                  <div className="w-full overflow-hidden">
+                    <div className="hidden sm:flex items-center gap-4 px-3 py-2 text-xs uppercase text-base-content/45 bg-base-200/40 rounded-t-md">
+                      <div className="w-6" />
+                      <div className="flex-1">File Name</div>
+                      <div className="w-36">Owner</div>
+                      <div className="w-24">Size</div>
+                      <div className="w-36">Modified</div>
+                    </div>
+                    <div className="divide-y">
+                      {records.map((record) => (
+                        <div
+                          key={record.id}
+                          role="button"
+                          tabIndex={0}
+                          draggable
+                          onContextMenu={(event) =>
+                            handleNotarialContextMenu(event, record)
+                          }
+                          onDragStart={(event) => {
+                            setDraggedRecordId(record.id);
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData(
+                              "application/x-rtc-notarial-record",
+                              String(record.id),
+                            );
+                          }}
+                          onDragEnd={() => {
+                            setDraggedRecordId(null);
+                            setDragOverRecordId(null);
+                          }}
+                          onDragOver={(event) => {
+                            if (!record.isDirectory) return;
+                            event.preventDefault();
+                            setDragOverRecordId(record.id);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverRecordId === record.id) {
+                              setDragOverRecordId(null);
+                            }
+                          }}
+                          onDrop={(event) =>
+                            void handleNotarialDropOnFolder(event, record)
+                          }
+                          onClick={() => {
+                            if (record.isDirectory) {
+                              setSelectedRecord(record);
+                            } else if (isExcelRecord(record)) {
+                              void handleDownloadFile(record);
+                            } else {
+                              setSelectedRecord(record);
+                            }
+                          }}
+                          onDoubleClick={() => {
+                            if (record.isDirectory) {
+                              openGarageDirectory(record);
+                            } else {
+                              void handlePreviewFile(record);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter") return;
+                            if (record.isDirectory) {
+                              openGarageDirectory(record);
+                            } else {
+                              void handlePreviewFile(record);
+                            }
+                          }}
+                          className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
+                            selectedRecord?.id === record.id
+                              ? "bg-primary/7"
+                              : dragOverRecordId === record.id
+                                ? "bg-primary/10"
+                                : ""
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={selectedRecordIds.includes(record.id)}
+                            onChange={(e) =>
+                              toggleRecordSelection(record.id, e.target.checked)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${record.fileName || record.title || record.id}`}
+                          />
+                          <div className="flex-1 truncate">
+                            <div className="flex items-center gap-3">
+                              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-base-200">
+                                {
+                                  getExplorerDescriptor({
+                                    fileName: record.fileName ?? record.title,
+                                    mimeType: record.mimeType,
+                                    isFolder: record.isDirectory,
+                                  }).icon
+                                }
+                              </span>
+                              <div className="min-w-0">
+                                <div className="truncate font-medium">
+                                  {record.fileName ||
+                                    record.title ||
+                                    `Record #${record.id}`}
+                                </div>
+                                <div className="text-xs text-base-content/50 truncate">
+                                  {record.name || ""}
+                                </div>
                               </div>
                             </div>
                           </div>
+                          <div className="w-36 text-sm text-base-content/60">
+                            —
+                          </div>
+                          <div className="w-24 text-sm text-base-content/60">
+                            {formatExplorerBytes(record.fileSize)}
+                          </div>
+                          <div className="w-36 text-sm text-base-content/60">
+                            {formatExplorerDateTime(
+                              record.fileUpdatedAt || record.updatedAt,
+                            )}
+                          </div>
                         </div>
-                        <div className="w-36 text-sm text-base-content/60">—</div>
-                        <div className="w-24 text-sm text-base-content/60">
-                          {formatExplorerBytes(record.fileSize)}
-                        </div>
-                        <div className="w-36 text-sm text-base-content/60">
-                          {formatExplorerDateTime(record.fileUpdatedAt || record.updatedAt)}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3096,7 +3138,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         <button
                           type="button"
                           className="btn btn-error btn-sm gap-2"
-                          onClick={() => void handleDeleteRecord(selectedRecord)}
+                          onClick={() =>
+                            void handleDeleteRecord(selectedRecord)
+                          }
                         >
                           Delete
                         </button>
