@@ -8,13 +8,13 @@ import AnnualRow from "../Annual/AnnualRow";
 import AnnualToolbar from "../Annual/AnnualToolbar";
 import JudgementAddReportPage from "./JudgementAddReportPage";
 import {
-    AnyColumnDef,
-    ColumnDef,
-    flattenColumns,
-    isGroupColumn,
+  AnyColumnDef,
+  ColumnDef,
+  flattenColumns,
+  isGroupColumn,
 } from "./JudgementColumnDef";
 import { FieldConfig } from "./JudgementFieldConfig";
-import JudgementViewPage from "./JudgementViewPage";
+// import JudgementViewPage from "./JudgementViewPage";
 import { useSession } from "@/app/lib/authClient";
 
 const PAGE_SIZE = 10;
@@ -70,7 +70,6 @@ function JudgementTable<T extends Record<string, unknown>>({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [showViewPage, setShowViewPage] = useState(false);
   const [showAddPage, setShowAddPage] = useState(false);
   const [editInitialData, setEditInitialData] = useState<
     Record<string, unknown>[] | undefined
@@ -406,23 +405,6 @@ function JudgementTable<T extends Record<string, unknown>>({
     );
   }
 
-  /* ── Sub-page: View Details ─────────────────────────────────────── */
-  if (showViewPage) {
-    return (
-      <JudgementViewPage
-        title={title}
-        subtitle={subtitle}
-        data={filteredAndSorted as unknown as Record<string, unknown>[]}
-        columns={normalizedColumns}
-        selectedYear={selectedYear}
-        onBack={() => {
-          setShowViewPage(false);
-          onActivePageChange?.(false);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── SUBTITLE HEADER ── */}{" "}
@@ -504,17 +486,8 @@ function JudgementTable<T extends Record<string, unknown>>({
             ? selectionMode === "delete"
               ? " ring-2 ring-error/30"
               : " ring-2 ring-info/30"
-            : " cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+            : ""
         }`}
-        onClick={
-          isSelecting
-            ? undefined
-            : () => {
-                setShowViewPage(true);
-                onActivePageChange?.(true);
-              }
-        }
-        title={isSelecting ? undefined : "Click to view detailed report"}
       >
         <div className="overflow-x-auto">
           <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">

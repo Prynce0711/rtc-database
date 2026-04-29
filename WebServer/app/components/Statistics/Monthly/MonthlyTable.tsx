@@ -1,9 +1,9 @@
 "use client";
 
+import { Pagination } from "@rtc-database/shared";
 import React, { useMemo, useState } from "react";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
-import { Pagination } from "@rtc-database/shared";
 
 const PAGE_SIZE = 10;
 
@@ -11,7 +11,6 @@ export type SelectionMode = "edit" | "delete" | null;
 
 interface MonthlyTableProps {
   data: MonthlyRow[];
-  onViewData?: () => void;
   selectionMode?: SelectionMode;
   selectedIds?: Set<number>;
   onToggleSelect?: (id: number) => void;
@@ -20,7 +19,6 @@ interface MonthlyTableProps {
 
 const MonthlyTable: React.FC<MonthlyTableProps> = ({
   data,
-  onViewData,
   selectionMode,
   selectedIds,
   onToggleSelect,
@@ -131,18 +129,8 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
           ? selectionMode === "delete"
             ? " ring-2 ring-error/30"
             : " ring-2 ring-info/30"
-          : onViewData
-            ? " cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
-            : ""
+          : ""
       }`}
-      onClick={isSelecting ? undefined : onViewData}
-      title={
-        isSelecting
-          ? undefined
-          : onViewData
-            ? "Click to view detailed report"
-            : undefined
-      }
     >
       <div className="overflow-x-auto">
         <table className="table table-fixed table-sm w-full text-center">

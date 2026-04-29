@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { Pagination, usePopup } from "@rtc-database/shared";
 import { BarChart3, FileText, Gavel, Scale } from "lucide-react";
@@ -11,8 +12,6 @@ import { FieldConfig } from "./AnnualFieldConfig";
 import AnnualRow from "./AnnualRow";
 import AnnualToolbar from "./AnnualToolbar";
 import { sortRecords } from "./AnnualUtils";
-import AnnualViewPage from "./AnnualViewPage";
-import { useSession } from "@/app/lib/authClient";
 
 const PAGE_SIZE = 10;
 
@@ -76,7 +75,6 @@ function AnnualTable<T extends Record<string, unknown>>({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [showViewPage, setShowViewPage] = useState(false);
   const [showAddPage, setShowAddPage] = useState(false);
   const [editInitialData, setEditInitialData] = useState<
     Record<string, unknown>[] | undefined
@@ -465,23 +463,6 @@ function AnnualTable<T extends Record<string, unknown>>({
     );
   }
 
-  if (showViewPage) {
-    return (
-      <AnnualViewPage
-        title={title}
-        subtitle={subtitle}
-        variant={variant}
-        data={filteredAndSorted as unknown as Record<string, unknown>[]}
-        columns={columns}
-        selectedYear={selectedYear}
-        onBack={() => {
-          setShowViewPage(false);
-          onActivePageChange?.(false);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── SUBTITLE HEADER ── */}{" "}
@@ -583,17 +564,8 @@ function AnnualTable<T extends Record<string, unknown>>({
             ? selectionMode === "delete"
               ? " ring-2 ring-error/30"
               : " ring-2 ring-info/30"
-            : " cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+            : ""
         }`}
-        onClick={
-          isSelecting
-            ? undefined
-            : () => {
-                setShowViewPage(true);
-                onActivePageChange?.(true);
-              }
-        }
-        title={isSelecting ? undefined : "Click to view detailed report"}
       >
         <div className="overflow-x-auto">
           <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
