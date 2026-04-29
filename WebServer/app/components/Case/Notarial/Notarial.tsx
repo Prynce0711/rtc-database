@@ -179,6 +179,11 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     order: "desc",
   });
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  // displayMode toggles the overall UI between the File Garage (explorer)
+  // and the classic table listing (table). Default to explorer.
+  const [displayMode, setDisplayMode] = useState<"explorer" | "table">(
+    "explorer",
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRecordIds, setSelectedRecordIds] = useState<number[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<NotarialRecord | null>(
@@ -201,7 +206,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [folderForm, setFolderForm] = useState({
     name: "",
-    parentPath: "",
+    parentPath: "Notarial Records",
     description: "",
   });
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -758,7 +763,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       setCreatingFolder(true);
       const result = await createGarageFolder({
         name: folderForm.name.trim(),
-        parentPath: folderForm.parentPath?.trim() || "",
+        parentPath: folderForm.parentPath?.trim() || "Notarial Records",
       });
       setCreatingFolder(false);
 
@@ -768,8 +773,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       }
 
       setShowFolderModal(false);
-      setFolderForm({ name: "", parentPath: "", description: "" });
-      statusPopup.showSuccess("Archive folder created.");
+      setFolderForm({ name: "", parentPath: "Notarial Records", description: "" });
+      statusPopup.showSuccess("Notarial folder created.");
+
       await refreshFromBackend(1);
     };
 
@@ -1077,7 +1083,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/60">New Folder</p>
-                <h2 className="mt-2 text-lg font-bold">Create Archive Folder</h2>
+                <h2 className="mt-2 text-lg font-bold">Create Notarial Folder</h2>
               </div>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowFolderModal(false)}>
                 <FiX className="h-4 w-4" />
@@ -1164,6 +1170,32 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
               {/* Row 2 — Action buttons */}
               <div className="flex flex-wrap items-center gap-2">
+                <div className="btn-group mr-2" role="tablist" aria-label="Display mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={displayMode === "explorer"}
+                    className={`btn btn-sm ${
+                      displayMode === "explorer" ? "btn-primary" : "btn-ghost"
+                    }`}
+                    onClick={() => setDisplayMode("explorer")}
+                  >
+                    <FiGrid className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Explorer</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={displayMode === "table"}
+                    className={`btn btn-sm ${
+                      displayMode === "table" ? "btn-primary" : "btn-ghost"
+                    }`}
+                    onClick={() => setDisplayMode("table")}
+                  >
+                    <FiList className="h-4 w-4" />
+                    <span className="ml-2 hidden sm:inline">Table</span>
+                  </button>
+                </div>
                 {/* <button
                   type="button"
                   className="btn btn-primary btn-sm gap-2"
@@ -1289,7 +1321,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   <button
                     type="button"
                     className="font-medium text-base-content/55 transition-colors hover:text-base-content"
-                    onClick={() => setSelectedRecord(null)}
+                    onClick={() => {
+                      setSelectedRecord(null);
+                      setAppliedFilters({});
+                      setExactMatchMap({});
+                      setSearchInput("");
+                      setCurrentPage(1);
+                      void refreshFromBackend(1);
+                      void router.push("/user/cases/notarial");
+                    }}
                   >
                     Root directory
                   </button>
@@ -1511,8 +1551,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             </div>
           )}
 
-          {/* TABLE/GRID LISTING DISABLED - replaced by File Garage UI below */}
-          {false && (
+          {/* TABLE/GRID LISTING - toggle via displayMode */}
+          {displayMode === "table" && (
             <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
             {records.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
@@ -1703,6 +1743,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             </div>
           )}
 
+          {displayMode === "explorer" && (
           <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
             <div className="flex items-center justify-between mb-4">
               {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
@@ -1839,6 +1880,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
               </div>
             </div>
           </div>
+          )}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/38">
