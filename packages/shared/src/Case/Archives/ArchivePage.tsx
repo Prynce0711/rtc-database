@@ -5,10 +5,12 @@ import React, {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   FiChevronRight,
+  FiChevronLeft,
   FiClock,
   FiDownload,
   FiEdit2,
@@ -128,6 +130,16 @@ const getPreviewType = (
   return null;
 };
 
+// Treat common spreadsheet file types as 'excel' for single-click download behavior
+const isSpreadsheetEntry = (entry: ArchiveEntryData) => {
+  const mime = (entry.file?.mimeType ?? "").toLowerCase();
+  const name = (entry.name ?? "").toLowerCase();
+  if (mime.includes("excel") || mime.includes("spreadsheet") || name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".csv") || name.endsWith(".ods")) {
+    return true;
+  }
+  return false;
+};
+
 const getSortLabel = (sortConfig: SortConfig) => {
   const keyLabel =
     sortConfig.key === "name"
@@ -164,6 +176,24 @@ const ArchivePage: React.FC<{
   const [typeFilter, setTypeFilter] = useState<EntryTypeFilter>("ALL");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  // Match Notarial: allow switching overall display between explorer and table
+  const [displayMode, setDisplayMode] = useState<"explorer" | "table">(
+    "explorer",
+  );
+  // Details drawer open state (matches Notarial drawer behavior)
+  const [isOpen, setIsOpen] = useState(false);
+  // Folder upload input ref — add webkitdirectory attribute after mount
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (folderInputRef.current) {
+      try {
+        folderInputRef.current.setAttribute("webkitdirectory", "");
+        folderInputRef.current.setAttribute("directory", "");
+      } catch {
+        // ignore if not supported
+      }
+    }
+  }, []);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "updatedAt",
@@ -292,6 +322,24 @@ const ArchivePage: React.FC<{
       return entries.find((item) => item.id === previous.id) ?? entries[0] ?? null;
     });
   }, [entries]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = isOpen ? "hidden" : "";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   const breadcrumbSegments = useMemo(() => {
     const normalized = normalizeArchivePath(currentPath);
@@ -514,6 +562,55 @@ const ArchivePage: React.FC<{
     await refreshEntries(1);
   };
 
+  // Garage drop handler: quick-set file and open upload modal
+  const handleGarageDrop = async (file: File | null) => {
+    if (!file) return;
+    setUploadForm((previous) => ({
+      ...previous,
+      file,
+      name: previous.name || file.name,
+    }));
+    setShowUploadModal(true);
+  };
+
+  const handleUploadFolderFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (
+      !(await statusPopup.showConfirm(
+        `Upload ${files.length} file${files.length > 1 ? "s" : ""} from folder?`,
+      ))
+    ) {
+      return;
+    }
+
+    statusPopup.showLoading(`Uploading ${files.length} files...`);
+    let successCount = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const title =
+          (file as unknown as { webkitRelativePath?: string }).webkitRelativePath ||
+          file.name;
+        // sequential upload to avoid overwhelming backend
+        // create archive entry per file under currentPath
+        // eslint-disable-next-line no-await-in-loop
+        const result = await adapter.createArchiveEntry({
+          name: title,
+          parentPath: currentPath,
+          entryType: ArchiveEntryType.FILE,
+          description: undefined,
+          file,
+        });
+        if (result.success) successCount++;
+      } catch {
+        // continue
+      }
+    }
+
+    statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    await refreshEntries(1);
+  };
+
   const toggleEntrySelection = (entryId: number, checked: boolean) => {
     setSelectedEntryIds((previous) => {
       if (checked) {
@@ -689,6 +786,352 @@ const ArchivePage: React.FC<{
       </div>
     );
   }
+
+  const renderListing = () => {
+    if (displayMode === "table") {
+      return (
+        <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
+          {entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+              <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
+                <FiFolder className="h-7 w-7 text-base-content/35" />
+              </span>
+              <h3 className="mt-5 text-lg font-semibold text-base-content">
+                This folder is empty
+              </h3>
+              <p className="mt-2 max-w-md text-sm text-base-content/55">
+                Create a folder, upload a file, or add a document/spreadsheet
+                to start organizing this archive thread.
+              </p>
+            </div>
+          ) : viewMode === "list" ? (
+            <div className="overflow-x-auto">
+              <table className="table w-full text-center">
+                <thead>
+                  <tr className="bg-base-200/40 text-xs uppercase tracking-[0.16em] text-base-content/45">
+                    <th className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allVisibleEntriesSelected}
+                        onChange={(event) => toggleSelectAllVisible(event.target.checked)}
+                        aria-label="Select all visible archive entries"
+                      />
+                    </th>
+                    <th className="px-4 py-4 text-left">File Name</th>
+                    <th className="px-4 py-4">File Type</th>
+                    <th className="px-4 py-4">Folder</th>
+                    <th className="px-4 py-4">Date Uploaded</th>
+                    <th className="px-4 py-4">Last Modified</th>
+                    <th className="px-4 py-4">File Size</th>
+                    <th className="px-4 py-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <ArchiveRow
+                      key={entry.id}
+                      entry={entry}
+                      canManage={canManage}
+                      isSelected={selectedEntryIds.includes(entry.id)}
+                      onToggleSelect={toggleEntrySelection}
+                      onSelectEntry={setSelectedEntry}
+                      onOpen={handleOpen}
+                      onPreview={(item) => void handlePreview(item)}
+                      onEdit={handleEdit}
+                      onDelete={(item) => void handleDelete(item)}
+                      onDownload={(item) => void handleDownload(item)}
+                      onPrint={(item) => void handlePrint(item)}
+                      onUnsupportedAction={handleUnsupportedAction}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
+              {entries.map((entry) => {
+                const descriptor = getArchiveDescriptor({
+                  entryType: entry.entryType,
+                  mimeType: entry.file?.mimeType,
+                  name: entry.name,
+                });
+                return (
+                  <div
+                    key={entry.id}
+                    className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                      selectedEntry?.id === entry.id
+                        ? "border-primary/35 bg-primary/7"
+                        : "border-base-300 bg-base-100"
+                    }`}
+                    onClick={() => setSelectedEntry(entry)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span
+                          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
+                        >
+                          {descriptor.icon}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-base-content">
+                            {entry.name}
+                          </p>
+                          <p className="mt-1 truncate text-xs text-base-content/50">
+                            {entry.parentPath || "Root Directory"}
+                          </p>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm mt-1"
+                        checked={selectedEntryIds.includes(entry.id)}
+                        onChange={(event) =>
+                          toggleEntrySelection(entry.id, event.target.checked)
+                        }
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Select ${entry.name}`}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${descriptor.badgeClassName}`}
+                      >
+                        {descriptor.label}
+                      </span>
+                      <span className="rounded-full bg-base-200/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/55">
+                        {entry.entryType === ArchiveEntryType.FOLDER
+                          ? "Container"
+                          : "Stored Item"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-base-200/30 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                          Modified
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-base-content">
+                          {formatArchiveDateTime(
+                            entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-base-200/30 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                          Size
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-base-content">
+                          {formatArchiveBytes(entry.file?.size)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline gap-2"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedEntry(entry);
+                        }}
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline gap-2"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (entry.entryType === ArchiveEntryType.FOLDER) {
+                            handleOpen(entry);
+                          } else {
+                            void handlePreview(entry);
+                          }
+                        }}
+                      >
+                        {entry.entryType === ArchiveEntryType.FOLDER
+                          ? "Open"
+                          : "Preview"}
+                      </button>
+                      {entry.file && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary gap-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleDownload(entry);
+                          }}
+                        >
+                          Download
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // explorer view
+    return (
+      <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <label className="btn btn-sm btn-outline flex items-center gap-2">
+              <FiUpload className="h-4 w-4" />
+              Upload
+              <input
+                type="file"
+                accept={acceptedArchiveUploadTypes}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file) {
+                    setUploadForm((previous) => ({
+                      ...previous,
+                      file,
+                      name: previous.name || file.name,
+                    }));
+                    setShowUploadModal(true);
+                    e.currentTarget.value = "";
+                  }
+                }}
+              />
+            </label>
+
+            <label className="btn btn-sm btn-outline flex items-center gap-2">
+              <FiFolder className="h-4 w-4" />
+              Upload Folder
+              <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => void handleUploadFolderFiles(e.target.files)}
+              />
+            </label>
+
+            <button
+              type="button"
+              className="btn btn-sm btn-outline flex items-center gap-2"
+              onClick={() => setShowFolderModal(true)}
+            >
+              <FiFolderPlus className="h-4 w-4" />
+              New Folder
+            </button>
+
+            <button type="button" className="btn btn-sm" onClick={() => setShowUploadModal(true)}>
+              Metadata
+            </button>
+          </div>
+        </div>
+
+        {entries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+            <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
+              <FiFolder className="h-7 w-7 text-base-content/35" />
+            </span>
+            <h3 className="mt-5 text-lg font-semibold text-base-content">This folder is empty</h3>
+            <p className="mt-2 max-w-md text-sm text-base-content/55">
+              Create a folder, upload a file, or add a document/spreadsheet to start organizing this archive thread.
+            </p>
+          </div>
+        ) : (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer?.files?.[0] ?? null;
+              void handleGarageDrop(file);
+            }}
+            className="flex flex-col gap-3"
+          >
+            <div className="mt-3 w-full">
+              <div className="w-full overflow-hidden">
+                <div className="hidden sm:flex items-center gap-4 px-3 py-2 text-xs uppercase text-base-content/45 bg-base-200/40 rounded-t-md">
+                  <div className="w-6" />
+                  <div className="flex-1">File Name</div>
+                  <div className="w-36">Owner</div>
+                  <div className="w-24">Size</div>
+                  <div className="w-36">Modified</div>
+                </div>
+
+                <div className="divide-y rounded-b-md">
+                  {entries.map((entry) => {
+                    const descriptor = getArchiveDescriptor({
+                      entryType: entry.entryType,
+                      mimeType: entry.file?.mimeType,
+                      name: entry.name,
+                    });
+                    return (
+                      <div
+                        key={entry.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (isSpreadsheetEntry(entry)) {
+                            void handleDownload(entry);
+                          } else {
+                            setSelectedEntry(entry);
+                          }
+                        }}
+                        onDoubleClick={() => {
+                          if (entry.entryType === ArchiveEntryType.FOLDER) {
+                            handleOpen(entry);
+                          } else {
+                            void handlePreview(entry);
+                          }
+                        }}
+                        className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
+                          selectedEntry?.id === entry.id ? "bg-primary/7" : ""
+                        }`}
+                      >
+                        <div className="w-6">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={selectedEntryIds.includes(entry.id)}
+                            onChange={(e) =>
+                              toggleEntrySelection(entry.id, e.target.checked)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Select ${entry.name}`}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
+                            >
+                              {descriptor.icon}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-base-content">{entry.name}</p>
+                              <p className="mt-1 truncate text-xs text-base-content/50">{entry.parentPath || "Root Directory"}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-36 text-sm text-base-content/60">—</div>
+                        <div className="w-24 text-sm text-base-content/60">{formatArchiveBytes(entry.file?.size)}</div>
+                        <div className="w-36 text-sm text-base-content/60">{formatArchiveDateTime(entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1002,21 +1445,21 @@ const ArchivePage: React.FC<{
         <div className="absolute inset-y-0 right-0 hidden w-72 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_55%)] lg:block" />
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-base-content/45">
+            {/* <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-base-content/45">
               <span>Archive & Notarial Workspace</span>
               <span className="opacity-40">•</span>
               <span>Structured file organization</span>
-            </div>
+            </div> */}
             <h1 className="mt-3 text-3xl font-black tracking-tight text-base-content md:text-5xl">
               Archive Explorer
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-base-content/62 md:text-base">
+            {/* <p className="mt-3 max-w-2xl text-sm leading-6 text-base-content/62 md:text-base">
               A clean archive workspace for folders, office files, scanned
               legal documents, and premium dashboard-style retrieval. Move
               quickly between threads, inspect metadata, and keep archive
               storage easy to browse.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            </p> */}
+            {/* <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100/80 px-3 py-1.5 text-xs font-semibold text-base-content/70">
                 <FiShield className="h-3.5 w-3.5 text-primary" />
                 Permission-aware explorer
@@ -1030,10 +1473,10 @@ const ArchivePage: React.FC<{
                 {stats.totalItems.toLocaleString()} visible item
                 {stats.totalItems !== 1 ? "s" : ""}
               </span>
-            </div>
+            </div> */}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[29rem]">
+          {/* <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[29rem]">
             <div className={statsCardClassName}>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
                 Total Items
@@ -1067,13 +1510,13 @@ const ArchivePage: React.FC<{
                 {stats.uploadedFiles.toLocaleString()} uploaded files
               </p>
             </div>
-          </div>
+          </div> */}
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[17rem_minmax(0,1fr)_21rem]">
-        <aside className="space-y-5">
-          <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
+      <div className="grid gap-6">
+        <aside className="hidden space-y-5">
+          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
               Workspace
             </p>
@@ -1118,9 +1561,9 @@ const ArchivePage: React.FC<{
                 Uploaded Files
               </button>
             </div>
-          </div>
+          </div> */}
 
-          <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
+          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
               Quick Create
             </p>
@@ -1166,9 +1609,9 @@ const ArchivePage: React.FC<{
                 New Spreadsheet
               </button>
             </div>
-          </div>
+          </div> */}
 
-          <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
+          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
               Security
             </p>
@@ -1194,9 +1637,9 @@ const ArchivePage: React.FC<{
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
 
-          <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
+          {/* <div className="rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
               Supported Types
             </p>
@@ -1211,7 +1654,7 @@ const ArchivePage: React.FC<{
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </aside>
 
         <main className="space-y-5">
@@ -1230,14 +1673,67 @@ const ArchivePage: React.FC<{
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary gap-2"
-                    onClick={() => setShowUploadModal(true)}
-                  >
+                  <div className="btn-group mr-2" role="tablist" aria-label="Display mode">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={displayMode === "explorer"}
+                      className={`btn btn-sm ${
+                        displayMode === "explorer" ? "btn-primary" : "btn-ghost"
+                      }`}
+                      onClick={() => setDisplayMode("explorer")}
+                    >
+                      <FiGrid className="h-4 w-4" />
+                      <span className="ml-2 hidden sm:inline">Explorer</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={displayMode === "table"}
+                      className={`btn btn-sm ${
+                        displayMode === "table" ? "btn-primary" : "btn-ghost"
+                      }`}
+                      onClick={() => setDisplayMode("table")}
+                    >
+                      <FiList className="h-4 w-4" />
+                      <span className="ml-2 hidden sm:inline">Table</span>
+                    </button>
+                  </div>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
                     <FiUpload className="h-4 w-4" />
-                    Upload File
-                  </button>
+                    Upload
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={acceptedArchiveUploadTypes}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        if (f) {
+                          setUploadForm((previous) => ({
+                            ...previous,
+                            file: f,
+                            name: previous.name || f.name,
+                          }));
+                          setShowUploadModal(true);
+                        }
+                      }}
+                    />
+                  </label>
+                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folder
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.currentTarget.files ?? null;
+                        void handleUploadFolderFiles(files);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
                   <button
                     type="button"
                     className="btn btn-outline gap-2"
@@ -1493,7 +1989,7 @@ const ArchivePage: React.FC<{
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {/* <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className={statsCardClassName}>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/40">
                 Total Items
@@ -1538,194 +2034,9 @@ const ArchivePage: React.FC<{
                 Binary attachments indexed
               </p>
             </div>
-          </div>
+          </div> */}
 
-          <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
-            {entries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
-                  <FiFolder className="h-7 w-7 text-base-content/35" />
-                </span>
-                <h3 className="mt-5 text-lg font-semibold text-base-content">
-                  This folder is empty
-                </h3>
-                <p className="mt-2 max-w-md text-sm text-base-content/55">
-                  Create a folder, upload a file, or add a document/spreadsheet
-                  to start organizing this archive thread.
-                </p>
-              </div>
-            ) : viewMode === "list" ? (
-              <div className="overflow-x-auto">
-                <table className="table w-full text-center">
-                  <thead>
-                    <tr className="bg-base-200/40 text-xs uppercase tracking-[0.16em] text-base-content/45">
-                      <th className="px-4 py-4">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={allVisibleEntriesSelected}
-                          onChange={(event) =>
-                            toggleSelectAllVisible(event.target.checked)
-                          }
-                          aria-label="Select all visible archive entries"
-                        />
-                      </th>
-                      <th className="px-4 py-4 text-left">File Name</th>
-                      <th className="px-4 py-4">File Type</th>
-                      <th className="px-4 py-4">Folder</th>
-                      <th className="px-4 py-4">Date Uploaded</th>
-                      <th className="px-4 py-4">Last Modified</th>
-                      <th className="px-4 py-4">File Size</th>
-                      <th className="px-4 py-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry) => (
-                      <ArchiveRow
-                        key={entry.id}
-                        entry={entry}
-                        canManage={canManage}
-                        isSelected={selectedEntryIds.includes(entry.id)}
-                        onToggleSelect={toggleEntrySelection}
-                        onSelectEntry={setSelectedEntry}
-                        onOpen={handleOpen}
-                        onPreview={(item) => void handlePreview(item)}
-                        onEdit={handleEdit}
-                        onDelete={(item) => void handleDelete(item)}
-                        onDownload={(item) => void handleDownload(item)}
-                        onPrint={(item) => void handlePrint(item)}
-                        onUnsupportedAction={handleUnsupportedAction}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
-                {entries.map((entry) => {
-                  const descriptor = getArchiveDescriptor({
-                    entryType: entry.entryType,
-                    mimeType: entry.file?.mimeType,
-                    name: entry.name,
-                  });
-                  return (
-                    <div
-                      key={entry.id}
-                      className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
-                        selectedEntry?.id === entry.id
-                          ? "border-primary/35 bg-primary/7"
-                          : "border-base-300 bg-base-100"
-                      }`}
-                      onClick={() => setSelectedEntry(entry)}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <span
-                            className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
-                          >
-                            {descriptor.icon}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-base-content">
-                              {entry.name}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-base-content/50">
-                              {entry.parentPath || "Root Directory"}
-                            </p>
-                          </div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm mt-1"
-                          checked={selectedEntryIds.includes(entry.id)}
-                          onChange={(event) =>
-                            toggleEntrySelection(entry.id, event.target.checked)
-                          }
-                          onClick={(event) => event.stopPropagation()}
-                          aria-label={`Select ${entry.name}`}
-                        />
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${descriptor.badgeClassName}`}
-                        >
-                          {descriptor.label}
-                        </span>
-                        <span className="rounded-full bg-base-200/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                          {entry.entryType === ArchiveEntryType.FOLDER
-                            ? "Container"
-                            : "Stored Item"}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-base-200/30 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                            Modified
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-base-content">
-                            {formatArchiveDateTime(
-                              entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt,
-                            )}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl bg-base-200/30 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                            Size
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-base-content">
-                            {formatArchiveBytes(entry.file?.size)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline gap-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedEntry(entry);
-                          }}
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline gap-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (entry.entryType === ArchiveEntryType.FOLDER) {
-                              handleOpen(entry);
-                            } else {
-                              void handlePreview(entry);
-                            }
-                          }}
-                        >
-                          {entry.entryType === ArchiveEntryType.FOLDER
-                            ? "Open"
-                            : "Preview"}
-                        </button>
-                        {entry.file && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-primary gap-2"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleDownload(entry);
-                            }}
-                          >
-                            Download
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {renderListing()}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/38">
@@ -1742,167 +2053,199 @@ const ArchivePage: React.FC<{
           </div>
         </main>
 
-        <aside className="space-y-5">
-          <div className="sticky top-4 rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-                  File Details
-                </p>
-                <h2 className="mt-2 text-lg font-bold text-base-content">
-                  {selectedEntry?.name || "No file selected"}
-                </h2>
-              </div>
-              {detailDescriptor && (
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${detailDescriptor.badgeClassName}`}
-                >
-                  {detailDescriptor.label}
-                </span>
-              )}
-            </div>
+        {/* Toggle tab — always visible on the right edge */}
+        <button
+          type="button"
+          onClick={() => setIsOpen((v) => !v)}
+          aria-label={isOpen ? "Close file details" : "Open file details"}
+          className="fixed right-0 top-1/2 z-50 -translate-y-1/2 flex flex-col items-center gap-2 rounded-l-xl border border-r-0 border-base-300 bg-base-100 px-2.5 py-4 shadow-md transition hover:bg-base-200"
+        >
+          {isOpen ? (
+            <FiChevronRight className="h-4 w-4 text-base-content/60" />
+          ) : (
+            <FiChevronLeft className="h-4 w-4 text-base-content/60" />
+          )}
+          <span className="[writing-mode:vertical-rl] rotate-180 text-[10px] font-semibold uppercase tracking-[0.18em] text-base-content/50">
+            Details
+          </span>
+        </button>
 
-            {!selectedEntry ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-base-300 bg-base-200/15 p-5 text-sm text-base-content/55">
-                Select an archive row or card to inspect its metadata, folder
-                thread, and quick actions.
+        {/* Overlay */}
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
+
+        {/* Drawer */}
+        <aside
+          className={`fixed right-0 top-0 z-50 h-full w-85 max-w-[92vw] overflow-y-auto border-l border-base-300 bg-base-100 shadow-xl transition-transform duration-300 ${
+            isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="p-5 pb-10">
+            <div className="sticky top-4 rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
+                    File Details
+                  </p>
+                  <h2 className="mt-2 text-lg font-bold text-base-content">
+                    {selectedEntry?.name || "No file selected"}
+                  </h2>
+                </div>
+                {detailDescriptor && (
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${detailDescriptor.badgeClassName}`}
+                  >
+                    {detailDescriptor.label}
+                  </span>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="mt-5 space-y-3">
-                  {[
-                    ["File Name", selectedEntry.name],
-                    ["File Type", detailDescriptor?.label || "—"],
-                    ["Folder", selectedEntry.parentPath || "Root Directory"],
-                    ["Description", selectedEntry.description || "—"],
-                    [
-                      "Date Created",
-                      formatArchiveDateTime(
-                        selectedEntry.file?.createdAt ?? selectedEntry.createdAt,
-                      ),
-                    ],
-                    [
-                      "Last Modified",
-                      formatArchiveDateTime(
-                        selectedEntry.file?.updatedAt ??
-                          selectedEntry.updatedAt ??
-                          selectedEntry.createdAt,
-                      ),
-                    ],
-                    ["File Size", formatArchiveBytes(selectedEntry.file?.size)],
-                    ["Full Path", selectedEntry.fullPath],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-[22px] border border-base-300 bg-base-200/18 px-4 py-3"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                        {label}
+
+              {!selectedEntry ? (
+                <div className="mt-6 rounded-[24px] border border-dashed border-base-300 bg-base-200/15 p-5 text-sm text-base-content/55">
+                  Select an archive row or card to inspect its metadata, folder
+                  thread, and quick actions.
+                </div>
+              ) : (
+                <>
+                  <div className="mt-5 space-y-3">
+                    {[
+                      ["File Name", selectedEntry.name],
+                      ["File Type", detailDescriptor?.label || "—"],
+                      ["Folder", selectedEntry.parentPath || "Root Directory"],
+                      ["Description", selectedEntry.description || "—"],
+                      [
+                        "Date Created",
+                        formatArchiveDateTime(
+                          selectedEntry.file?.createdAt ?? selectedEntry.createdAt,
+                        ),
+                      ],
+                      [
+                        "Last Modified",
+                        formatArchiveDateTime(
+                          selectedEntry.file?.updatedAt ??
+                            selectedEntry.updatedAt ??
+                            selectedEntry.createdAt,
+                        ),
+                      ],
+                      ["File Size", formatArchiveBytes(selectedEntry.file?.size)],
+                      ["Full Path", selectedEntry.fullPath],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="rounded-[22px] border border-base-300 bg-base-200/18 px-4 py-3"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                          {label}
+                        </p>
+                        <p className="mt-2 break-words text-sm font-semibold text-base-content">
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                      Folder Thread
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
+                      <span>Root Directory</span>
+                      {breadcrumbSegments.map((segment) => (
+                        <React.Fragment key={segment.path}>
+                          <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                          <span>{segment.label}</span>
+                        </React.Fragment>
+                      ))}
+                      {selectedEntry.entryType !== ArchiveEntryType.FOLDER && (
+                        <>
+                          <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
+                          <span>{selectedEntry.name}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
+                      Security
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-base-content/60">
+                      <p className="flex items-center gap-2">
+                        <FiShield className="h-4 w-4 text-primary" />
+                        Access scoped to the active role
                       </p>
-                      <p className="mt-2 break-words text-sm font-semibold text-base-content">
-                        {value}
+                      <p className="flex items-center gap-2">
+                        <FiLock className="h-4 w-4 text-primary" />
+                        Secure preview and download links
                       </p>
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                    Folder Thread
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
-                    <span>Root Directory</span>
-                    {breadcrumbSegments.map((segment) => (
-                      <React.Fragment key={segment.path}>
-                        <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                        <span>{segment.label}</span>
-                      </React.Fragment>
-                    ))}
-                    {selectedEntry.entryType !== ArchiveEntryType.FOLDER && (
-                      <>
-                        <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                        <span>{selectedEntry.name}</span>
-                      </>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm gap-2"
+                      onClick={() =>
+                        selectedEntry.entryType === ArchiveEntryType.FOLDER
+                          ? handleOpen(selectedEntry)
+                          : void handlePreview(selectedEntry)
+                      }
+                    >
+                      {selectedEntry.entryType === ArchiveEntryType.FOLDER
+                        ? "Open Folder"
+                        : "Preview"}
+                    </button>
+                    {selectedEntry.file && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handleDownload(selectedEntry)}
+                      >
+                        Download
+                      </button>
+                    )}
+                    {selectedEntry.file && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => void handlePrint(selectedEntry)}
+                      >
+                        Print
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm gap-2"
+                      onClick={() => handleOpen(selectedEntry)}
+                    >
+                      Open Page
+                    </button>
+                    {canManage && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => handleEdit(selectedEntry)}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        className="btn btn-error btn-sm gap-2"
+                        onClick={() => void handleDelete(selectedEntry)}
+                      >
+                        Delete
+                      </button>
                     )}
                   </div>
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                    Security
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-base-content/60">
-                    <p className="flex items-center gap-2">
-                      <FiShield className="h-4 w-4 text-primary" />
-                      Access scoped to the active role
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <FiLock className="h-4 w-4 text-primary" />
-                      Secure preview and download links
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm gap-2"
-                    onClick={() =>
-                      selectedEntry.entryType === ArchiveEntryType.FOLDER
-                        ? handleOpen(selectedEntry)
-                        : void handlePreview(selectedEntry)
-                    }
-                  >
-                    {selectedEntry.entryType === ArchiveEntryType.FOLDER
-                      ? "Open Folder"
-                      : "Preview"}
-                  </button>
-                  {selectedEntry.file && (
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() => void handleDownload(selectedEntry)}
-                    >
-                      Download
-                    </button>
-                  )}
-                  {selectedEntry.file && (
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() => void handlePrint(selectedEntry)}
-                    >
-                      Print
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm gap-2"
-                    onClick={() => handleOpen(selectedEntry)}
-                  >
-                    Open Page
-                  </button>
-                  {canManage && (
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() => handleEdit(selectedEntry)}
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {canManage && (
-                    <button
-                      type="button"
-                      className="btn btn-error btn-sm gap-2"
-                      onClick={() => void handleDelete(selectedEntry)}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </aside>
       </div>
@@ -1911,3 +2254,4 @@ const ArchivePage: React.FC<{
 };
 
 export default ArchivePage;
+ 
