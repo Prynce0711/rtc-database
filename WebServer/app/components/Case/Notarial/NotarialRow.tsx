@@ -7,6 +7,7 @@ import {
   FiEdit2,
   FiEye,
   FiExternalLink,
+  FiFolder,
   FiMoreHorizontal,
   FiPrinter,
   FiTrash2,
@@ -32,6 +33,8 @@ export type NotarialRecord = {
   fileCreatedAt?: string;
   fileUpdatedAt?: string;
   filePath?: string;
+  isDirectory?: boolean;
+  source?: "notarial" | "archive" | "garage";
 };
 
 const NotarialRow = ({
@@ -63,9 +66,11 @@ const NotarialRow = ({
   onPrintRecord: (record: NotarialRecord) => void;
   onUnsupportedAction: (action: string) => void;
 }) => {
+  const isDirectory = record.isDirectory === true;
   const descriptor = getExplorerDescriptor({
     fileName: record.fileName ?? record.title,
     mimeType: record.mimeType,
+    isFolder: isDirectory,
   });
 
   return (
@@ -74,6 +79,11 @@ const NotarialRow = ({
         isSelected ? "bg-primary/8" : ""
       }`}
       onClick={() => onSelectRecord(record)}
+      onDoubleClick={() => {
+        if (isDirectory) {
+          onOpenRecord(record);
+        }
+      }}
     >
       <td
         className="px-4 py-4 text-center"
@@ -155,7 +165,17 @@ const NotarialRow = ({
             View
           </button>
 
-          {record.link && (
+          {isDirectory ? (
+            <button
+              type="button"
+              className="btn btn-xs btn-primary gap-1.5"
+              onClick={() => onOpenRecord(record)}
+              title="Open folder"
+            >
+              <FiFolder size={12} />
+              Open
+            </button>
+          ) : record.link ? (
             <button
               type="button"
               className="btn btn-xs btn-primary gap-1.5"
@@ -165,7 +185,7 @@ const NotarialRow = ({
               <FiDownload size={12} />
               Download
             </button>
-          )}
+          ) : null}
 
           <div className="dropdown dropdown-end">
             <button
@@ -178,7 +198,7 @@ const NotarialRow = ({
             </button>
             <ul
               tabIndex={0}
-              className="menu dropdown-content z-[1] mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
+              className="menu dropdown-content z-1 mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
             >
               <li>
                 <button type="button" onClick={() => onSelectRecord(record)}>
@@ -186,29 +206,45 @@ const NotarialRow = ({
                   Details
                 </button>
               </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() =>
-                    canPreview ? onPreviewFile(record) : onDownloadFile(record)
-                  }
-                >
-                  <FiExternalLink size={14} />
-                  {canPreview ? "Preview" : "Open File"}
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => onDownloadFile(record)}>
-                  <FiDownload size={14} />
-                  Download
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => onPrintRecord(record)}>
-                  <FiPrinter size={14} />
-                  Print
-                </button>
-              </li>
+              {isDirectory ? (
+                <li>
+                  <button type="button" onClick={() => onOpenRecord(record)}>
+                    <FiFolder size={14} />
+                    Open Folder
+                  </button>
+                </li>
+              ) : (
+                <>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        canPreview
+                          ? onPreviewFile(record)
+                          : onDownloadFile(record)
+                      }
+                    >
+                      <FiExternalLink size={14} />
+                      {canPreview ? "Preview" : "Open File"}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => onDownloadFile(record)}
+                    >
+                      <FiDownload size={14} />
+                      Download
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => onPrintRecord(record)}>
+                      <FiPrinter size={14} />
+                      Print
+                    </button>
+                  </li>
+                </>
+              )}
               <li>
                 <button type="button" onClick={() => onOpenRecord(record)}>
                   <FiEye size={14} />
