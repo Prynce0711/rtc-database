@@ -38,7 +38,7 @@ Standalone LAN relay service for RTC Database.
 3. Start the relay. It auto-discovers the machine's active LAN IPv4 addresses and advertises all of them to clients.
 4. Optionally set `UDP_ADVERTISED_HOST` if you also want to advertise a custom DNS name.
 5. Ensure `UDP_ADVERTISED_PORT` matches `RELAY_PORT` (or leave default behavior).
-5. Run:
+6. Run:
 
 ```bash
 pnpm --filter rtc-database-relay dev
@@ -50,3 +50,15 @@ pnpm --filter rtc-database-relay dev
 pnpm --filter rtc-database-relay build
 pnpm --filter rtc-database-relay start
 ```
+
+## Windows EXE
+
+```bash
+pnpm --filter rtc-database-relay build:exe
+```
+
+The executable is written to `RelayServer/release-builds/rtc-database-relay.exe`.
+
+## Shared Relay Data
+
+Relay-only constants and discovery types now live in `packages/shared-relay`.

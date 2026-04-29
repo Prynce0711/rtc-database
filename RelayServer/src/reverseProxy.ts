@@ -1,4 +1,4 @@
-import { RELAY_HEALTH_PATH } from "@rtc-database/shared/src/UdpData";
+import { RELAY_HEALTH_PATH } from "@rtc-database/shared-relay";
 import httpProxy from "http-proxy";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -392,7 +392,7 @@ export async function startReverseProxy(): Promise<void> {
     }
   });
 
-const requestHandler: http.RequestListener = (request, response) => {
+  const requestHandler: http.RequestListener = (request, response) => {
     const requestPath = request.url
       ? new URL(request.url, "http://relay.local").pathname
       : "";

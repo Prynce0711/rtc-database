@@ -38,6 +38,9 @@ importers:
       '@rtc-database/shared':
         specifier: workspace:*
         version: link:../packages/shared
+      '@rtc-database/shared-relay':
+        specifier: workspace:*
+        version: link:../packages/shared-relay
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.2.2(vite@8.0.8(@types/node@25.2.0)(esbuild@0.27.7)(jiti@2.6.1))

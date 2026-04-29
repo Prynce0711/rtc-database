@@ -2,7 +2,7 @@ import {
   type BackendInfo,
   UDP_DISCOVERY_PORT,
   UdpDiscoveryResponse,
-} from "@rtc-database/shared/src/UdpData";
+} from "@rtc-database/shared-relay";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
 import { inspectBackendTrust, probeRelayReachability } from "./relayTrust";

@@ -3,7 +3,7 @@ import {
   UDP_DISCOVERY_RESPONSE_TYPE,
   UDP_SERVICE_NAME,
   type UdpDiscoveryResponse,
-} from "@rtc-database/shared/src/UdpData";
+} from "@rtc-database/shared-relay";
 import dgram from "dgram";
 import { networkInterfaces } from "node:os";
 
@@ -85,7 +85,11 @@ const parseIpv4 = (value: string): number | null => {
 
   for (const octet of octets) {
     const parsedOctet = Number.parseInt(octet, 10);
-    if (!Number.isInteger(parsedOctet) || parsedOctet < 0 || parsedOctet > 255) {
+    if (
+      !Number.isInteger(parsedOctet) ||
+      parsedOctet < 0 ||
+      parsedOctet > 255
+    ) {
       return null;
     }
 

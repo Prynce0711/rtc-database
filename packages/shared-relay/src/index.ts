@@ -30,11 +30,7 @@ export type UdpDiscoveryResponse = z.infer<typeof UdpDiscoveryResponse>;
 export const UdpData = UdpDiscoveryResponse;
 export type UdpData = UdpDiscoveryResponse;
 
-export type RelayTrustState =
-  | "trusted"
-  | "new"
-  | "changed"
-  | "unverified";
+export type RelayTrustState = "trusted" | "new" | "changed" | "unverified";
 
 export type RelayWarningKind =
   | "certificate-changed"

@@ -22,6 +22,7 @@
     "@prisma/fetch-engine": "^7.7.0",
     "@prisma/get-platform": "^7.7.0",
     "@rtc-database/shared": "workspace:*",
+    "@rtc-database/shared-relay": "workspace:*",
     "@tailwindcss/vite": "^4.2.2",
     "bindings": "^1.5.0",
     "better-sqlite3": "12.8.0",

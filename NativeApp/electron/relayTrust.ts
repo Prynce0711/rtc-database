@@ -1,4 +1,7 @@
-import { RELAY_HEALTH_PATH, type BackendInfo } from "@rtc-database/shared";
+import {
+  RELAY_HEALTH_PATH,
+  type BackendInfo,
+} from "@rtc-database/shared-relay";
 import { app, session } from "electron";
 import { X509Certificate } from "node:crypto";
 import fs from "node:fs";
@@ -221,7 +224,9 @@ const formatCertificateName = (value: unknown): string | undefined => {
   }
 
   const parts = Object.entries(record)
-    .filter(([, partValue]) => typeof partValue === "string" && partValue.trim())
+    .filter(
+      ([, partValue]) => typeof partValue === "string" && partValue.trim(),
+    )
     .map(([key, partValue]) => `${key}=${String(partValue).trim()}`);
 
   return parts.length > 0 ? parts.join(", ") : undefined;
@@ -291,14 +296,11 @@ export const probeRelayReachability = async (
 export const inspectLocalRelayCertificate = async (
   hostname: string,
   port: number,
-): Promise<
-  | {
-      fingerprint256: string | null;
-      subjectName?: string;
-      issuerName?: string;
-    }
-  | null
-> => {
+): Promise<{
+  fingerprint256: string | null;
+  subjectName?: string;
+  issuerName?: string;
+} | null> => {
   if (
     !hostname.trim() ||
     !Number.isInteger(port) ||
@@ -318,13 +320,11 @@ export const inspectLocalRelayCertificate = async (
     });
 
     const finish = (
-      result:
-        | {
-            fingerprint256: string | null;
-            subjectName?: string;
-            issuerName?: string;
-          }
-        | null,
+      result: {
+        fingerprint256: string | null;
+        subjectName?: string;
+        issuerName?: string;
+      } | null,
     ) => {
       if (settled) {
         return;
@@ -382,8 +382,10 @@ export const inspectBackendTrust = async (
 ): Promise<BackendTrustAssessment> => {
   const pinnedRelay = getPinnedRelayCertificatePin();
   const pinnedRelayFingerprint256 = pinnedRelay?.fingerprint256 ?? null;
-  const pinnedRelayProtocol = normalizeRelayProtocol(pinnedRelay?.protocol) ?? "https";
-  const pinnedRelayPort = pinnedRelay?.port ?? getDefaultPortForProtocol(pinnedRelayProtocol);
+  const pinnedRelayProtocol =
+    normalizeRelayProtocol(pinnedRelay?.protocol) ?? "https";
+  const pinnedRelayPort =
+    pinnedRelay?.port ?? getDefaultPortForProtocol(pinnedRelayProtocol);
   const assessment: BackendTrustAssessment = {
     relayFingerprint256: null,
     relaySubjectName: null,
@@ -406,11 +408,9 @@ export const inspectBackendTrust = async (
       parsedBackendUrl.protocol === "http:" ? "http" : "https";
     const shouldCheckPinnedRelayReachability = Boolean(
       pinnedRelay?.hostname &&
-        (
-          pinnedRelay.hostname !== parsedBackendUrl.hostname ||
-          pinnedRelayPort !== backendPort ||
-          pinnedRelayProtocol !== currentBackendProtocol
-        ),
+      (pinnedRelay.hostname !== parsedBackendUrl.hostname ||
+        pinnedRelayPort !== backendPort ||
+        pinnedRelayProtocol !== currentBackendProtocol),
     );
     const pinnedRelayReachabilityPromise = shouldCheckPinnedRelayReachability
       ? probeRelayReachability(
