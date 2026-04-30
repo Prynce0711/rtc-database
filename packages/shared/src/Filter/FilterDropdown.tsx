@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { FiChevronDown, FiSliders, FiX } from "react-icons/fi";
 import FilterRow from "./FilterRow";
 import { ExactMatchMap, FilterModalProps, FilterValues } from "./FilterTypes";
@@ -53,6 +53,9 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
   const [focusedFilter, setFocusedFilter] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
 
   const getCurrentSearchParams = () => {
     if (typeof window === "undefined") return new URLSearchParams();
@@ -77,6 +80,62 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
       setEnabledFilters(new Set(Object.keys(initialFilters)));
       setExactMatchMap(initialExactMatchMap);
     }
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !panelRef.current || !contentRef.current) return;
+
+    const panelEl = panelRef.current;
+    const contentEl = contentRef.current;
+
+    const adjust = () => {
+      // clear previous limits so we can measure natural sizes
+      panelEl.style.maxHeight = "";
+      contentEl.style.maxHeight = "";
+
+      const margin = 12; // spacing from viewport edges
+
+      const headerH = headerRef.current ? headerRef.current.getBoundingClientRect().height : 0;
+      const footerH = footerRef.current ? footerRef.current.getBoundingClientRect().height : 0;
+
+      // Cap the panel to 50% of the viewport height so it doesn't become too large
+      const panelMax50 = Math.floor(window.innerHeight * 0.5);
+      const finalPanelMax = Math.max(160, panelMax50);
+      panelEl.style.maxHeight = `${finalPanelMax}px`;
+
+      // Now compute the available space for the scrollable content area
+      const panelInnerHeight = panelEl.clientHeight;
+      let contentMax = panelInnerHeight - headerH - footerH;
+
+      // If the computed content space is too small, ensure a sensible minimum
+      if (contentMax < 120) {
+        contentMax = Math.max(120, Math.floor(window.innerHeight - margin * 2 - headerH - footerH));
+      }
+
+      contentEl.style.maxHeight = `${Math.floor(contentMax)}px`;
+    };
+
+    // initial adjust on next frame
+    requestAnimationFrame(adjust);
+
+    window.addEventListener("resize", adjust);
+
+    // Debounced scroll handler using requestAnimationFrame to avoid layout thrash
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(adjust);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", adjust);
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      panelEl.style.maxHeight = "";
+      contentEl.style.maxHeight = "";
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -230,7 +289,7 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
           transition={{ duration: 0.2 }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base-300">
+          <div ref={headerRef} className="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <div className="flex items-center gap-3">
               <FiSliders className="w-5 h-5 text-primary" />
               <span className="font-bold text-base">Advanced Filters</span>
@@ -252,6 +311,18 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
                 </button>
               )}
 
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>
+                Cancel
+              </button>
+
+              <button
+                className={`btn btn-primary btn-sm ${activeCount === 0 ? "opacity-50 pointer-events-none" : ""}`}
+                onClick={applyFilters}
+                disabled={activeCount === 0}
+              >
+                Apply Filters
+              </button>
+
               <button
                 className="btn btn-ghost btn-xs btn-circle"
                 onClick={onClose}
@@ -262,7 +333,11 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-5 max-h-[65vh] overflow-y-auto">
+          <div
+            ref={contentRef}
+            className="p-5 max-h-[65vh] overflow-y-auto"
+            style={{ overscrollBehavior: "contain" }}
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {options.map((option) => (
                 <FilterRow
@@ -293,21 +368,12 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-base-300 bg-base-200/50">
+          <div ref={footerRef} className="flex items-center justify-between px-6 py-4 border-t border-base-300 bg-base-200/50">
             <span className="text-sm text-base-content/50">
               {activeCount === 0
                 ? "Select filters above to narrow results"
                 : `${activeCount} filter${activeCount > 1 ? "s" : ""} will be applied`}
             </span>
-
-            <div className="flex gap-3">
-              <button className="btn btn-ghost btn-sm" onClick={onClose}>
-                Cancel
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={applyFilters}>
-                Apply Filters
-              </button>
-            </div>
           </div>
         </motion.div>
       )}
