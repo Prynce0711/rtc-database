@@ -333,6 +333,25 @@ const CriminalCasePage: React.FC<{
     fetchCases(currentPage);
   }, [fetchCases, currentPage]);
 
+  useEffect(() => {
+    const refreshCases = () => {
+      void fetchCases(currentPage);
+    };
+    const refreshRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        refreshCases();
+      }
+    };
+
+    window.addEventListener("focus", refreshCases);
+    window.addEventListener("pageshow", refreshRestoredPage);
+
+    return () => {
+      window.removeEventListener("focus", refreshCases);
+      window.removeEventListener("pageshow", refreshRestoredPage);
+    };
+  }, [fetchCases, currentPage]);
+
   const totalItems = totalCount;
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
   const visibleCaseIds = cases.map((caseItem) => caseItem.id);
