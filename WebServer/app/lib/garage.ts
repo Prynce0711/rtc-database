@@ -257,15 +257,14 @@ async function getBucketConsumedBytes(
   return Number.isFinite(consumedById) && consumedById > 0 ? consumedById : 0;
 }
 
-export async function getInfo(): Promise<GarageInfo> {
+export async function getInfo(bucket: string): Promise<GarageInfo> {
+  if (!bucket || !String(bucket).trim()) {
+    throw new Error("Garage bucket must be selected by the caller.");
+  }
   const settings = await loadSystemSettings();
-  const garageBucket = settings.garageBucket;
   const adminBaseUrl = getGarageAdminBaseUrl(settings);
   const metricsUrl = `${adminBaseUrl}/metrics`;
   const metricsToken = settings.garageMetricsToken?.trim() || "";
-  if (!garageBucket) {
-    throw new Error("Garage bucket is not configured in System Settings.");
-  }
 
   const response = await fetch(metricsUrl, {
     cache: "no-store",
@@ -295,10 +294,7 @@ export async function getInfo(): Promise<GarageInfo> {
     throw new Error("Garage metrics did not contain a valid capacity value.");
   }
 
-  const consumedBytes = await getBucketConsumedBytes(
-    garageBucket,
-    adminBaseUrl,
-  );
+  const consumedBytes = await getBucketConsumedBytes(bucket, adminBaseUrl);
   const normalizedConsumed = Math.max(0, consumedBytes);
   const normalizedRemaining = Math.max(0, totalBytes - normalizedConsumed);
 

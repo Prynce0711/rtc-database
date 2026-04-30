@@ -216,11 +216,26 @@ const getSortLabel = (sortConfig: SortConfig) => {
           ? "Created"
           : "Modified";
 
-  return `${keyLabel} · ${sortConfig.order === "asc" ? "Ascending" : "Descending"}`;
+  return `${keyLabel} - ${sortConfig.order === "asc" ? "Ascending" : "Descending"}`;
 };
 
 const statsCardClassName =
   "group overflow-hidden rounded-[28px] border border-base-300/70 bg-base-100/95 p-5 shadow-[0_18px_55px_-28px_rgba(15,23,42,0.42)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_-30px_rgba(14,116,144,0.36)]";
+
+const ArchiveEmptyState = () => (
+  <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
+    <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60 sm:h-20 sm:w-20">
+      <FiFolder className="h-7 w-7 text-base-content/35 sm:h-8 sm:w-8" />
+    </span>
+    <h3 className="mt-5 text-lg font-semibold text-base-content">
+      This folder is empty
+    </h3>
+    <p className="mt-2 max-w-md text-sm leading-6 text-base-content/55">
+      Create a folder, upload a file, or add a document/spreadsheet to start
+      organizing this archive thread.
+    </p>
+  </div>
+);
 
 const ArchivePage: React.FC<{
   role: Roles;
@@ -248,7 +263,7 @@ const ArchivePage: React.FC<{
   );
   // Details drawer open state (matches Notarial drawer behavior)
   const [isOpen, setIsOpen] = useState(false);
-  // Folder upload input ref — add webkitdirectory attribute after mount
+  // Folder upload input ref - add webkitdirectory attribute after mount
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (folderInputRef.current) {
@@ -1298,20 +1313,9 @@ const ArchivePage: React.FC<{
   const renderListing = () => {
     if (displayMode === "table") {
       return (
-        <div className="overflow-hidden rounded-[30px] border border-base-300 bg-base-100 shadow-lg">
+        <div className="min-w-0 overflow-hidden rounded-[24px] border border-base-300 bg-base-100 shadow-lg sm:rounded-[30px]">
           {entries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-              <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
-                <FiFolder className="h-7 w-7 text-base-content/35" />
-              </span>
-              <h3 className="mt-5 text-lg font-semibold text-base-content">
-                This folder is empty
-              </h3>
-              <p className="mt-2 max-w-md text-sm text-base-content/55">
-                Create a folder, upload a file, or add a document/spreadsheet
-                to start organizing this archive thread.
-              </p>
-            </div>
+            <ArchiveEmptyState />
           ) : viewMode === "list" ? (
             <div className="overflow-x-auto">
               <table className="table w-full text-center">
@@ -1357,7 +1361,7 @@ const ArchivePage: React.FC<{
               </table>
             </div>
           ) : (
-            <div className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-3 p-3 sm:grid-cols-2 sm:gap-4 sm:p-4 xl:grid-cols-3">
               {entries.map((entry) => {
                 const descriptor = getArchiveDescriptor({
                   entryType: entry.entryType,
@@ -1463,10 +1467,10 @@ const ArchivePage: React.FC<{
                       </div>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline gap-2"
+                        className="btn btn-sm btn-outline min-w-0 gap-2 sm:w-auto"
                         onClick={(event) => {
                           event.stopPropagation();
                           setSelectedEntry(entry);
@@ -1476,7 +1480,7 @@ const ArchivePage: React.FC<{
                       </button>
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline gap-2"
+                        className="btn btn-sm btn-outline min-w-0 gap-2 sm:w-auto"
                         onClick={(event) => {
                           event.stopPropagation();
                           if (entry.entryType === ArchiveEntryType.FOLDER) {
@@ -1493,7 +1497,7 @@ const ArchivePage: React.FC<{
                       {entry.file && (
                         <button
                           type="button"
-                          className="btn btn-sm btn-primary gap-2"
+                          className="btn btn-sm btn-primary min-w-0 gap-2 sm:w-auto"
                           onClick={(event) => {
                             event.stopPropagation();
                             void handleDownload(entry);
@@ -1514,12 +1518,12 @@ const ArchivePage: React.FC<{
 
     // explorer view
     return (
-      <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+      <div className="min-w-0 overflow-hidden rounded-[22px] border border-base-300 bg-base-100 p-3 sm:p-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <button
               type="button"
-              className="btn btn-sm btn-outline flex items-center gap-2"
+              className="btn btn-sm btn-outline flex items-center justify-center gap-2"
               onClick={() => navigateArchivePath(parentArchivePath)}
               disabled={!currentPath}
               title="Back to parent folder"
@@ -1528,7 +1532,7 @@ const ArchivePage: React.FC<{
               Back
             </button>
 
-            <label className="btn btn-sm btn-outline flex items-center gap-2">
+            <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
               <FiUpload className="h-4 w-4" />
               Upload
               <input
@@ -1550,7 +1554,7 @@ const ArchivePage: React.FC<{
               />
             </label>
 
-            <label className="btn btn-sm btn-outline flex items-center gap-2">
+            <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
               <FiFolder className="h-4 w-4" />
               Upload Folder
               <input
@@ -1564,29 +1568,25 @@ const ArchivePage: React.FC<{
 
             <button
               type="button"
-              className="btn btn-sm btn-outline flex items-center gap-2"
+              className="btn btn-sm btn-outline flex items-center justify-center gap-2"
               onClick={() => setShowFolderModal(true)}
             >
               <FiFolderPlus className="h-4 w-4" />
               New Folder
             </button>
 
-            <button type="button" className="btn btn-sm" onClick={() => setShowUploadModal(true)}>
+            <button
+              type="button"
+              className="btn btn-sm col-span-2 sm:col-span-1"
+              onClick={() => setShowUploadModal(true)}
+            >
               Metadata
             </button>
           </div>
         </div>
 
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-            <span className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-base-200/60">
-              <FiFolder className="h-7 w-7 text-base-content/35" />
-            </span>
-            <h3 className="mt-5 text-lg font-semibold text-base-content">This folder is empty</h3>
-            <p className="mt-2 max-w-md text-sm text-base-content/55">
-              Create a folder, upload a file, or add a document/spreadsheet to start organizing this archive thread.
-            </p>
-          </div>
+          <ArchiveEmptyState />
         ) : (
           <div
             onDragOver={(e) => e.preventDefault()}
@@ -1594,10 +1594,10 @@ const ArchivePage: React.FC<{
             className="flex flex-col gap-3"
           >
             <div className="mt-3 w-full">
-              <div className="w-full overflow-hidden">
-                <div className="hidden sm:flex items-center gap-4 px-3 py-2 text-xs uppercase text-base-content/45 bg-base-200/40 rounded-t-md">
+              <div className="w-full min-w-0 overflow-hidden">
+                <div className="hidden grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] items-center gap-4 rounded-t-md bg-base-200/40 px-4 py-2 text-xs uppercase text-base-content/45 lg:grid">
                   <div className="w-6" />
-                  <div className="flex-1">File Name</div>
+                  <div>File Name</div>
                   <div className="w-36">Owner</div>
                   <div className="w-24">Size</div>
                   <div className="w-36">Modified</div>
@@ -1654,7 +1654,7 @@ const ArchivePage: React.FC<{
                             void handlePreview(entry);
                           }
                         }}
-                        className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
+                        className={`grid gap-3 px-3 py-3 transition hover:bg-base-200/40 sm:px-4 lg:grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] lg:items-center lg:gap-4 ${
                           selectedEntry?.id === entry.id
                             ? "bg-primary/7"
                             : dragOverEntryId === entry.id
@@ -1662,20 +1662,20 @@ const ArchivePage: React.FC<{
                               : ""
                         }`}
                       >
-                        <div className="w-6">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm"
-                            checked={selectedEntryIds.includes(entry.id)}
-                            onChange={(e) =>
-                              toggleEntrySelection(entry.id, e.target.checked)
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Select ${entry.name}`}
-                          />
-                        </div>
+                        <div className="flex min-w-0 items-start gap-3 lg:contents">
+                          <div className="shrink-0 pt-2 lg:pt-0">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={selectedEntryIds.includes(entry.id)}
+                              onChange={(e) =>
+                                toggleEntrySelection(entry.id, e.target.checked)
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Select ${entry.name}`}
+                            />
+                          </div>
 
-                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3">
                             <span
                               className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${descriptor.iconWrapClassName}`}
@@ -1683,15 +1683,46 @@ const ArchivePage: React.FC<{
                               {descriptor.icon}
                             </span>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-base-content">{entry.name}</p>
-                              <p className="mt-1 truncate text-xs text-base-content/50">{entry.parentPath || "Root Directory"}</p>
+                              <p className="truncate text-sm font-semibold text-base-content">
+                                {entry.name}
+                              </p>
+                              <p className="mt-1 truncate text-xs text-base-content/50">
+                                {entry.parentPath || "Root Directory"}
+                              </p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="w-36 text-sm text-base-content/60">—</div>
-                        <div className="w-24 text-sm text-base-content/60">{formatArchiveBytes(entry.file?.size)}</div>
-                        <div className="w-36 text-sm text-base-content/60">{formatArchiveDateTime(entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt)}</div>
+                        <div className="grid grid-cols-2 gap-2 pl-12 sm:grid-cols-3 lg:contents lg:pl-0">
+                          <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
+                            <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                              Owner
+                            </p>
+                            <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                              -
+                            </p>
+                          </div>
+                          <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
+                            <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                              Size
+                            </p>
+                            <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                              {formatArchiveBytes(entry.file?.size)}
+                            </p>
+                          </div>
+                          <div className="col-span-2 min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 sm:col-span-1 lg:col-span-auto lg:bg-transparent lg:p-0">
+                            <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                              Modified
+                            </p>
+                            <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                              {formatArchiveDateTime(
+                                entry.file?.updatedAt ??
+                                  entry.updatedAt ??
+                                  entry.createdAt,
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -1705,7 +1736,7 @@ const ArchivePage: React.FC<{
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <FileViewerModal
         open={previewState.open}
         loading={previewState.loading}
@@ -1851,7 +1882,7 @@ const ArchivePage: React.FC<{
                     </label>
                     <p className="text-xs font-medium text-base-content/45">
                       {uploadForm.file
-                        ? `${uploadForm.file.name} · ${formatArchiveBytes(uploadForm.file.size)}`
+                        ? `${uploadForm.file.name} - ${formatArchiveBytes(uploadForm.file.size)}`
                         : "No file selected"}
                     </p>
                   </div>
@@ -2061,7 +2092,7 @@ const ArchivePage: React.FC<{
         </ModalBase>
       )}
 
-      <header className="relative overflow-hidden rounded-[34px] border border-base-300/70 bg-gradient-to-br from-base-100 via-base-100 to-primary/8 p-6 shadow-[0_24px_80px_-38px_rgba(15,23,42,0.55)]">
+      <header className="relative overflow-hidden rounded-[26px] border border-base-300/70 bg-gradient-to-br from-base-100 via-base-100 to-primary/8 p-4 shadow-[0_24px_80px_-38px_rgba(15,23,42,0.55)] sm:rounded-[34px] sm:p-6">
         <div className="absolute inset-y-0 right-0 hidden w-72 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_55%)] lg:block" />
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
@@ -2070,7 +2101,7 @@ const ArchivePage: React.FC<{
               <span className="opacity-40">•</span>
               <span>Structured file organization</span>
             </div> */}
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-base-content md:text-5xl">
+            <h1 className="mt-3 text-2xl font-black tracking-tight text-base-content sm:text-3xl md:text-5xl">
               Archive Explorer
             </h1>
             {/* <p className="mt-3 max-w-2xl text-sm leading-6 text-base-content/62 md:text-base">
@@ -2277,11 +2308,11 @@ const ArchivePage: React.FC<{
           </div> */}
         </aside>
 
-        <main className="space-y-5">
-          <div className="rounded-[30px] border border-base-300 bg-base-100 p-5 shadow-lg">
+        <main className="min-w-0 space-y-5">
+          <div className="rounded-[24px] border border-base-300 bg-base-100 p-3 shadow-lg sm:rounded-[30px] sm:p-5">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
-                <div className="relative flex-1">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <div className="relative min-w-0 flex-1">
                   <FiSearch className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/35" />
                   <input
                     type="text"
@@ -2292,13 +2323,17 @@ const ArchivePage: React.FC<{
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="btn-group mr-2" role="tablist" aria-label="Display mode">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                  <div
+                    className="btn-group col-span-2 w-full sm:col-span-1 sm:mr-2 sm:w-auto"
+                    role="tablist"
+                    aria-label="Display mode"
+                  >
                     <button
                       type="button"
                       role="tab"
                       aria-selected={displayMode === "explorer"}
-                      className={`btn btn-sm ${
+                      className={`btn btn-sm flex-1 sm:flex-none ${
                         displayMode === "explorer" ? "btn-primary" : "btn-ghost"
                       }`}
                       onClick={() => setDisplayMode("explorer")}
@@ -2310,7 +2345,7 @@ const ArchivePage: React.FC<{
                       type="button"
                       role="tab"
                       aria-selected={displayMode === "table"}
-                      className={`btn btn-sm ${
+                      className={`btn btn-sm flex-1 sm:flex-none ${
                         displayMode === "table" ? "btn-primary" : "btn-ghost"
                       }`}
                       onClick={() => setDisplayMode("table")}
@@ -2319,7 +2354,7 @@ const ArchivePage: React.FC<{
                       <span className="ml-2 hidden sm:inline">Table</span>
                     </button>
                   </div>
-                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                  <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
                     <FiUpload className="h-4 w-4" />
                     Upload
                     <input
@@ -2339,7 +2374,7 @@ const ArchivePage: React.FC<{
                       }}
                     />
                   </label>
-                  <label className="btn btn-sm btn-outline flex items-center gap-2">
+                  <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
                     <FiFolder className="h-4 w-4" />
                     Upload Folder
                     <input
@@ -2356,7 +2391,7 @@ const ArchivePage: React.FC<{
                   </label>
                   <button
                     type="button"
-                    className="btn btn-outline gap-2"
+                    className="btn btn-sm btn-outline min-w-0 gap-2"
                     onClick={() => setShowFolderModal(true)}
                   >
                     <FiFolderPlus className="h-4 w-4" />
@@ -2364,7 +2399,7 @@ const ArchivePage: React.FC<{
                   </button>
                   <button
                     type="button"
-                    className={`btn btn-outline gap-2 ${refreshing ? "loading" : ""}`}
+                    className={`btn btn-sm btn-outline min-w-0 gap-2 ${refreshing ? "loading" : ""}`}
                     onClick={() => void handleRefresh()}
                     disabled={refreshing}
                   >
@@ -2372,7 +2407,7 @@ const ArchivePage: React.FC<{
                     Refresh
                   </button>
                   <div className="dropdown dropdown-end">
-                    <button type="button" tabIndex={0} className="btn btn-outline gap-2">
+                    <button type="button" tabIndex={0} className="btn btn-sm btn-outline min-w-0 gap-2">
                       <FiList className="h-4 w-4" />
                       Sort
                     </button>
@@ -2434,7 +2469,7 @@ const ArchivePage: React.FC<{
 
                   <button
                     type="button"
-                    className={`btn btn-outline gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+                    className={`btn btn-sm btn-outline min-w-0 gap-2 ${activeFilterCount > 0 ? "btn-primary" : ""}`}
                     onClick={() => setShowFilterPanel((previous) => !previous)}
                   >
                     <FiFilter className="h-4 w-4" />
@@ -2448,11 +2483,11 @@ const ArchivePage: React.FC<{
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-base-content/55">
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto pb-1 text-sm text-base-content/55">
                   <button
                     type="button"
-                    className="btn btn-xs btn-ghost"
+                    className="btn btn-xs btn-ghost shrink-0"
                     onClick={() => navigateArchivePath("")}
                   >
                     Root Directory
@@ -2462,7 +2497,7 @@ const ArchivePage: React.FC<{
                       <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
                       <button
                         type="button"
-                        className="btn btn-xs btn-ghost"
+                        className="btn btn-xs btn-ghost shrink-0"
                         onClick={() => navigateArchivePath(segment.path)}
                       >
                         {segment.label}
@@ -2471,7 +2506,7 @@ const ArchivePage: React.FC<{
                   ))}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                   {/* <button
                     type="button"
                     className="btn btn-sm btn-outline gap-2"
@@ -2502,7 +2537,7 @@ const ArchivePage: React.FC<{
                     </button>
                   </div>
 
-                  <span className="rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
+                  <span className="max-w-full truncate rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
                     {getSortLabel(sortConfig)}
                   </span>
                 </div>
@@ -2535,7 +2570,7 @@ const ArchivePage: React.FC<{
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
                       Current Folder
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-base-content">
+                    <p className="mt-2 break-words text-sm font-semibold text-base-content">
                       {currentPath || "Root Directory"}
                     </p>
                   </div>
@@ -2556,7 +2591,7 @@ const ArchivePage: React.FC<{
           {selectedCount > 0 && (
             <div className="rounded-[26px] border border-primary/20 bg-primary/8 p-4 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/65">
                     Bulk Actions
                   </p>
@@ -2564,7 +2599,7 @@ const ArchivePage: React.FC<{
                     {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
                   <button
                     type="button"
                     className="btn btn-sm btn-outline gap-2"
@@ -2662,7 +2697,8 @@ const ArchivePage: React.FC<{
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-base-content/38">
-              Showing page {currentPage} of {pageCount} · {totalCount.toLocaleString()} items
+              Showing page {currentPage} of {pageCount} -{" "}
+              {totalCount.toLocaleString()} items
             </p>
             <Pagination
               pageCount={pageCount}
@@ -2675,7 +2711,7 @@ const ArchivePage: React.FC<{
           </div>
         </main>
 
-        {/* Toggle tab — always visible on the right edge */}
+        {/* Toggle tab - always visible on the right edge */}
         <button
           type="button"
           onClick={() => setIsOpen((v) => !v)}
@@ -2702,24 +2738,24 @@ const ArchivePage: React.FC<{
 
         {/* Drawer */}
         <aside
-          className={`fixed right-0 top-0 z-50 h-full w-85 max-w-[92vw] overflow-y-auto border-l border-base-300 bg-base-100 shadow-xl transition-transform duration-300 ${
+          className={`fixed right-0 top-0 z-50 h-full w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto border-l border-base-300 bg-base-100 shadow-xl transition-transform duration-300 sm:w-[24rem] ${
             isOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="p-5 pb-10">
+          <div className="p-4 pb-10 sm:p-5">
             <div className="sticky top-4 rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
                     File Details
                   </p>
-                  <h2 className="mt-2 text-lg font-bold text-base-content">
+                  <h2 className="mt-2 break-words text-lg font-bold text-base-content">
                     {selectedEntry?.name || "No file selected"}
                   </h2>
                 </div>
                 {detailDescriptor && (
                   <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${detailDescriptor.badgeClassName}`}
+                    className={`inline-flex shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${detailDescriptor.badgeClassName}`}
                   >
                     {detailDescriptor.label}
                   </span>
@@ -2736,9 +2772,9 @@ const ArchivePage: React.FC<{
                   <div className="mt-5 space-y-3">
                     {[
                       ["File Name", selectedEntry.name],
-                      ["File Type", detailDescriptor?.label || "—"],
+                      ["File Type", detailDescriptor?.label || "-"],
                       ["Folder", selectedEntry.parentPath || "Root Directory"],
-                      ["Description", selectedEntry.description || "—"],
+                      ["Description", selectedEntry.description || "-"],
                       [
                         "Date Created",
                         formatArchiveDateTime(

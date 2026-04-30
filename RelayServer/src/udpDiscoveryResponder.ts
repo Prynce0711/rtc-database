@@ -50,6 +50,9 @@ const normalizeAdvertisedHost = (
   return normalized;
 };
 
+const isLinkLocalIpv4 = (address: string): boolean =>
+  address.startsWith("169.254.");
+
 const getActiveIpv4Interfaces = (): ActiveIpv4Interface[] => {
   const interfaces = networkInterfaces();
   const results = new Map<string, ActiveIpv4Interface>();
@@ -60,7 +63,11 @@ const getActiveIpv4Interfaces = (): ActiveIpv4Interface[] => {
     }
 
     for (const iface of ifaceList) {
-      if (iface.family === "IPv4" && !iface.internal) {
+      if (
+        iface.family === "IPv4" &&
+        !iface.internal &&
+        !isLinkLocalIpv4(iface.address)
+      ) {
         results.set(iface.address, {
           address: iface.address,
           netmask: iface.netmask,

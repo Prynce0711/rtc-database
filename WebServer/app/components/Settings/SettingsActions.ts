@@ -6,9 +6,9 @@ import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
 import {
-    defaultSystemSettings,
-    SystemSettingsSchema,
-    type SystemSettingsSchema as SystemSettingsData,
+  defaultSystemSettings,
+  SystemSettingsSchema,
+  type SystemSettingsSchema as SystemSettingsData,
 } from "./schema";
 
 const normalizeSettingsRecord = (
@@ -109,18 +109,28 @@ export async function updateSystemSettings(
   }
 }
 
-export async function getGarageInfo(): Promise<ActionResult<GarageInfo>> {
+export async function getGarageInfo(
+  bucket?: string,
+): Promise<ActionResult<GarageInfo>> {
   try {
     const sessionValidation = await validateSession([Roles.ADMIN]);
     if (!sessionValidation.success) {
       return sessionValidation;
     }
 
+    if (!bucket || !String(bucket).trim()) {
+      return {
+        success: false,
+        error:
+          "No Garage bucket selected. Select a bucket before fetching metrics.",
+      };
+    }
+
     const { getInfo } = await import("@/app/lib/garage");
 
     return {
       success: true,
-      result: await getInfo(),
+      result: await getInfo(String(bucket)),
     };
   } catch (error) {
     console.error("Error fetching Garage info:", error);

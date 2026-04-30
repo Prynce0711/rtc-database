@@ -26,28 +26,141 @@ async function getGarageBucket(): Promise<string> {
   return settings.garageBucket?.trim() || "uploads";
 }
 
+export const GARAGE_ARCHIVES_ROOT = "archives";
+export const GARAGE_NOTARIAL_ROOT = "notarial";
+
 export async function getFileHash(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
 }
+
+const normalizeGarageKey = (key: string): string => {
+  const cleaned = String(key || "")
+    .replace(/\\/g, "/")
+    .trim()
+    .replace(/^\/+/, "");
+  const hasTrailingSlash = cleaned.endsWith("/");
+  const normalized = cleaned
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(
+      (segment) => segment.length > 0 && segment !== "." && segment !== "..",
+    )
+    .join("/");
+
+  return normalized && hasTrailingSlash ? `${normalized}/` : normalized;
+};
+
+const getGarageParentPath = (key: string): string => {
+  const normalized = normalizeGarageKey(key).replace(/\/$/, "");
+  if (!normalized.includes("/")) return "";
+  return normalized.slice(0, normalized.lastIndexOf("/"));
+};
+
+const getGarageBaseName = (key: string): string => {
+  const normalized = normalizeGarageKey(key).replace(/\/$/, "");
+  if (!normalized) return "";
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] ?? "";
+};
+
+const joinGaragePath = (parentPath: string, name: string): string => {
+  const cleanedParent = normalizeGarageKey(parentPath).replace(/\/$/, "");
+  const cleanedName = String(name || "")
+    .replace(/\\/g, "/")
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
+
+  return cleanedParent ? `${cleanedParent}/${cleanedName}` : cleanedName;
+};
+
+const getGarageScopePrefix = (scopePrefix?: string): string =>
+  normalizeGarageKey(scopePrefix || "").replace(/\/+$/, "");
+
+const addGarageScopeToKey = (key: string, scopePrefix?: string): string => {
+  const scope = getGarageScopePrefix(scopePrefix);
+  const normalizedKey = normalizeGarageKey(key);
+  if (!scope) return normalizedKey;
+  if (!normalizedKey) return scope;
+
+  const keyWithoutTrailingSlash = normalizedKey.replace(/\/+$/, "");
+  const trailingSlash = normalizedKey.endsWith("/") ? "/" : "";
+
+  if (
+    keyWithoutTrailingSlash === scope ||
+    keyWithoutTrailingSlash.startsWith(`${scope}/`)
+  ) {
+    return `${keyWithoutTrailingSlash}${trailingSlash}`;
+  }
+
+  return `${scope}/${normalizedKey}`;
+};
+
+const removeGarageScopeFromKey = (
+  key: string,
+  scopePrefix?: string,
+): string => {
+  const scope = getGarageScopePrefix(scopePrefix);
+  const normalizedKey = normalizeGarageKey(key);
+  if (!scope) return normalizedKey;
+
+  const keyWithoutTrailingSlash = normalizedKey.replace(/\/+$/, "");
+  const trailingSlash = normalizedKey.endsWith("/") ? "/" : "";
+
+  if (keyWithoutTrailingSlash === scope) return "";
+  if (keyWithoutTrailingSlash.startsWith(`${scope}/`)) {
+    return `${keyWithoutTrailingSlash.slice(scope.length + 1)}${trailingSlash}`;
+  }
+
+  return normalizedKey;
+};
+
+const isGarageScopeRootKey = (key: string, scopePrefix?: string): boolean => {
+  const scope = getGarageScopePrefix(scopePrefix);
+  return !!scope && normalizeGarageKey(key).replace(/\/+$/, "") === scope;
+};
+
+const ensureGarageScopeFolderMarker = async (
+  bucket: string,
+  scopePrefix?: string,
+): Promise<void> => {
+  const scope = getGarageScopePrefix(scopePrefix);
+  if (!scope) return;
+
+  const markerKey = `${scope}/`;
+  if (await garageObjectExists(bucket, markerKey)) return;
+
+  const garageClient = await getGarageClient();
+  await garageClient.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: markerKey,
+      Body: new Uint8Array(0),
+      ContentType: "application/x-directory",
+    }),
+  );
+};
 
 export async function uploadFileToGarage(
   file: File,
   fileName?: string,
   folderPath?: string,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<FileData>>;
 export async function uploadFileToGarage(
   file: File,
   key: string,
   folderPath?: string,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<FileData>>;
 export async function uploadFileToGarage(
   file: File,
   fileNameOrKey: string = "",
   folderPathParam: string = "",
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<FileData>> {
   return uploadFileToGarageCore(
     file,
@@ -55,6 +168,7 @@ export async function uploadFileToGarage(
     folderPathParam,
     false,
     bucketParam,
+    scopePrefix,
   );
 }
 
@@ -64,6 +178,7 @@ export async function uploadFileToGarageTrusted(
   fileNameOrKey: string = "",
   folderPathParam: string = "",
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<FileData>> {
   return uploadFileToGarageCore(
     file,
@@ -71,6 +186,7 @@ export async function uploadFileToGarageTrusted(
     folderPathParam,
     true,
     bucketParam,
+    scopePrefix,
   );
 }
 
@@ -80,6 +196,7 @@ async function uploadFileToGarageCore(
   folderPathParam: string,
   skipSessionValidation: boolean,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<FileData>> {
   try {
     if (!skipSessionValidation) {
@@ -118,6 +235,12 @@ async function uploadFileToGarageCore(
       key = folderPath ? `${folderPath}/${fileName}` : fileName;
     }
 
+    if (scopePrefix) {
+      key = addGarageScopeToKey(key, scopePrefix);
+      fileName = getGarageBaseName(key);
+      folderPath = getGarageParentPath(key);
+    }
+
     const maxSize = parseInt(process.env.MAX_FILE_SIZE || "50") * 1024 * 1024; // 50 MB
     if (file.size > maxSize) {
       return {
@@ -150,6 +273,7 @@ async function uploadFileToGarageCore(
     }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const garageClient = await getGarageClient();
 
     const command = new PutObjectCommand({
@@ -254,6 +378,7 @@ export async function getGarageFileUrl(
   key: string,
   options?: GetFileOptions,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<string>> {
   try {
     const sessionValidation = await validateSession();
@@ -261,10 +386,11 @@ export async function getGarageFileUrl(
       return sessionValidation;
     }
 
+    const scopedKey = scopePrefix ? addGarageScopeToKey(key, scopePrefix) : key;
     const inline = options?.inline ?? false;
     const normalizedFileName = (
       options?.fileName ||
-      key.split("/").pop() ||
+      scopedKey.split("/").pop() ||
       "file"
     )
       .replace(/[\r\n"]/g, "")
@@ -275,7 +401,7 @@ export async function getGarageFileUrl(
 
     const command = new GetObjectCommand({
       Bucket: bucket,
-      Key: key,
+      Key: scopedKey,
       ResponseContentDisposition: `${inline ? "inline" : "attachment"}; filename="${normalizedFileName}"`,
       ...(options?.contentType
         ? { ResponseContentType: options.contentType }
@@ -351,35 +477,6 @@ export type MoveGarageKeysResult = {
   }>;
 };
 
-const normalizeGarageKey = (key: string): string =>
-  String(key || "")
-    .replace(/\\/g, "/")
-    .trim()
-    .replace(/^\/+/, "");
-
-const getGarageParentPath = (key: string): string => {
-  const normalized = normalizeGarageKey(key).replace(/\/$/, "");
-  if (!normalized.includes("/")) return "";
-  return normalized.slice(0, normalized.lastIndexOf("/"));
-};
-
-const getGarageBaseName = (key: string): string => {
-  const normalized = normalizeGarageKey(key).replace(/\/$/, "");
-  if (!normalized) return "";
-  const parts = normalized.split("/");
-  return parts[parts.length - 1] ?? "";
-};
-
-const joinGaragePath = (parentPath: string, name: string): string => {
-  const cleanedParent = normalizeGarageKey(parentPath).replace(/\/$/, "");
-  const cleanedName = String(name || "")
-    .replace(/\\/g, "/")
-    .trim()
-    .replace(/^\/+|\/+$/g, "");
-
-  return cleanedParent ? `${cleanedParent}/${cleanedName}` : cleanedName;
-};
-
 const encodeCopySourceKey = (key: string): string =>
   key.split("/").map(encodeURIComponent).join("/");
 
@@ -401,9 +498,9 @@ const listGarageObjectKeysByPrefix = async (
     );
 
     keys.push(
-      ...((response.Contents ?? [])
+      ...(response.Contents ?? [])
         .map((item) => item.Key || "")
-        .filter((itemKey) => itemKey.length > 0)),
+        .filter((itemKey) => itemKey.length > 0),
     );
 
     continuationToken = response.IsTruncated
@@ -472,7 +569,9 @@ const moveGarageKeyPairs = async (
       oldKey: normalizeGarageKey(pair.oldKey),
       newKey: normalizeGarageKey(pair.newKey),
     }))
-    .filter((pair) => pair.oldKey && pair.newKey && pair.oldKey !== pair.newKey);
+    .filter(
+      (pair) => pair.oldKey && pair.newKey && pair.oldKey !== pair.newKey,
+    );
 
   const uniquePairs = Array.from(
     new Map(normalizedPairs.map((pair) => [pair.oldKey, pair])).values(),
@@ -540,6 +639,7 @@ export async function moveGarageKeys(
   keys: string[],
   targetFolderPath: string,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<MoveGarageKeysResult>> {
   try {
     const sessionValidation = await validateSession();
@@ -548,14 +648,32 @@ export async function moveGarageKeys(
     }
 
     const requestedKeys = Array.from(
-      new Set(keys.map(normalizeGarageKey).filter((key) => key.length > 0)),
+      new Set(
+        keys
+          .map((key) => addGarageScopeToKey(key, scopePrefix))
+          .filter((key) => key.length > 0),
+      ),
     );
     if (requestedKeys.length === 0) {
       return { success: false, error: "No files or folders selected" };
     }
 
     const bucket = bucketParam || (await getGarageBucket());
-    const targetFolder = normalizeGarageKey(targetFolderPath).replace(/\/$/, "");
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
+    if (
+      scopePrefix &&
+      requestedKeys.some((key) => isGarageScopeRootKey(key, scopePrefix))
+    ) {
+      return {
+        success: false,
+        error: "The root Garage folder cannot be moved.",
+      };
+    }
+
+    const targetFolder = addGarageScopeToKey(
+      targetFolderPath,
+      scopePrefix,
+    ).replace(/\/$/, "");
     const movePairs: Array<{ oldKey: string; newKey: string }> = [];
 
     for (const key of requestedKeys) {
@@ -577,7 +695,10 @@ export async function moveGarageKeys(
           targetFolder,
           getGarageBaseName(sourcePrefix),
         )}/`;
-        const childKeys = await listGarageObjectKeysByPrefix(bucket, sourcePrefix);
+        const childKeys = await listGarageObjectKeysByPrefix(
+          bucket,
+          sourcePrefix,
+        );
 
         for (const childKey of childKeys) {
           movePairs.push({
@@ -594,7 +715,21 @@ export async function moveGarageKeys(
       });
     }
 
-    return await moveGarageKeyPairs(bucket, movePairs);
+    const result = await moveGarageKeyPairs(bucket, movePairs);
+    if (!result.success || !scopePrefix) {
+      return result;
+    }
+
+    return {
+      success: true,
+      result: {
+        movedCount: result.result.movedCount,
+        movedKeys: result.result.movedKeys.map((pair) => ({
+          oldKey: removeGarageScopeFromKey(pair.oldKey, scopePrefix),
+          newKey: removeGarageScopeFromKey(pair.newKey, scopePrefix),
+        })),
+      },
+    };
   } catch (err) {
     console.error("Move Garage keys error:", err);
     return {
@@ -608,6 +743,7 @@ export async function renameGarageKey(
   key: string,
   newName: string,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<MoveGarageKeysResult>> {
   try {
     const sessionValidation = await validateSession();
@@ -615,41 +751,74 @@ export async function renameGarageKey(
       return sessionValidation;
     }
 
-    const normalizedKey = normalizeGarageKey(key);
+    const normalizedKey = addGarageScopeToKey(key, scopePrefix);
     const normalizedName = String(newName || "").trim();
     if (!normalizedKey) {
       return { success: false, error: "No file or folder selected" };
     }
-    if (!normalizedName || normalizedName.includes("/") || normalizedName.includes("\\")) {
+    if (scopePrefix && isGarageScopeRootKey(normalizedKey, scopePrefix)) {
+      return {
+        success: false,
+        error: "The root Garage folder cannot be renamed.",
+      };
+    }
+    if (
+      !normalizedName ||
+      normalizedName.includes("/") ||
+      normalizedName.includes("\\")
+    ) {
       return { success: false, error: "Enter a valid name without slashes" };
     }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const parentPath = getGarageParentPath(normalizedKey);
+    const finish = (
+      result: ActionResult<MoveGarageKeysResult>,
+    ): ActionResult<MoveGarageKeysResult> => {
+      if (!result.success || !scopePrefix) return result;
+
+      return {
+        success: true,
+        result: {
+          movedCount: result.result.movedCount,
+          movedKeys: result.result.movedKeys.map((pair) => ({
+            oldKey: removeGarageScopeFromKey(pair.oldKey, scopePrefix),
+            newKey: removeGarageScopeFromKey(pair.newKey, scopePrefix),
+          })),
+        },
+      };
+    };
 
     if (normalizedKey.endsWith("/")) {
       const sourcePrefix = normalizedKey;
       const destinationPrefix = `${joinGaragePath(parentPath, normalizedName)}/`;
-      const childKeys = await listGarageObjectKeysByPrefix(bucket, sourcePrefix);
+      const childKeys = await listGarageObjectKeysByPrefix(
+        bucket,
+        sourcePrefix,
+      );
       const movePairs = childKeys.map((childKey) => ({
         oldKey: childKey,
         newKey: `${destinationPrefix}${childKey.slice(sourcePrefix.length)}`,
       }));
 
-      return await moveGarageKeyPairs(bucket, movePairs);
+      return finish(await moveGarageKeyPairs(bucket, movePairs));
     }
 
-    return await moveGarageKeyPairs(bucket, [
-      {
-        oldKey: normalizedKey,
-        newKey: joinGaragePath(parentPath, normalizedName),
-      },
-    ]);
+    return finish(
+      await moveGarageKeyPairs(bucket, [
+        {
+          oldKey: normalizedKey,
+          newKey: joinGaragePath(parentPath, normalizedName),
+        },
+      ]),
+    );
   } catch (err) {
     console.error("Rename Garage key error:", err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to rename Garage item",
+      error:
+        err instanceof Error ? err.message : "Failed to rename Garage item",
     };
   }
 }
@@ -657,6 +826,7 @@ export async function renameGarageKey(
 export async function deleteGarageKeys(
   keys: string[],
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<DeleteGarageKeysResult>> {
   try {
     const sessionValidation = await validateSession();
@@ -665,14 +835,28 @@ export async function deleteGarageKeys(
     }
 
     const requestedKeys = Array.from(
-      new Set(keys.map(normalizeGarageKey).filter((key) => key.length > 0)),
+      new Set(
+        keys
+          .map((key) => addGarageScopeToKey(key, scopePrefix))
+          .filter((key) => key.length > 0),
+      ),
     );
 
     if (requestedKeys.length === 0) {
       return { success: false, error: "No files or folders selected" };
     }
+    if (
+      scopePrefix &&
+      requestedKeys.some((key) => isGarageScopeRootKey(key, scopePrefix))
+    ) {
+      return {
+        success: false,
+        error: "The root Garage folder cannot be deleted.",
+      };
+    }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const garageClient = await getGarageClient();
     const keysToDelete = new Set<string>();
 
@@ -773,14 +957,17 @@ export async function deleteGarageKeys(
       success: true,
       result: {
         deletedCount: deletedKeys.length,
-        deletedKeys,
+        deletedKeys: scopePrefix
+          ? deletedKeys.map((key) => removeGarageScopeFromKey(key, scopePrefix))
+          : deletedKeys,
       },
     };
   } catch (err) {
     console.error("Delete Garage keys error:", err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Failed to delete Garage items",
+      error:
+        err instanceof Error ? err.message : "Failed to delete Garage items",
     };
   }
 }
@@ -882,12 +1069,15 @@ export async function createGarageFolder(
   name: string,
   parentPath: string = "",
   bucketParam?: string,
-): Promise<ActionResult<{
-  id: number;
-  name: string;
-  parentPath: string;
-  fullPath: string;
-}>> {
+  scopePrefix?: string,
+): Promise<
+  ActionResult<{
+    id: number;
+    name: string;
+    parentPath: string;
+    fullPath: string;
+  }>
+> {
   try {
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) {
@@ -899,25 +1089,36 @@ export async function createGarageFolder(
       return { success: false, error: "Folder name is required" };
     }
 
-    const cleanedParent = String(parentPath || "").trim().replace(/^\/+|\/+$/g, "");
-    const fullPath = cleanedParent ? `${cleanedParent}/${folderName}` : folderName;
+    const cleanedParent = String(parentPath || "")
+      .trim()
+      .replace(/^\/+|\/+$/g, "");
+    const fullPath = cleanedParent
+      ? `${cleanedParent}/${folderName}`
+      : folderName;
+    const storageFullPath = scopePrefix
+      ? addGarageScopeToKey(fullPath, scopePrefix)
+      : fullPath;
 
     // check for existing archive entry with same fullPath
     const existing = await prisma.archiveEntry.findUnique({
       where: { fullPath },
     });
     if (existing) {
-      return { success: false, error: "A file or folder already exists at that path" };
+      return {
+        success: false,
+        error: "A file or folder already exists at that path",
+      };
     }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const garageClient = await getGarageClient();
 
     // Create a zero-byte object with trailing slash to represent folder
     await garageClient.send(
       new PutObjectCommand({
         Bucket: bucket,
-        Key: `${fullPath}/`,
+        Key: `${storageFullPath}/`,
         Body: new Uint8Array(0),
         ContentType: "application/x-directory",
       }),
@@ -953,6 +1154,7 @@ export async function createGarageFolder(
 export async function createGarageFolderMarker(
   folderPath: string,
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<void>> {
   try {
     const sessionValidation = await validateSession();
@@ -963,17 +1165,21 @@ export async function createGarageFolderMarker(
     const cleanedPath = String(folderPath || "")
       .trim()
       .replace(/^\/+|\/+$/g, "");
-    if (!cleanedPath) {
+    const storagePath = scopePrefix
+      ? addGarageScopeToKey(cleanedPath, scopePrefix)
+      : cleanedPath;
+    if (!storagePath) {
       return { success: false, error: "Folder path is required" };
     }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const garageClient = await getGarageClient();
 
     await garageClient.send(
       new PutObjectCommand({
         Bucket: bucket,
-        Key: `${cleanedPath}/`,
+        Key: `${storagePath}/`,
         Body: new Uint8Array(0),
         ContentType: "application/x-directory",
       }),
@@ -1009,6 +1215,7 @@ export type GarageItem = {
 export async function listGarageFolder(
   folderPath: string = "",
   bucketParam?: string,
+  scopePrefix?: string,
 ): Promise<ActionResult<GarageItem[]>> {
   try {
     const sessionValidation = await validateSession();
@@ -1017,10 +1224,16 @@ export async function listGarageFolder(
     }
 
     const bucket = bucketParam || (await getGarageBucket());
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
     const garageClient = await getGarageClient();
 
-    const cleaned = String(folderPath || "").trim().replace(/^\/+|\/+$/g, "");
-    const prefix = cleaned ? `${cleaned}/` : "";
+    const cleaned = String(folderPath || "")
+      .trim()
+      .replace(/^\/+|\/+$/g, "");
+    const storageFolder = scopePrefix
+      ? addGarageScopeToKey(cleaned, scopePrefix)
+      : cleaned;
+    const prefix = storageFolder ? `${storageFolder}/` : "";
 
     const dirsByKey = new Map<string, GarageItem>();
     const filesByKey = new Map<string, GarageItem>();
@@ -1042,7 +1255,7 @@ export async function listGarageFolder(
 
         const name = key.slice(prefix.length).replace(/\/$/, "");
         dirsByKey.set(key, {
-          key,
+          key: removeGarageScopeFromKey(key, scopePrefix),
           name,
           size: 0,
           lastModified: null,
@@ -1052,12 +1265,17 @@ export async function listGarageFolder(
 
       for (const item of response.Contents ?? []) {
         const key = item.Key || "";
-        if (!key || key === prefix || key.endsWith("/") || filesByKey.has(key)) {
+        if (
+          !key ||
+          key === prefix ||
+          key.endsWith("/") ||
+          filesByKey.has(key)
+        ) {
           continue;
         }
 
         filesByKey.set(key, {
-          key,
+          key: removeGarageScopeFromKey(key, scopePrefix),
           name: key.slice(prefix.length),
           size: item.Size || 0,
           lastModified: item.LastModified || null,

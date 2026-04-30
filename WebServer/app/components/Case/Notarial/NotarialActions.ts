@@ -12,7 +12,8 @@ import {
   moveGarageFile,
   renameGarageKey,
   uploadFileToGarage,
-  createGarageFolder as createGarageFolderCore,
+  createGarageFolderMarker,
+  GARAGE_NOTARIAL_ROOT,
   type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
@@ -60,6 +61,7 @@ export type NotarialRecentFile = {
 
 const NOTARIAL_ACCESS_ROLES = [Roles.ADMIN, Roles.NOTARIAL] as const;
 const NOTARIAL_GARAGE_BUCKET = "rtc-bucket";
+const NOTARIAL_GARAGE_ROOT = GARAGE_NOTARIAL_ROOT;
 
 const normalizeGaragePath = (path?: string | null): string =>
   (path ?? "")
@@ -74,6 +76,15 @@ const normalizeGaragePath = (path?: string | null): string =>
 const buildFolderUploadKey = (folderPath: string, file: File): string => {
   const fileName = file.name.trim() || `upload-${Date.now()}`;
   return folderPath ? `${folderPath}/${fileName}` : fileName;
+};
+
+const scopeNotarialStorageKey = (key: string): string => {
+  const normalized = normalizeGaragePath(key);
+  if (!normalized) return NOTARIAL_GARAGE_ROOT;
+  return normalized === NOTARIAL_GARAGE_ROOT ||
+    normalized.startsWith(`${NOTARIAL_GARAGE_ROOT}/`)
+    ? normalized
+    : `${NOTARIAL_GARAGE_ROOT}/${normalized}`;
 };
 
 function buildNotarialWhere(
@@ -527,6 +538,7 @@ export async function createNotarial(
         uploadKey,
         "",
         NOTARIAL_GARAGE_BUCKET,
+        NOTARIAL_GARAGE_ROOT,
       );
     } catch (uploadError) {
       console.error("Error uploading file to garage:", uploadError);
@@ -671,6 +683,7 @@ export async function updateNotarial(
         uploadKey,
         "",
         NOTARIAL_GARAGE_BUCKET,
+        NOTARIAL_GARAGE_ROOT,
       );
 
       if (!updatedFile.success) {
@@ -692,10 +705,11 @@ export async function updateNotarial(
         ...mergedData,
         fileHash: existingNotarial.file.fileHash,
       });
-      if (nextKey && nextKey !== existingNotarial.file.key) {
+      const nextStorageKey = nextKey ? scopeNotarialStorageKey(nextKey) : "";
+      if (nextStorageKey && nextStorageKey !== existingNotarial.file.key) {
         await moveGarageFile(
           existingNotarial.file.key,
-          nextKey,
+          nextStorageKey,
           "",
           NOTARIAL_GARAGE_BUCKET,
         );
@@ -801,7 +815,11 @@ export async function getNotarialGarageDirectoryItems(
       return sessionResult;
     }
 
-    return await listGarageFolder(folderPath, NOTARIAL_GARAGE_BUCKET);
+    return await listGarageFolder(
+      folderPath,
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
   } catch (error) {
     console.error("Error fetching notarial garage directory:", error);
     return { success: false, error: "Failed to fetch garage directory" };
@@ -818,7 +836,12 @@ export async function getNotarialGarageFileUrl(
       return sessionResult;
     }
 
-    return await getGarageFileUrl(key, options, NOTARIAL_GARAGE_BUCKET);
+    return await getGarageFileUrl(
+      key,
+      options,
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
   } catch (error) {
     console.error("Error getting notarial garage file URL:", error);
     return { success: false, error: "Failed to get garage file URL" };
@@ -834,7 +857,11 @@ export async function deleteNotarialGarageItems(
       return sessionResult;
     }
 
-    const result = await deleteGarageKeys(keys, NOTARIAL_GARAGE_BUCKET);
+    const result = await deleteGarageKeys(
+      keys,
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
     if (!result.success) {
       return { success: false, error: result.error };
     }
@@ -865,6 +892,7 @@ export async function moveNotarialGarageItems(
       keys,
       targetFolderPath,
       NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) {
       return { success: false, error: result.error };
@@ -896,6 +924,7 @@ export async function renameNotarialGarageItem(
       key,
       newName,
       NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) {
       return { success: false, error: result.error };
@@ -978,14 +1007,42 @@ export async function createGarageFolder(
       return { success: false, error: "Folder name is required" };
     }
 
-    const result = await createGarageFolderCore(
-      name,
-      parentPath,
+    if (name.includes("/") || name.includes("\\")) {
+      return { success: false, error: "Enter a folder name without slashes" };
+    }
+
+    const cleanedParent = normalizeGaragePath(parentPath);
+    const fullPath = cleanedParent ? `${cleanedParent}/${name}` : name;
+    const existingItems = await listGarageFolder(
+      cleanedParent,
       NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
+    if (
+      existingItems.success &&
+      existingItems.result.some(
+        (item) => item.isDirectory && item.name.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      return { success: false, error: "A folder already exists at that path" };
+    }
+
+    const result = await createGarageFolderMarker(
+      fullPath,
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) return { success: false, error: result.error };
 
-    return { success: true, result: result.result as Record<string, unknown> };
+    return {
+      success: true,
+      result: {
+        id: 0,
+        name,
+        parentPath: cleanedParent,
+        fullPath,
+      },
+    };
   } catch (error) {
     console.error("Error creating garage folder:", error);
     return { success: false, error: "Failed to create folder" };
