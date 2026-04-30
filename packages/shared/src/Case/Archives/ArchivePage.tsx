@@ -40,9 +40,11 @@ import ModalBase from "../../Popup/ModalBase";
 import FileViewerModal from "../../Popup/FileViewerModal";
 import { usePopup } from "../../Popup/PopupProvider";
 import Pagination from "../../Table/Pagination";
-import type { ArchiveAdapter } from "./ArchiveAdapter";
+import type { ArchiveAdapter, ArchiveGarageDirectoryItem } from "./ArchiveAdapter";
 import ArchiveRow from "./ArchiveRow";
 import {
+  getArchiveExtension,
+  joinArchivePath,
   normalizeArchivePath,
   type ArchiveEntryData,
   type ArchiveFilterOptions,
@@ -68,6 +70,15 @@ type UploadFormState = {
 type FolderFormState = {
   name: string;
   description: string;
+};
+type GarageArchiveEntry = ArchiveEntryData & {
+  source: "garage";
+  garageKey: string;
+};
+type ArchiveContextMenuState = {
+  x: number;
+  y: number;
+  entry: ArchiveEntryData;
 };
 
 const pageSize = 10;
@@ -126,8 +137,63 @@ const getPreviewType = (
   const name = entry.name.toLowerCase();
 
   if (mimeType === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-  if (mimeType.startsWith("image/")) return "image";
+  if (
+    mimeType.startsWith("image/") ||
+    /\.(png|jpe?g|gif|bmp|webp|svg|tiff?)$/i.test(name)
+  ) {
+    return "image";
+  }
   return null;
+};
+
+const isGarageArchiveEntry = (
+  entry: ArchiveEntryData | null | undefined,
+): entry is GarageArchiveEntry =>
+  (entry as { source?: string } | null | undefined)?.source === "garage";
+
+const mapGarageItemToArchiveEntry = (
+  item: ArchiveGarageDirectoryItem,
+  index: number,
+  parentPath: string,
+): GarageArchiveEntry => {
+  const normalizedParent = normalizeArchivePath(parentPath);
+  const normalizedKey = normalizeArchivePath(item.key);
+  const entryPath = item.isDirectory
+    ? normalizedKey
+    : joinArchivePath(normalizedParent, item.name || normalizedKey);
+  const timestamp = item.lastModified ? new Date(item.lastModified) : new Date();
+  const updatedAt = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
+  const id = -(index + 1);
+
+  return {
+    id,
+    name: item.name || normalizedKey || "Untitled",
+    parentPath: normalizedParent,
+    fullPath: entryPath,
+    entryType: item.isDirectory ? ArchiveEntryType.FOLDER : ArchiveEntryType.FILE,
+    description: null,
+    extension: item.isDirectory ? null : getArchiveExtension(item.name),
+    textContent: null,
+    sheetData: null,
+    fileId: item.isDirectory ? null : id,
+    createdAt: updatedAt,
+    updatedAt,
+    file: item.isDirectory
+      ? null
+      : {
+          id,
+          key: item.key,
+          fileHash: "",
+          fileName: item.name || normalizedKey,
+          path: normalizedParent,
+          size: item.size,
+          mimeType: "",
+          createdAt: updatedAt,
+          updatedAt,
+        },
+    source: "garage",
+    garageKey: item.key,
+  } as GarageArchiveEntry;
 };
 
 // Treat common spreadsheet file types as 'excel' for single-click download behavior
@@ -203,6 +269,10 @@ const ArchivePage: React.FC<{
   const [selectedEntry, setSelectedEntry] = useState<ArchiveEntryData | null>(
     null,
   );
+  const [contextMenu, setContextMenu] =
+    useState<ArchiveContextMenuState | null>(null);
+  const [draggedEntryId, setDraggedEntryId] = useState<number | null>(null);
+  const [dragOverEntryId, setDragOverEntryId] = useState<number | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [uploadForm, setUploadForm] = useState<UploadFormState>(
@@ -258,7 +328,7 @@ const ArchivePage: React.FC<{
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [currentPath, deferredSearch, sortConfig, typeFilter]);
+  }, [currentPath, deferredSearch, displayMode, sortConfig, typeFilter]);
 
   const filters = useMemo(
     () => ({
@@ -272,6 +342,74 @@ const ArchivePage: React.FC<{
   const refreshEntries = useCallback(
     async (page = currentPage) => {
       try {
+        if (displayMode === "explorer" && adapter.getArchiveGarageDirectoryItems) {
+          const listResult =
+            await adapter.getArchiveGarageDirectoryItems(currentPath);
+
+          if (!listResult.success) {
+            setError(listResult.error || "Failed to load garage files");
+            return;
+          }
+
+          const normalizedSearch = deferredSearch.toLowerCase();
+          const mapped = listResult.result.map((item, index) =>
+            mapGarageItemToArchiveEntry(item, index, currentPath),
+          );
+          const filtered = mapped
+            .filter((entry) => {
+              if (!normalizedSearch) return true;
+              return (
+                entry.name.toLowerCase().includes(normalizedSearch) ||
+                entry.fullPath.toLowerCase().includes(normalizedSearch)
+              );
+            })
+            .filter((entry) =>
+              typeFilter === "ALL" ? true : entry.entryType === typeFilter,
+            )
+            .sort((a, b) => {
+              if (sortConfig.key === "name") {
+                return sortConfig.order === "asc"
+                  ? a.name.localeCompare(b.name)
+                  : b.name.localeCompare(a.name);
+              }
+
+              if (sortConfig.key === "entryType") {
+                return sortConfig.order === "asc"
+                  ? a.entryType.localeCompare(b.entryType)
+                  : b.entryType.localeCompare(a.entryType);
+              }
+
+              const aTime = new Date(
+                a.file?.updatedAt ?? a.updatedAt ?? a.createdAt,
+              ).getTime();
+              const bTime = new Date(
+                b.file?.updatedAt ?? b.updatedAt ?? b.createdAt,
+              ).getTime();
+              return sortConfig.order === "asc" ? aTime - bTime : bTime - aTime;
+            });
+          const start = (page - 1) * pageSize;
+          const pagedItems = filtered.slice(start, start + pageSize);
+
+          setEntries(pagedItems);
+          setTotalCount(filtered.length);
+          setStats({
+            totalItems: filtered.length,
+            folders: filtered.filter(
+              (entry) => entry.entryType === ArchiveEntryType.FOLDER,
+            ).length,
+            editableItems: 0,
+            uploadedFiles: filtered.filter(
+              (entry) => entry.entryType !== ArchiveEntryType.FOLDER,
+            ).length,
+            storageUsedBytes: filtered.reduce(
+              (total, entry) => total + (entry.file?.size ?? 0),
+              0,
+            ),
+          });
+          setError(null);
+          return;
+        }
+
         const [listResult, statsResult] = await Promise.all([
           adapter.getArchiveEntriesPage({
             page,
@@ -308,7 +446,16 @@ const ArchivePage: React.FC<{
         setRefreshing(false);
       }
     },
-    [adapter, currentPage, filters, sortConfig],
+    [
+      adapter,
+      currentPage,
+      currentPath,
+      deferredSearch,
+      displayMode,
+      filters,
+      sortConfig,
+      typeFilter,
+    ],
   );
 
   useEffect(() => {
@@ -325,11 +472,22 @@ const ArchivePage: React.FC<{
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setContextMenu(null);
+      }
     };
 
+    const closeMenu = () => setContextMenu(null);
+
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -351,6 +509,34 @@ const ArchivePage: React.FC<{
       path: segments.slice(0, index + 1).join("/"),
     }));
   }, [currentPath]);
+
+  const parentArchivePath = useMemo(() => {
+    const normalized = normalizeArchivePath(currentPath);
+    if (!normalized.includes("/")) return "";
+    return normalized.slice(0, normalized.lastIndexOf("/"));
+  }, [currentPath]);
+
+  const navigateArchivePath = useCallback((path: string) => {
+    const normalized = normalizeArchivePath(path);
+    const href = buildArchiveHref(normalized);
+
+    setCurrentPath(normalized);
+    setSelectedEntry(null);
+    setSelectedEntryIds([]);
+    setCurrentPage(1);
+
+    if (typeof window === "undefined") {
+      router.push(href);
+      return;
+    }
+
+    if (window.location.hash.startsWith("#/")) {
+      window.location.hash = href;
+      return;
+    }
+
+    window.history.pushState(null, "", href);
+  }, [router]);
 
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const activeFilterCount =
@@ -389,14 +575,41 @@ const ArchivePage: React.FC<{
 
   const handleOpen = (entry: ArchiveEntryData) => {
     if (entry.entryType === ArchiveEntryType.FOLDER) {
-      router.push(buildArchiveHref(entry.fullPath));
+      navigateArchivePath(entry.fullPath);
       return;
     }
     router.push(`/user/cases/archive/${entry.id}`);
   };
 
   const handleEdit = (entry: ArchiveEntryData) => {
+    if (isGarageArchiveEntry(entry)) {
+      statusPopup.showError("Garage-only files do not have archive metadata to edit yet.");
+      return;
+    }
+
     router.push(`/user/cases/archive/edit?id=${entry.id}`);
+  };
+
+  const getEntryFileUrl = async (
+    entry: ArchiveEntryData,
+    options: {
+      inline?: boolean;
+      fileName?: string;
+      contentType?: string;
+    },
+  ) => {
+    if (isGarageArchiveEntry(entry)) {
+      if (!adapter.getArchiveGarageFileUrl) {
+        return {
+          success: false as const,
+          error: "Garage file access is not available.",
+        };
+      }
+
+      return adapter.getArchiveGarageFileUrl(entry.garageKey, options);
+    }
+
+    return adapter.getArchiveFileUrl(entry.id, options);
   };
 
   const handlePreview = async (entry: ArchiveEntryData) => {
@@ -421,7 +634,7 @@ const ArchivePage: React.FC<{
       entry,
     });
 
-    const result = await adapter.getArchiveFileUrl(entry.id, {
+    const result = await getEntryFileUrl(entry, {
       inline: true,
       fileName: entry.name,
       contentType: entry.file?.mimeType ?? undefined,
@@ -447,7 +660,7 @@ const ArchivePage: React.FC<{
   const handleDownload = async (entry: ArchiveEntryData) => {
     if (!entry.file) return;
 
-    const result = await adapter.getArchiveFileUrl(entry.id, {
+    const result = await getEntryFileUrl(entry, {
       inline: false,
       fileName: entry.name,
       contentType: entry.file?.mimeType ?? undefined,
@@ -467,7 +680,7 @@ const ArchivePage: React.FC<{
   const handlePrint = async (entry: ArchiveEntryData) => {
     if (!entry.file) return;
 
-    const result = await adapter.getArchiveFileUrl(entry.id, {
+    const result = await getEntryFileUrl(entry, {
       inline: true,
       fileName: entry.name,
       contentType: entry.file?.mimeType ?? undefined,
@@ -482,6 +695,32 @@ const ArchivePage: React.FC<{
     win?.focus();
   };
 
+  const deleteGarageEntries = async (items: GarageArchiveEntry[]) => {
+    if (!adapter.deleteArchiveGarageItems) {
+      statusPopup.showError("Garage deletion is not available in Archive Explorer.");
+      return false;
+    }
+
+    statusPopup.showLoading(
+      `Deleting ${items.length} Garage item${items.length !== 1 ? "s" : ""}...`,
+    );
+    const result = await adapter.deleteArchiveGarageItems(
+      items.map((item) => item.garageKey),
+    );
+
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to delete Garage items");
+      return false;
+    }
+
+    statusPopup.showSuccess(
+      `Deleted ${result.result.deletedCount.toLocaleString()} Garage object${
+        result.result.deletedCount !== 1 ? "s" : ""
+      }.`,
+    );
+    return true;
+  };
+
   const handleDelete = async (entry: ArchiveEntryData) => {
     const confirmed = await statusPopup.showConfirm(
       entry.entryType === ArchiveEntryType.FOLDER
@@ -490,6 +729,20 @@ const ArchivePage: React.FC<{
     );
 
     if (!confirmed) return;
+
+    if (isGarageArchiveEntry(entry)) {
+      const deleted = await deleteGarageEntries([entry]);
+      if (!deleted) return;
+
+      setSelectedEntryIds((previous) =>
+        previous.filter((id) => id !== entry.id),
+      );
+      if (selectedEntry?.id === entry.id) {
+        setSelectedEntry(null);
+      }
+      await refreshEntries(1);
+      return;
+    }
 
     const result = await adapter.deleteArchiveEntry(entry.id);
     if (!result.success) {
@@ -527,6 +780,7 @@ const ArchivePage: React.FC<{
 
     setShowFolderModal(false);
     setFolderForm(initialFolderForm());
+    setCurrentPage(1);
     statusPopup.showSuccess("Archive folder created.");
     await refreshEntries(1);
   };
@@ -558,6 +812,7 @@ const ArchivePage: React.FC<{
 
     setShowUploadModal(false);
     setUploadForm(initialUploadForm());
+    setCurrentPage(1);
     statusPopup.showSuccess("Archive file uploaded.");
     await refreshEntries(1);
   };
@@ -573,6 +828,221 @@ const ArchivePage: React.FC<{
     setShowUploadModal(true);
   };
 
+  const getEntriesForDrag = (entry: ArchiveEntryData) => {
+    if (selectedEntryIds.includes(entry.id)) {
+      return entries.filter((item) => selectedEntryIds.includes(item.id));
+    }
+
+    return [entry];
+  };
+
+  const uploadDroppedArchiveFiles = async (
+    fileList: FileList,
+    targetPath: string,
+  ) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return false;
+
+    statusPopup.showLoading(
+      `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
+    );
+
+    let successCount = 0;
+    for (const file of files) {
+      const result = await adapter.createArchiveEntry({
+        name: file.name,
+        parentPath: targetPath,
+        entryType: ArchiveEntryType.FILE,
+        file,
+      });
+
+      if (result.success) {
+        successCount++;
+      }
+    }
+
+    statusPopup.showSuccess(
+      `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
+    );
+    setCurrentPage(1);
+    await refreshEntries(1);
+    return true;
+  };
+
+  const moveArchiveEntriesToFolder = async (
+    items: ArchiveEntryData[],
+    targetPath: string,
+  ) => {
+    const garageItems = items.filter(isGarageArchiveEntry);
+    if (garageItems.length !== items.length) {
+      statusPopup.showError("Only Garage Explorer items can be moved by drag and drop.");
+      return false;
+    }
+
+    if (!adapter.moveArchiveGarageItems) {
+      statusPopup.showError("Garage move is not available in Archive Explorer.");
+      return false;
+    }
+
+    const normalizedTarget = normalizeArchivePath(targetPath);
+    const keys = garageItems
+      .filter((item) => item.fullPath !== normalizedTarget)
+      .map((item) => item.garageKey);
+
+    if (keys.length === 0) return false;
+
+    statusPopup.showLoading(
+      `Moving ${keys.length} item${keys.length !== 1 ? "s" : ""}...`,
+    );
+    const result = await adapter.moveArchiveGarageItems(keys, normalizedTarget);
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to move archive items");
+      return false;
+    }
+
+    statusPopup.showSuccess(
+      `Moved ${result.result.movedCount.toLocaleString()} Garage object${
+        result.result.movedCount !== 1 ? "s" : ""
+      }.`,
+    );
+    clearSelection();
+    setSelectedEntry(null);
+    await refreshEntries(1);
+    return true;
+  };
+
+  const handleArchiveDropOnFolder = async (
+    event: React.DragEvent,
+    targetEntry: ArchiveEntryData,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragOverEntryId(null);
+
+    if (targetEntry.entryType !== ArchiveEntryType.FOLDER) return;
+
+    const droppedFiles = event.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      await uploadDroppedArchiveFiles(droppedFiles, targetEntry.fullPath);
+      return;
+    }
+
+    const draggedId = Number(
+      event.dataTransfer.getData("application/x-rtc-archive-entry"),
+    );
+    const draggedEntry =
+      entries.find((entry) => entry.id === draggedId) ??
+      (draggedEntryId == null
+        ? undefined
+        : entries.find((entry) => entry.id === draggedEntryId));
+    if (!draggedEntry) return;
+
+    await moveArchiveEntriesToFolder(
+      getEntriesForDrag(draggedEntry),
+      targetEntry.fullPath,
+    );
+  };
+
+  const handleArchiveSurfaceDrop = async (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragOverEntryId(null);
+
+    const droppedFiles = event.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      await uploadDroppedArchiveFiles(droppedFiles, currentPath);
+      return;
+    }
+
+    const draggedId = Number(
+      event.dataTransfer.getData("application/x-rtc-archive-entry"),
+    );
+    const draggedEntry = entries.find((entry) => entry.id === draggedId);
+    if (!draggedEntry) return;
+
+    await moveArchiveEntriesToFolder(getEntriesForDrag(draggedEntry), currentPath);
+  };
+
+  const handleArchiveContextMenu = (
+    event: React.MouseEvent,
+    entry: ArchiveEntryData,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedEntry(entry);
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      entry,
+    });
+  };
+
+  const handleRenameArchiveEntry = async (entry: ArchiveEntryData) => {
+    setContextMenu(null);
+
+    if (!isGarageArchiveEntry(entry)) {
+      handleEdit(entry);
+      return;
+    }
+
+    if (!adapter.renameArchiveGarageItem) {
+      statusPopup.showError("Garage rename is not available in Archive Explorer.");
+      return;
+    }
+
+    const nextName = window.prompt("Rename item", entry.name);
+    if (!nextName || nextName.trim() === entry.name) return;
+
+    const result = await adapter.renameArchiveGarageItem(
+      entry.garageKey,
+      nextName.trim(),
+    );
+    if (!result.success) {
+      statusPopup.showError(result.error || "Failed to rename archive item");
+      return;
+    }
+
+    statusPopup.showSuccess("Archive item renamed.");
+    await refreshEntries(1);
+  };
+
+  const ensureArchiveFolderPath = async (
+    basePath: string,
+    folderSegments: string[],
+    createdFolderPaths: Set<string>,
+  ): Promise<{ success: true; path: string } | { success: false; error: string }> => {
+    let parentPath = normalizeArchivePath(basePath);
+
+    for (const rawSegment of folderSegments) {
+      const folderName = rawSegment.trim();
+      if (!folderName) continue;
+
+      const fullPath = joinArchivePath(parentPath, folderName);
+      if (createdFolderPaths.has(fullPath)) {
+        parentPath = fullPath;
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const result = await adapter.createArchiveEntry({
+        name: folderName,
+        parentPath,
+        entryType: ArchiveEntryType.FOLDER,
+      });
+
+      if (!result.success) {
+        const message = result.error || "Failed to create folder";
+        if (!message.toLowerCase().includes("already exists")) {
+          return { success: false, error: message };
+        }
+      }
+
+      createdFolderPaths.add(fullPath);
+      parentPath = fullPath;
+    }
+
+    return { success: true, path: parentPath };
+  };
+
   const handleUploadFolderFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     if (
@@ -585,18 +1055,32 @@ const ArchivePage: React.FC<{
 
     statusPopup.showLoading(`Uploading ${files.length} files...`);
     let successCount = 0;
+    const createdFolderPaths = new Set<string>();
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        const title =
-          (file as unknown as { webkitRelativePath?: string }).webkitRelativePath ||
-          file.name;
-        // sequential upload to avoid overwhelming backend
-        // create archive entry per file under currentPath
+        const relativePath = normalizeArchivePath(
+          (file as unknown as { webkitRelativePath?: string })
+            .webkitRelativePath || file.name,
+        );
+        const pathSegments = relativePath ? relativePath.split("/") : [file.name];
+        const fileName = pathSegments.pop() || file.name;
+        // sequential upload to avoid overwhelming backend and to preserve folder order
+        // eslint-disable-next-line no-await-in-loop
+        const folderResult = await ensureArchiveFolderPath(
+          currentPath,
+          pathSegments,
+          createdFolderPaths,
+        );
+        if (!folderResult.success) {
+          continue;
+        }
+
         // eslint-disable-next-line no-await-in-loop
         const result = await adapter.createArchiveEntry({
-          name: title,
-          parentPath: currentPath,
+          name: fileName,
+          parentPath: folderResult.path,
           entryType: ArchiveEntryType.FILE,
           description: undefined,
           file,
@@ -608,6 +1092,7 @@ const ArchivePage: React.FC<{
     }
 
     statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    setCurrentPage(1);
     await refreshEntries(1);
   };
 
@@ -643,6 +1128,14 @@ const ArchivePage: React.FC<{
 
   const fetchSelectedEntries = async () => {
     if (selectedEntryIds.length === 0) return [] as ArchiveEntryData[];
+    const selectedGarageEntries = entries.filter(
+      (entry) =>
+        selectedEntryIds.includes(entry.id) && isGarageArchiveEntry(entry),
+    );
+    if (selectedGarageEntries.length > 0) {
+      return selectedGarageEntries;
+    }
+
     const result = await adapter.getArchiveEntriesByIds(selectedEntryIds);
     if (!result.success) {
       statusPopup.showError(result.error || "Failed to load selected archive entries");
@@ -660,11 +1153,26 @@ const ArchivePage: React.FC<{
 
   const handleDeleteSelected = async () => {
     if (selectedEntryIds.length === 0) return;
+    const selectedGarageEntries = entries.filter(
+      (entry): entry is GarageArchiveEntry =>
+        selectedEntryIds.includes(entry.id) && isGarageArchiveEntry(entry),
+    );
+
     if (
       !(await statusPopup.showConfirm(
         `Delete ${selectedEntryIds.length} selected archive item${selectedEntryIds.length > 1 ? "s" : ""}?`,
       ))
     ) {
+      return;
+    }
+
+    if (selectedGarageEntries.length > 0) {
+      const deleted = await deleteGarageEntries(selectedGarageEntries);
+      if (!deleted) return;
+
+      clearSelection();
+      setSelectedEntry(null);
+      await refreshEntries(1);
       return;
     }
 
@@ -832,7 +1340,7 @@ const ArchivePage: React.FC<{
                     <ArchiveRow
                       key={entry.id}
                       entry={entry}
-                      canManage={canManage}
+                      canManage={canManage && !isGarageArchiveEntry(entry)}
                       isSelected={selectedEntryIds.includes(entry.id)}
                       onToggleSelect={toggleEntrySelection}
                       onSelectEntry={setSelectedEntry}
@@ -859,11 +1367,38 @@ const ArchivePage: React.FC<{
                 return (
                   <div
                     key={entry.id}
+                    draggable
                     className={`group cursor-pointer rounded-[26px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
                       selectedEntry?.id === entry.id
                         ? "border-primary/35 bg-primary/7"
+                        : dragOverEntryId === entry.id
+                          ? "border-primary/40 bg-primary/10"
                         : "border-base-300 bg-base-100"
                     }`}
+                    onContextMenu={(event) =>
+                      handleArchiveContextMenu(event, entry)
+                    }
+                    onDragStart={(event) => {
+                      setDraggedEntryId(entry.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData(
+                        "application/x-rtc-archive-entry",
+                        String(entry.id),
+                      );
+                    }}
+                    onDragEnd={() => {
+                      setDraggedEntryId(null);
+                      setDragOverEntryId(null);
+                    }}
+                    onDragOver={(event) => {
+                      if (entry.entryType !== ArchiveEntryType.FOLDER) return;
+                      event.preventDefault();
+                      setDragOverEntryId(entry.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverEntryId === entry.id) setDragOverEntryId(null);
+                    }}
+                    onDrop={(event) => void handleArchiveDropOnFolder(event, entry)}
                     onClick={() => setSelectedEntry(entry)}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -982,6 +1517,17 @@ const ArchivePage: React.FC<{
       <div className="overflow-hidden rounded-[18px] border border-base-300 bg-base-100 p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline flex items-center gap-2"
+              onClick={() => navigateArchivePath(parentArchivePath)}
+              disabled={!currentPath}
+              title="Back to parent folder"
+            >
+              <FiChevronLeft className="h-4 w-4" />
+              Back
+            </button>
+
             <label className="btn btn-sm btn-outline flex items-center gap-2">
               <FiUpload className="h-4 w-4" />
               Upload
@@ -1044,11 +1590,7 @@ const ArchivePage: React.FC<{
         ) : (
           <div
             onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const file = e.dataTransfer?.files?.[0] ?? null;
-              void handleGarageDrop(file);
-            }}
+            onDrop={(event) => void handleArchiveSurfaceDrop(event)}
             className="flex flex-col gap-3"
           >
             <div className="mt-3 w-full">
@@ -1073,6 +1615,31 @@ const ArchivePage: React.FC<{
                         key={entry.id}
                         role="button"
                         tabIndex={0}
+                        draggable
+                        onContextMenu={(event) =>
+                          handleArchiveContextMenu(event, entry)
+                        }
+                        onDragStart={(event) => {
+                          setDraggedEntryId(entry.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData(
+                            "application/x-rtc-archive-entry",
+                            String(entry.id),
+                          );
+                        }}
+                        onDragEnd={() => {
+                          setDraggedEntryId(null);
+                          setDragOverEntryId(null);
+                        }}
+                        onDragOver={(event) => {
+                          if (entry.entryType !== ArchiveEntryType.FOLDER) return;
+                          event.preventDefault();
+                          setDragOverEntryId(entry.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverEntryId === entry.id) setDragOverEntryId(null);
+                        }}
+                        onDrop={(event) => void handleArchiveDropOnFolder(event, entry)}
                         onClick={() => {
                           if (isSpreadsheetEntry(entry)) {
                             void handleDownload(entry);
@@ -1088,7 +1655,11 @@ const ArchivePage: React.FC<{
                           }
                         }}
                         className={`flex items-center gap-3 px-3 py-3 hover:bg-base-200/40 ${
-                          selectedEntry?.id === entry.id ? "bg-primary/7" : ""
+                          selectedEntry?.id === entry.id
+                            ? "bg-primary/7"
+                            : dragOverEntryId === entry.id
+                              ? "bg-primary/10"
+                              : ""
                         }`}
                       >
                         <div className="w-6">
@@ -1145,10 +1716,59 @@ const ArchivePage: React.FC<{
         onClose={closePreview}
         onDownload={
           previewState.entry
-            ? () => void handleDownload(previewState.entry as ArchiveEntryData)
+          ? () => void handleDownload(previewState.entry as ArchiveEntryData)
             : undefined
         }
       />
+
+      {contextMenu && (
+        <div
+          className="fixed z-[90] w-44 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-2xl"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2"
+            onClick={() => {
+              const entry = contextMenu.entry;
+              setContextMenu(null);
+              if (entry.entryType === ArchiveEntryType.FOLDER) {
+                handleOpen(entry);
+              } else {
+                void handlePreview(entry);
+              }
+            }}
+          >
+            <FiFolder className="h-4 w-4" />
+            Open
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2"
+            onClick={() => void handleRenameArchiveEntry(contextMenu.entry)}
+          >
+            <FiEdit2 className="h-4 w-4" />
+            Rename
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-error"
+            onClick={() => {
+              const entry = contextMenu.entry;
+              setContextMenu(null);
+              void handleDelete(entry);
+            }}
+          >
+            <FiTrash2 className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
+      )}
 
       {showUploadModal && (
         <ModalBase onClose={() => setShowUploadModal(false)}>
@@ -1751,15 +2371,6 @@ const ArchivePage: React.FC<{
                     <FiRefreshCw className="h-4 w-4" />
                     Refresh
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-info gap-2"
-                    onClick={handleExportCurrentView}
-                  >
-                    <FiDownload className="h-4 w-4" />
-                    Export
-                  </button>
-
                   <div className="dropdown dropdown-end">
                     <button type="button" tabIndex={0} className="btn btn-outline gap-2">
                       <FiList className="h-4 w-4" />
@@ -1842,7 +2453,7 @@ const ArchivePage: React.FC<{
                   <button
                     type="button"
                     className="btn btn-xs btn-ghost"
-                    onClick={() => router.push("/user/cases/archive")}
+                    onClick={() => navigateArchivePath("")}
                   >
                     Root Directory
                   </button>
@@ -1852,7 +2463,7 @@ const ArchivePage: React.FC<{
                       <button
                         type="button"
                         className="btn btn-xs btn-ghost"
-                        onClick={() => router.push(buildArchiveHref(segment.path))}
+                        onClick={() => navigateArchivePath(segment.path)}
                       >
                         {segment.label}
                       </button>
@@ -1861,6 +2472,17 @@ const ArchivePage: React.FC<{
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* <button
+                    type="button"
+                    className="btn btn-sm btn-outline gap-2"
+                    onClick={() => navigateArchivePath(parentArchivePath)}
+                    disabled={!currentPath}
+                    title="Back to parent folder"
+                  >
+                    <FiChevronLeft className="h-4 w-4" />
+                    Back
+                  </button> */}
+
                   <div className="join rounded-2xl border border-base-300 bg-base-100 p-1">
                     <button
                       type="button"
@@ -2217,14 +2839,16 @@ const ArchivePage: React.FC<{
                         Print
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm gap-2"
-                      onClick={() => handleOpen(selectedEntry)}
-                    >
-                      Open Page
-                    </button>
-                    {canManage && (
+                    {!isGarageArchiveEntry(selectedEntry) && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => handleOpen(selectedEntry)}
+                      >
+                        Open Page
+                      </button>
+                    )}
+                    {canManage && !isGarageArchiveEntry(selectedEntry) && (
                       <button
                         type="button"
                         className="btn btn-outline btn-sm gap-2"
@@ -2233,7 +2857,7 @@ const ArchivePage: React.FC<{
                         Edit
                       </button>
                     )}
-                    {canManage && (
+                    {canManage && !isGarageArchiveEntry(selectedEntry) && (
                       <button
                         type="button"
                         className="btn btn-error btn-sm gap-2"
@@ -2254,4 +2878,3 @@ const ArchivePage: React.FC<{
 };
 
 export default ArchivePage;
- 

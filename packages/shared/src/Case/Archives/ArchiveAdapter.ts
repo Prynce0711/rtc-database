@@ -12,6 +12,14 @@ export type ArchiveFileUrlOptions = {
   contentType?: string;
 };
 
+export type ArchiveGarageDirectoryItem = {
+  key: string;
+  name: string;
+  size: number;
+  lastModified: Date | string | null;
+  isDirectory: boolean;
+};
+
 export interface ArchiveAdapter {
   getArchiveEntriesPage: (
     options?: ArchiveFilterOptions,
@@ -37,4 +45,22 @@ export interface ArchiveAdapter {
     id: number,
     options?: ArchiveFileUrlOptions,
   ) => Promise<ActionResult<string>>;
+  getArchiveGarageDirectoryItems?: (
+    folderPath?: string,
+  ) => Promise<ActionResult<ArchiveGarageDirectoryItem[]>>;
+  getArchiveGarageFileUrl?: (
+    key: string,
+    options?: ArchiveFileUrlOptions,
+  ) => Promise<ActionResult<string>>;
+  deleteArchiveGarageItems?: (
+    keys: string[],
+  ) => Promise<ActionResult<{ deletedCount: number }>>;
+  moveArchiveGarageItems?: (
+    keys: string[],
+    targetFolderPath: string,
+  ) => Promise<ActionResult<{ movedCount: number }>>;
+  renameArchiveGarageItem?: (
+    key: string,
+    newName: string,
+  ) => Promise<ActionResult<{ movedCount: number }>>;
 }
