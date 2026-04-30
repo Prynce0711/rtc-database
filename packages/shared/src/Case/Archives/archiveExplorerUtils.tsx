@@ -16,7 +16,7 @@ export type ArchiveVisualDescriptor = {
 };
 
 export const formatArchiveBytes = (value?: number | null): string => {
-  if (!value || value <= 0) return "—";
+  if (!value || value <= 0) return "-";
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   if (value < 1024 * 1024 * 1024) {
@@ -28,9 +28,9 @@ export const formatArchiveBytes = (value?: number | null): string => {
 export const formatArchiveDateTime = (
   value?: Date | string | null,
 ): string => {
-  if (!value) return "—";
+  if (!value) return "-";
   const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
+  if (Number.isNaN(parsed.getTime())) return "-";
 
   return parsed.toLocaleString("en-PH", {
     year: "numeric",

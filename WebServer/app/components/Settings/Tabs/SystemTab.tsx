@@ -74,8 +74,16 @@ const SystemTab = () => {
   const loadGarageInfo = async () => {
     setGarageInfoLoading(true);
     setGarageInfoError(null);
+    if (!garageBucket || !garageBucket.trim()) {
+      setGarageInfo(null);
+      setGarageInfoError(
+        "No Garage bucket selected. Select a bucket to view metrics.",
+      );
+      setGarageInfoLoading(false);
+      return;
+    }
 
-    const result = await getGarageInfo();
+    const result = await getGarageInfo(garageBucket.trim());
     if (!result.success) {
       setGarageInfo(null);
       setGarageInfoError(result.error || "Failed to load Garage metrics");
@@ -606,4 +614,3 @@ const SystemTab = () => {
 };
 
 export default SystemTab;
-

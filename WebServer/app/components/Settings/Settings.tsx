@@ -4,14 +4,23 @@ import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
 import { RedirectingUI } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import DashboardLayout from "../Dashboard/DashboardLayout";
 import SettingsTab from "./SettingsTab";
 import { TABS } from "./tabConfig";
 import TabContent from "./Tabs/TabContent";
 
+const subscribeToHydration = () => () => {};
+const getHydratedSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
+
 const Settings = () => {
   const session = useSession();
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydrationSnapshot,
+  );
 
   const role = session.data?.user?.role ?? Roles.USER;
 
@@ -20,21 +29,12 @@ const Settings = () => {
     [role],
   );
 
-  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.id ?? "profile");
+  const [requestedActiveTab, setRequestedActiveTab] = useState("profile");
+  const activeTab = visibleTabs.some((tab) => tab.id === requestedActiveTab)
+    ? requestedActiveTab
+    : visibleTabs[0]?.id ?? "profile";
 
-  useEffect(() => {
-    if (visibleTabs.length === 0) {
-      setActiveTab("profile");
-      return;
-    }
-
-    const tabExists = visibleTabs.some((tab) => tab.id === activeTab);
-    if (!tabExists) {
-      setActiveTab(visibleTabs[0].id);
-    }
-  }, [activeTab, visibleTabs]);
-
-  if (session.isPending) {
+  if (!isHydrated || session.isPending) {
     return <RedirectingUI titleText="Loading settings..." />;
   }
 
@@ -48,7 +48,7 @@ const Settings = () => {
           <SettingsTab
             tabs={visibleTabs}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={setRequestedActiveTab}
           />
 
           <div className="mt-5 px-4">

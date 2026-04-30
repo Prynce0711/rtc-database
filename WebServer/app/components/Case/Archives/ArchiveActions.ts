@@ -5,6 +5,7 @@ import {
   createGarageFolderMarker,
   deleteGarageFile,
   deleteGarageKeys,
+  GARAGE_ARCHIVES_ROOT,
   getGarageFileUrl,
   listGarageFolder,
   moveGarageKeys,
@@ -38,6 +39,7 @@ import * as XLSX from "xlsx";
 
 const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.NOTARIAL];
 const ARCHIVE_GARAGE_BUCKET = "rtc-bucket";
+const ARCHIVE_GARAGE_ROOT = GARAGE_ARCHIVES_ROOT;
 const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
@@ -289,6 +291,7 @@ const uploadPreparedFile = async (
     key,
     "",
     ARCHIVE_GARAGE_BUCKET,
+    ARCHIVE_GARAGE_ROOT,
   );
 
   if (!uploadResult.success) {
@@ -848,7 +851,11 @@ export async function getArchiveGarageDirectoryItems(
       return sessionValidation;
     }
 
-    return await listGarageFolder(folderPath, ARCHIVE_GARAGE_BUCKET);
+    return await listGarageFolder(
+      folderPath,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
   } catch (error) {
     console.error("Error fetching archive garage directory:", error);
     return { success: false, error: "Failed to fetch garage directory" };
@@ -869,7 +876,12 @@ export async function getArchiveGarageFileUrl(
       return sessionValidation;
     }
 
-    return await getGarageFileUrl(key, options, ARCHIVE_GARAGE_BUCKET);
+    return await getGarageFileUrl(
+      key,
+      options,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
   } catch (error) {
     console.error("Error getting archive garage file URL:", error);
     return { success: false, error: "Failed to get garage file URL" };
@@ -905,6 +917,7 @@ export async function deleteArchiveGarageItems(
     const deleteResult = await deleteGarageKeys(
       normalizedKeys,
       ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
     );
     if (!deleteResult.success) {
       return { success: false, error: deleteResult.error };
@@ -962,6 +975,7 @@ export async function moveArchiveGarageItems(
       keys,
       targetFolderPath,
       ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
     );
     if (!result.success) {
       return { success: false, error: result.error };
@@ -991,7 +1005,12 @@ export async function renameArchiveGarageItem(
       return sessionValidation;
     }
 
-    const result = await renameGarageKey(key, newName, ARCHIVE_GARAGE_BUCKET);
+    const result = await renameGarageKey(
+      key,
+      newName,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
     if (!result.success) {
       return { success: false, error: result.error };
     }
@@ -1058,6 +1077,7 @@ export async function createArchiveEntry(
       const folderMarkerResult = await createGarageFolderMarker(
         fullPath,
         ARCHIVE_GARAGE_BUCKET,
+        ARCHIVE_GARAGE_ROOT,
       );
       if (!folderMarkerResult.success) {
         return {
