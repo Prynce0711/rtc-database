@@ -6,11 +6,9 @@ import {
   FiCalendar,
   FiCheck,
   FiDownload,
-  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
-  FiTrash2,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -607,34 +605,7 @@ const ReceiveLogsPage: React.FC<{
                     <FiX className="h-4 w-4" />
                   </button>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 sm:ml-3">
-                  <button
-                    type="button"
-                    className="btn btn-md btn-outline gap-2"
-                    onClick={() => {
-                      setSelectionMode("edit");
-                      setSelectedLogIds([]);
-                    }}
-                    disabled={totalCount === 0}
-                  >
-                    <FiEdit2 className="h-4 w-4" />
-                    Edit Rows
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-md btn-outline btn-error gap-2"
-                    onClick={() => {
-                      setSelectionMode("delete");
-                      setSelectedLogIds([]);
-                    }}
-                    disabled={totalCount === 0}
-                  >
-                    <FiTrash2 className="h-4 w-4" />
-                    Delete Rows
-                  </button>
-                </div>
-              ))}
+              ) : null)}
           </div>
 
           <FilterDropdown

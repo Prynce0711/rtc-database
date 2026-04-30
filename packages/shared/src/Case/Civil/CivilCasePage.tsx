@@ -13,11 +13,9 @@ import {
   FiCalendar,
   FiCheck,
   FiDownload,
-  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
-  FiTrash2,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -596,32 +594,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
                   <FiX className="h-4 w-4" />
                 </button>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 sm:ml-3">
-                <button
-                  className="btn btn-md btn-outline gap-2"
-                  onClick={() => {
-                    setSelectionMode("edit");
-                    setSelectedCaseIds([]);
-                  }}
-                  disabled={totalCount === 0}
-                >
-                  <FiEdit2 className="h-4 w-4" />
-                  <span>Edit Rows</span>
-                </button>
-                <button
-                  className="btn btn-md btn-outline btn-error gap-2"
-                  onClick={() => {
-                    setSelectionMode("delete");
-                    setSelectedCaseIds([]);
-                  }}
-                  disabled={totalCount === 0}
-                >
-                  <FiTrash2 className="h-4 w-4" />
-                  <span>Delete Rows</span>
-                </button>
-              </div>
-            ))}
+            ) : null)}
 
           <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
             {totalCount} case{totalCount !== 1 && "s"}
