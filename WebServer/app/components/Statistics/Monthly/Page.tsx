@@ -16,7 +16,7 @@ import type { MonthlyRow } from "./Schema";
 import AddReportPage from "./AddReportPage";
 
 import MonthlyTable from "./MonthlyTable";
-import MonthlyToolbar from "./MonthlyToolbar";
+// import MonthlyToolbar from "./MonthlyToolbar";
 
 type MonthlyCategoryView =
   | "Cases Disposed"
@@ -329,35 +329,15 @@ export default function MonthlyPage() {
       </div>
 
       {/* ── TOOLBAR ── */}
-      <MonthlyToolbar
+      {/* <MonthlyToolbar
         search={search}
         onSearchChange={setSearch}
         rowCount={filteredData.length}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
-        onStartEdit={
-          canManageStats
-            ? () => {
-                if (filteredData.length > 0) {
-                  setSelectionMode("edit");
-                  setSelectedIds(new Set());
-                }
-              }
-            : undefined
-        }
-        onStartDelete={
-          canManageStats
-            ? () => {
-                if (filteredData.length > 0) {
-                  setSelectionMode("delete");
-                  setSelectedIds(new Set());
-                }
-              }
-            : undefined
-        }
         onConfirmSelection={canManageStats ? confirmSelection : undefined}
         onCancelSelection={canManageStats ? cancelSelection : undefined}
-      />
+      /> */}
 
       {/* ── TABLE ── */}
       <MonthlyTable

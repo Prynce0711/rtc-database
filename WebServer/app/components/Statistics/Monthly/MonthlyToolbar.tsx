@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FiCheck, FiEdit2, FiSearch, FiTrash2, FiX } from "react-icons/fi";
+import { FiCheck, FiSearch, FiX } from "react-icons/fi";
 import type { SelectionMode } from "./MonthlyTable";
 
 interface MonthlyToolbarProps {
@@ -10,8 +10,6 @@ interface MonthlyToolbarProps {
   rowCount: number;
   selectionMode?: SelectionMode;
   selectedCount?: number;
-  onStartEdit?: () => void;
-  onStartDelete?: () => void;
   onConfirmSelection?: () => void;
   onCancelSelection?: () => void;
 }
@@ -22,8 +20,6 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
   rowCount,
   selectionMode,
   selectedCount = 0,
-  onStartEdit,
-  onStartDelete,
   onConfirmSelection,
   onCancelSelection,
 }) => {
@@ -68,25 +64,6 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         </div>
       ) : (
         <div className="flex items-center gap-3 ml-3">
-          {onStartEdit && (
-            <button
-              className="btn btn-md btn-outline gap-2"
-              onClick={onStartEdit}
-            >
-              <FiEdit2 className="h-4 w-4" />
-              Edit rows
-            </button>
-          )}
-          {onStartDelete && (
-            <button
-              className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
-              onClick={onStartDelete}
-            >
-              <FiTrash2 className="h-4 w-4" />
-              Delete rows
-            </button>
-          )}
-        </div>
       )}
 
       <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">

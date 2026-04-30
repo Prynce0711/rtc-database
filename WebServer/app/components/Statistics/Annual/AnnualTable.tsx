@@ -534,26 +534,6 @@ function AnnualTable<T extends Record<string, unknown>>({
         placeholder={searchPlaceholder ?? `Search ${title}…`}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
-        onStartEdit={
-          isAdminOrAtty
-            ? () => {
-                if (filteredAndSorted.length > 0) {
-                  setSelectionMode("edit");
-                  setSelectedIds(new Set());
-                }
-              }
-            : undefined
-        }
-        onStartDelete={
-          isAdminOrAtty
-            ? () => {
-                if (filteredAndSorted.length > 0) {
-                  setSelectionMode("delete");
-                  setSelectedIds(new Set());
-                }
-              }
-            : undefined
-        }
         onConfirmSelection={isAdminOrAtty ? confirmSelection : undefined}
         onCancelSelection={isAdminOrAtty ? cancelSelection : undefined}
       />
