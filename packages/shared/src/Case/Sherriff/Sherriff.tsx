@@ -26,10 +26,8 @@ import {
   FiCalendar,
   FiCheck,
   FiDownload,
-  FiEdit2,
   FiFileText,
   FiSearch,
-  FiTrash2,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -659,36 +657,7 @@ const Sherriff: React.FC<{
                     <FiX className="h-4 w-4" />
                   </button>
                 </div>
-              ) : (
-                <div className="flex items-center gap-3 ml-3">
-                  <button
-                    type="button"
-                    className="btn btn-md btn-outline gap-2"
-                    onClick={() => {
-                      if (totalCount > 0) {
-                        setSelectionMode("edit");
-                        setSelectedRecordIds([]);
-                      }
-                    }}
-                  >
-                    <FiEdit2 className="h-4 w-4" />
-                    Edit rows
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
-                    onClick={() => {
-                      if (totalCount > 0) {
-                        setSelectionMode("delete");
-                        setSelectedRecordIds([]);
-                      }
-                    }}
-                  >
-                    <FiTrash2 className="h-4 w-4" />
-                    Delete rows
-                  </button>
-                </div>
-              ))}
+              ) : null)}
           </div>
 
           <FilterDropdown
