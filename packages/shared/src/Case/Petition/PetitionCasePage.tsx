@@ -175,6 +175,25 @@ const PetitionCasePage: React.FC<{
     void fetchCases(currentPage);
   }, [fetchCases, currentPage]);
 
+  useEffect(() => {
+    const refreshCases = () => {
+      void fetchCases(currentPage);
+    };
+    const refreshRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        refreshCases();
+      }
+    };
+
+    window.addEventListener("focus", refreshCases);
+    window.addEventListener("pageshow", refreshRestoredPage);
+
+    return () => {
+      window.removeEventListener("focus", refreshCases);
+      window.removeEventListener("pageshow", refreshRestoredPage);
+    };
+  }, [fetchCases, currentPage]);
+
   const getSuggestions = async (
     key: string,
     inputValue: string,

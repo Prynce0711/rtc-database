@@ -11,6 +11,18 @@ import type {
 import { ActionResult, DEFAULT_PAGE_SIZE } from "@rtc-database/shared";
 import { CaseType, Prisma } from "@rtc-database/shared/prisma/client";
 
+const STATISTICS_CASE_TYPES = [
+  CaseType.CRIMINAL,
+  CaseType.CIVIL,
+  CaseType.PETITION,
+  CaseType.SCA,
+];
+
+const buildCaseManagementWhere = (
+  caseType?: CaseType,
+): Prisma.CaseWhereInput =>
+  caseType ? { caseType } : { caseType: { in: STATISTICS_CASE_TYPES } };
+
 const toUnifiedCase = (
   c: Prisma.CaseGetPayload<{
     include: {
@@ -127,9 +139,7 @@ export async function getCases(
         ? options.pageSize
         : DEFAULT_PAGE_SIZE;
 
-    const where: Prisma.CaseWhereInput = options?.caseType
-      ? { caseType: options.caseType }
-      : {};
+    const where = buildCaseManagementWhere(options?.caseType);
 
     const orderBy: Prisma.CaseOrderByWithRelationInput = {
       [options?.sortKey ?? "dateFiled"]: options?.sortOrder ?? "desc",
@@ -176,9 +186,7 @@ export async function getCaseStats(
       return sessionResult;
     }
 
-    const where: Prisma.CaseWhereInput = options?.caseType
-      ? { caseType: options.caseType }
-      : {};
+    const where = buildCaseManagementWhere(options?.caseType);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const includeCriminalStats =
       !options?.caseType || options.caseType === "CRIMINAL";
