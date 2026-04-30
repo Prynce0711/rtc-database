@@ -39,7 +39,6 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         />
       </div>
 
-      {/* Actions (now in the position where All Categories used to be) */}
       {isSelecting ? (
         <div className="flex items-center gap-2 ml-3">
           <span className="text-xs text-base-content/40 tabular-nums">
@@ -63,7 +62,7 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-3 ml-3">
+        <div className="ml-3" />
       )}
 
       <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">
