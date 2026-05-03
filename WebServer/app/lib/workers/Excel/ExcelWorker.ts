@@ -23,6 +23,7 @@ import { uploadReceivingLogExcel } from "./Case/ReceivingLogExcel";
 import { uploadSheriffCaseExcel } from "./Case/SheriffCaseExcel";
 import { uploadSpecialProceedingCaseExcel } from "./Case/SpecialProceedingCaseExcel";
 import { uploadEmployeeExcel } from "./Employee/EmployeeExcel";
+import { uploadNotarialCommissionExcel } from "./NotarialCommission/NotarialCommissionExcel";
 import {
   deserializeExcelFile,
   ExcelJob,
@@ -448,6 +449,8 @@ IS_WORKER
             );
           case ExcelTypes.EMPLOYEE:
             return uploadEmployeeExcel(file);
+          case ExcelTypes.NOTARIAL_COMMISSION:
+            return uploadNotarialCommissionExcel(file);
           case ExcelTypes.MUNICIPAL_TRIAL_COURT:
             return uploadMunicipalTrialCourtExcel(file);
           case ExcelTypes.REGIONAL_TRIAL_COURT:

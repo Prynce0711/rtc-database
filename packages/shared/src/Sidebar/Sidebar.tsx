@@ -358,11 +358,8 @@ const SectionLabel = ({
   );
 };
 
-const resolveTheme = (): "winter" | "dim" => {
-  if (typeof document === "undefined") return "winter";
-  return document.documentElement.getAttribute("data-theme") === "dim"
-    ? "dim"
-    : "winter";
+const getThemeFromSession = (session: SidebarSession | null): SidebarTheme => {
+  return session?.user?.darkMode === true ? "dim" : "winter";
 };
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
@@ -420,8 +417,14 @@ const notarialOnlyNavItem: NavItem = {
   href: "cases/notarial",
   label: "Notarial",
 };
+const notarialCommissionNavItem: NavItem = {
+  icon: <FiFileText />,
+  href: "notarial-commission",
+  label: "Notarial Commission",
+};
 
 const adminNavItems: NavItem[] = [
+  notarialCommissionNavItem,
   { icon: <FiUsers />, href: "employees", label: "Employees" },
   { icon: <FaUserCog />, href: "account", label: "Account" },
   { icon: <FaHistory />, href: "activity-reports", label: "Activity Logs" },
@@ -543,10 +546,10 @@ function adminSidebar({
       ))}
 
       {/* Communication */}
-      <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
         <SectionLabel label="Communication" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "360ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "390ms" }}>
         <ActionBtn
           icon={<FiMessageSquare />}
           label="Messages"
@@ -566,10 +569,10 @@ function adminSidebar({
       </div> */}
 
       {/* Settings */}
-      <div className="sidebar-stagger" style={{ animationDelay: "420ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "450ms" }}>
         <SectionLabel label="Settings" isExpanded={isExpanded} />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "450ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "480ms" }}>
         <ActionBtn
           icon={<FiSettings />}
           label="Settings"
@@ -577,7 +580,7 @@ function adminSidebar({
           onClick={onOpenSettings}
         />
       </div>
-      <div className="sidebar-stagger" style={{ animationDelay: "480ms" }}>
+      <div className="sidebar-stagger" style={{ animationDelay: "510ms" }}>
         <ActionBtn
           icon={theme === "winter" ? <FiMoon /> : <FiSun />}
           label={theme === "winter" ? "Dark Mode" : "Light Mode"}
@@ -1029,6 +1032,16 @@ function notarialSidebar({
           onExpandSidebar={onExpandSidebar}
         />
       </div>
+      <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
+        <NavBtn
+          item={notarialCommissionNavItem}
+          isExpanded={isExpanded}
+          activeView={activeView}
+          openDropdown={openDropdown}
+          setOpenDropdown={setOpenDropdown}
+          onExpandSidebar={onExpandSidebar}
+        />
+      </div>
       {/* <div className="sidebar-stagger" style={{ animationDelay: "120ms" }}>
         <NavBtn
           item={archiveOnlyNavItem}
@@ -1181,10 +1194,21 @@ const Sidebar: React.FC<SidebarProps> = ({
     providedSession ?? sessionState?.data ?? null;
   const activeView = pathname.split("/")[2] || "";
 
-  const [theme, setTheme] = useState<"winter" | "dim">(resolveTheme);
+  const [theme, setTheme] = useState<SidebarTheme>(() =>
+    getThemeFromSession(session),
+  );
   const [collapsed, setCollapsed] = useState(false);
   const isExpanded = !collapsed;
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const nextTheme = getThemeFromSession(session);
+    setTheme(nextTheme);
+
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", nextTheme);
+    }
+  }, [session]);
 
   async function updateTheme(newTheme: SidebarTheme) {
     if (updateDarkMode) {
