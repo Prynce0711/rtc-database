@@ -175,7 +175,9 @@ async function queryEmployeeRecords(
   return rows.map(mapEmployeeRow);
 }
 
-async function countEmployeesByImageFileId(imageFileId: number): Promise<number> {
+async function countEmployeesByImageFileId(
+  imageFileId: number,
+): Promise<number> {
   await ensureEmployeeImageColumn();
 
   const rows = await prisma.$queryRawUnsafe<Array<{ count: number }>>(
@@ -234,7 +236,9 @@ export async function getEmployees(): Promise<ActionResult<EmployeeRecord[]>> {
       return sessionResult;
     }
 
-    const employees = await queryEmployeeRecords(`ORDER BY e."employeeName" ASC`);
+    const employees = await queryEmployeeRecords(
+      `ORDER BY e."employeeName" ASC`,
+    );
     return { success: true, result: employees };
   } catch (error) {
     console.error("Error fetching employees:", error);
@@ -251,9 +255,9 @@ export async function getEmployeeById(
       return sessionResult;
     }
 
-    const employee = (await queryEmployeeRecords(`WHERE e."id" = ?`, [
-      employeeId,
-    ]))[0];
+    const employee = (
+      await queryEmployeeRecords(`WHERE e."id" = ?`, [employeeId])
+    )[0];
 
     if (!employee) {
       return { success: false, error: "Employee not found" };
@@ -355,9 +359,9 @@ export async function createEmployee(
       );
     }
 
-    const createdEmployee = (await queryEmployeeRecords(`WHERE e."id" = ?`, [
-      newEmployee.id,
-    ]))[0];
+    const createdEmployee = (
+      await queryEmployeeRecords(`WHERE e."id" = ?`, [newEmployee.id])
+    )[0];
 
     await createLog({
       action: LogAction.CREATE_EMPLOYEE,
@@ -392,9 +396,9 @@ export async function updateEmployee(
       throw new Error(`Invalid employee data: ${employeeData.error.message}`);
     }
 
-    const oldEmployee = (await queryEmployeeRecords(`WHERE e."id" = ?`, [
-      employeeId,
-    ]))[0];
+    const oldEmployee = (
+      await queryEmployeeRecords(`WHERE e."id" = ?`, [employeeId])
+    )[0];
 
     if (!oldEmployee) {
       throw new Error("Employee not found");
@@ -437,9 +441,9 @@ export async function updateEmployee(
       );
     }
 
-    const reloadedEmployee = (await queryEmployeeRecords(`WHERE e."id" = ?`, [
-      employeeId,
-    ]))[0];
+    const reloadedEmployee = (
+      await queryEmployeeRecords(`WHERE e."id" = ?`, [employeeId])
+    )[0];
 
     if (
       imageFileId &&
@@ -447,7 +451,9 @@ export async function updateEmployee(
       oldEmployee.imageFileId !== imageFileId &&
       oldEmployee.imageFile?.key
     ) {
-      const remaining = await countEmployeesByImageFileId(oldEmployee.imageFileId);
+      const remaining = await countEmployeesByImageFileId(
+        oldEmployee.imageFileId,
+      );
       if (remaining === 0) {
         await deleteGarageFile(
           oldEmployee.imageFile.key,
@@ -488,9 +494,9 @@ export async function deleteEmployee(
       throw new Error("Employee ID is required for deletion");
     }
 
-    const employeeToDelete = (await queryEmployeeRecords(`WHERE e."id" = ?`, [
-      employeeId,
-    ]))[0];
+    const employeeToDelete = (
+      await queryEmployeeRecords(`WHERE e."id" = ?`, [employeeId])
+    )[0];
 
     if (!employeeToDelete) {
       throw new Error("Employee not found");
