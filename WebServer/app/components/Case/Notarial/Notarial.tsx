@@ -148,6 +148,33 @@ const normalizeGaragePath = (path?: string | null): string =>
     .trim()
     .replace(/^\/+|\/+$/g, "");
 
+const getLastPathSegment = (value: string): string => {
+  const normalized = normalizeGaragePath(value);
+  if (!normalized) return "";
+  const segments = normalized.split("/");
+  return segments[segments.length - 1] ?? "";
+};
+
+const resolveYearSegment = (value: string): string => {
+  if (!value) return "unknown-year";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "unknown-year";
+  return String(parsed.getFullYear());
+};
+
+const buildAttorneyFolderPath = (options: {
+  basePath?: string;
+  attorney?: string;
+  date?: string;
+}): string => {
+  const basePath = normalizeGaragePath(options.basePath);
+  const attorney = (options.attorney ?? "").trim();
+  if (!attorney) return basePath;
+  const yearSegment = resolveYearSegment(options.date ?? "");
+  const combined = [basePath, attorney, yearSegment].filter(Boolean).join("/");
+  return normalizeGaragePath(combined);
+};
+
 const initialUploadForm = (): UploadFormState => ({
   title: "",
   name: "",
@@ -487,6 +514,23 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     return normalized.slice(0, normalized.lastIndexOf("/"));
   }, [currentGaragePath]);
 
+  const garageFolderOptions = useMemo(() => {
+    if (displayMode !== "explorer") return [] as string[];
+    const names = records
+      .filter((record) => record.isDirectory)
+      .map((record) =>
+        getLastPathSegment(
+          record.filePath ||
+            record.link ||
+            record.fileName ||
+            record.title ||
+            "",
+        ),
+      )
+      .filter((name) => name.length > 0);
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+  }, [displayMode, records]);
+
   const detailPathSegments = useMemo(() => {
     const detailPath = normalizeGaragePath(
       selectedRecord?.filePath || selectedRecord?.link || "",
@@ -518,17 +562,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const destinationPreview = useMemo(() => {
     const trimmedAttorney = uploadForm.atty.trim();
-    const year = uploadForm.date
-      ? new Date(uploadForm.date).getFullYear()
-      : null;
     if (!trimmedAttorney) {
-      return "Generated after attorney and filing date are entered";
+      return "Enter an attorney to generate the folder path";
     }
 
-    return year
-      ? `${trimmedAttorney}/${year}`
-      : `${trimmedAttorney}/unknown-year`;
-  }, [uploadForm.atty, uploadForm.date]);
+    const basePath = displayMode === "explorer" ? currentGaragePath : "";
+    const previewPath = buildAttorneyFolderPath({
+      basePath,
+      attorney: trimmedAttorney,
+      date: uploadForm.date,
+    });
+    return previewPath || "Root Directory";
+  }, [currentGaragePath, displayMode, uploadForm.atty, uploadForm.date]);
 
   const getSuggestions = async (
     key: string,
@@ -934,15 +979,53 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       return;
     }
 
+    const trimmedAttorney = uploadForm.atty.trim();
+    if (!trimmedAttorney) {
+      statusPopup.showError("Attorney is required for the folder path.");
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(12);
+
+    const basePath =
+      displayMode === "explorer" ? normalizeGaragePath(currentGaragePath) : "";
+    const targetPath = buildAttorneyFolderPath({
+      basePath,
+      attorney: trimmedAttorney,
+      date: uploadForm.date,
+    });
+
+    if (displayMode === "explorer") {
+      const folderExists = garageFolderOptions.some(
+        (name) => name.toLowerCase() === trimmedAttorney.toLowerCase(),
+      );
+
+      if (!folderExists) {
+        const createResult = await createGarageFolder({
+          name: trimmedAttorney,
+          parentPath: basePath,
+        });
+        if (
+          !createResult.success &&
+          createResult.error !== "A folder already exists at that path"
+        ) {
+          statusPopup.showError(
+            createResult.error || "Failed to create attorney folder",
+          );
+          setUploading(false);
+          setUploadProgress(0);
+          return;
+        }
+      }
+    }
 
     const result = await createNotarial({
       title: uploadForm.title.trim(),
       name: uploadForm.name.trim() || undefined,
-      attorney: uploadForm.atty.trim() || undefined,
+      attorney: trimmedAttorney || undefined,
       date: uploadForm.date || undefined,
-      path: displayMode === "explorer" ? currentGaragePath : undefined,
+      path: targetPath,
       file: uploadForm.file,
     });
 
@@ -1512,6 +1595,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     <input
                       type="text"
                       className="input input-bordered"
+                      list="notarial-attorney-folders"
                       value={uploadForm.atty}
                       onChange={(event) =>
                         setUploadForm((previous) => ({
@@ -1520,6 +1604,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         }))
                       }
                     />
+                    {garageFolderOptions.length > 0 && (
+                      <datalist id="notarial-attorney-folders">
+                        {garageFolderOptions.map((name) => (
+                          <option key={name} value={name} />
+                        ))}
+                      </datalist>
+                    )}
                   </label>
                   <label className="form-control">
                     <span className="label-text mb-2 text-sm font-semibold">
@@ -2171,47 +2262,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       List
                     </button>
                   </div>
-
-                  {/* File type filter */}
-                  {/* <select
-                    className="select select-bordered select-sm h-10 rounded-2xl pr-8"
-                    value={fileTypeFilter}
-                    onChange={(event) =>
-                      setFileTypeFilter(
-                        event.target.value as NotarialFileTypeFilter,
-                      )
-                    }
-                  >
-                    <option value="ALL">All file types</option>
-                    <option value="pdf">PDF</option>
-                    <option value="word">Word</option>
-                    <option value="excel">Excel</option>
-                    <option value="image">Images</option>
-                    <option value="other">Other</option>
-                  </select> */}
-
-                  {/* <span className="rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                    {getNotarialSortLabel(sortConfig)}
-                  </span> */}
-                  {/* <select
-                    className="select select-bordered select-sm h-10 rounded-2xl pr-8"
-                    value={fileTypeFilter}
-                    onChange={(event) =>
-                      setFileTypeFilter(
-                        event.target.value as NotarialFileTypeFilter,
-                      )
-                    }
-                  >
-                    <option value="ALL">All file types</option>
-                    <option value="pdf">PDF</option>
-                    <option value="word">Word</option>
-                    <option value="excel">Excel</option>
-                    <option value="image">Images</option>
-                    <option value="other">Other</option>
-                  </select> */}
-                  {/* <span className="rounded-full bg-base-200/60 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/55">
-                    {getNotarialSortLabel(sortConfig)}
-                  </span> */}
                 </div>
               </div>
             </div>
@@ -2291,6 +2341,72 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           {/* TABLE/GRID LISTING - toggle via displayMode */}
           {displayMode === "table" && (
             <div className="min-w-0 overflow-hidden rounded-[24px] border border-base-300 bg-base-100 shadow-lg sm:rounded-[30px]">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center justify-center gap-2"
+                    onClick={() => navigateGaragePath(parentGaragePath)}
+                    disabled={!currentGaragePath}
+                    title="Back to parent folder"
+                  >
+                    <FiChevronLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                  <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
+                    <FiUpload className="h-4 w-4" />
+                    Upload
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        if (f) void handleGarageDrop(f);
+                      }}
+                    />
+                  </label>
+                  <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folder
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.currentTarget.files ?? null;
+                        void handleUploadFolderFiles(files);
+                        // reset so same folder can be chosen again
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center justify-center gap-2"
+                    onClick={() => {
+                      setFolderForm((previous) => ({
+                        ...previous,
+                        parentPath: currentGaragePath,
+                      }));
+                      setShowFolderModal(true);
+                    }}
+                  >
+                    <FiFolderPlus className="h-4 w-4" />
+                    New Folder
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm col-span-2 sm:col-span-1"
+                    onClick={() => setShowUploadModal(true)}
+                  >
+                    Metadata
+                  </button>
+                </div>
+              </div>
+
               {records.length === 0 ? (
                 <NotarialEmptyState />
               ) : viewMode === "list" ? (
@@ -2581,163 +2697,156 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   onDrop={(event) => void handleNotarialSurfaceDrop(event)}
                   className="flex flex-col gap-3"
                 >
-                {/* <div className="rounded-md border border-dashed border-base-300 p-6 text-center">
-                <p className="text-sm text-base-content/70">
-                  Drag & drop files here to upload (all types accepted)
-                </p>
-                <p className="text-xs text-base-content/50 mt-2">
-                  Or click Upload to select files
-                </p>
-              </div> */}
-
-                <div className="mt-3 w-full">
-                  <div className="w-full min-w-0 overflow-hidden">
-                    <div className="hidden grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] items-center gap-4 rounded-t-md bg-base-200/40 px-4 py-2 text-xs uppercase text-base-content/45 lg:grid">
-                      <div className="w-6" />
-                      <div>File Name</div>
-                      <div className="w-36">Owner</div>
-                      <div className="w-24">Size</div>
-                      <div className="w-36">Modified</div>
-                    </div>
-                    <div className="divide-y rounded-b-md">
-                      {records.map((record) => (
-                        <div
-                          key={record.id}
-                          role="button"
-                          tabIndex={0}
-                          draggable
-                          onContextMenu={(event) =>
-                            handleNotarialContextMenu(event, record)
-                          }
-                          onDragStart={(event) => {
-                            setDraggedRecordId(record.id);
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData(
-                              "application/x-rtc-notarial-record",
-                              String(record.id),
-                            );
-                          }}
-                          onDragEnd={() => {
-                            setDraggedRecordId(null);
-                            setDragOverRecordId(null);
-                          }}
-                          onDragOver={(event) => {
-                            if (!record.isDirectory) return;
-                            event.preventDefault();
-                            setDragOverRecordId(record.id);
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverRecordId === record.id) {
+                  <div className="mt-3 w-full">
+                    <div className="w-full min-w-0 overflow-hidden">
+                      <div className="hidden grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] items-center gap-4 rounded-t-md bg-base-200/40 px-4 py-2 text-xs uppercase text-base-content/45 lg:grid">
+                        <div className="w-6" />
+                        <div>File Name</div>
+                        <div className="w-36">Owner</div>
+                        <div className="w-24">Size</div>
+                        <div className="w-36">Modified</div>
+                      </div>
+                      <div className="divide-y rounded-b-md">
+                        {records.map((record) => (
+                          <div
+                            key={record.id}
+                            role="button"
+                            tabIndex={0}
+                            draggable
+                            onContextMenu={(event) =>
+                              handleNotarialContextMenu(event, record)
+                            }
+                            onDragStart={(event) => {
+                              setDraggedRecordId(record.id);
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData(
+                                "application/x-rtc-notarial-record",
+                                String(record.id),
+                              );
+                            }}
+                            onDragEnd={() => {
+                              setDraggedRecordId(null);
                               setDragOverRecordId(null);
+                            }}
+                            onDragOver={(event) => {
+                              if (!record.isDirectory) return;
+                              event.preventDefault();
+                              setDragOverRecordId(record.id);
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverRecordId === record.id) {
+                                setDragOverRecordId(null);
+                              }
+                            }}
+                            onDrop={(event) =>
+                              void handleNotarialDropOnFolder(event, record)
                             }
-                          }}
-                          onDrop={(event) =>
-                            void handleNotarialDropOnFolder(event, record)
-                          }
-                          onClick={() => {
-                            if (record.isDirectory) {
-                              setSelectedRecord(record);
-                            } else if (isExcelRecord(record)) {
-                              void handleDownloadFile(record);
-                            } else {
-                              setSelectedRecord(record);
-                            }
-                          }}
-                          onDoubleClick={() => {
-                            if (record.isDirectory) {
-                              openGarageDirectory(record);
-                            } else {
-                              void handlePreviewFile(record);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter") return;
-                            if (record.isDirectory) {
-                              openGarageDirectory(record);
-                            } else {
-                              void handlePreviewFile(record);
-                            }
-                          }}
-                          className={`grid gap-3 px-3 py-3 transition hover:bg-base-200/40 sm:px-4 lg:grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] lg:items-center lg:gap-4 ${
-                            selectedRecord?.id === record.id
-                              ? "bg-primary/7"
-                              : dragOverRecordId === record.id
-                                ? "bg-primary/10"
-                                : ""
-                          }`}
-                        >
-                          <div className="flex min-w-0 items-start gap-3 lg:contents">
-                            <div className="shrink-0 pt-2 lg:pt-0">
-                              <input
-                                type="checkbox"
-                                className="checkbox checkbox-sm"
-                                checked={selectedRecordIds.includes(record.id)}
-                                onChange={(e) =>
-                                  toggleRecordSelection(
+                            onClick={() => {
+                              if (record.isDirectory) {
+                                setSelectedRecord(record);
+                              } else if (isExcelRecord(record)) {
+                                void handleDownloadFile(record);
+                              } else {
+                                setSelectedRecord(record);
+                              }
+                            }}
+                            onDoubleClick={() => {
+                              if (record.isDirectory) {
+                                openGarageDirectory(record);
+                              } else {
+                                void handlePreviewFile(record);
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter") return;
+                              if (record.isDirectory) {
+                                openGarageDirectory(record);
+                              } else {
+                                void handlePreviewFile(record);
+                              }
+                            }}
+                            className={`grid gap-3 px-3 py-3 transition hover:bg-base-200/40 sm:px-4 lg:grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] lg:items-center lg:gap-4 ${
+                              selectedRecord?.id === record.id
+                                ? "bg-primary/7"
+                                : dragOverRecordId === record.id
+                                  ? "bg-primary/10"
+                                  : ""
+                            }`}
+                          >
+                            <div className="flex min-w-0 items-start gap-3 lg:contents">
+                              <div className="shrink-0 pt-2 lg:pt-0">
+                                <input
+                                  type="checkbox"
+                                  className="checkbox checkbox-sm"
+                                  checked={selectedRecordIds.includes(
                                     record.id,
-                                    e.target.checked,
-                                  )
-                                }
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label={`Select ${record.fileName || record.title || record.id}`}
-                              />
-                            </div>
+                                  )}
+                                  onChange={(e) =>
+                                    toggleRecordSelection(
+                                      record.id,
+                                      e.target.checked,
+                                    )
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Select ${record.fileName || record.title || record.id}`}
+                                />
+                              </div>
 
-                            <div className="flex min-w-0 items-center gap-3">
-                              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-base-200">
-                                {
-                                  getExplorerDescriptor({
-                                    fileName: record.fileName ?? record.title,
-                                    mimeType: record.mimeType,
-                                    isFolder: record.isDirectory,
-                                  }).icon
-                                }
-                              </span>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-base-content">
-                                  {record.fileName ||
-                                    record.title ||
-                                    `Record #${record.id}`}
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-base-200">
+                                  {
+                                    getExplorerDescriptor({
+                                      fileName: record.fileName ?? record.title,
+                                      mimeType: record.mimeType,
+                                      isFolder: record.isDirectory,
+                                    }).icon
+                                  }
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-base-content">
+                                    {record.fileName ||
+                                      record.title ||
+                                      `Record #${record.id}`}
+                                  </p>
+                                  <p className="mt-1 truncate text-xs text-base-content/50">
+                                    {record.name || "Root Directory"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 pl-12 sm:grid-cols-3 lg:contents lg:pl-0">
+                              <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
+                                <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                                  Owner
                                 </p>
-                                <p className="mt-1 truncate text-xs text-base-content/50">
-                                  {record.name || "Root Directory"}
+                                <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                                  —
+                                </p>
+                              </div>
+                              <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
+                                <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                                  Size
+                                </p>
+                                <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                                  {formatExplorerBytes(record.fileSize)}
+                                </p>
+                              </div>
+                              <div className="col-span-2 min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 sm:col-span-1 lg:col-span-auto lg:bg-transparent lg:p-0">
+                                <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
+                                  Modified
+                                </p>
+                                <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
+                                  {formatExplorerDateTime(
+                                    record.fileUpdatedAt || record.updatedAt,
+                                  )}
                                 </p>
                               </div>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 pl-12 sm:grid-cols-3 lg:contents lg:pl-0">
-                            <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
-                              <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
-                                Owner
-                              </p>
-                              <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
-                            —
-                              </p>
-                            </div>
-                            <div className="min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 lg:bg-transparent lg:p-0">
-                              <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
-                                Size
-                              </p>
-                              <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
-                                {formatExplorerBytes(record.fileSize)}
-                              </p>
-                            </div>
-                            <div className="col-span-2 min-w-0 rounded-2xl bg-base-200/35 px-3 py-2 sm:col-span-1 lg:col-span-auto lg:bg-transparent lg:p-0">
-                              <p className="text-[10px] font-semibold uppercase text-base-content/38 lg:hidden">
-                                Modified
-                              </p>
-                              <p className="mt-1 truncate text-xs text-base-content/60 lg:mt-0 lg:text-sm">
-                            {formatExplorerDateTime(
-                              record.fileUpdatedAt || record.updatedAt,
-                            )}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
                 </div>
               )}
             </div>
@@ -2758,196 +2867,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             />
           </div>
         </main>
-
-        {/* <aside className="space-y-5">
-          <div className="sticky top-4 rounded-[28px] border border-base-300 bg-base-100 p-5 shadow-lg">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/38">
-                  File Details
-                </p>
-                <h2 className="mt-2 text-lg font-bold text-base-content">
-                  {selectedRecord?.fileName ||
-                    selectedRecord?.title ||
-                    "No file selected"}
-                </h2>
-              </div>
-              {selectedRecord && (
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${
-                      getExplorerDescriptor({
-                        fileName: selectedRecord.fileName ?? selectedRecord.title,
-                        mimeType: selectedRecord.mimeType,
-                        isFolder: selectedRecord.isDirectory,
-                      }).badgeClassName
-                  }`}
-                >
-                  {
-                      getExplorerDescriptor({
-                        fileName: selectedRecord.fileName ?? selectedRecord.title,
-                        mimeType: selectedRecord.mimeType,
-                        isFolder: selectedRecord.isDirectory,
-                      }).label
-                  }
-                </span>
-              )}
-            </div>
-
-            {!selectedRecord ? (
-              <div className="mt-6 rounded-[24px] border border-dashed border-base-300 bg-base-200/15 p-5 text-sm text-base-content/55">
-                Select a file row or card to inspect its metadata, storage path,
-                timestamps, and quick actions.
-              </div>
-            ) : (
-              <>
-                <div className="mt-5 space-y-3">
-                  {[
-                    ["File Name", selectedRecord.fileName || "—"],
-                    [
-                      "File Type",
-                      getExplorerDescriptor({
-                        fileName:
-                          selectedRecord.fileName ?? selectedRecord.title,
-                        mimeType: selectedRecord.mimeType,
-                        isFolder: selectedRecord.isDirectory,
-                      }).label,
-                    ],
-                    ["Client / Signatory", selectedRecord.name || "—"],
-                    ["Attorney", selectedRecord.atty || "—"],
-                    [
-                      "Date Created",
-                      formatExplorerDateTime(
-                        selectedRecord.fileCreatedAt ||
-                          selectedRecord.createdAt,
-                      ),
-                    ],
-                    [
-                      "Last Modified",
-                      formatExplorerDateTime(
-                        selectedRecord.fileUpdatedAt ||
-                          selectedRecord.updatedAt,
-                      ),
-                    ],
-                    ["File Size", formatExplorerBytes(selectedRecord.fileSize)],
-                    ["Filing Date", selectedRecord.date || "—"],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-[22px] border border-base-300 bg-base-200/18 px-4 py-3"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                        {label}
-                      </p>
-                      <p className="mt-2 break-words text-sm font-semibold text-base-content">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                    Folder Thread
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-base-content/58">
-                    <span>Root Directory</span>
-                    {detailPathSegments.map((segment) => (
-                      <React.Fragment key={segment.path}>
-                        <FiChevronRight className="h-3.5 w-3.5 text-base-content/30" />
-                        <span>{segment.label}</span>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-base-300 bg-base-200/15 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
-                    Security
-                  </p>
-                  <div className="mt-3 space-y-2 text-sm text-base-content/60">
-                    <p className="flex items-center gap-2">
-                      <FiShield className="h-4 w-4 text-primary" />
-                      Access scoped to the active role
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <FiLock className="h-4 w-4 text-primary" />
-                      Secure preview and download links
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {selectedRecord.isDirectory ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm gap-2"
-                      onClick={() => openGarageDirectory(selectedRecord)}
-                    >
-                      Open Folder
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm gap-2"
-                        onClick={() => void handlePreviewFile(selectedRecord)}
-                      >
-                        Preview
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm gap-2"
-                        onClick={() => void handleDownloadFile(selectedRecord)}
-                      >
-                        Download
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm gap-2"
-                        onClick={() => void handlePrintFile(selectedRecord)}
-                      >
-                        Print
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm gap-2"
-                        onClick={() =>
-                          router.push(
-                            `/user/cases/notarial/${selectedRecord.id}`,
-                          )
-                        }
-                      >
-                        Open Page
-                      </button>
-                      {canManageNotarial && (
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm gap-2"
-                          onClick={() =>
-                            router.push(
-                              `/user/cases/notarial/edit?ids=${selectedRecord.id}`,
-                            )
-                          }
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {canManageNotarial && (
-                        <button
-                          type="button"
-                          className="btn btn-error btn-sm gap-2"
-                          onClick={() => void handleDeleteRecord(selectedRecord)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </aside> */}
 
         {/* Toggle tab — always visible on the right edge */}
         <button
@@ -3078,7 +2997,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-3xl border border-base-300 bg-base-200/15 p-4">
+                <div className="mt-5 rounded-3xl border border-base-300 bg-base-200/15 p-s4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-base-content/38">
                     Folder Thread
                   </p>

@@ -51,17 +51,42 @@ export type NotarialFileKeyInput = {
   fileHash?: string | null;
 };
 
+function sanitizeGarageKeySegment(
+  value: string | null | undefined,
+  fallback = "",
+): string {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/[\u0000-\u001f\u007f]+/g, "")
+    .replace(/[\\/:*?"<>|#%{}[\]~&]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+
+  return normalized || fallback;
+}
+
 export function generateFileKey(data: NotarialFileKeyInput): string {
-  const titleStr = data.title ? `${data.title}-` : "";
-  const attyStr = data.attorney ? `${data.attorney}-` : "";
-  const nameStr = data.name ? `${data.name}-` : "";
-  const dateStr = data.date ? `${data.date.toISOString().split("T")[0]}` : "";
-  const hashStr = data.fileHash ? `-${data.fileHash.slice(0, 12)}` : "";
+  const titlePart = sanitizeGarageKeySegment(data.title);
+  const attyPart = sanitizeGarageKeySegment(data.attorney);
+  const namePart = sanitizeGarageKeySegment(data.name);
+  const datePart = data.date ? data.date.toISOString().split("T")[0] : "";
+  const hashPart = data.fileHash?.slice(0, 12) ?? "";
 
-  const fileName = `${titleStr}${attyStr}${nameStr}${dateStr}${hashStr}`;
+  const fileName = [
+    titlePart,
+    attyPart,
+    namePart,
+    datePart,
+    hashPart,
+  ]
+    .filter(Boolean)
+    .join("-");
+  const safeFileName = fileName || "notarial-file";
 
-  const year = data.date ? data.date.getFullYear() : "unknown-year";
-  const folderPath = data.attorney ? `${data.attorney}/${year}` : "";
+  const year = data.date ? String(data.date.getFullYear()) : "unknown-year";
+  const folderAttorney = sanitizeGarageKeySegment(data.attorney, "Unassigned");
+  const folderPath = `${folderAttorney}/${year}`;
 
-  return folderPath ? `${folderPath}/${fileName}` : fileName;
+  return `${folderPath}/${safeFileName}`;
 }

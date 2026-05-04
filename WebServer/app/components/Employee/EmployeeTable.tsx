@@ -1,23 +1,24 @@
 "use client";
 
 import {
-    ActionDropdown,
-    Table,
-    TipCell,
-    enumToText,
-    formatDate,
-    getAgeFromDate,
-    isRetirementEligible,
+  FileViewerModal,
+  Table,
+  TipCell,
+  enumToText,
+  formatDate,
+  getAgeFromDate,
+  isRetirementEligible,
 } from "@rtc-database/shared";
-import type { Employee } from "@rtc-database/shared/prisma/browser";
+import { buildGarageProxyUrl } from "@/app/lib/garageProxy";
 import { useRouter } from "next/navigation";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FiEdit, FiEye, FiTrash2 } from "react-icons/fi";
+import type { EmployeeRecord } from "./schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
-  employees: Employee[];
-  onEdit: (emp: Employee) => void;
+  employees: EmployeeRecord[];
+  onEdit: (emp: EmployeeRecord) => void;
   onDelete: (id: number) => void;
   selectedIds?: number[];
   onToggleSelect?: (id: number) => void;
@@ -25,7 +26,7 @@ interface Props {
 
 type SortKey =
   | keyof Pick<
-      Employee,
+      EmployeeRecord,
       | "employeeName"
       | "employeeNumber"
       | "position"
@@ -42,10 +43,16 @@ type SortKey =
 
 type SortOrder = "asc" | "desc";
 
-type EmployeeRow = Employee & {
+type EmployeeRow = EmployeeRecord & {
   ageSort: number;
   yearsInServiceSort: number;
   retirementSort: number;
+};
+
+type EmployeeContextMenuState = {
+  x: number;
+  y: number;
+  employee: EmployeeRecord;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -78,6 +85,32 @@ const EmployeeTable: React.FC<Props> = ({
 
   const [sortKey, setSortKey] = useState<SortKey>("employeeName");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [contextMenu, setContextMenu] =
+    useState<EmployeeContextMenuState | null>(null);
+  const [imageViewer, setImageViewer] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    const closeMenu = () => setContextMenu(null);
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -123,6 +156,39 @@ const EmployeeTable: React.FC<Props> = ({
     });
   }, [rows, sortKey, sortOrder]);
 
+  const handleContextMenu = (
+    event: React.MouseEvent,
+    employee: EmployeeRecord,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      employee,
+    });
+  };
+
+  const openImageViewer = (employee: EmployeeRecord) => {
+    if (!employee.imageFile?.key) return;
+
+    setImageViewer({
+      open: true,
+      url: buildGarageProxyUrl({
+        bucket: "rtc-bucket",
+        key: employee.imageFile.key,
+        fileName: employee.imageFile.fileName,
+        inline: true,
+        contentType: employee.imageFile.mimeType,
+      }),
+      title: employee.employeeName || "Employee Photo",
+    });
+  };
+
+  const closeImageViewer = () => {
+    setImageViewer({ open: false, url: "", title: "" });
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="w-full bg-base-100 rounded-xl border border-base-200 overflow-hidden">
@@ -136,17 +202,17 @@ const EmployeeTable: React.FC<Props> = ({
             className: "w-14",
           },
           {
-            key: "actions",
-            label: "Actions",
-            align: "center",
-            className: "w-16",
-          },
-          {
             key: "branch",
             label: "Branch",
             sortable: true,
             sortKey: "branch",
             align: "left",
+          },
+          {
+            key: "photo",
+            label: "Photo",
+            align: "center",
+            className: "w-24",
           },
           {
             key: "employeeName",
@@ -231,20 +297,11 @@ const EmployeeTable: React.FC<Props> = ({
         sortConfig={{ key: sortKey as keyof EmployeeRow, order: sortOrder }}
         onSort={(key) => handleSort(key as SortKey)}
         renderRow={(emp) => {
-          const popoverId = `employee-actions-popover-${emp.id}`;
-          const anchorName = `--employee-actions-anchor-${emp.id}`;
-
-          const closeActionsPopover = () => {
-            const popoverEl = document.getElementById(popoverId) as
-              | (HTMLElement & { hidePopover?: () => void })
-              | null;
-            popoverEl?.hidePopover?.();
-          };
-
           return (
             <tr
               key={emp.id}
               onClick={() => router.push(`/user/employees/${emp.id}`)}
+              onContextMenu={(event) => handleContextMenu(event, emp)}
               className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100 cursor-pointer text-center"
             >
               <td
@@ -259,58 +316,6 @@ const EmployeeTable: React.FC<Props> = ({
                   aria-label={`Select employee ${emp.id}`}
                 />
               </td>
-              <td
-                className="py-4 px-5 text-center"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ActionDropdown
-                  popoverId={popoverId}
-                  anchorName={anchorName}
-                  buttonClassName="btn btn-ghost btn-xs px-2 text-base-content/40 hover:text-base-content"
-                  menuClassName="dropdown menu p-2 shadow-lg bg-base-100 rounded-xl w-44 border border-base-200"
-                  iconSize={16}
-                >
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-info text-sm py-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeActionsPopover();
-                        router.push(`/user/employees/${emp.id}`);
-                      }}
-                    >
-                      <FiEye size={14} />
-                      View
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-warning text-sm py-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeActionsPopover();
-                        onEdit(emp);
-                      }}
-                    >
-                      <FiEdit size={14} />
-                      Edit
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-error text-sm py-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeActionsPopover();
-                        onDelete(emp.id);
-                      }}
-                    >
-                      <FiTrash2 size={14} />
-                      Delete
-                    </button>
-                  </li>
-                </ActionDropdown>
-              </td>
 
               <TipCell
                 label="Branch"
@@ -318,6 +323,37 @@ const EmployeeTable: React.FC<Props> = ({
                 className="py-4 px-5 text-base-content/80"
                 clickHint
               />
+              <td
+                className="py-4 px-3 text-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {emp.imageFile?.key ? (
+                  <button
+                    type="button"
+                    className="mx-auto h-11 w-11 rounded-xl border border-base-300 overflow-hidden cursor-zoom-in"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openImageViewer(emp);
+                    }}
+                    aria-label={`View photo of ${emp.employeeName || "employee"}`}
+                  >
+                    <img
+                      src={buildGarageProxyUrl({
+                        bucket: "rtc-bucket",
+                        key: emp.imageFile.key,
+                        fileName: emp.imageFile.fileName,
+                        inline: true,
+                        contentType: emp.imageFile.mimeType,
+                      })}
+                      alt={emp.employeeName || "Employee"}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ) : (
+                  <span className="text-xs text-base-content/35">No image</span>
+                )}
+              </td>
               <TipCell
                 label="Full Name"
                 value={emp.employeeName}
@@ -397,6 +433,63 @@ const EmployeeTable: React.FC<Props> = ({
           );
         }}
       />
+      <FileViewerModal
+        open={imageViewer.open}
+        loading={false}
+        url={imageViewer.url}
+        type="image"
+        title={imageViewer.title}
+        error=""
+        onClose={closeImageViewer}
+      />
+      {contextMenu && (
+        <div
+          className="fixed z-[90] w-44 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-2xl"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-info"
+            onClick={() => {
+              const target = contextMenu.employee;
+              setContextMenu(null);
+              router.push(`/user/employees/${target.id}`);
+            }}
+          >
+            <FiEye className="h-4 w-4" />
+            View
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-warning"
+            onClick={() => {
+              const target = contextMenu.employee;
+              setContextMenu(null);
+              onEdit(target);
+            }}
+          >
+            <FiEdit className="h-4 w-4" />
+            Edit
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-error"
+            onClick={() => {
+              const target = contextMenu.employee;
+              setContextMenu(null);
+              onDelete(target.id);
+            }}
+          >
+            <FiTrash2 className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 };

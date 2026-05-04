@@ -5,8 +5,10 @@ import {
   isValidElement,
   type ReactElement,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
@@ -27,10 +29,28 @@ const ModalBase = ({
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(true);
   const canClose = typeof onClose === "function";
+  const backdropPointerDown = useRef(false);
 
   const requestClose = () => {
     if (!canClose) return;
     setVisible(false);
+  };
+
+  const handleBackdropPointerDown = (event: ReactPointerEvent) => {
+    backdropPointerDown.current = event.target === event.currentTarget;
+  };
+
+  const handleBackdropPointerUp = (event: ReactPointerEvent) => {
+    const shouldClose =
+      backdropPointerDown.current && event.target === event.currentTarget;
+    backdropPointerDown.current = false;
+    if (shouldClose) {
+      requestClose();
+    }
+  };
+
+  const handleBackdropPointerCancel = () => {
+    backdropPointerDown.current = false;
   };
 
   useEffect(() => {
@@ -77,9 +97,9 @@ const ModalBase = ({
           className={`fixed inset-0 min-w-0 flex items-center justify-center z-9999 ${
             notTransparent ? `${bgColor}` : "bg-black/50"
           } ${className}`}
-          onClick={() => {
-            requestClose();
-          }}
+          onPointerDown={handleBackdropPointerDown}
+          onPointerUp={handleBackdropPointerUp}
+          onPointerCancel={handleBackdropPointerCancel}
         >
           <div className="max-h-100vh overflow-y-auto w-full items-center justify-center scrollbar-gutter-stable">
             <div className="flex-1 flex p-5 items-center justify-center">
