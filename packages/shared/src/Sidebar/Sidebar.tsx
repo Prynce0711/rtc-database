@@ -457,9 +457,6 @@ function adminSidebar({
 }: SidebarMenuProps) {
   return (
     <>
-      {/* <Link href="/user/test" className="btn">
-        Test
-      </Link> */}
       {/* Main */}
       <div className="sidebar-stagger" style={{ animationDelay: "0ms" }}>
         <SectionLabel label="Main" isExpanded={isExpanded} isFirst />
@@ -558,15 +555,6 @@ function adminSidebar({
           onClick={onOpenMessages}
         />
       </div>
-      {/* <div className="sidebar-stagger" style={{ animationDelay: "330ms" }}>
-        <ActionBtn
-          icon={<FiBell />}
-          label="Notifications"
-          badge={5}
-          isExpanded={isExpanded}
-          onClick={onOpenNotifications}
-        />
-      </div> */}
 
       {/* Settings */}
       <div className="sidebar-stagger" style={{ animationDelay: "450ms" }}>
@@ -1239,7 +1227,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const role = session?.user?.role;
   const normalizedRole = (role || "").toLowerCase();
-
   const menuProps: SidebarMenuProps = {
     isExpanded,
     activeView,

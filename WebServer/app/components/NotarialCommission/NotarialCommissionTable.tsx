@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  ActionDropdown,
-  Table,
-  TipCell,
-} from "@rtc-database/shared";
-import React, { useMemo, useState } from "react";
+import { buildGarageProxyUrl } from "@/app/lib/garageProxy";
+import { FileViewerModal, Table, TipCell } from "@rtc-database/shared";
+import React, { useEffect, useMemo, useState } from "react";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { getCommissionYearLabel, NotarialCommissionRecord } from "./schema";
 
@@ -30,6 +27,12 @@ type NotarialCommissionRow = NotarialCommissionRecord & {
   yearLabel: string;
 };
 
+type NotarialCommissionContextMenuState = {
+  x: number;
+  y: number;
+  record: NotarialCommissionRecord;
+};
+
 const NotarialCommissionTable: React.FC<Props> = ({
   records,
   selectedIds = [],
@@ -39,6 +42,32 @@ const NotarialCommissionTable: React.FC<Props> = ({
 }) => {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [contextMenu, setContextMenu] =
+    useState<NotarialCommissionContextMenuState | null>(null);
+  const [imageViewer, setImageViewer] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    };
+
+    const closeMenu = () => setContextMenu(null);
+
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("click", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, []);
 
   const rows = useMemo<NotarialCommissionRow[]>(
     () =>
@@ -72,6 +101,39 @@ const NotarialCommissionTable: React.FC<Props> = ({
     setSortOrder("asc");
   };
 
+  const handleContextMenu = (
+    event: React.MouseEvent,
+    record: NotarialCommissionRecord,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      record,
+    });
+  };
+
+  const openImageViewer = (record: NotarialCommissionRecord) => {
+    if (!record.imageFile?.key) return;
+
+    setImageViewer({
+      open: true,
+      url: buildGarageProxyUrl({
+        bucket: "rtc-bucket",
+        key: record.imageFile.key,
+        fileName: record.imageFile.fileName,
+        inline: true,
+        contentType: record.imageFile.mimeType,
+      }),
+      title: record.name || "Notarial Commission Photo",
+    });
+  };
+
+  const closeImageViewer = () => {
+    setImageViewer({ open: false, url: "", title: "" });
+  };
+
   return (
     <div className="w-full bg-base-100 rounded-xl border border-base-200 overflow-hidden">
       <Table<NotarialCommissionRow>
@@ -84,17 +146,17 @@ const NotarialCommissionTable: React.FC<Props> = ({
             className: "w-14",
           },
           {
-            key: "actions",
-            label: "Actions",
-            align: "center",
-            className: "w-16",
-          },
-          {
             key: "petition",
             label: "Petition",
             sortable: true,
             sortKey: "petition",
             align: "left",
+          },
+          {
+            key: "photo",
+            label: "Photo",
+            align: "center",
+            className: "w-24",
           },
           {
             key: "name",
@@ -130,19 +192,10 @@ const NotarialCommissionTable: React.FC<Props> = ({
         sortConfig={{ key: sortKey, order: sortOrder }}
         onSort={(key) => handleSort(key as SortKey)}
         renderRow={(record) => {
-          const popoverId = `notarial-commission-actions-${record.id}`;
-          const anchorName = `--notarial-commission-actions-${record.id}`;
-
-          const closeActionsPopover = () => {
-            const popoverEl = document.getElementById(popoverId) as
-              | (HTMLElement & { hidePopover?: () => void })
-              | null;
-            popoverEl?.hidePopover?.();
-          };
-
           return (
             <tr
               key={record.id}
+              onContextMenu={(event) => handleContextMenu(event, record)}
               className="border-b border-base-200 last:border-0 hover:bg-base-200/50 transition-colors duration-100 text-center"
             >
               <td className="py-4 px-3 text-center">
@@ -154,45 +207,39 @@ const NotarialCommissionTable: React.FC<Props> = ({
                   aria-label={`Select notarial commission ${record.id}`}
                 />
               </td>
-              <td className="py-4 px-5 text-center">
-                <ActionDropdown
-                  popoverId={popoverId}
-                  anchorName={anchorName}
-                  buttonClassName="btn btn-ghost btn-xs px-2 text-base-content/40 hover:text-base-content"
-                  menuClassName="dropdown menu p-2 shadow-lg bg-base-100 rounded-xl w-44 border border-base-200"
-                  iconSize={16}
-                >
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-warning text-sm py-2"
-                      onClick={() => {
-                        closeActionsPopover();
-                        onEdit(record);
-                      }}
-                    >
-                      <FiEdit size={14} />
-                      Edit
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      className="flex items-center gap-3 text-error text-sm py-2"
-                      onClick={() => {
-                        closeActionsPopover();
-                        onDelete(record.id);
-                      }}
-                    >
-                      <FiTrash2 size={14} />
-                      Delete
-                    </button>
-                  </li>
-                </ActionDropdown>
-              </td>
               <TipCell
                 label="Petition"
                 value={record.petition}
                 className="py-4 px-5 font-mono text-[13px] text-base-content/70"
               />
+              <td className="py-4 px-3 text-center">
+                {record.imageFile?.key ? (
+                  <button
+                    type="button"
+                    className="mx-auto h-11 w-11 rounded-xl border border-base-300 overflow-hidden cursor-zoom-in"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openImageViewer(record);
+                    }}
+                    aria-label={`View photo of ${record.name || "commission"}`}
+                  >
+                    <img
+                      src={buildGarageProxyUrl({
+                        bucket: "rtc-bucket",
+                        key: record.imageFile.key,
+                        fileName: record.imageFile.fileName,
+                        inline: true,
+                        contentType: record.imageFile.mimeType,
+                      })}
+                      alt={record.name || "Notarial commission"}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                ) : (
+                  <span className="text-xs text-base-content/35">No image</span>
+                )}
+              </td>
               <TipCell
                 label="Name"
                 value={record.name}
@@ -218,6 +265,51 @@ const NotarialCommissionTable: React.FC<Props> = ({
           );
         }}
       />
+      <FileViewerModal
+        open={imageViewer.open}
+        loading={false}
+        url={imageViewer.url}
+        type="image"
+        title={imageViewer.title}
+        error=""
+        onClose={closeImageViewer}
+      />
+      {contextMenu && (
+        <div
+          className="fixed z-[90] w-44 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-2xl"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-warning"
+            onClick={() => {
+              const target = contextMenu.record;
+              setContextMenu(null);
+              onEdit(target);
+            }}
+          >
+            <FiEdit className="h-4 w-4" />
+            Edit
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm w-full justify-start gap-2 text-error"
+            onClick={() => {
+              const target = contextMenu.record;
+              setContextMenu(null);
+              onDelete(target.id);
+            }}
+          >
+            <FiTrash2 className="h-4 w-4" />
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 };

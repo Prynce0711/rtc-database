@@ -1,7 +1,8 @@
 "use client";
 
+import { buildGarageProxyUrl } from "@/app/lib/garageProxy";
 import { EmploymentType } from "@rtc-database/shared/prisma/enums";
-import { enumToText } from "@rtc-database/shared";
+import { enumToText, FileViewerModal, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -14,12 +15,13 @@ import {
   FiCopy,
   FiEdit3,
   FiEye,
+  FiImage,
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUser,
 } from "react-icons/fi";
-import { usePopup } from "@rtc-database/shared";
 import {
   createEmployee,
   deleteEmployee,
@@ -46,6 +48,8 @@ interface EntryForm {
   employmentType: EmploymentType | "";
   contactNumber: string;
   email: string;
+  imageFile: File | null;
+  imagePreviewUrl: string;
   errors: Record<string, string>;
 }
 
@@ -64,6 +68,8 @@ const emptyEntry = (id: string): EntryForm => ({
   employmentType: "",
   contactNumber: "",
   email: "",
+  imageFile: null,
+  imagePreviewUrl: "",
   errors: {},
 });
 
@@ -81,7 +87,7 @@ type ColDef = {
   key: string;
   label: string;
   placeholder: string;
-  type: "text" | "date" | "email" | "number";
+  type: "text" | "date" | "email" | "number" | "image";
   width: number;
   required?: boolean;
   mono?: boolean;
@@ -104,6 +110,13 @@ const FROZEN_COLS: ColDef[] = [
     width: 120,
     mono: true,
     numbersOnly: true,
+  },
+  {
+    key: "imageFile",
+    label: "Photo",
+    placeholder: "",
+    type: "image",
+    width: 170,
   },
 ];
 
@@ -183,6 +196,39 @@ const TABS: {
 ];
 
 const EMPLOYMENT_TYPE_OPTIONS = Object.values(EmploymentType);
+const IMAGE_ACCEPT = "image/*";
+
+const revokePreviewUrl = (url?: string) => {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+};
+
+const getEmployeeImagePreviewUrl = (employee: Record<string, any>): string =>
+  employee.imageFile?.key
+    ? buildGarageProxyUrl({
+        bucket: "rtc-bucket",
+        key: employee.imageFile.key,
+        fileName: employee.imageFile.fileName,
+        inline: true,
+        contentType: employee.imageFile.mimeType,
+      })
+    : "";
+
+const employeeToEntry = (employee: Record<string, any>): EntryForm => ({
+  ...emptyEntry(uid()),
+  employeeName: employee.employeeName ?? "",
+  employeeNumber: employee.employeeNumber ?? "",
+  position: employee.position ?? "",
+  branch: employee.branch ?? "",
+  birthDate: employee.birthDate ? String(employee.birthDate).slice(0, 10) : today,
+  dateHired: employee.dateHired ? String(employee.dateHired).slice(0, 10) : today,
+  employmentType: employee.employmentType ?? "",
+  contactNumber: employee.contactNumber ?? "",
+  email: employee.email ?? "",
+  imageFile: null,
+  imagePreviewUrl: getEmployeeImagePreviewUrl(employee),
+});
 
 /* ─── Validation ─────────────────────────────────────────────── */
 function validateEntry(entry: EntryForm): Record<string, string> {
@@ -248,13 +294,78 @@ const CellInput = ({
   );
 };
 
+const ImageCell = ({
+  entry,
+  onSelectFile,
+  onPreview,
+  onClear,
+}: {
+  entry: EntryForm;
+  onSelectFile: (file: File | null) => void;
+  onPreview: () => void;
+  onClear: () => void;
+}) => {
+  const hasImage = Boolean(entry.imagePreviewUrl);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <label className="btn btn-xs btn-outline gap-1.5">
+          <FiUpload size={12} />
+          {hasImage ? "Replace" : "Upload"}
+          <input
+            type="file"
+            accept={IMAGE_ACCEPT}
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              onSelectFile(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        {hasImage && (
+          <button
+            type="button"
+            className="btn btn-xs btn-ghost"
+            onClick={onClear}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="flex items-center gap-2 text-left"
+        onClick={hasImage ? onPreview : undefined}
+        disabled={!hasImage}
+      >
+        {hasImage ? (
+          <img
+            src={entry.imagePreviewUrl}
+            alt="Employee"
+            className="h-10 w-10 rounded-lg border border-base-300 object-cover"
+          />
+        ) : (
+          <span className="text-xs text-base-content/40 inline-flex items-center gap-1">
+            <FiImage size={12} />
+            No image
+          </span>
+        )}
+      </button>
+    </div>
+  );
+};
+
 /* ─── ReviewCard ─────────────────────────────────────────────── */
 function ReviewCard({
   entry,
   isExistingEmployee,
+  onViewImage,
 }: {
   entry: EntryForm;
   isExistingEmployee: boolean;
+  onViewImage?: () => void;
 }) {
   const fmtDate = (d: string) =>
     d
@@ -348,6 +459,29 @@ function ReviewCard({
             </div>
           </div>
 
+          {entry.imagePreviewUrl && (
+            <div className="rv-section">
+              <div className="rv-section-header">
+                <FiImage size={13} />
+                <span>Photo</span>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-3"
+                onClick={onViewImage}
+              >
+                <img
+                  src={entry.imagePreviewUrl}
+                  alt={entry.employeeName || "Employee"}
+                  className="h-16 w-16 rounded-xl border border-base-300 object-cover"
+                />
+                <span className="text-sm font-semibold text-base-content/70">
+                  View image
+                </span>
+              </button>
+            </div>
+          )}
+
           <div className="rv-section">
             <div className="rv-section-header">
               <FiBriefcase size={13} />
@@ -409,24 +543,31 @@ const EmployeeDrawer = ({
     string[]
   >([]);
   const tableRef = useRef<HTMLDivElement>(null);
+  const entriesRef = useRef<EntryForm[]>([]);
+  const [imageViewer, setImageViewer] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
 
   const [entries, setEntries] = useState<EntryForm[]>(() => {
     if (isEdit && editEmployees.length > 0) {
-      return editEmployees.map((e) => ({
-        ...emptyEntry(uid()),
-        employeeName: e.employeeName ?? "",
-        employeeNumber: e.employeeNumber ?? "",
-        position: e.position ?? "",
-        branch: e.branch ?? "",
-        birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
-        dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
-        employmentType: e.employmentType ?? "",
-        contactNumber: e.contactNumber ?? "",
-        email: e.email ?? "",
-      }));
+      return editEmployees.map(employeeToEntry);
     }
     return [emptyEntry(uid())];
   });
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  useEffect(() => {
+    return () => {
+      entriesRef.current.forEach((entry) =>
+        revokePreviewUrl(entry.imagePreviewUrl),
+      );
+    };
+  }, []);
 
   useEffect(() => {
     setStep("entry");
@@ -434,20 +575,7 @@ const EmployeeDrawer = ({
 
     if (isEdit) {
       if (editEmployees.length > 0) {
-        setEntries(
-          editEmployees.map((e) => ({
-            ...emptyEntry(uid()),
-            employeeName: e.employeeName ?? "",
-            employeeNumber: e.employeeNumber ?? "",
-            position: e.position ?? "",
-            branch: e.branch ?? "",
-            birthDate: e.birthDate ? String(e.birthDate).slice(0, 10) : today,
-            dateHired: e.dateHired ? String(e.dateHired).slice(0, 10) : today,
-            employmentType: e.employmentType ?? "",
-            contactNumber: e.contactNumber ?? "",
-            email: e.email ?? "",
-          })),
-        );
+        setEntries(editEmployees.map(employeeToEntry));
       }
       return;
     }
@@ -462,6 +590,39 @@ const EmployeeDrawer = ({
           ? { ...e, [field]: value, errors: { ...e.errors, [field]: "" } }
           : e,
       ),
+    );
+  };
+
+  const closeImageViewer = () =>
+    setImageViewer({ open: false, url: "", title: "" });
+
+  const openImageViewer = (entry: EntryForm) => {
+    if (!entry.imagePreviewUrl) return;
+    setImageViewer({
+      open: true,
+      url: entry.imagePreviewUrl,
+      title: entry.employeeName || "Employee image",
+    });
+  };
+
+  const handleImageChange = (id: string, file: File | null) => {
+    const existing = entries.find((entry) => entry.id === id);
+    if (existing?.imagePreviewUrl) {
+      revokePreviewUrl(existing.imagePreviewUrl);
+      if (imageViewer.url === existing.imagePreviewUrl) {
+        closeImageViewer();
+      }
+    }
+
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== id) return entry;
+        return {
+          ...entry,
+          imageFile: file,
+          imagePreviewUrl: file ? URL.createObjectURL(file) : "",
+        };
+      }),
     );
   };
 
@@ -483,12 +644,24 @@ const EmployeeDrawer = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
+    entries.forEach((entry) => revokePreviewUrl(entry.imagePreviewUrl));
+    setImageViewer({ open: false, url: "", title: "" });
+
     setEntries([emptyEntry(uid())]);
     setExistingEmployeeNumbers([]);
-  }, [entries.length, statusPopup]);
+  }, [entries, statusPopup]);
 
   const handleRemove = (id: string) =>
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+    setEntries((prev) => {
+      const target = prev.find((entry) => entry.id === id);
+      if (target?.imagePreviewUrl) {
+        revokePreviewUrl(target.imagePreviewUrl);
+        if (imageViewer.url === target.imagePreviewUrl) {
+          closeImageViewer();
+        }
+      }
+      return prev.filter((entry) => entry.id !== id);
+    });
 
   const handleDuplicate = (id: string) => {
     const source = entries.find((e) => e.id === id);
@@ -498,6 +671,8 @@ const EmployeeDrawer = ({
       id: uid(),
       employeeName: "",
       employeeNumber: "",
+      imageFile: null,
+      imagePreviewUrl: "",
       errors: {},
     };
     setEntries((prev) => {
@@ -695,6 +870,7 @@ const EmployeeDrawer = ({
         employmentType: e.employmentType || undefined,
         contactNumber: e.contactNumber || undefined,
         email: e.email?.trim() || undefined,
+        imageFile: e.imageFile ?? undefined,
       }));
 
       if (isEdit) {
@@ -805,6 +981,15 @@ const EmployeeDrawer = ({
 
   return (
     <div className="xls-root">
+      <FileViewerModal
+        open={imageViewer.open}
+        loading={false}
+        url={imageViewer.url}
+        type="image"
+        title={imageViewer.title}
+        error=""
+        onClose={closeImageViewer}
+      />
       {/* ══ TOPBAR ══ */}
       <div className="bg-base-100 xls-topbar">
         <div className="xls-topbar-left">
@@ -1052,20 +1237,44 @@ const EmployeeDrawer = ({
 
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={(entry as any)[col.key] ?? ""}
-                                  error={entry.errors[col.key]}
-                                  onChange={(v) =>
-                                    handleChange(entry.id, col.key, v)
-                                  }
-                                />
+                                {col.type === "image" ? (
+                                  <ImageCell
+                                    entry={entry}
+                                    onSelectFile={(file) =>
+                                      handleImageChange(entry.id, file)
+                                    }
+                                    onPreview={() => openImageViewer(entry)}
+                                    onClear={() =>
+                                      handleImageChange(entry.id, null)
+                                    }
+                                  />
+                                ) : (
+                                  <CellInput
+                                    col={col}
+                                    value={(entry as any)[col.key] ?? ""}
+                                    error={entry.errors[col.key]}
+                                    onChange={(v) =>
+                                      handleChange(entry.id, col.key, v)
+                                    }
+                                  />
+                                )}
                               </td>
                             ))}
 
                             {activeCols.map((col, colIdx) => (
                               <td key={col.key}>
-                                {col.key === "employmentType" ? (
+                                {col.type === "image" ? (
+                                  <ImageCell
+                                    entry={entry}
+                                    onSelectFile={(file) =>
+                                      handleImageChange(entry.id, file)
+                                    }
+                                    onPreview={() => openImageViewer(entry)}
+                                    onClear={() =>
+                                      handleImageChange(entry.id, null)
+                                    }
+                                  />
+                                ) : col.key === "employmentType" ? (
                                   <div
                                     style={{
                                       display: "flex",
@@ -1304,6 +1513,7 @@ const EmployeeDrawer = ({
                       isExistingEmployee={isEmployeeNumberExisting(
                         entries[reviewIdx]?.employeeNumber ?? "",
                       )}
+                      onViewImage={() => openImageViewer(entries[reviewIdx])}
                     />
                   </motion.div>
                 </AnimatePresence>
@@ -1380,4 +1590,3 @@ const EmployeeDrawer = ({
 };
 
 export default EmployeeDrawer;
-
