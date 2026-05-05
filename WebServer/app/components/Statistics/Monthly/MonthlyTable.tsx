@@ -1,7 +1,13 @@
 "use client";
 
 import { Pagination } from "@rtc-database/shared";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
 
@@ -41,9 +47,8 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
     col: string;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [colWidths, setColWidths] = useState<Record<string, number>>(
-    DEFAULT_WIDTHS,
-  );
+  const [colWidths, setColWidths] =
+    useState<Record<string, number>>(DEFAULT_WIDTHS);
   const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
   const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
   const activeResize = useRef<{
