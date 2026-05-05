@@ -9,12 +9,15 @@ import {
   uploadNotarialCommissionExcel,
 } from "@/app/components/NotarialCommission/ExcelActions";
 import {
+  downloadImportFailedExcel,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
   PageListSkeleton,
+  showImportFailedRowsToast,
   usePopup,
+  useToast,
 } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -50,21 +53,7 @@ const getErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
 
 const downloadExcel = (base64: string, fileName: string) => {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  const blob = new Blob([bytes], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadImportFailedExcel({ base64, fileName });
 };
 
 const matchesText = (
@@ -81,6 +70,7 @@ const matchesText = (
 const NotarialCommissionDashboard: React.FC = () => {
   const router = useRouter();
   const statusPopup = usePopup();
+  const toast = useToast();
   const [records, setRecords] = useState<NotarialCommissionRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deletingSelected, setDeletingSelected] = useState(false);
@@ -292,10 +282,8 @@ const NotarialCommissionDashboard: React.FC = () => {
           : result.errorResult;
 
         if (importPayload?.failedExcel) {
-          downloadExcel(
-            importPayload.failedExcel.base64,
-            importPayload.failedExcel.fileName,
-          );
+          downloadImportFailedExcel(importPayload.failedExcel);
+          showImportFailedRowsToast(toast, importPayload.failedExcel);
         }
 
         if (!result.success) {

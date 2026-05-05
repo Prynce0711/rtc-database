@@ -27,6 +27,7 @@ import {
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 import { createTempId } from "../../utils";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import {
@@ -37,6 +38,7 @@ import {
   formatImportFileSize,
   getCaseImportConflictModeLabel,
   previewCivilCaseImport,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
@@ -616,6 +618,7 @@ export const CivilCaseUpdatePage = ({
 }) => {
   const router = useAdaptiveNavigation();
   const statusPopup = usePopup();
+  const toast = useToast();
 
   const editCases =
     selectedCases && selectedCases.length > 0
@@ -891,6 +894,7 @@ export const CivilCaseUpdatePage = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -937,6 +941,7 @@ export const CivilCaseUpdatePage = ({
       const result = await previewCivilCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

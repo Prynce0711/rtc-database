@@ -173,30 +173,38 @@ const JudgementAddReportPage: React.FC<JudgementAddProps> = ({
       ? rows.map(mapMtcRecordFromRtcLayout)
       : rows;
 
-    if (initialData && initialData.length > 0) {
-      // update mode
-      if (onUpdate) {
-        for (const record of rowsToPersist) {
-          await onUpdate(record);
+    try {
+      if (initialData && initialData.length > 0) {
+        statusPopup.showLoading("Updating judgement report...");
+        // update mode
+        if (onUpdate) {
+          for (const record of rowsToPersist) {
+            await onUpdate(record);
+          }
         }
-      }
-      statusPopup.showSuccess(
-        `${rowsToPersist.length} entry(s) updated successfully`,
-      );
-    } else {
-      // add mode
-      if (onAdd) {
-        for (const record of rowsToPersist) {
-          await onAdd(record);
+        statusPopup.showSuccess(
+          `${rowsToPersist.length} entry(s) updated successfully`,
+        );
+      } else {
+        statusPopup.showLoading("Saving judgement report...");
+        // add mode
+        if (onAdd) {
+          for (const record of rowsToPersist) {
+            await onAdd(record);
+          }
         }
+        statusPopup.showSuccess(
+          `${rowsToPersist.length} entry(s) added successfully`,
+        );
       }
-      statusPopup.showSuccess(
-        `${rowsToPersist.length} entry(s) added successfully`,
+
+      // go back to parent view
+      onBack();
+    } catch (error) {
+      statusPopup.showError(
+        error instanceof Error ? error.message : "Failed to save report.",
       );
     }
-
-    // go back to parent view
-    onBack();
   };
 
   return (

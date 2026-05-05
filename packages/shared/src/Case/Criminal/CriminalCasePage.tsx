@@ -34,6 +34,7 @@ import {
   Roles,
   Table,
   usePopup,
+  useToast,
   type CriminalCaseData,
   type CriminalCaseFilters,
   type CriminalCasesFilterOptions,
@@ -50,6 +51,7 @@ import {
   formatImportFileSize,
   previewCriminalCaseImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
@@ -121,6 +123,7 @@ const CriminalCasePage: React.FC<{
   const [exporting, setExporting] = useState(false);
   const [deletingSelected, setDeletingSelected] = useState(false);
   const statusPopup = usePopup();
+  const toast = useToast();
 
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
@@ -209,12 +212,20 @@ const CriminalCasePage: React.FC<{
     { key: "amountInvolved", label: "Amount Involved", type: "number" },
   ];
 
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // const params = new URLSearchParams(window.location.search);
+  // const initialPage = Number(params.get("page")) || 1;
+
+  // const [currentPage, setCurrentPage] = useState(initialPage);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return Number(params.get("page")) || 1;
+  });
+
   const pageSize = 10;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [appliedFilters]);
+  // useEffect(() => {
+  //   setCurrentPage(currentPage);
+  // }, [appliedFilters]);
 
   const handleToggleCaseSelection = (caseId: number, checked: boolean) => {
     setSelectedCaseIds((prev) => {
@@ -299,6 +310,7 @@ const CriminalCasePage: React.FC<{
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -553,6 +565,7 @@ const CriminalCasePage: React.FC<{
       const result = await previewCriminalCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
@@ -989,7 +1002,22 @@ const CriminalCasePage: React.FC<{
           pageCount={pageCount}
           currentPage={currentPage}
           onPageChange={(page) => {
+            const params = new URLSearchParams(window.location.search);
+            params.set("page", String(page));
+
+            window.history.pushState(
+              {},
+              "",
+              `${window.location.pathname}?${params.toString()}`,
+            );
+
+            setSearchParams(params);
+            // update currentPage only; fetchCases will run via useEffect
             setCurrentPage(page);
+
+            // ✅ this is the important one
+            fetchCases(page);
+
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         />
@@ -999,4 +1027,3 @@ const CriminalCasePage: React.FC<{
 };
 
 export default CriminalCasePage;
-

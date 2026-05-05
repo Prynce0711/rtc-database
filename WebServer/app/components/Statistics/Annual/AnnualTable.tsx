@@ -438,26 +438,34 @@ function AnnualTable<T extends Record<string, unknown>>({
           onActivePageChange?.(false);
         }}
         onSave={async (rows) => {
-          if (editInitialData && editInitialData.length > 0) {
-            // Edit mode – update existing records
-            for (const record of rows) {
-              await handleUpdate(record);
+          try {
+            if (editInitialData && editInitialData.length > 0) {
+              statusPopup.showLoading("Updating annual report...");
+              // Edit mode – update existing records
+              for (const record of rows) {
+                await handleUpdate(record);
+              }
+              statusPopup.showSuccess(
+                `${rows.length} entry(s) updated successfully`,
+              );
+            } else {
+              statusPopup.showLoading("Saving annual report...");
+              // Add mode – create new records
+              for (const record of rows) {
+                await handleCreate(record);
+              }
+              statusPopup.showSuccess(
+                `${rows.length} entry(s) added successfully`,
+              );
             }
-            statusPopup.showSuccess(
-              `${rows.length} entry(s) updated successfully`,
-            );
-          } else {
-            // Add mode – create new records
-            for (const record of rows) {
-              await handleCreate(record);
-            }
-            statusPopup.showSuccess(
-              `${rows.length} entry(s) added successfully`,
+            setShowAddPage(false);
+            setEditInitialData(undefined);
+            onActivePageChange?.(false);
+          } catch (error) {
+            statusPopup.showError(
+              error instanceof Error ? error.message : "Failed to save report.",
             );
           }
-          setShowAddPage(false);
-          setEditInitialData(undefined);
-          onActivePageChange?.(false);
         }}
       />
     );
