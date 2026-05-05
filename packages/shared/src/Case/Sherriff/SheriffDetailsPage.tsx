@@ -25,6 +25,7 @@ export default function SheriffDetailsPage({
   adapter: SherriffCaseAdapter;
 }) {
   const router = useAdaptiveRouter();
+  const listPath = "/user/cases/sheriff";
   const pathname = useAdaptivePathname();
 
   const [caseData, setCaseData] = useState<SheriffCaseData | null>(null);
@@ -87,7 +88,7 @@ export default function SheriffDetailsPage({
             Sheriff case not found
           </p>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(listPath)}
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -104,7 +105,7 @@ export default function SheriffDetailsPage({
       <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(listPath)}
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             Back
