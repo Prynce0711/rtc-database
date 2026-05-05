@@ -1,11 +1,21 @@
 "use client";
 
 import { Pagination } from "@rtc-database/shared";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORY_BADGE } from "./MonthlyUtils";
 import type { MonthlyRow } from "./Schema";
 
 const PAGE_SIZE = 10;
+
+const COL_KEYS = ["category", "branch", "criminal", "civil", "total"] as const;
+
+const DEFAULT_WIDTHS: Record<string, number> = {
+  category: 160,
+  branch: 140,
+  criminal: 120,
+  civil: 120,
+  total: 120,
+};
 
 export type SelectionMode = "edit" | "delete" | null;
 
@@ -31,6 +41,73 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
     col: string;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [colWidths, setColWidths] = useState<Record<string, number>>(
+    DEFAULT_WIDTHS,
+  );
+  const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const activeResize = useRef<{
+    key: string;
+    startX: number;
+    startW: number;
+    moved: boolean;
+  } | null>(null);
+
+  const MIN_COL_WIDTH = 64;
+
+  const startResize = useCallback((e: React.MouseEvent, key: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = thRefs.current[key];
+    if (!th) return;
+    activeResize.current = {
+      key,
+      startX: e.clientX,
+      startW: th.getBoundingClientRect().width,
+      moved: false,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const active = activeResize.current;
+      if (!active) return;
+      const delta = e.clientX - active.startX;
+      if (Math.abs(delta) < 2) return;
+      active.moved = true;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(active.startW + delta));
+      const th = thRefs.current[active.key];
+      if (th) th.style.width = `${next}px`;
+      const col = colRefs.current[active.key];
+      if (col) col.style.width = `${next}px`;
+    };
+    const onUp = (e: MouseEvent) => {
+      const active = activeResize.current;
+      if (!active) return;
+      if (!active.moved) {
+        activeResize.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        return;
+      }
+      const delta = e.clientX - active.startX;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(active.startW + delta));
+      setColWidths((prev) => ({ ...prev, [active.key]: next }));
+      activeResize.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
 
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil(data.length / PAGE_SIZE)),
@@ -133,14 +210,18 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
       }`}
     >
       <div className="overflow-x-auto">
-        <table className="table table-fixed table-sm w-full text-center">
+        <table className="table table-fixed table-sm w-max min-w-full text-center">
           <colgroup>
-            {isSelecting && <col className="w-10" />}
-            <col className="w-[20%]" />
-            <col className="w-[20%]" />
-            <col className="w-[20%]" />
-            <col className="w-[20%]" />
-            <col className="w-[20%]" />
+            {isSelecting && <col style={{ width: 44 }} />}
+            {COL_KEYS.map((key) => (
+              <col
+                key={key}
+                ref={(node) => {
+                  colRefs.current[key] = node;
+                }}
+                style={{ width: colWidths[key] }}
+              />
+            ))}
           </colgroup>
 
           <thead>
@@ -155,20 +236,85 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
                   />
                 </th>
               )}
-              <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                Category
+              <th
+                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                ref={(node) => {
+                  thRefs.current["category"] = node;
+                }}
+                style={{ width: colWidths["category"] }}
+              >
+                <span className="block truncate">Category</span>
+                <div
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "category")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                Branch
+              <th
+                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                ref={(node) => {
+                  thRefs.current["branch"] = node;
+                }}
+                style={{ width: colWidths["branch"] }}
+              >
+                <span className="block truncate">Branch</span>
+                <div
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "branch")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                Criminal
+              <th
+                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                ref={(node) => {
+                  thRefs.current["criminal"] = node;
+                }}
+                style={{ width: colWidths["criminal"] }}
+              >
+                <span className="block truncate">Criminal</span>
+                <div
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "criminal")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                Civil
+              <th
+                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                ref={(node) => {
+                  thRefs.current["civil"] = node;
+                }}
+                style={{ width: colWidths["civil"] }}
+              >
+                <span className="block truncate">Civil</span>
+                <div
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "civil")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
-              <th className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50">
-                Total
+              <th
+                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                ref={(node) => {
+                  thRefs.current["total"] = node;
+                }}
+                style={{ width: colWidths["total"] }}
+              >
+                <span className="block truncate">Total</span>
+                <div
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                  onMouseDown={(e) => startResize(e, "total")}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                </div>
               </th>
             </tr>
           </thead>
