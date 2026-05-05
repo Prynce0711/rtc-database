@@ -27,6 +27,10 @@ export default function SheriffDetailsPage({
   const router = useAdaptiveRouter();
   const listPath = "/user/cases/sheriff";
   const pathname = useAdaptivePathname();
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
 
   const [caseData, setCaseData] = useState<SheriffCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<SheriffCaseData | null>(null);
@@ -88,7 +92,11 @@ export default function SheriffDetailsPage({
             Sheriff case not found
           </p>
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -105,7 +113,11 @@ export default function SheriffDetailsPage({
       <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             Back
@@ -167,7 +179,10 @@ export default function SheriffDetailsPage({
             label={prevCase?.caseNumber ?? "-"}
             sublabel={prevCase?.sheriffName ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/sheriff/${prevCase.id}`)
+              prevCase &&
+              router.push(
+                `/user/cases/sheriff/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!prevCase}
           />
@@ -176,7 +191,10 @@ export default function SheriffDetailsPage({
             label={nextCase?.caseNumber ?? "-"}
             sublabel={nextCase?.sheriffName ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/sheriff/${nextCase.id}`)
+              nextCase &&
+              router.push(
+                `/user/cases/sheriff/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!nextCase}
           />

@@ -23,6 +23,10 @@ export default function CriminalCaseDetailsPage({
   const router = useAdaptiveNavigation();
   const listPath = "/user/cases/criminal";
   const pathname = useAdaptivePathname();
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
   const idParam = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
     return segments.length > 0 ? segments[segments.length - 1] : "";
@@ -89,7 +93,11 @@ export default function CriminalCaseDetailsPage({
             Case not found
           </p>
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -109,7 +117,11 @@ export default function CriminalCaseDetailsPage({
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           {/* Back */}
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             <svg
@@ -143,8 +155,11 @@ export default function CriminalCaseDetailsPage({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() =>
-                prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
-              }
+                  prevCase &&
+                  router.push(
+                    `/user/cases/criminal/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!prevCase}
               title={
                 prevCase
@@ -177,8 +192,11 @@ export default function CriminalCaseDetailsPage({
 
             <button
               onClick={() =>
-                nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
-              }
+                  nextCase &&
+                  router.push(
+                    `/user/cases/criminal/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!nextCase}
               title={nextCase ? `Next: ${nextCase.caseNumber}` : "No next case"}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
@@ -373,7 +391,10 @@ export default function CriminalCaseDetailsPage({
             label={prevCase?.caseNumber ?? "—"}
             sublabel={prevCase?.name ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/criminal/${prevCase.id}`)
+              prevCase &&
+              router.push(
+                `/user/cases/criminal/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!prevCase}
           />
@@ -382,7 +403,10 @@ export default function CriminalCaseDetailsPage({
             label={nextCase?.caseNumber ?? "—"}
             sublabel={nextCase?.name ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/criminal/${nextCase.id}`)
+              nextCase &&
+              router.push(
+                `/user/cases/criminal/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!nextCase}
           />

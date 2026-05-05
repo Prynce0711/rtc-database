@@ -58,6 +58,18 @@ const ArchiveDetailsPage = ({ adapter }: { adapter: ArchiveAdapter }) => {
   const statusPopup = usePopup();
   const entryId = useMemo(() => getArchiveIdFromPathname(pathname), [pathname]);
 
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
+
+  const appendPage = (href: string) =>
+    returnPage
+      ? href.includes("?")
+        ? `${href}&page=${encodeURIComponent(returnPage)}`
+        : `${href}?page=${encodeURIComponent(returnPage)}`
+      : href;
+
   const [entry, setEntry] = useState<ArchiveEntryData | null>(null);
   const [folderChildren, setFolderChildren] = useState<ArchiveEntryData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +199,7 @@ const ArchiveDetailsPage = ({ adapter }: { adapter: ArchiveAdapter }) => {
             {error || "Archive entry not found"}
           </p>
           <button
-            onClick={() => router.push("/user/cases/archive")}
+            onClick={() => router.push(appendPage("/user/cases/archive"))}
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Back to archive explorer
@@ -242,8 +254,10 @@ const ArchiveDetailsPage = ({ adapter }: { adapter: ArchiveAdapter }) => {
             <button
               className="btn btn-sm btn-outline"
               onClick={() =>
-                router.push(`/user/cases/archive/edit?id=${entry.id}`)
-              }
+                  router.push(
+                    appendPage(`/user/cases/archive/edit?id=${entry.id}`),
+                  )
+                }
             >
               <FiEdit2 size={14} />
               Edit
@@ -433,9 +447,11 @@ const ArchiveDetailsPage = ({ adapter }: { adapter: ArchiveAdapter }) => {
                           className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-base-200/40 transition-colors"
                           onClick={() =>
                             router.push(
-                              child.entryType === ArchiveEntryType.FOLDER
-                                ? buildExplorerHref(child.fullPath)
-                                : `/user/cases/archive/${child.id}`,
+                              appendPage(
+                                child.entryType === ArchiveEntryType.FOLDER
+                                  ? buildExplorerHref(child.fullPath)
+                                  : `/user/cases/archive/${child.id}`,
+                              ),
                             )
                           }
                         >

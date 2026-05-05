@@ -231,6 +231,17 @@ const ArchiveUpdatePage = ({
   const router = useAdaptiveNavigation();
   const statusPopup = usePopup();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
+
+  const appendPage = (href: string) =>
+    returnPage
+      ? href.includes("?")
+        ? `${href}&page=${encodeURIComponent(returnPage)}`
+        : `${href}?page=${encodeURIComponent(returnPage)}`
+      : href;
 
   const [draft, setDraft] = useState<ArchiveEntryForm>(() =>
     archiveEntryToForm(null),
@@ -408,7 +419,7 @@ const ArchiveUpdatePage = ({
     }
 
     statusPopup.showSuccess("Archive entry saved");
-    router.push(`/user/cases/archive/${result.result.id}`);
+    router.push(appendPage(`/user/cases/archive/${result.result.id}`));
   };
 
   if (loading) {
@@ -432,7 +443,7 @@ const ArchiveUpdatePage = ({
         </div>
         <button
           className="btn btn-primary"
-          onClick={() => router.push("/user/cases/archive")}
+          onClick={() => router.push(appendPage("/user/cases/archive"))}
         >
           Back to Archive Explorer
         </button>
@@ -445,7 +456,7 @@ const ArchiveUpdatePage = ({
       <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.push(buildExplorerHref(draft.parentPath))}
+            onClick={() => router.push(appendPage(buildExplorerHref(draft.parentPath)))}
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             <FiArrowLeft size={15} />

@@ -737,7 +737,11 @@ const ReceiveLogsPage: React.FC<{
               <ReceiveRow
                 key={(log as unknown as ReceiveLog).id}
                 log={log as unknown as ReceiveLog}
-                onView={(l) => router.push(`/user/cases/receiving/${l.id}`)}
+                onView={(l) =>
+                  router.push(
+                    `/user/cases/receiving/${l.id}?page=${currentPage}`,
+                  )
+                }
                 canManageLogs={canManageLogs}
                 isSelected={selectedLogIds.includes(
                   (log as unknown as ReceiveLog).id,
