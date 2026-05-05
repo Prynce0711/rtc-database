@@ -300,6 +300,8 @@ model Employee {
   employmentType EmploymentType
   contactNumber  String?        @unique
   email          String?        @unique
+  imageFileId    Int?
+  imageFile      FileData?      @relation(fields: [imageFileId], references: [id], onDelete: SetNull)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime?      @updatedAt
 
@@ -314,6 +316,8 @@ model NotarialCommission {
   address            String
   termStartYear      Int?
   termEndYear        Int?
+  imageFileId         Int?
+  imageFile           FileData? @relation(fields: [imageFileId], references: [id], onDelete: SetNull)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime? @updatedAt
 
@@ -539,6 +543,8 @@ model FileData {
   updatedAt DateTime? @updatedAt
 
   archiveEntries ArchiveEntry[]
+  employees      Employee[]
+  notarialCommissions NotarialCommission[]
   notarials    Notarial[]
   chatMessages ChatMessage[]
 }

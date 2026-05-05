@@ -1,5 +1,8 @@
 import { validateSession } from "@/app/lib/authActions";
+import { getGarageClient } from "@/app/lib/garage";
 import { loadSystemSettings } from "@/app/lib/systemSettings";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const runtime = "nodejs";
 
@@ -19,6 +22,51 @@ function getGarageOrigin(settings: {
   return `${protocol}://${host}:${port}`;
 }
 
+const sanitizeContentDispositionFileName = (
+  fileName: string | null | undefined,
+): string | undefined => {
+  const normalized = String(fileName ?? "")
+    .replace(/[\r\n"]/g, "")
+    .trim();
+  return normalized || undefined;
+};
+
+async function resolveSignedUrlFromRequest(
+  searchParams: URLSearchParams,
+): Promise<string | null> {
+  const rawSignedUrl = searchParams.get("url")?.trim();
+  if (rawSignedUrl) {
+    return rawSignedUrl;
+  }
+
+  const bucket = searchParams.get("bucket")?.trim();
+  const key = searchParams.get("key")?.trim();
+  if (!bucket || !key) {
+    return null;
+  }
+
+  const inline = searchParams.get("inline") === "1";
+  const fileName =
+    sanitizeContentDispositionFileName(searchParams.get("fileName")) ??
+    key.split("/").pop() ??
+    "file";
+  const contentType =
+    sanitizeContentDispositionFileName(searchParams.get("contentType")) ??
+    undefined;
+  const garageClient = await getGarageClient();
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: `${inline ? "inline" : "attachment"}; filename="${fileName}"`,
+    ...(contentType ? { ResponseContentType: contentType } : {}),
+  });
+
+  return getSignedUrl(garageClient, command, {
+    expiresIn: 3600,
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const sessionResult = await validateSession();
@@ -30,14 +78,17 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const rawSignedUrl = searchParams.get("url")?.trim();
-    if (!rawSignedUrl) {
-      return Response.json({ error: "Missing signed url" }, { status: 400 });
+    const resolvedSignedUrl = await resolveSignedUrlFromRequest(searchParams);
+    if (!resolvedSignedUrl) {
+      return Response.json(
+        { error: "Missing file reference" },
+        { status: 400 },
+      );
     }
 
     const settings = await loadSystemSettings();
     const allowedOrigin = getGarageOrigin(settings);
-    const signedUrl = new URL(rawSignedUrl);
+    const signedUrl = new URL(resolvedSignedUrl);
 
     if (!["http:", "https:"].includes(signedUrl.protocol)) {
       return Response.json(

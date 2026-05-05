@@ -25,7 +25,6 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import type { Employee } from "@rtc-database/shared/prisma/browser";
 import {
   downloadImportFailedExcel,
   ExactMatchMap,
@@ -39,6 +38,7 @@ import {
   useToast,
 } from "@rtc-database/shared";
 import EmployeeTable from "./EmployeeTable";
+import type { EmployeeRecord } from "./schema";
 
 const EmployeeDashboard: React.FC = () => {
   const router = useRouter();
@@ -49,9 +49,11 @@ const EmployeeDashboard: React.FC = () => {
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
-  const [filteredByAdvanced, setFilteredByAdvanced] = useState<Employee[]>([]);
+  const [filteredByAdvanced, setFilteredByAdvanced] = useState<
+    EmployeeRecord[]
+  >([]);
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -152,7 +154,7 @@ const EmployeeDashboard: React.FC = () => {
     })();
   }
 
-  function handleEdit(emp: Employee) {
+  function handleEdit(emp: EmployeeRecord) {
     router.push(`/user/employees/edit?id=${emp.id}`);
   }
 
@@ -256,9 +258,9 @@ const EmployeeDashboard: React.FC = () => {
 
   const applyEmployeeFilters = (
     filters: FilterValues,
-    list: Employee[],
+    list: EmployeeRecord[],
     exactMap: ExactMatchMap = {},
-  ): Employee[] => {
+  ): EmployeeRecord[] => {
     return list.filter((e) => {
       const matchesText = (
         itemValue: string | null | undefined,

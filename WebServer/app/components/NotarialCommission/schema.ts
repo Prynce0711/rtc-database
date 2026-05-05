@@ -1,4 +1,5 @@
 import { excelHeaders } from "@rtc-database/shared";
+import type { NotarialCommission } from "@rtc-database/shared/prisma/browser";
 import { z } from "zod";
 
 const YEAR_PATTERN = /(?:19|20)\d{2}/g;
@@ -158,16 +159,24 @@ export const NotarialCommissionSchema = z.object({
     ),
   termStartYear: z.number().int().min(1900).max(2100).nullable().optional(),
   termEndYear: z.number().int().min(1900).max(2100).nullable().optional(),
+  imageFile: z.file().nullable().optional(),
 });
 
-export type NotarialCommissionSchema = z.infer<
-  typeof NotarialCommissionSchema
->;
+export type NotarialCommissionSchema = z.infer<typeof NotarialCommissionSchema>;
 
-export type NotarialCommissionRecord = NotarialCommissionSchema & {
+export type NotarialCommissionImageFile = {
   id: number;
-  termStartYear: number | null;
-  termEndYear: number | null;
+  key: string;
+  fileHash: string;
+  fileName: string;
+  path: string;
+  size: number;
+  mimeType: string;
   createdAt: Date;
   updatedAt: Date | null;
+};
+
+export type NotarialCommissionRecord = NotarialCommission & {
+  imageFileId?: number | null;
+  imageFile?: NotarialCommissionImageFile | null;
 };

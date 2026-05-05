@@ -1,6 +1,7 @@
 "use client";
 
-import { usePopup } from "@rtc-database/shared";
+import { buildGarageProxyUrl } from "@/app/lib/garageProxy";
+import { FileViewerModal, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -13,10 +14,12 @@ import {
   FiEdit3,
   FiEye,
   FiFileText,
+  FiImage,
   FiMapPin,
   FiPlus,
   FiSave,
   FiTrash2,
+  FiUpload,
   FiUser,
 } from "react-icons/fi";
 import {
@@ -47,6 +50,8 @@ interface EntryForm {
   name: string;
   termOfCommission: string;
   address: string;
+  imageFile: File | null;
+  imagePreviewUrl: string;
   errors: Record<string, string>;
 }
 
@@ -57,6 +62,7 @@ type ColDef = {
   width: number;
   required?: boolean;
   mono?: boolean;
+  type?: "text" | "image";
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -67,15 +73,34 @@ const emptyEntry = (id: string): EntryForm => ({
   name: "",
   termOfCommission: "",
   address: "",
+  imageFile: null,
+  imagePreviewUrl: "",
   errors: {},
 });
 
-const recordToEntry = (record: Partial<NotarialCommissionRecord>): EntryForm => ({
+const getRecordImagePreviewUrl = (
+  record: Partial<NotarialCommissionRecord>,
+): string =>
+  record.imageFile?.key
+    ? buildGarageProxyUrl({
+        bucket: "rtc-bucket",
+        key: record.imageFile.key,
+        fileName: record.imageFile.fileName,
+        inline: true,
+        contentType: record.imageFile.mimeType,
+      })
+    : "";
+
+const recordToEntry = (
+  record: Partial<NotarialCommissionRecord>,
+): EntryForm => ({
   id: uid(),
   petition: record.petition ?? "",
   name: record.name ?? "",
   termOfCommission: record.termOfCommission ?? "",
   address: record.address ?? "",
+  imageFile: null,
+  imagePreviewUrl: getRecordImagePreviewUrl(record),
   errors: {},
 });
 
@@ -95,6 +120,13 @@ const FROZEN_COLS: ColDef[] = [
     placeholder: "ABAD, MELVIN J.",
     width: 260,
     required: true,
+  },
+  {
+    key: "imageFile",
+    label: "Photo",
+    placeholder: "",
+    width: 170,
+    type: "image",
   },
 ];
 
@@ -124,6 +156,14 @@ const TABS = [
     cols: COMMISSION_COLS,
   },
 ] as const;
+
+const IMAGE_ACCEPT = "image/*";
+
+const revokePreviewUrl = (url?: string) => {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+};
 
 function validateEntry(entry: EntryForm): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -177,12 +217,77 @@ const CellInput = ({
   );
 };
 
+const ImageCell = ({
+  entry,
+  onSelectFile,
+  onPreview,
+  onClear,
+}: {
+  entry: EntryForm;
+  onSelectFile: (file: File | null) => void;
+  onPreview: () => void;
+  onClear: () => void;
+}) => {
+  const hasImage = Boolean(entry.imagePreviewUrl);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <label className="btn btn-xs btn-outline gap-1.5">
+          <FiUpload size={12} />
+          {hasImage ? "Replace" : "Upload"}
+          <input
+            type="file"
+            accept={IMAGE_ACCEPT}
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              onSelectFile(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        {hasImage && (
+          <button
+            type="button"
+            className="btn btn-xs btn-ghost"
+            onClick={onClear}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="flex items-center gap-2 text-left"
+        onClick={hasImage ? onPreview : undefined}
+        disabled={!hasImage}
+      >
+        {hasImage ? (
+          <img
+            src={entry.imagePreviewUrl}
+            alt="Commission"
+            className="h-10 w-10 rounded-lg border border-base-300 object-cover"
+          />
+        ) : (
+          <span className="text-xs text-base-content/40 inline-flex items-center gap-1">
+            <FiImage size={12} />
+            No image
+          </span>
+        )}
+      </button>
+    </div>
+  );
+};
+
 function ReviewCard({
   entry,
   isExistingRecord,
+  onViewImage,
 }: {
   entry: EntryForm;
   isExistingRecord: boolean;
+  onViewImage?: () => void;
 }) {
   const years = extractCommissionYears(entry.termOfCommission);
   const yearLabel = getCommissionYearLabel(
@@ -262,6 +367,29 @@ function ReviewCard({
               </div>
             </div>
           </div>
+
+          {entry.imagePreviewUrl && (
+            <div className="rv-section">
+              <div className="rv-section-header">
+                <FiImage size={13} />
+                <span>Photo</span>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-3"
+                onClick={onViewImage}
+              >
+                <img
+                  src={entry.imagePreviewUrl}
+                  alt={entry.name || "Commission"}
+                  className="h-16 w-16 rounded-xl border border-base-300 object-cover"
+                />
+                <span className="text-sm font-semibold text-base-content/70">
+                  View image
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -292,18 +420,35 @@ const NotarialCommissionDrawer = ({
         : [];
   const statusPopup = usePopup();
   const tableRef = useRef<HTMLDivElement>(null);
+  const entriesRef = useRef<EntryForm[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<Step>("entry");
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["key"]>(
-    "commission",
-  );
+  const [activeTab, setActiveTab] =
+    useState<(typeof TABS)[number]["key"]>("commission");
   const [reviewIdx, setReviewIdx] = useState(0);
   const [existingRecordKeys, setExistingRecordKeys] = useState<string[]>([]);
+  const [imageViewer, setImageViewer] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
   const [entries, setEntries] = useState<EntryForm[]>(() =>
     isEdit && editRecords.length > 0
       ? editRecords.map(recordToEntry)
       : [emptyEntry(uid())],
   );
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  useEffect(() => {
+    return () => {
+      entriesRef.current.forEach((entry) =>
+        revokePreviewUrl(entry.imagePreviewUrl),
+      );
+    };
+  }, []);
 
   useEffect(() => {
     setStep("entry");
@@ -340,6 +485,39 @@ const NotarialCommissionDrawer = ({
     );
   };
 
+  const closeImageViewer = () =>
+    setImageViewer({ open: false, url: "", title: "" });
+
+  const openImageViewer = (entry: EntryForm) => {
+    if (!entry.imagePreviewUrl) return;
+    setImageViewer({
+      open: true,
+      url: entry.imagePreviewUrl,
+      title: entry.name || "Commission image",
+    });
+  };
+
+  const handleImageChange = (id: string, file: File | null) => {
+    const existing = entries.find((entry) => entry.id === id);
+    if (existing?.imagePreviewUrl) {
+      revokePreviewUrl(existing.imagePreviewUrl);
+      if (imageViewer.url === existing.imagePreviewUrl) {
+        closeImageViewer();
+      }
+    }
+
+    setEntries((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== id) return entry;
+        return {
+          ...entry,
+          imageFile: file,
+          imagePreviewUrl: file ? URL.createObjectURL(file) : "",
+        };
+      }),
+    );
+  };
+
   const handleAddEntry = useCallback(() => {
     setEntries((prev) => [...prev, emptyEntry(uid())]);
     setTimeout(() => {
@@ -358,12 +536,24 @@ const NotarialCommissionDrawer = ({
 
     if (!(await statusPopup.showConfirm(label))) return;
 
+    entries.forEach((entry) => revokePreviewUrl(entry.imagePreviewUrl));
+    setImageViewer({ open: false, url: "", title: "" });
+
     setEntries([emptyEntry(uid())]);
     setExistingRecordKeys([]);
-  }, [entries.length, statusPopup]);
+  }, [entries, statusPopup]);
 
   const handleRemove = (id: string) =>
-    setEntries((prev) => prev.filter((entry) => entry.id !== id));
+    setEntries((prev) => {
+      const target = prev.find((entry) => entry.id === id);
+      if (target?.imagePreviewUrl) {
+        revokePreviewUrl(target.imagePreviewUrl);
+        if (imageViewer.url === target.imagePreviewUrl) {
+          closeImageViewer();
+        }
+      }
+      return prev.filter((entry) => entry.id !== id);
+    });
 
   const handleDuplicate = (id: string) => {
     const source = entries.find((entry) => entry.id === id);
@@ -374,6 +564,8 @@ const NotarialCommissionDrawer = ({
       id: uid(),
       petition: "",
       name: "",
+      imageFile: null,
+      imagePreviewUrl: "",
       errors: {},
     };
 
@@ -411,8 +603,8 @@ const NotarialCommissionDrawer = ({
   };
 
   const completedCount = entries.filter((entry) =>
-    REQUIRED_FIELDS.every((field) =>
-      normalizeCommissionText(entry[field]).length > 0,
+    REQUIRED_FIELDS.every(
+      (field) => normalizeCommissionText(entry[field]).length > 0,
     ),
   ).length;
   const incompleteCount = entries.length - completedCount;
@@ -552,7 +744,8 @@ const NotarialCommissionDrawer = ({
           return [`Rollback failed for record ID ${createdIds[index]}`];
         }
         if (!result.value.success) {
-          const rollbackMessage = result.value.error ?? "Unknown rollback error";
+          const rollbackMessage =
+            result.value.error ?? "Unknown rollback error";
           return [
             `Rollback failed for record ID ${createdIds[index]}: ${rollbackMessage}`,
           ];
@@ -571,6 +764,7 @@ const NotarialCommissionDrawer = ({
           address: normalizeCommissionText(entry.address),
           termStartYear: years.termStartYear ?? null,
           termEndYear: years.termEndYear ?? null,
+          imageFile: entry.imageFile ?? undefined,
         };
       });
 
@@ -671,6 +865,15 @@ const NotarialCommissionDrawer = ({
 
   return (
     <div className="xls-root">
+      <FileViewerModal
+        open={imageViewer.open}
+        loading={false}
+        url={imageViewer.url}
+        type="image"
+        title={imageViewer.title}
+        error=""
+        onClose={closeImageViewer}
+      />
       <div className="bg-base-100 xls-topbar">
         <div className="xls-topbar-left">
           <button
@@ -909,35 +1112,61 @@ const NotarialCommissionDrawer = ({
 
                             {FROZEN_COLS.map((col) => (
                               <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={entry[col.key] ?? ""}
-                                  error={entry.errors[col.key]}
-                                  onChange={(value) =>
-                                    handleChange(entry.id, col.key, value)
-                                  }
-                                />
+                                {col.type === "image" ? (
+                                  <ImageCell
+                                    entry={entry}
+                                    onSelectFile={(file) =>
+                                      handleImageChange(entry.id, file)
+                                    }
+                                    onPreview={() => openImageViewer(entry)}
+                                    onClear={() =>
+                                      handleImageChange(entry.id, null)
+                                    }
+                                  />
+                                ) : (
+                                  <CellInput
+                                    col={col}
+                                    value={String(entry[col.key] ?? "")}
+                                    error={entry.errors[col.key]}
+                                    onChange={(value) =>
+                                      handleChange(entry.id, col.key, value)
+                                    }
+                                  />
+                                )}
                               </td>
                             ))}
 
                             {activeCols.map((col, colIdx) => (
                               <td key={col.key}>
-                                <CellInput
-                                  col={col}
-                                  value={entry[col.key] ?? ""}
-                                  error={entry.errors[col.key]}
-                                  onChange={(value) =>
-                                    handleChange(entry.id, col.key, value)
-                                  }
-                                  onKeyDown={(event) =>
-                                    handleCellKeyDown(
-                                      event,
-                                      entry.id,
-                                      colIdx === lastColIdx,
-                                      isLastTab,
-                                    )
-                                  }
-                                />
+                                {col.type === "image" ? (
+                                  <ImageCell
+                                    entry={entry}
+                                    onSelectFile={(file) =>
+                                      handleImageChange(entry.id, file)
+                                    }
+                                    onPreview={() => openImageViewer(entry)}
+                                    onClear={() =>
+                                      handleImageChange(entry.id, null)
+                                    }
+                                  />
+                                ) : (
+                                  <CellInput
+                                    col={col}
+                                    value={String(entry[col.key] ?? "")}
+                                    error={entry.errors[col.key]}
+                                    onChange={(value) =>
+                                      handleChange(entry.id, col.key, value)
+                                    }
+                                    onKeyDown={(event) =>
+                                      handleCellKeyDown(
+                                        event,
+                                        entry.id,
+                                        colIdx === lastColIdx,
+                                        isLastTab,
+                                      )
+                                    }
+                                  />
+                                )}
                               </td>
                             ))}
 
@@ -1109,6 +1338,7 @@ const NotarialCommissionDrawer = ({
                     <ReviewCard
                       entry={entries[reviewIdx]}
                       isExistingRecord={isExistingRecord(entries[reviewIdx])}
+                      onViewImage={() => openImageViewer(entries[reviewIdx])}
                     />
                   </motion.div>
                 </AnimatePresence>
@@ -1128,7 +1358,9 @@ const NotarialCommissionDrawer = ({
                   <div className="rv-pager">
                     <button
                       className="xls-btn-icon"
-                      onClick={() => setReviewIdx((idx) => Math.max(0, idx - 1))}
+                      onClick={() =>
+                        setReviewIdx((idx) => Math.max(0, idx - 1))
+                      }
                       disabled={reviewIdx === 0}
                     >
                       <FiChevronLeft size={15} />

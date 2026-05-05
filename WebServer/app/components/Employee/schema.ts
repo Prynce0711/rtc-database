@@ -1,6 +1,24 @@
+import type { Employee } from "@rtc-database/shared/prisma/browser";
 import { EmploymentType } from "@rtc-database/shared/prisma/enums";
 import { excelHeaders } from "@rtc-database/shared";
 import { z } from "zod";
+
+export type EmployeeImageFile = {
+  id: number;
+  key: string;
+  fileHash: string;
+  fileName: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  createdAt: Date;
+  updatedAt: Date | null;
+};
+
+export type EmployeeRecord = Employee & {
+  imageFileId?: number | null;
+  imageFile?: EmployeeImageFile | null;
+};
 
 export const EmployeeSchema = z.object({
   id: z.number().int().optional(),
@@ -74,6 +92,7 @@ export const EmployeeSchema = z.object({
     .optional()
     .or(z.literal(""))
     .describe(excelHeaders(["Email", "EMAIL"])),
+  imageFile: z.file().nullable().optional(),
 });
 
 export type EmployeeSchema = z.infer<typeof EmployeeSchema>;
