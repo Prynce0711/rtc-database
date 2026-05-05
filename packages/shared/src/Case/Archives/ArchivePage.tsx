@@ -1058,8 +1058,11 @@ const ArchivePage: React.FC<{
     return { success: true, path: parentPath };
   };
 
-  const handleUploadFolderFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleUploadFolderFiles = async (files: File[] | null) => {
+    if (!files || files.length === 0) {
+      statusPopup.showError("No files found in the selected folder.");
+      return;
+    }
     if (
       !(await statusPopup.showConfirm(
         `Upload ${files.length} file${files.length > 1 ? "s" : ""} from folder?`,
@@ -1072,8 +1075,7 @@ const ArchivePage: React.FC<{
     let successCount = 0;
     const createdFolderPaths = new Set<string>();
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of files) {
       try {
         const relativePath = normalizeArchivePath(
           (file as unknown as { webkitRelativePath?: string })
@@ -1561,8 +1563,18 @@ const ArchivePage: React.FC<{
                 ref={folderInputRef}
                 type="file"
                 multiple
+                // @ts-expect-error -- non-standard attribute required for folder selection
+                webkitdirectory=""
+               
+                directory=""
                 className="hidden"
-                onChange={(e) => void handleUploadFolderFiles(e.target.files)}
+                onChange={(e) => {
+                  const files = Array.from(e.currentTarget.files ?? []);
+                  void handleUploadFolderFiles(
+                    files.length > 0 ? files : null,
+                  );
+                  e.currentTarget.value = "";
+                }}
               />
             </label>
 
@@ -2381,10 +2393,18 @@ const ArchivePage: React.FC<{
                       ref={folderInputRef}
                       type="file"
                       multiple
+                      // @ts-expect-error -- non-standard attribute required for folder selection
+                      webkitdirectory=""
+                   
+                      directory=""
                       className="hidden"
                       onChange={(e) => {
-                        const files = e.currentTarget.files ?? null;
-                        void handleUploadFolderFiles(files);
+                        const files = Array.from(
+                          e.currentTarget.files ?? [],
+                        );
+                        void handleUploadFolderFiles(
+                          files.length > 0 ? files : null,
+                        );
                         e.currentTarget.value = "";
                       }}
                     />
