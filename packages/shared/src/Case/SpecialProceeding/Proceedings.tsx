@@ -15,6 +15,7 @@ import {
   calculateSpecialProceedingStats,
   isTextFieldKey,
   usePopup,
+  useToast,
 } from "../../index";
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -39,6 +40,7 @@ import {
   formatImportFileSize,
   previewSpecialProceedingImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
@@ -73,6 +75,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
 }) => {
   const router = useAdaptiveNavigation();
   const popup = usePopup();
+  const toast = useToast();
   const [cases, setCases] = useState<SpecialProceedingData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -378,6 +381,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           popup.showError(
@@ -423,6 +427,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
       const result = await previewSpecialProceedingImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         popup.showError(

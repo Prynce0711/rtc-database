@@ -27,6 +27,7 @@ import {
 import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import {
   buildDirectCaseImportSuccessMessage,
@@ -36,6 +37,7 @@ import {
   formatImportFileSize,
   getCaseImportConflictModeLabel,
   previewPetitionCaseImport,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
@@ -232,10 +234,7 @@ const importedPetitionRowToEntry = (row: PetitionCaseSchema): EntryForm => ({
   saved: false,
 });
 
-const REQUIRED_FIELDS = [
-  "caseNumber",
-  "titleNo",
-] as const;
+const REQUIRED_FIELDS = ["caseNumber"] as const;
 
 type ColDef = {
   key: string;
@@ -276,14 +275,6 @@ const TAB_COLS: ColDef[] = [
     placeholder: "Branch 1",
     type: "text",
     width: 160,
-  },
-  {
-    key: "titleNo",
-    label: "Title No",
-    placeholder: "T-12345",
-    type: "text",
-    width: 150,
-    mono: true,
   },
   {
     key: "petitioners",
@@ -497,6 +488,7 @@ const PetitionCaseUpdatePage = ({
         : [];
   const isEdit = editCases.length > 0;
   const statusPopup = usePopup();
+  const toast = useToast();
   const router = useAdaptiveNavigation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -793,6 +785,7 @@ const PetitionCaseUpdatePage = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -843,6 +836,7 @@ const PetitionCaseUpdatePage = ({
       const result = await previewPetitionCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

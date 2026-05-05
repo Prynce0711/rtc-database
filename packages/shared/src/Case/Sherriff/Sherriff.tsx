@@ -17,6 +17,7 @@ import {
   SherriffCaseAdapter,
   Table,
   usePopup,
+  useToast,
 } from "@rtc-database/shared";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -41,6 +42,7 @@ import {
   formatImportFileSize,
   previewSheriffCaseImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
@@ -68,6 +70,7 @@ const Sherriff: React.FC<{
 }> = ({ role, adapter }) => {
   const router = useAdaptiveRouter();
   const statusPopup = usePopup();
+  const toast = useToast();
   const [records, setRecords] = useState<SheriffCaseData[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -355,6 +358,7 @@ const Sherriff: React.FC<{
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -402,6 +406,7 @@ const Sherriff: React.FC<{
       const result = await previewSheriffCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

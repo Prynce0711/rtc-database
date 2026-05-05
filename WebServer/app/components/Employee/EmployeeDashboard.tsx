@@ -25,14 +25,18 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-import { isRetirementEligible } from "@rtc-database/shared";
+import type { Employee } from "@rtc-database/shared/prisma/browser";
 import {
+  downloadImportFailedExcel,
   ExactMatchMap,
   FilterDropdown,
   FilterOption,
   FilterValues,
+  isRetirementEligible,
   PageListSkeleton,
+  showImportFailedRowsToast,
   usePopup,
+  useToast,
 } from "@rtc-database/shared";
 import EmployeeTable from "./EmployeeTable";
 import type { EmployeeRecord } from "./schema";
@@ -40,6 +44,7 @@ import type { EmployeeRecord } from "./schema";
 const EmployeeDashboard: React.FC = () => {
   const router = useRouter();
   const statusPopup = usePopup();
+  const toast = useToast();
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [deletingSelected, setDeletingSelected] = useState(false);
 
@@ -86,21 +91,8 @@ const EmployeeDashboard: React.FC = () => {
         const importPayload = res.success ? res.result : res.errorResult;
 
         if (importPayload?.failedExcel) {
-          const { fileName, base64 } = importPayload.failedExcel;
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i += 1) {
-            bytes[i] = binary.charCodeAt(i);
-          }
-          const blob = new Blob([bytes], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fileName;
-          a.click();
-          URL.revokeObjectURL(url);
+          downloadImportFailedExcel(importPayload.failedExcel);
+          showImportFailedRowsToast(toast, importPayload.failedExcel);
         }
 
         if (!res.success) {

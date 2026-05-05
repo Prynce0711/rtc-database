@@ -29,6 +29,7 @@ import {
   Roles,
   Table,
   usePopup,
+  useToast,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
@@ -40,6 +41,7 @@ import {
   formatImportFileSize,
   previewPetitionCaseImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
@@ -72,6 +74,7 @@ const PetitionCasePage: React.FC<{
 }> = ({ role, adapter }) => {
   const router = useAdaptiveNavigation();
   const statusPopup = usePopup();
+  const toast = useToast();
 
   const [cases, setCases] = useState<PetitionCaseData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -359,6 +362,7 @@ const PetitionCasePage: React.FC<{
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -406,6 +410,7 @@ const PetitionCasePage: React.FC<{
       const result = await previewPetitionCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

@@ -22,40 +22,52 @@ type ToastItem = {
   id: string;
   type: ToastType;
   message: string;
-  duration: number;
+  duration: number | null;
   href?: string;
   title?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 };
+
+export type ToastOptions = {
+  duration?: number | null;
+  href?: string;
+  title?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+type ToastDurationOrOptions = number | null | ToastOptions;
 
 type ToastContextType = {
   showToast: (
     message: string,
     type?: ToastType,
-    duration?: number,
+    durationOrOptions?: ToastDurationOrOptions,
     href?: string,
     title?: string,
   ) => string;
   info: (
     message: string,
-    duration?: number,
+    durationOrOptions?: ToastDurationOrOptions,
     href?: string,
     title?: string,
   ) => string;
   success: (
     message: string,
-    duration?: number,
+    durationOrOptions?: ToastDurationOrOptions,
     href?: string,
     title?: string,
   ) => string;
   warning: (
     message: string,
-    duration?: number,
+    durationOrOptions?: ToastDurationOrOptions,
     href?: string,
     title?: string,
   ) => string;
   error: (
     message: string,
-    duration?: number,
+    durationOrOptions?: ToastDurationOrOptions,
     href?: string,
     title?: string,
   ) => string;
@@ -74,6 +86,37 @@ const createToastId = (): string => {
   }
 
   return `toast-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const resolveToastOptions = (
+  durationOrOptions?: ToastDurationOrOptions,
+  href?: string,
+  title?: string,
+): Required<Pick<ToastOptions, "duration">> &
+  Omit<ToastOptions, "duration"> => {
+  if (
+    typeof durationOrOptions === "number" ||
+    durationOrOptions === null ||
+    typeof durationOrOptions === "undefined"
+  ) {
+    return {
+      duration:
+        typeof durationOrOptions === "undefined" ? 4000 : durationOrOptions,
+      href,
+      title,
+    };
+  }
+
+  return {
+    duration:
+      typeof durationOrOptions.duration === "undefined"
+        ? 4000
+        : durationOrOptions.duration,
+    href: durationOrOptions.href,
+    title: durationOrOptions.title,
+    actionLabel: durationOrOptions.actionLabel,
+    onAction: durationOrOptions.onAction,
+  };
 };
 
 export function useToast(): ToastContextType {
@@ -103,14 +146,15 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
     (
       message: string,
       type: ToastType = ToastType.INFO,
-      duration = 4000,
+      durationOrOptions?: ToastDurationOrOptions,
       href?: string,
       title?: string,
     ) => {
       const id = createToastId();
+      const options = resolveToastOptions(durationOrOptions, href, title);
       setToasts((prev) => [
         ...prev,
-        { id, message, type, duration, href, title },
+        { id, message, type, ...options },
       ]);
       return id;
     },
@@ -126,6 +170,7 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     toasts.forEach((toast) => {
       if (timersRef.current.has(toast.id)) return;
+      if (toast.duration === null || toast.duration <= 0) return;
 
       const timer = setTimeout(() => {
         dismissToast(toast.id);
@@ -177,6 +222,8 @@ const ToastProvider = ({ children }: { children: React.ReactNode }) => {
                 onClose={() => dismissToast(toast.id)}
                 href={toast.href}
                 title={toast.title}
+                actionLabel={toast.actionLabel}
+                onAction={toast.onAction}
               />
             </motion.div>
           ))}

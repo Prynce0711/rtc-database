@@ -21,12 +21,14 @@ import {
 import type { RecievingLog } from "../../generated/prisma/browser";
 import { CaseType } from "../../generated/prisma/enums";
 import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 import CaseEntryToolbar from "../CaseEntryToolbar";
 import {
   CASE_IMPORT_DRAFT_KEYS,
   consumeCaseImportDraft,
   downloadImportFailedExcel,
   previewReceivingLogImport,
+  showImportFailedRowsToast,
   shouldLoadCaseImportDraft,
 } from "../importPreview";
 import type { RecievingLogsAdapter } from "./RecievingLogsAdapter";
@@ -363,6 +365,7 @@ const ReceiveUpdatePage = ({
         ? [selectedLog]
         : [];
   const statusPopup = usePopup();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<Step>("entry");
@@ -538,6 +541,7 @@ const ReceiveUpdatePage = ({
       const result = await previewReceivingLogImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

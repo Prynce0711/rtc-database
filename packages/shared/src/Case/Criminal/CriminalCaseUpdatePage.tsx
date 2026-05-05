@@ -46,6 +46,7 @@ import {
   downloadImportFailedExcel,
   formatImportFileSize,
   previewCriminalCaseImport,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
@@ -1161,6 +1162,7 @@ const CriminalCaseUpdatePage = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -1217,6 +1219,7 @@ const CriminalCaseUpdatePage = ({
       const result = await previewCriminalCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

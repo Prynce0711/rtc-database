@@ -1109,6 +1109,39 @@ export const downloadImportFailedExcel = (
   URL.revokeObjectURL(url);
 };
 
+type FailedRowsToastOptions = {
+  duration?: number | null;
+  title?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+type FailedRowsToast = {
+  warning?: (
+    message: string,
+    options?: FailedRowsToastOptions,
+  ) => string;
+};
+
+export const showImportFailedRowsToast = (
+  toast: FailedRowsToast,
+  failedExcel?: ExportExcelData,
+): void => {
+  if (!failedExcel || !toast.warning) {
+    return;
+  }
+
+  toast.warning(
+    "Failed rows were downloaded. You can download them again from this toast.",
+    {
+      duration: null,
+      title: "Failed rows available",
+      actionLabel: "Download",
+      onAction: () => downloadImportFailedExcel(failedExcel),
+    },
+  );
+};
+
 export const saveCaseImportDraft = <T>(
   storageKey: string,
   rows: T[],

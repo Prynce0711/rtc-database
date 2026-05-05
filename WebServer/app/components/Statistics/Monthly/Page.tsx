@@ -2,7 +2,7 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { RadioButton, RedirectingUI } from "@rtc-database/shared";
+import { RadioButton, RedirectingUI, usePopup } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
 import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
@@ -55,6 +55,7 @@ const categoryViews: {
 
 export default function MonthlyPage() {
   const session = useSession();
+  const statusPopup = usePopup();
 
   const canManageStats =
     session?.data?.user?.role === Roles.ADMIN ||
@@ -214,16 +215,24 @@ export default function MonthlyPage() {
           setEditMode(false);
         }}
         onSave={async (newRows) => {
-          const res = await upsertMonthlyStatistics(newRows);
-          if (res.success) {
-            const savedMonth = newRows[0]?.month ?? selectedDate;
-            const fresh = await getMonthlyStatistics(savedMonth);
-            if (fresh.success) {
-              setImportedData(fresh.result);
-              setSelectedMonth(savedMonth);
+          statusPopup.showLoading("Saving monthly report...");
+          try {
+            const res = await upsertMonthlyStatistics(newRows);
+            if (res.success) {
+              const savedMonth = newRows[0]?.month ?? selectedDate;
+              const fresh = await getMonthlyStatistics(savedMonth);
+              if (fresh.success) {
+                setImportedData(fresh.result);
+                setSelectedMonth(savedMonth);
+              }
+              statusPopup.showSuccess("Monthly report saved successfully.");
+            } else {
+              statusPopup.showError(res.error ?? "Save failed.");
             }
-          } else {
-            console.error("Save failed:", res.error);
+          } catch (error) {
+            statusPopup.showError(
+              error instanceof Error ? error.message : "Save failed.",
+            );
           }
           setShowAddPage(false);
           setEditMode(false);
