@@ -1,0 +1,12 @@
+.git
+.github
+.serena
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+*.log
+dev.db
+WebServer/dev.db
+NativeApp/dist
