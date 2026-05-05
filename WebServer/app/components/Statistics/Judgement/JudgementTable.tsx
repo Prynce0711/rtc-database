@@ -2,7 +2,14 @@
 
 import Roles from "@/app/lib/Roles";
 import { Pagination, usePopup } from "@rtc-database/shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import AnnualRow from "../Annual/AnnualRow";
 import AnnualToolbar from "../Annual/AnnualToolbar";
@@ -344,7 +351,106 @@ function JudgementTable<T extends Record<string, unknown>>({
   }, [columns]);
 
   const hasGroups = normalizedColumns.some(isGroupColumn);
-  const leafColumns = flattenColumns(normalizedColumns);
+  const leafColumns = useMemo(
+    () => flattenColumns(normalizedColumns),
+    [normalizedColumns],
+  );
+
+  const getDefaultWidth = useCallback((col: ColumnDef) => {
+    const label = col.label ?? col.key;
+    const base = Math.round(label.length * 7 + 36);
+    return Math.min(220, Math.max(72, base));
+  }, []);
+
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const activeResize = useRef<{
+    key: string;
+    startX: number;
+    startW: number;
+    moved: boolean;
+  } | null>(null);
+
+  const MIN_COL_WIDTH = 56;
+
+  useEffect(() => {
+    setColWidths((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      const keys = new Set(leafColumns.map((col) => col.key));
+      for (const col of leafColumns) {
+        if (next[col.key] == null) {
+          next[col.key] = getDefaultWidth(col);
+          changed = true;
+        }
+      }
+      for (const key of Object.keys(next)) {
+        if (!keys.has(key)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [leafColumns, getDefaultWidth]);
+
+  const startResize = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>, key: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const th = thRefs.current[key];
+      if (!th) return;
+      activeResize.current = {
+        key,
+        startX: e.clientX,
+        startW: th.getBoundingClientRect().width,
+        moved: false,
+      };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const active = activeResize.current;
+      if (!active) return;
+      const delta = e.clientX - active.startX;
+      if (Math.abs(delta) < 2) return;
+      active.moved = true;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(active.startW + delta));
+      const th = thRefs.current[active.key];
+      if (th) th.style.width = `${next}px`;
+      const col = colRefs.current[active.key];
+      if (col) col.style.width = `${next}px`;
+    };
+    const onUp = (e: MouseEvent) => {
+      const active = activeResize.current;
+      if (!active) return;
+      if (!active.moved) {
+        activeResize.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        return;
+      }
+      const delta = e.clientX - active.startX;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(active.startW + delta));
+      setColWidths((prev) => ({ ...prev, [active.key]: next }));
+      activeResize.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
 
   /* ── Column totals ──────────────────────────────────────────────── */
   const columnTotals = useMemo(() => {
@@ -470,7 +576,22 @@ function JudgementTable<T extends Record<string, unknown>>({
         }`}
       >
         <div className="overflow-x-auto">
-          <table className="table table-sm w-full [&_th]:first:pl-6 [&_td]:first:pl-6">
+          <table
+            className="table table-sm w-max min-w-full [&_th]:first:pl-6 [&_td]:first:pl-6"
+            style={{ tableLayout: "fixed" }}
+          >
+            <colgroup>
+              {isSelecting && <col style={{ width: 44 }} />}
+              {leafColumns.map((col) => (
+                <col
+                  key={col.key}
+                  ref={(node) => {
+                    colRefs.current[col.key] = node;
+                  }}
+                  style={{ width: colWidths[col.key] ?? getDefaultWidth(col) }}
+                />
+              ))}
+            </colgroup>
             <thead>
               {/* Primary header row */}
               <tr className="bg-base-300 text-base-content text-sm uppercase tracking-widest">
@@ -500,9 +621,9 @@ function JudgementTable<T extends Record<string, unknown>>({
                       <th
                         key={col.title + i}
                         colSpan={col.children.length}
-                        className="py-4 px-5 text-center font-extrabold border-b border-base-200 bg-base-content/5"
+                        className="py-4 px-5 text-center font-extrabold border-b border-base-200 bg-base-content/5 overflow-hidden whitespace-nowrap"
                       >
-                        {col.title}
+                        <span className="block truncate">{col.title}</span>
                       </th>
                     );
                   }
@@ -510,7 +631,10 @@ function JudgementTable<T extends Record<string, unknown>>({
                     <th
                       key={col.key}
                       rowSpan={hasGroups ? 2 : 1}
-                      className={`py-4 px-5 font-extrabold align-middle ${
+                      ref={(node) => {
+                        thRefs.current[col.key] = node;
+                      }}
+                      className={`py-4 px-5 font-extrabold align-middle overflow-hidden whitespace-nowrap relative ${
                         col.align === "center"
                           ? "text-center"
                           : col.align === "right"
@@ -521,8 +645,25 @@ function JudgementTable<T extends Record<string, unknown>>({
                         col.sortable ? () => handleSort(col.key) : undefined
                       }
                     >
-                      {col.label}
-                      {sortIcon(col.key)}
+                      <div
+                        className={`flex items-center gap-1 min-w-0 ${
+                          col.align === "center"
+                            ? "justify-center"
+                            : col.align === "right"
+                              ? "justify-end"
+                              : "justify-start"
+                        }`}
+                      >
+                        <span className="truncate">{col.label}</span>
+                        {sortIcon(col.key)}
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                        onMouseDown={(e) => startResize(e, col.key)}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                      </div>
                     </th>
                   );
                 })}
@@ -536,7 +677,10 @@ function JudgementTable<T extends Record<string, unknown>>({
                     return col.children.map((child) => (
                       <th
                         key={child.key + gi}
-                        className={`py-3 px-5 font-extrabold ${
+                        ref={(node) => {
+                          thRefs.current[child.key] = node;
+                        }}
+                        className={`py-3 px-5 font-extrabold overflow-hidden whitespace-nowrap relative ${
                           child.align === "center"
                             ? "text-center"
                             : child.align === "right"
@@ -549,8 +693,25 @@ function JudgementTable<T extends Record<string, unknown>>({
                             : undefined
                         }
                       >
-                        {child.label}
-                        {sortIcon(child.key)}
+                        <div
+                          className={`flex items-center gap-1 min-w-0 ${
+                            child.align === "center"
+                              ? "justify-center"
+                              : child.align === "right"
+                                ? "justify-end"
+                                : "justify-start"
+                          }`}
+                        >
+                          <span className="truncate">{child.label}</span>
+                          {sortIcon(child.key)}
+                        </div>
+                        <div
+                          className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
+                          onMouseDown={(e) => startResize(e, child.key)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
+                        </div>
                       </th>
                     ));
                   })}
@@ -605,7 +766,7 @@ function JudgementTable<T extends Record<string, unknown>>({
                     return (
                       <td
                         key={col.key}
-                        className={`px-5 py-4 font-black tabular-nums text-base ${
+                        className={`px-5 py-4 font-black tabular-nums text-base overflow-hidden whitespace-nowrap ${
                           col.align === "center"
                             ? "text-center"
                             : col.align === "right"
@@ -614,7 +775,7 @@ function JudgementTable<T extends Record<string, unknown>>({
                         }`}
                       >
                         {isFirstCol ? (
-                          <span className="text-sm uppercase tracking-widest">
+                          <span className="block truncate text-sm uppercase tracking-widest">
                             Grand Total
                           </span>
                         ) : total != null ? (

@@ -236,11 +236,15 @@ export default function SummaryPage() {
   const [colWidths, setColWidths] =
     useState<Record<string, number>>(DEFAULT_WIDTHS);
   const thRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
   const activeResize = useRef<{
     key: string;
     startX: number;
     startW: number;
+    moved: boolean;
   } | null>(null);
+
+  const MIN_COL_WIDTH = 48;
 
   const startResize = useCallback((e: React.MouseEvent, key: string) => {
     e.preventDefault();
@@ -251,6 +255,7 @@ export default function SummaryPage() {
       key,
       startX: e.clientX,
       startW: th.getBoundingClientRect().width,
+      moved: false,
     };
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
@@ -260,14 +265,26 @@ export default function SummaryPage() {
     const onMove = (e: MouseEvent) => {
       const a = activeResize.current;
       if (!a) return;
-      const next = Math.max(48, Math.round(a.startW + (e.clientX - a.startX)));
+      const delta = e.clientX - a.startX;
+      if (Math.abs(delta) < 2) return;
+      a.moved = true;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(a.startW + delta));
       const th = thRefs.current[a.key];
       if (th) th.style.width = `${next}px`;
+      const col = colRefs.current[a.key];
+      if (col) col.style.width = `${next}px`;
     };
     const onUp = (e: MouseEvent) => {
       const a = activeResize.current;
       if (!a) return;
-      const next = Math.max(48, Math.round(a.startW + (e.clientX - a.startX)));
+      if (!a.moved) {
+        activeResize.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        return;
+      }
+      const delta = e.clientX - a.startX;
+      const next = Math.max(MIN_COL_WIDTH, Math.round(a.startW + delta));
       setColWidths((prev) => ({ ...prev, [a.key]: next }));
       activeResize.current = null;
       document.body.style.cursor = "";
@@ -662,7 +679,13 @@ export default function SummaryPage() {
           <colgroup>
             {selectionMode === "delete" && <col style={{ width: 40 }} />}
             {COL_KEYS.map((key) => (
-              <col key={key} style={{ width: colWidths[key] }} />
+              <col
+                key={key}
+                ref={(node) => {
+                  colRefs.current[key] = node;
+                }}
+                style={{ width: colWidths[key] }}
+              />
             ))}
           </colgroup>
           <thead>
@@ -691,7 +714,7 @@ export default function SummaryPage() {
               >
                 #
                 <div
-                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
                   onMouseDown={(e) => startResize(e, "num")}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -708,7 +731,7 @@ export default function SummaryPage() {
               >
                 Branch
                 <div
-                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
                   onMouseDown={(e) => startResize(e, "branch")}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -725,7 +748,7 @@ export default function SummaryPage() {
               >
                 Raffle Date
                 <div
-                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
                   onMouseDown={(e) => startResize(e, "raffleDate")}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -751,7 +774,7 @@ export default function SummaryPage() {
               >
                 Total
                 <div
-                  className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
                   onMouseDown={(e) => startResize(e, "total")}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -805,7 +828,7 @@ export default function SummaryPage() {
                       {labels[key]}
                     </span>
                     <div
-                      className="absolute right-0 top-0 h-full w-4 cursor-col-resize hover:bg-primary/10"
+                      className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
                       onMouseDown={(e) => startResize(e, key)}
                       onClick={(e) => e.stopPropagation()}
                     >

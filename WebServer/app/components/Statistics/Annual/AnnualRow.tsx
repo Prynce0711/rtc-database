@@ -54,7 +54,7 @@ const AnnualRow = ({
         return (
           <td
             key={col.key}
-            className={`px-5 py-3 tabular-nums relative ${
+            className={`px-5 py-3 tabular-nums relative overflow-hidden ${
               col.align === "center"
                 ? "text-center"
                 : col.align === "right"
@@ -64,7 +64,7 @@ const AnnualRow = ({
             onMouseEnter={() => !isSelecting && setHoveredCol(col.key)}
             onMouseLeave={() => setHoveredCol(null)}
           >
-            {rendered}
+            <span className="block truncate">{rendered}</span>
 
             {/* ── Hover tooltip ── */}
             {isHovered &&
