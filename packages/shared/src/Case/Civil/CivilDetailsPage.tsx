@@ -22,6 +22,10 @@ export default function CivilDetailsPage({
   const router = useAdaptiveNavigation();
   const listPath = "/user/cases/civil";
   const pathname = useAdaptivePathname();
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
   const idParam = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
     return segments.length > 0 ? segments[segments.length - 1] : "";
@@ -94,7 +98,11 @@ export default function CivilDetailsPage({
             Case not found
           </p>
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -109,7 +117,11 @@ export default function CivilDetailsPage({
       <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             Back
@@ -126,8 +138,11 @@ export default function CivilDetailsPage({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() =>
-                prevCase && router.push(`/user/cases/civil/${prevCase.id}`)
-              }
+                  prevCase &&
+                  router.push(
+                    `/user/cases/civil/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!prevCase}
               title={
                 prevCase
@@ -159,8 +174,11 @@ export default function CivilDetailsPage({
 
             <button
               onClick={() =>
-                nextCase && router.push(`/user/cases/civil/${nextCase.id}`)
-              }
+                  nextCase &&
+                  router.push(
+                    `/user/cases/civil/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!nextCase}
               title={nextCase ? `Next: ${nextCase.caseNumber}` : "No next case"}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-base-content/35 hover:text-base-content hover:bg-base-200 disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
@@ -231,7 +249,10 @@ export default function CivilDetailsPage({
             label={prevCase?.caseNumber ?? "-"}
             sublabel={prevCase?.petitioners ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/civil/${prevCase.id}`)
+              prevCase &&
+              router.push(
+                `/user/cases/civil/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!prevCase}
           />
@@ -240,7 +261,10 @@ export default function CivilDetailsPage({
             label={nextCase?.caseNumber ?? "-"}
             sublabel={nextCase?.petitioners ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/civil/${nextCase.id}`)
+              nextCase &&
+              router.push(
+                `/user/cases/civil/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!nextCase}
           />

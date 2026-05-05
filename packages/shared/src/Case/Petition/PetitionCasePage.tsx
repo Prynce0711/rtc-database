@@ -717,7 +717,11 @@ const PetitionCasePage: React.FC<{
             <PetitionCaseRow
               key={caseItem.id}
               caseItem={caseItem}
-              onView={(item) => router.push(`/user/cases/petition/${item.id}`)}
+              onView={(item) =>
+                router.push(
+                  `/user/cases/petition/${item.id}?page=${currentPage}`,
+                )
+              }
               selected={selectedCaseIds.includes(caseItem.id)}
               isSelecting={isSelecting}
               onToggleSelect={

@@ -24,6 +24,10 @@ export default function SpecialProceedingDetailsPage({
   const router = useAdaptiveNavigation();
   const listPath = "/user/cases/proceedings";
   const pathname = useAdaptivePathname();
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
 
   const idParam = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
@@ -88,7 +92,11 @@ export default function SpecialProceedingDetailsPage({
             Record not found
           </p>
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -110,7 +118,11 @@ export default function SpecialProceedingDetailsPage({
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           {/* Back */}
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             <svg
@@ -144,9 +156,11 @@ export default function SpecialProceedingDetailsPage({
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() =>
-                prevCase &&
-                router.push(`/user/cases/proceedings/${prevCase.id}`)
-              }
+                  prevCase &&
+                  router.push(
+                    `/user/cases/proceedings/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!prevCase}
               title={
                 prevCase
@@ -179,9 +193,11 @@ export default function SpecialProceedingDetailsPage({
 
             <button
               onClick={() =>
-                nextCase &&
-                router.push(`/user/cases/proceedings/${nextCase.id}`)
-              }
+                  nextCase &&
+                  router.push(
+                    `/user/cases/proceedings/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+                  )
+                }
               disabled={!nextCase}
               title={
                 nextCase ? `Next: ${nextCase.caseNumber}` : "No next record"
@@ -310,7 +326,10 @@ export default function SpecialProceedingDetailsPage({
             label={prevCase?.caseNumber ?? "—"}
             sublabel={prevCase?.petitioner ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/proceedings/${prevCase.id}`)
+              prevCase &&
+              router.push(
+                `/user/cases/proceedings/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!prevCase}
           />
@@ -319,7 +338,10 @@ export default function SpecialProceedingDetailsPage({
             label={nextCase?.caseNumber ?? "—"}
             sublabel={nextCase?.petitioner ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/proceedings/${nextCase.id}`)
+              nextCase &&
+              router.push(
+                `/user/cases/proceedings/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!nextCase}
           />

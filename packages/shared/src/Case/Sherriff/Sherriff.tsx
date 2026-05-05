@@ -782,7 +782,9 @@ const Sherriff: React.FC<{
                   } catch (e) {
                     // ignore
                   }
-                  router.push(`/user/cases/sheriff/${item.id}`);
+                  router.push(
+                    `/user/cases/sheriff/${item.id}?page=${currentPage}`,
+                  );
                 }}
                 selected={selectedRecordIds.includes(r.id)}
                 isSelecting={isSelecting}

@@ -777,7 +777,9 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
                 key={c.id}
                 caseItem={c}
                 onRowClick={(item) =>
-                  router.push(`/user/cases/proceedings/${item.id}`)
+                  router.push(
+                    `/user/cases/proceedings/${item.id}?page=${currentPage}`,
+                  )
                 }
                 isSelected={selectedCaseIds.includes(c.id)}
                 isSelecting={isSelecting}

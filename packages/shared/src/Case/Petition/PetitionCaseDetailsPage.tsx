@@ -23,6 +23,10 @@ export default function PetitionCaseDetailsPage({
   const router = useAdaptiveNavigation();
   const listPath = "/user/cases/petition";
   const pathname = useAdaptivePathname();
+  const returnPage =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("page")
+      : null;
   const idParam = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
     return segments.length > 0 ? segments[segments.length - 1] : "";
@@ -84,7 +88,11 @@ export default function PetitionCaseDetailsPage({
             Petition record not found
           </p>
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity underline underline-offset-4"
           >
             Go back
@@ -101,7 +109,11 @@ export default function PetitionCaseDetailsPage({
       <header className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-md border-b border-base-200">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between gap-4">
           <button
-            onClick={() => router.push(listPath)}
+            onClick={() =>
+              router.push(
+                returnPage ? `${listPath}?page=${encodeURIComponent(returnPage)}` : listPath,
+              )
+            }
             className="flex items-center gap-2 text-[13px] font-semibold text-base-content/40 hover:text-base-content transition-colors duration-150 shrink-0"
           >
             Back
@@ -157,7 +169,10 @@ export default function PetitionCaseDetailsPage({
             label={prevCase?.caseNumber ?? "-"}
             sublabel={prevCase?.petitioner ?? undefined}
             onClick={() =>
-              prevCase && router.push(`/user/cases/petition/${prevCase.id}`)
+              prevCase &&
+              router.push(
+                `/user/cases/petition/${prevCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!prevCase}
           />
@@ -166,7 +181,10 @@ export default function PetitionCaseDetailsPage({
             label={nextCase?.caseNumber ?? "-"}
             sublabel={nextCase?.petitioner ?? undefined}
             onClick={() =>
-              nextCase && router.push(`/user/cases/petition/${nextCase.id}`)
+              nextCase &&
+              router.push(
+                `/user/cases/petition/${nextCase.id}${returnPage ? `?page=${encodeURIComponent(returnPage)}` : ""}`,
+              )
             }
             disabled={!nextCase}
           />

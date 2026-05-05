@@ -62,7 +62,13 @@ const CriminalCaseRow = ({
           return;
         }
         console.log(caseItem);
-        router.push(`/user/cases/criminal/${caseItem.id}`);
+        const pageParam =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("page")
+            : null;
+        router.push(
+          `/user/cases/criminal/${caseItem.id}${pageParam ? `?page=${encodeURIComponent(pageParam)}` : ""}`,
+        );
       }}
     >
       {canManageCases && isSelecting && (

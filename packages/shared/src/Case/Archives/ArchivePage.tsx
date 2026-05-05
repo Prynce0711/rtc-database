@@ -593,7 +593,7 @@ const ArchivePage: React.FC<{
       navigateArchivePath(entry.fullPath);
       return;
     }
-    router.push(`/user/cases/archive/${entry.id}`);
+    router.push(`/user/cases/archive/${entry.id}?page=${currentPage}`);
   };
 
   const handleEdit = (entry: ArchiveEntryData) => {
@@ -602,7 +602,9 @@ const ArchivePage: React.FC<{
       return;
     }
 
-    router.push(`/user/cases/archive/edit?id=${entry.id}`);
+    router.push(
+      `/user/cases/archive/edit?id=${entry.id}&page=${currentPage}`,
+    );
   };
 
   const getEntryFileUrl = async (

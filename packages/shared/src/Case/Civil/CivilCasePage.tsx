@@ -759,7 +759,11 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             <CivilCaseRow
               key={caseItem.id}
               caseItem={caseItem}
-              onView={(item) => router.push(`/user/cases/civil/${item.id}`)}
+              onView={(item) =>
+                router.push(
+                  `/user/cases/civil/${item.id}?page=${currentPage}`,
+                )
+              }
               selected={selectedCaseIds.includes(caseItem.id)}
               isSelecting={isSelecting}
               onToggleSelect={
