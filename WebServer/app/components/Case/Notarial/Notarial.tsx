@@ -66,6 +66,8 @@ import {
   getExplorerPathSegments,
 } from "./notarialExplorerUtils";
 
+
+
 type NotarialFilterValues = {
   title?: string;
   name?: string;
@@ -1072,8 +1074,22 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     }
   }, []);
 
-  const handleUploadFolderFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleUploadFolderFiles = async (files: File[] | null) => {
+    if (!files || files.length === 0) {
+      statusPopup.showError("No files found in the selected folder.");
+      return;
+    }
+
+    console.log("[Notarial] Folder upload selection:", {
+      count: files.length,
+      sample: files.slice(0, 3).map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        webkitRelativePath: (file as unknown as { webkitRelativePath?: string })
+          .webkitRelativePath,
+      })),
+    });
     if (
       !(await statusPopup.showConfirm(
         `Upload ${files.length} file${files.length > 1 ? "s" : ""} from folder?`,
@@ -1082,37 +1098,98 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       return;
     }
 
-    statusPopup.showLoading(`Uploading ${files.length} files...`);
-    let successCount = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        const relativePath = normalizeGaragePath(
-          (file as unknown as { webkitRelativePath?: string })
-            .webkitRelativePath || file.name,
+    const basePath = "";
+    const fileEntries = files.map((file) => {
+      const relativePath = normalizeGaragePath(
+        (file as unknown as { webkitRelativePath?: string })
+          .webkitRelativePath || file.name,
+      );
+      const pathSegments = relativePath ? relativePath.split("/") : [];
+      const title = pathSegments.pop() || file.name;
+      const relativeDir = normalizeGaragePath(pathSegments.join("/"));
+      const targetFolder = normalizeGaragePath(
+        [basePath, relativeDir].filter(Boolean).join("/"),
+      );
+
+      return { file, title, relativeDir, targetFolder };
+    });
+
+    // Ensure folder markers exist for nested paths before upload.
+    const folderErrors: string[] = [];
+    const ensuredPaths = new Set<string>();
+    const ensureFolderPath = async (relativeDir: string) => {
+      if (!relativeDir) return;
+      const segments = relativeDir.split("/").filter(Boolean);
+      let parentPath = basePath;
+
+      for (const segment of segments) {
+        const fullPath = normalizeGaragePath(
+          [parentPath, segment].filter(Boolean).join("/"),
         );
-        const pathSegments = relativePath
-          ? relativePath.split("/")
-          : [file.name];
-        const title = pathSegments.pop() || file.name;
-        const targetFolder = normalizeGaragePath(
-          [currentGaragePath, ...pathSegments].filter(Boolean).join("/"),
-        );
-        // Upload sequentially to avoid overwhelming the backend
-        const result = await createNotarial({
-          title,
-          path: targetFolder,
-          file,
+        if (ensuredPaths.has(fullPath)) {
+          parentPath = fullPath;
+          continue;
+        }
+
+        const result = await createGarageFolder({
+          name: segment,
+          parentPath,
         });
-        if (result.success) successCount++;
-      } catch {
-        // continue to next file
+        if (
+          !result.success &&
+          result.error !== "A folder already exists at that path"
+        ) {
+          folderErrors.push(result.error || "Failed to create folder");
+          return;
+        }
+
+        ensuredPaths.add(fullPath);
+        parentPath = fullPath;
+      }
+    };
+
+    const uniqueRelativeDirs = new Set(
+      fileEntries.map((entry) => entry.relativeDir).filter(Boolean),
+    );
+
+    for (const relativeDir of uniqueRelativeDirs) {
+      await ensureFolderPath(relativeDir);
+    }
+
+    statusPopup.showLoading(`Uploading ${fileEntries.length} files...`);
+    let successCount = 0;
+    const uploadErrors: string[] = [];
+
+    for (const entry of fileEntries) {
+      try {
+        // Upload sequentially to avoid overwhelming the backend.
+        const result = await createNotarial({
+          title: entry.title,
+          path: entry.targetFolder,
+          file: entry.file,
+        });
+        if (result.success) {
+          successCount++;
+        } else {
+          uploadErrors.push(result.error || "Upload failed");
+        }
+      } catch (err) {
+        uploadErrors.push(
+          err instanceof Error ? err.message : "Upload failed",
+        );
       }
     }
 
-    statusPopup.showSuccess(
-      `Uploaded ${successCount} of ${files.length} files.`,
-    );
+    if (uploadErrors.length > 0 || folderErrors.length > 0) {
+      const firstError = uploadErrors[0] || folderErrors[0] || "Upload failed";
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${fileEntries.length} files. ${uploadErrors.length + folderErrors.length} failed. ${firstError}`,
+      );
+    } else {
+      statusPopup.showSuccess(
+        `Uploaded ${successCount} of ${fileEntries.length} files.`,
+      );
+    }
     setCurrentPage(1);
     await refreshFromBackend(1);
   };
@@ -1866,49 +1943,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       <span className="ml-2 hidden sm:inline">Table</span>
                     </button>
                   </div>
-                  <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
-                    <FiUpload className="h-4 w-4" />
-                    Upload
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0] ?? null;
-                        if (file) void handleGarageDrop(file);
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                  </label>
-                  <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
-                    <FiFolder className="h-4 w-4" />
-                    Upload Folder
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => {
-                        const files = event.currentTarget.files ?? null;
-                        void handleUploadFolderFiles(files);
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline min-w-0 gap-2"
-                    onClick={() => {
-                      setFolderForm((previous) => ({
-                        ...previous,
-                        parentPath: currentGaragePath,
-                      }));
-                      setShowFolderModal(true);
-                    }}
-                  >
-                    <FiFolderPlus className="h-4 w-4" />
-                    New Folder
-                  </button>
+
                   <button
                     type="button"
                     className={`btn btn-sm btn-outline min-w-0 gap-2 ${refreshing ? "loading" : ""}`}
@@ -2338,11 +2373,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             </div>
           )}
 
-          {/* TABLE/GRID LISTING - toggle via displayMode */}
           {displayMode === "table" && (
             <div className="min-w-0 overflow-hidden rounded-[24px] border border-base-300 bg-base-100 shadow-lg sm:rounded-[30px]">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                   <button
                     type="button"
@@ -2367,7 +2400,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       }}
                     />
                   </label>
-                  <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
+                  {/* <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
                     <FiFolder className="h-4 w-4" />
                     Upload Folder
                     <input
@@ -2382,7 +2415,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                         e.currentTarget.value = "";
                       }}
                     />
-                  </label>
+                  </label> */}
+
+                  
                   <button
                     type="button"
                     className="btn btn-sm btn-outline flex items-center justify-center gap-2"
@@ -2624,7 +2659,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           {displayMode === "explorer" && (
             <div className="min-w-0 overflow-hidden rounded-[22px] border border-base-300 bg-base-100 p-3 sm:p-4">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {/* <h3 className="text-lg font-semibold">File Garage</h3> */}
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                   <button
                     type="button"
@@ -2656,10 +2690,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       ref={folderInputRef}
                       type="file"
                       multiple
+                      // @ts-expect-error -- non-standard attribute required for folder selection
+                      webkitdirectory=""
+                     
+                      directory=""
                       className="hidden"
                       onChange={(e) => {
-                        const files = e.currentTarget.files ?? null;
-                        void handleUploadFolderFiles(files);
+                        const files = Array.from(
+                          e.currentTarget.files ?? [],
+                        );
+                        void handleUploadFolderFiles(
+                          files.length > 0 ? files : null,
+                        );
                         // reset so same folder can be chosen again
                         e.currentTarget.value = "";
                       }}
