@@ -8,6 +8,7 @@ import {
   SpecialProceedingEntry,
   SpecialProceedingSchema,
   usePopup,
+  useToast,
 } from "../../index";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -43,6 +44,7 @@ import {
   formatImportFileSize,
   getCaseImportConflictModeLabel,
   previewSpecialProceedingImport,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
@@ -467,6 +469,7 @@ const SpecialProceedingUpdatePage = ({
         ? [selectedCase]
         : [];
   const statusPopup = usePopup();
+  const toast = useToast();
   const [step, setStep] = useState<Step>("entry");
   const [entryPage, setEntryPage] = useState(1);
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -842,6 +845,7 @@ const SpecialProceedingUpdatePage = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -888,6 +892,7 @@ const SpecialProceedingUpdatePage = ({
       const result = await previewSpecialProceedingImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

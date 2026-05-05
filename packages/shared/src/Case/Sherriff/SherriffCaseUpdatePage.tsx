@@ -9,6 +9,7 @@ import {
   SherriffCaseEntry,
   sherriffCaseToEntry,
   usePopup,
+  useToast,
 } from "@rtc-database/shared";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -45,6 +46,7 @@ import {
   formatImportFileSize,
   getCaseImportConflictModeLabel,
   previewSheriffCaseImport,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
   shouldLoadCaseImportDraft,
@@ -360,6 +362,7 @@ export const SherriffCaseUpdatePage = ({
   adapter: SherriffCaseAdapter;
 }) => {
   const statusPopup = usePopup();
+  const toast = useToast();
   const editRecords =
     selectedRecords && selectedRecords.length > 0
       ? selectedRecords
@@ -597,6 +600,7 @@ export const SherriffCaseUpdatePage = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -643,6 +647,7 @@ export const SherriffCaseUpdatePage = ({
       const result = await previewSheriffCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

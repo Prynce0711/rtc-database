@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { usePopup } from "@rtc-database/shared";
 import {
   FiArrowLeft,
   FiCheck,
@@ -225,6 +226,7 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
   onBack,
   onSave,
 }) => {
+  const statusPopup = usePopup();
   const resolvedInitialMonth = normalizeMonthPart(month);
   const resolvedInitialYear = normalizeYearPart(year);
 
@@ -614,20 +616,23 @@ const SumAddReport: React.FC<SumAddReportProps> = ({
 
     setSaveError(null);
     setSaving(true);
+    statusPopup.showLoading("Saving summary report...");
     try {
       await onSave(payload, {
         month: selectedMonthFilter,
         year: effectiveYearFilter,
         courtType: selectedCourtType,
       });
+      statusPopup.showSuccess("Summary report saved successfully.");
       onBack();
     } catch (error) {
       console.error("Summary save failed:", error);
-      setSaveError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Failed to save summary statistics.",
-      );
+          : "Failed to save summary statistics.";
+      setSaveError(message);
+      statusPopup.showError(message);
     } finally {
       setSaving(false);
     }

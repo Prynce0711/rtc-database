@@ -30,6 +30,7 @@ import {
   Roles,
   Table,
   usePopup,
+  useToast,
 } from "../../index";
 import { useAdaptiveNavigation } from "../../lib/nextCompat";
 import StatsCard from "../../Stats/StatsCard";
@@ -41,6 +42,7 @@ import {
   formatImportFileSize,
   previewCivilCaseImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
 } from "../importPreview";
@@ -77,6 +79,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 }) => {
   const router = useAdaptiveNavigation();
   const statusPopup = usePopup();
+  const toast = useToast();
 
   const [cases, setCases] = useState<CivilCaseData[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -359,6 +362,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
         const errorMessage = result.success ? undefined : result.error;
 
         downloadImportFailedExcel(failedExcel);
+        showImportFailedRowsToast(toast, failedExcel);
 
         if (!result.success || !result.result) {
           statusPopup.showError(
@@ -406,6 +410,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
       const result = await previewCivilCaseImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(

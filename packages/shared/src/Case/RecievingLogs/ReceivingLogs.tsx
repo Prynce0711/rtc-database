@@ -23,6 +23,7 @@ import { CaseType } from "../../generated/prisma/enums";
 import { useAdaptiveRouter } from "../../lib/nextCompat";
 import Roles from "../../lib/Roles";
 import { usePopup } from "../../Popup/PopupProvider";
+import { useToast } from "../../Toast/ToastProvider";
 import { PageListSkeleton } from "../../Skeleton/SkeletonTable";
 import StatsCard from "../../Stats/StatsCard";
 import Pagination from "../../Table/Pagination";
@@ -36,6 +37,7 @@ import {
   downloadImportFailedExcel,
   previewReceivingLogImport,
   saveCaseImportDraft,
+  showImportFailedRowsToast,
 } from "../importPreview";
 
 type ReceiveLog = RecievingLog;
@@ -89,6 +91,7 @@ const ReceiveLogsPage: React.FC<{
   const [exporting, setExporting] = useState(false);
 
   const statusPopup = usePopup();
+  const toast = useToast();
 
   const [sortConfig, setSortConfig] = useState<{
     key: ReceiveSortKey;
@@ -345,6 +348,7 @@ const ReceiveLogsPage: React.FC<{
       const result = await previewReceivingLogImport(file);
 
       downloadImportFailedExcel(result.failedExcel);
+      showImportFailedRowsToast(toast, result.failedExcel);
 
       if (!result.success || result.rows.length === 0) {
         statusPopup.showError(
