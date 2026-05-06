@@ -28,7 +28,7 @@ FROM deps AS builder
 COPY packages ./packages
 COPY WebServer ./WebServer
 
-RUN DATABASE_URL="file:./dev.db" pnpm --filter rtc-database-webserver exec prisma generate --schema packages/shared/prisma/schema.prisma
+RUN DATABASE_URL="file:./dev.db" pnpm --filter rtc-database-webserver exec prisma generate --schema /app/packages/shared/prisma/schema.prisma
 RUN pnpm --filter rtc-database-webserver build
 
 FROM base AS runner
