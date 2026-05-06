@@ -6,12 +6,15 @@ export const MAX_UPLOAD_BATCH_BYTES = 250 * 1024 * 1024;
 
 export type BatchUploadPhase = "processing" | "completed" | "failed";
 
+<<<<<<< HEAD
 export type BatchUploadFailure = {
   name: string;
   error: string;
   kind?: "file" | "folder";
 };
 
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 export type BatchUploadProgressState = {
   phase: BatchUploadPhase;
   totalFiles: number;
@@ -26,7 +29,10 @@ export type BatchUploadProgressState = {
   currentFileName?: string;
   title?: string;
   error?: string;
+<<<<<<< HEAD
   failedItems?: BatchUploadFailure[];
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 };
 
 export const createUploadBatches = <T,>(
@@ -135,12 +141,15 @@ const getSubcopy = (state: BatchUploadProgressState) => {
   }
 
   if (state.phase === "failed") {
+<<<<<<< HEAD
     const firstFailure = state.failedItems?.[0];
     if (firstFailure) {
       const label = firstFailure.kind === "folder" ? "Folder" : "File";
       return `${label} "${firstFailure.name}" failed: ${firstFailure.error}`;
     }
 
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
     return state.error || "Some files could not be uploaded.";
   }
 
@@ -165,7 +174,10 @@ export function BatchUploadProgressPanel({
   if (!state) return null;
 
   const percent = getBatchUploadProgressPercent(state);
+<<<<<<< HEAD
   const failedItems = state.failedItems ?? [];
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   const progressColor =
     state.phase === "failed"
       ? "bg-error"
@@ -212,6 +224,7 @@ export function BatchUploadProgressPanel({
           <p className="mt-1 truncate text-sm text-base-content/55">
             {getSubcopy(state)}
           </p>
+<<<<<<< HEAD
           {failedItems.length > 0 && (
             <div className="mt-3 max-h-32 space-y-2 overflow-y-auto rounded-md border border-error/20 bg-error/5 p-2">
               {failedItems.slice(0, 5).map((item, index) => (
@@ -232,6 +245,8 @@ export function BatchUploadProgressPanel({
               )}
             </div>
           )}
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/45">
             <span>{percent}% this batch</span>
             {state.totalBatches > 1 && (

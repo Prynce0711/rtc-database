@@ -30,9 +30,13 @@ import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import Roles from "@/app/lib/Roles";
 import {
   BatchUploadProgressPanel,
+<<<<<<< HEAD
   BatchUploadFailure,
   BatchUploadProgressState,
   MAX_UPLOAD_BATCH_BYTES,
+=======
+  BatchUploadProgressState,
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   createBatchUploadProgressState,
   createUploadBatches,
   ExactMatchMap,
@@ -126,6 +130,7 @@ type NotarialUploadEntry = {
   targetFolder: string;
 };
 
+<<<<<<< HEAD
 const LARGE_FILE_UPLOAD_CHUNK_BYTES = 16 * 1024 * 1024;
 
 const getUploadErrorMessage = (error: unknown) =>
@@ -213,6 +218,8 @@ const uploadNotarialFileWithSplitting = async (
   }
 };
 
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 type NotarialContextMenuState = {
   x: number;
   y: number;
@@ -491,6 +498,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       />,
     );
   };
+<<<<<<< HEAD
 
   const showNonBlockingSuccessProgress = (message: string) => {
     statusPopup.showLoading(
@@ -522,6 +530,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       statusPopup.hidePopup();
     }, 2200);
   };
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   const [folderForm, setFolderForm] = useState({
     name: "",
     parentPath: "",
@@ -1836,13 +1846,19 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       (total, entry) => total + entry.file.size,
       0,
     );
+<<<<<<< HEAD
     const getBatchBytes = (batch: NotarialUploadEntry[]) =>
       batch.reduce((total, entry) => total + entry.file.size, 0);
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
     let processedCount = 0;
     let uploadedBytes = 0;
     let successCount = 0;
     const uploadErrors: string[] = [];
+<<<<<<< HEAD
     const uploadFailures: BatchUploadFailure[] = [];
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 
     setUploading(true);
     setUploadProgress(0);
@@ -1860,12 +1876,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         ...currentState,
         currentBatch: batchIndex + 1,
         currentFileName: undefined,
+<<<<<<< HEAD
         currentBatchBytes: getBatchBytes(batch),
         uploadedBatchBytes: 0,
       };
       setBatchUploadProgress(currentState);
       onStatusUpdate?.(currentState);
       let uploadedBatchBytes = 0;
+=======
+      };
+      setBatchUploadProgress(currentState);
+      onStatusUpdate?.(currentState);
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 
       for (const entry of batch) {
         currentState = {
@@ -1876,6 +1898,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         setBatchUploadProgress(currentState);
         onStatusUpdate?.(currentState);
 
+<<<<<<< HEAD
         let currentEntryUploadedBytes = 0;
         const updateCurrentEntryProgress = (entryUploadedBytes: number) => {
           currentEntryUploadedBytes = Math.min(
@@ -1920,11 +1943,32 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
             error: message,
             kind: "file",
           });
+=======
+        try {
+          // Upload sequentially inside each 250 MB batch to keep the backend steady.
+          const result = await createNotarial({
+            title: entry.title,
+            path: entry.targetFolder,
+            file: entry.file,
+          });
+          if (result.success) {
+            successCount++;
+          } else {
+            uploadErrors.push(result.error || "Upload failed");
+          }
+        } catch (err) {
+          uploadErrors.push(
+            err instanceof Error ? err.message : "Upload failed",
+          );
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
         }
 
         processedCount++;
         uploadedBytes += entry.file.size;
+<<<<<<< HEAD
         uploadedBatchBytes += entry.file.size;
+=======
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
         const percentage = Math.round((processedCount / entries.length) * 100);
         setUploadProgress(percentage);
 
@@ -1932,9 +1976,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           ...currentState,
           completedFiles: processedCount,
           failedFiles: uploadErrors.length,
+<<<<<<< HEAD
           failedItems: uploadFailures.slice(),
           uploadedBytes,
           uploadedBatchBytes,
+=======
+          uploadedBytes,
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
         };
         setBatchUploadProgress(currentState);
         onStatusUpdate?.(currentState);
@@ -1947,9 +1995,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       phase: hasErrors ? "failed" : "completed",
       completedFiles: processedCount,
       failedFiles: uploadErrors.length,
+<<<<<<< HEAD
       failedItems: uploadFailures,
       uploadedBytes,
       uploadedBatchBytes: currentState.currentBatchBytes,
+=======
+      uploadedBytes,
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
       currentFileName: undefined,
       error: hasErrors
         ? `Uploaded ${successCount} of ${entries.length} files. ${
@@ -1969,7 +2021,11 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     }
 
     setUploading(false);
+<<<<<<< HEAD
     return { successCount, uploadErrors, uploadFailures, state: currentState };
+=======
+    return { successCount, uploadErrors };
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   };
 
   const handleUploadFolderFiles = async (files: File[] | null) => {
@@ -2060,11 +2116,26 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       await ensureFolderPath(relativeDir);
     }
 
+<<<<<<< HEAD
     const { successCount, uploadErrors, uploadFailures, state } =
       await runBatchedNotarialUpload(
         fileEntries,
         "Processing",
         showBatchUploadPopup,
+=======
+    const { successCount, uploadErrors } = await runBatchedNotarialUpload(
+      fileEntries,
+      "Processing",
+      showBatchUploadPopup,
+    );
+
+    statusPopup.hidePopup();
+
+    if (uploadErrors.length > 0 || folderErrors.length > 0) {
+      const firstError = uploadErrors[0] || folderErrors[0] || "Upload failed";
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${fileEntries.length} files. ${uploadErrors.length + folderErrors.length} failed. ${firstError}`,
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
       );
 
     const failedItems = [...uploadFailures, ...folderFailures];
@@ -2093,6 +2164,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
   const handleOpenNotarialFolderPicker = async () => {
     const pickedFiles = await pickDirectoriesWithFileSystemAccess({
+<<<<<<< HEAD
       allowMultiple: false,
     });
 
@@ -2103,6 +2175,17 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     if (pickedFiles.length > 0) {
       await handleUploadFolderFiles(pickedFiles);
     }
+=======
+      allowMultiple: true,
+    });
+
+    if (pickedFiles === null) {
+      folderInputRef.current?.click();
+      return;
+    }
+
+    await handleUploadFolderFiles(pickedFiles.length > 0 ? pickedFiles : null);
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   };
 
   const handleGarageFilesUpload = async (files: File[] | null) => {
@@ -2120,8 +2203,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         showBatchUploadPopup,
       );
 
+<<<<<<< HEAD
       if (uploadErrors.length === 0) {
         statusPopup.hidePopup();
+=======
+      statusPopup.hidePopup();
+
+      if (uploadErrors.length > 0) {
+        statusPopup.showError(
+          `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+        );
+      } else {
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
         statusPopup.showSuccess(
           `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
         );
@@ -2170,8 +2263,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       showBatchUploadPopup,
     );
 
+<<<<<<< HEAD
     if (uploadErrors.length === 0) {
       statusPopup.hidePopup();
+=======
+    statusPopup.hidePopup();
+
+    if (uploadErrors.length > 0) {
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+      );
+    } else {
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
       statusPopup.showSuccess(
         `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
       );
@@ -3336,9 +3439,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
                       onChange={(e) => {
                         const files = Array.from(e.currentTarget.files ?? []);
+<<<<<<< HEAD
                         if (files.length > 0) {
                           void handleGarageFilesUpload(files);
                         }
+=======
+                        void handleGarageFilesUpload(
+                          files.length > 0 ? files : null,
+                        );
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
                         e.currentTarget.value = "";
                       }}
                     />
@@ -3361,9 +3470,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.currentTarget.files ?? []);
+<<<<<<< HEAD
                       if (files.length > 0) {
                         void handleUploadFolderFiles(files);
                       }
+=======
+                      void handleUploadFolderFiles(
+                        files.length > 0 ? files : null,
+                      );
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
                       e.currentTarget.value = "";
                     }}
                   />
@@ -3635,9 +3750,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
                       onChange={(e) => {
                         const files = Array.from(e.currentTarget.files ?? []);
+<<<<<<< HEAD
                         if (files.length > 0) {
                           void handleGarageFilesUpload(files);
                         }
+=======
+                        void handleGarageFilesUpload(
+                          files.length > 0 ? files : null,
+                        );
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
                         e.currentTarget.value = "";
                       }}
                     />
@@ -3660,9 +3781,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.currentTarget.files ?? []);
+<<<<<<< HEAD
                       if (files.length > 0) {
                         void handleUploadFolderFiles(files);
                       }
+=======
+                      void handleUploadFolderFiles(
+                        files.length > 0 ? files : null,
+                      );
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
                       e.currentTarget.value = "";
                     }}
                   />
