@@ -8,6 +8,19 @@ import { BrowserWindow } from "electron";
 import { inspectBackendTrust, probeRelayReachability } from "./relayTrust";
 
 let socket: dgram.Socket | null = null;
+const DEBUG_UDP = false;
+
+const logUdp = (...args: unknown[]) => {
+  if (DEBUG_UDP) {
+    console.log(...args);
+  }
+};
+
+const warnUdp = (...args: unknown[]) => {
+  if (DEBUG_UDP) {
+    console.warn(...args);
+  }
+};
 
 const resolveAdvertisedHost = (
   candidateHost: string | undefined,
@@ -121,13 +134,13 @@ export function startUdpListener(mainWindow: BrowserWindow) {
     return;
   }
 
-  console.log("[udp] Starting discovery listener...");
+  logUdp("[udp] Starting discovery listener...");
 
   socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
 
   socket.on("listening", () => {
     const addr = socket!.address();
-    console.log(
+    logUdp(
       `[udp] Discovery listener bound on ${addr.address}:${addr.port} (waiting for relay announcements on UDP ${UDP_DISCOVERY_PORT})`,
     );
   });
@@ -156,13 +169,13 @@ export function startUdpListener(mainWindow: BrowserWindow) {
         rinfo.address,
       );
       if (!resolvedBackend) {
-        console.warn(
+        warnUdp(
           `[udp] Relay announcement from ${rinfo.address}:${rinfo.port} did not produce a reachable relay candidate.`,
         );
         return;
       }
 
-      console.log(
+      logUdp(
         `[udp] Received relay announcement from ${rinfo.address}:${rinfo.port} -> ${resolvedBackend.url} (${resolvedBackend.relayTrustState ?? "unknown"})`,
       );
 

@@ -9,6 +9,7 @@
     "dev:nativeapp": "pnpm --filter rtc-database-nativeapp dev",
     "dev:relay": "pnpm --filter rtc-database-relay dev",
     "dev": "concurrently \"pnpm --filter @rtc-database/shared build:watch\" \"pnpm --filter @rtc-database/shared-relay build:watch\" \"pnpm --filter rtc-database-webserver dev\" \"pnpm --filter rtc-database-nativeapp dev\" \"pnpm --filter rtc-database-relay dev\"",
+    "build:docker": "pnpm --filter rtc-database-webserver build:docker && pnpm --filter rtc-database-relay build:docker",
     "build:relay": "pnpm --filter rtc-database-relay build",
     "build": "pnpm --filter '@rtc-database/shared' build && pnpm --filter '@rtc-database/shared-relay' build && pnpm --filter rtc-database-webserver build && pnpm --filter rtc-database-nativeapp build",
     "update": "pnpm i && pnpm update:prisma",

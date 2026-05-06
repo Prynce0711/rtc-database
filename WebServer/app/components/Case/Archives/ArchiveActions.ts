@@ -1,6 +1,7 @@
 "use server";
 
 import { validateSession } from "@/app/lib/authActions";
+import { getGarageClient } from "@/app/lib/garage";
 import {
   createGarageFolderMarker,
   deleteGarageFile,
@@ -11,12 +12,17 @@ import {
   moveGarageKeys,
   renameGarageKey,
   uploadFileToGarage,
+  uploadFileToGarageTrusted,
   type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
+import { redisConnection } from "@/app/lib/redis";
 import Roles from "@/app/lib/Roles";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   ActionResult,
+  ArchiveEditLockErrorResult,
+  ArchiveEditLockOptions,
   ArchiveEntryData,
   ArchiveEntryInput,
   ArchiveEntryInputSchema,
@@ -35,6 +41,7 @@ import {
   PaginatedResult,
 } from "@rtc-database/shared";
 import { Prisma } from "@rtc-database/shared/prisma/client";
+import { createHash, randomUUID } from "crypto";
 import * as XLSX from "xlsx";
 
 const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.NOTARIAL];
@@ -47,6 +54,14 @@ const ARCHIVE_INCLUDE = {
 const SPREADSHEET_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const SPREADSHEET_EXTENSIONS = new Set(["xlsx", "xls", "csv"]);
+const OFFICE_EDITABLE_EXTENSIONS = new Set(["doc", "docx", "xls", "xlsx"]);
+const OFFICE_EDITABLE_MIME_TOKENS = [
+  "word",
+  "wordprocessingml",
+  "excel",
+  "spreadsheet",
+  "officedocument",
+];
 const DOCUMENT_EXTENSIONS = new Set([
   "txt",
   "md",
@@ -86,6 +101,259 @@ export type ArchiveRecentItem = {
 const normalizeNullableString = (value?: string | null): string | null => {
   const normalized = value?.trim() ?? "";
   return normalized.length > 0 ? normalized : null;
+};
+
+const ARCHIVE_EDIT_LOCK_TTL_SECONDS = 45;
+const ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS = 10_000;
+const ARCHIVE_EDIT_SYNC_INTERVAL_MS = 15_000;
+const ARCHIVE_EDIT_STALE_GRACE_MS = Math.max(
+  5000,
+  Math.min(
+    ARCHIVE_EDIT_LOCK_TTL_SECONDS * 1000 - 5000,
+    ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS * 3,
+  ),
+);
+
+type ArchiveEditLockPayload = {
+  lockId: string;
+  entryId: number;
+  userId: string;
+  userDisplayName: string;
+  deviceId?: string | null;
+  acquiredAt: string;
+  heartbeatAt: string;
+};
+
+type ArchiveGarageEditLockPayload = {
+  lockId: string;
+  garageKey: string;
+  userId: string;
+  userDisplayName: string;
+  deviceId?: string | null;
+  acquiredAt: string;
+  heartbeatAt: string;
+};
+
+const getArchiveEditLockKey = (entryId: number): string =>
+  `archive:edit-lock:entry:${entryId}`;
+
+const getArchiveEditTokenKey = (lockId: string): string =>
+  `archive:edit-lock:token:${lockId}`;
+
+const normalizeGarageEditKey = (garageKey: string): string =>
+  String(garageKey || "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
+
+const getArchiveGarageLockScopeKey = (garageKey: string): string => {
+  const normalized = normalizeGarageEditKey(garageKey);
+  return createHash("sha256").update(normalized).digest("hex");
+};
+
+const getArchiveGarageEditLockKey = (garageKey: string): string =>
+  `archive:edit-lock:garage:${getArchiveGarageLockScopeKey(garageKey)}`;
+
+const parseArchiveEditLockPayload = (
+  raw: string | null,
+): ArchiveEditLockPayload | null => {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<ArchiveEditLockPayload>;
+    if (
+      typeof parsed.lockId !== "string" ||
+      typeof parsed.entryId !== "number" ||
+      typeof parsed.userId !== "string" ||
+      typeof parsed.userDisplayName !== "string" ||
+      typeof parsed.acquiredAt !== "string" ||
+      typeof parsed.heartbeatAt !== "string"
+    ) {
+      return null;
+    }
+
+    const deviceId =
+      typeof parsed.deviceId === "string" ? parsed.deviceId : null;
+
+    return {
+      lockId: parsed.lockId,
+      entryId: parsed.entryId,
+      userId: parsed.userId,
+      userDisplayName: parsed.userDisplayName,
+      deviceId,
+      acquiredAt: parsed.acquiredAt,
+      heartbeatAt: parsed.heartbeatAt,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseArchiveGarageEditLockPayload = (
+  raw: string | null,
+): ArchiveGarageEditLockPayload | null => {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<ArchiveGarageEditLockPayload>;
+    if (
+      typeof parsed.lockId !== "string" ||
+      typeof parsed.garageKey !== "string" ||
+      typeof parsed.userId !== "string" ||
+      typeof parsed.userDisplayName !== "string" ||
+      typeof parsed.acquiredAt !== "string" ||
+      typeof parsed.heartbeatAt !== "string"
+    ) {
+      return null;
+    }
+
+    const deviceId =
+      typeof parsed.deviceId === "string" ? parsed.deviceId : null;
+
+    return {
+      lockId: parsed.lockId,
+      garageKey: parsed.garageKey,
+      userId: parsed.userId,
+      userDisplayName: parsed.userDisplayName,
+      deviceId,
+      acquiredAt: parsed.acquiredAt,
+      heartbeatAt: parsed.heartbeatAt,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const normalizeDeviceId = (value?: string | null): string | null => {
+  const normalized = String(value || "").trim();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const isLockStale = (heartbeatAt: string): boolean => {
+  const heartbeatMs = Date.parse(heartbeatAt);
+  if (!Number.isFinite(heartbeatMs)) {
+    return true;
+  }
+
+  return Date.now() - heartbeatMs > ARCHIVE_EDIT_STALE_GRACE_MS;
+};
+
+const clearArchiveEditLock = async (lockKey: string, lockId: string) => {
+  await redisConnection.del(lockKey);
+  await redisConnection.del(getArchiveEditTokenKey(lockId));
+};
+
+const isOfficeEditableArchiveFile = (entry: {
+  name: string;
+  extension?: string | null;
+  file?: { mimeType: string } | null;
+}): boolean => {
+  const extension = (entry.extension || getArchiveExtension(entry.name) || "")
+    .toLowerCase()
+    .trim();
+  if (OFFICE_EDITABLE_EXTENSIONS.has(extension)) {
+    return true;
+  }
+
+  const mimeType = (entry.file?.mimeType || "").toLowerCase();
+  return OFFICE_EDITABLE_MIME_TOKENS.some((token) => mimeType.includes(token));
+};
+
+const refreshArchiveEditLock = async (
+  lockId: string,
+  nextPayload: ArchiveEditLockPayload,
+): Promise<boolean> => {
+  const tokenKey = getArchiveEditTokenKey(lockId);
+  const lockKey = getArchiveEditLockKey(nextPayload.entryId);
+  const payloadJson = JSON.stringify(nextPayload);
+
+  const updated = await redisConnection.eval(
+    `
+      local tokenKey = KEYS[1]
+      local lockKey = KEYS[2]
+      local expectedEntryId = ARGV[1]
+      local expectedLockId = ARGV[2]
+      local payload = ARGV[3]
+      local ttl = tonumber(ARGV[4])
+
+      local entryId = redis.call('GET', tokenKey)
+      if not entryId or entryId ~= expectedEntryId then
+        return 0
+      end
+
+      local lockPayload = redis.call('GET', lockKey)
+      if not lockPayload then
+        return 0
+      end
+
+      local ok, decoded = pcall(cjson.decode, lockPayload)
+      if not ok or not decoded or decoded['lockId'] ~= expectedLockId then
+        return 0
+      end
+
+      redis.call('SET', lockKey, payload, 'EX', ttl)
+      redis.call('SET', tokenKey, expectedEntryId, 'EX', ttl)
+      return 1
+    `,
+    2,
+    tokenKey,
+    lockKey,
+    String(nextPayload.entryId),
+    lockId,
+    payloadJson,
+    String(ARCHIVE_EDIT_LOCK_TTL_SECONDS),
+  );
+
+  return updated === 1;
+};
+
+const refreshArchiveGarageEditLock = async (
+  lockId: string,
+  nextPayload: ArchiveGarageEditLockPayload,
+): Promise<boolean> => {
+  const tokenKey = getArchiveEditTokenKey(lockId);
+  const lockScope = getArchiveGarageLockScopeKey(nextPayload.garageKey);
+  const lockKey = getArchiveGarageEditLockKey(nextPayload.garageKey);
+  const payloadJson = JSON.stringify(nextPayload);
+
+  const updated = await redisConnection.eval(
+    `
+      local tokenKey = KEYS[1]
+      local lockKey = KEYS[2]
+      local expectedLockScope = ARGV[1]
+      local expectedLockId = ARGV[2]
+      local payload = ARGV[3]
+      local ttl = tonumber(ARGV[4])
+
+      local lockScope = redis.call('GET', tokenKey)
+      if not lockScope or lockScope ~= expectedLockScope then
+        return 0
+      end
+
+      local lockPayload = redis.call('GET', lockKey)
+      if not lockPayload then
+        return 0
+      end
+
+      local ok, decoded = pcall(cjson.decode, lockPayload)
+      if not ok or not decoded or decoded['lockId'] ~= expectedLockId then
+        return 0
+      end
+
+      redis.call('SET', lockKey, payload, 'EX', ttl)
+      redis.call('SET', tokenKey, expectedLockScope, 'EX', ttl)
+      return 1
+    `,
+    2,
+    tokenKey,
+    lockKey,
+    lockScope,
+    lockId,
+    payloadJson,
+    String(ARCHIVE_EDIT_LOCK_TTL_SECONDS),
+  );
+
+  return updated === 1;
 };
 
 const defaultExtensionForType = (entryType: ArchiveEntryType): string => {
@@ -885,6 +1153,723 @@ export async function getArchiveGarageFileUrl(
   } catch (error) {
     console.error("Error getting archive garage file URL:", error);
     return { success: false, error: "Failed to get garage file URL" };
+  }
+}
+
+export async function acquireArchiveEditLock(
+  entryId: number,
+  options?: ArchiveEditLockOptions,
+): Promise<
+  ActionResult<
+    {
+      lockId: string;
+      heartbeatIntervalMs: number;
+      syncIntervalMs: number;
+      expiresInSeconds: number;
+    },
+    ArchiveEditLockErrorResult
+  >
+> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return { success: false, error: "Invalid archive entry id" };
+    }
+
+    const entry = await fetchArchiveEntry(entryId);
+    if (!entry || !entry.file) {
+      return { success: false, error: "Archive file not found" };
+    }
+
+    if (!isOfficeEditableArchiveFile(entry)) {
+      return {
+        success: false,
+        error: "Only Word and Excel files can be opened for desktop editing.",
+      };
+    }
+
+    const requestDeviceId = normalizeDeviceId(options?.deviceId);
+    const lockKey = getArchiveEditLockKey(entryId);
+    const existing = parseArchiveEditLockPayload(
+      await redisConnection.get(lockKey),
+    );
+    if (existing) {
+      const nowIso = new Date().toISOString();
+      if (
+        existing.userId === sessionValidation.result.id &&
+        requestDeviceId &&
+        existing.deviceId === requestDeviceId
+      ) {
+        const refreshed = await refreshArchiveEditLock(existing.lockId, {
+          ...existing,
+          deviceId: requestDeviceId,
+          heartbeatAt: nowIso,
+        });
+
+        if (refreshed) {
+          return {
+            success: true,
+            result: {
+              lockId: existing.lockId,
+              heartbeatIntervalMs: ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS,
+              syncIntervalMs: ARCHIVE_EDIT_SYNC_INTERVAL_MS,
+              expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+            },
+          };
+        }
+
+        await clearArchiveEditLock(lockKey, existing.lockId);
+      } else if (isLockStale(existing.heartbeatAt)) {
+        await clearArchiveEditLock(lockKey, existing.lockId);
+      } else {
+        const lockedBySelf = existing.userId === sessionValidation.result.id;
+        return {
+          success: false,
+          error: lockedBySelf
+            ? `This file is already locked by you on another device (${existing.lockId.slice(0, 8)}).`
+            : `File is currently being edited by ${existing.userDisplayName}.`,
+          errorResult: {
+            code: "locked",
+            lockId: existing.lockId,
+            lockedBy: existing.userDisplayName,
+            lockDeviceId: existing.deviceId ?? null,
+          },
+        };
+      }
+    }
+
+    const lockId = randomUUID();
+    const nowIso = new Date().toISOString();
+    const payload: ArchiveEditLockPayload = {
+      lockId,
+      entryId,
+      userId: sessionValidation.result.id,
+      userDisplayName:
+        sessionValidation.result.name ||
+        sessionValidation.result.email ||
+        "Unknown user",
+      deviceId: requestDeviceId,
+      acquiredAt: nowIso,
+      heartbeatAt: nowIso,
+    };
+
+    const acquired = await redisConnection.set(
+      lockKey,
+      JSON.stringify(payload),
+      "EX",
+      ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      "NX",
+    );
+
+    if (acquired !== "OK") {
+      return {
+        success: false,
+        error:
+          "Unable to acquire lock. Another user may have opened this file.",
+      };
+    }
+
+    await redisConnection.set(
+      getArchiveEditTokenKey(lockId),
+      String(entryId),
+      "EX",
+      ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+    );
+
+    return {
+      success: true,
+      result: {
+        lockId,
+        heartbeatIntervalMs: ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS,
+        syncIntervalMs: ARCHIVE_EDIT_SYNC_INTERVAL_MS,
+        expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      },
+    };
+  } catch (error) {
+    console.error("Error acquiring archive edit lock:", error);
+    return { success: false, error: "Failed to lock archive file" };
+  }
+}
+
+export async function heartbeatArchiveEditLock(
+  lockId: string,
+): Promise<ActionResult<{ expiresInSeconds: number }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    const tokenKey = getArchiveEditTokenKey(normalizedLockId);
+    const entryIdRaw = await redisConnection.get(tokenKey);
+    const entryId = Number(entryIdRaw);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    const lockKey = getArchiveEditLockKey(entryId);
+    const payload = parseArchiveEditLockPayload(
+      await redisConnection.get(lockKey),
+    );
+    if (!payload || payload.lockId !== normalizedLockId) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    if (payload.userId !== sessionValidation.result.id) {
+      return {
+        success: false,
+        error: "This lock belongs to another user.",
+      };
+    }
+
+    const refreshed = await refreshArchiveEditLock(normalizedLockId, {
+      ...payload,
+      heartbeatAt: new Date().toISOString(),
+    });
+
+    if (!refreshed) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    return {
+      success: true,
+      result: {
+        expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      },
+    };
+  } catch (error) {
+    console.error("Error heartbeat for archive edit lock:", error);
+    return { success: false, error: "Failed to refresh archive lock" };
+  }
+}
+
+export async function releaseArchiveEditLock(
+  lockId: string,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    const tokenKey = getArchiveEditTokenKey(normalizedLockId);
+    const entryIdRaw = await redisConnection.get(tokenKey);
+    const entryId = Number(entryIdRaw);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return { success: true, result: undefined };
+    }
+
+    const lockKey = getArchiveEditLockKey(entryId);
+
+    await redisConnection.eval(
+      `
+        local tokenKey = KEYS[1]
+        local lockKey = KEYS[2]
+        local expectedEntryId = ARGV[1]
+        local expectedLockId = ARGV[2]
+        local expectedUserId = ARGV[3]
+
+        local entryId = redis.call('GET', tokenKey)
+        if not entryId or entryId ~= expectedEntryId then
+          return 0
+        end
+
+        local lockPayload = redis.call('GET', lockKey)
+        if lockPayload then
+          local ok, decoded = pcall(cjson.decode, lockPayload)
+          if ok and decoded and decoded['lockId'] == expectedLockId and decoded['userId'] == expectedUserId then
+            redis.call('DEL', lockKey)
+          end
+        end
+
+        redis.call('DEL', tokenKey)
+        return 1
+      `,
+      2,
+      tokenKey,
+      lockKey,
+      String(entryId),
+      normalizedLockId,
+      sessionValidation.result.id,
+    );
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error releasing archive edit lock:", error);
+    return { success: false, error: "Failed to release archive lock" };
+  }
+}
+
+export async function syncArchiveEditedFile(
+  lockId: string,
+  file: File,
+): Promise<ActionResult<{ updatedAt: string }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    if (!(file instanceof File)) {
+      return { success: false, error: "Edited file payload is required" };
+    }
+
+    const entryIdRaw = await redisConnection.get(
+      getArchiveEditTokenKey(normalizedLockId),
+    );
+    const entryId = Number(entryIdRaw);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    const lockPayload = parseArchiveEditLockPayload(
+      await redisConnection.get(getArchiveEditLockKey(entryId)),
+    );
+    if (!lockPayload || lockPayload.lockId !== normalizedLockId) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    if (lockPayload.userId !== sessionValidation.result.id) {
+      return {
+        success: false,
+        error: "This lock belongs to another user.",
+      };
+    }
+
+    const entry = await fetchArchiveEntry(entryId);
+    if (!entry || !entry.file) {
+      return { success: false, error: "Archive file not found" };
+    }
+
+    if (!isOfficeEditableArchiveFile(entry)) {
+      return {
+        success: false,
+        error:
+          "Only Word and Excel files can be synced through desktop editing.",
+      };
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileHash = createHash("sha256").update(buffer).digest("hex");
+    const contentType =
+      file.type || entry.file.mimeType || "application/octet-stream";
+    const fileName = file.name || entry.file.fileName;
+
+    const garageClient = await getGarageClient();
+    await garageClient.send(
+      new PutObjectCommand({
+        Bucket: ARCHIVE_GARAGE_BUCKET,
+        Key: entry.file.key,
+        Body: new Uint8Array(buffer),
+        ContentType: contentType,
+      }),
+    );
+
+    const nowIso = new Date().toISOString();
+    await prisma.$transaction([
+      prisma.fileData.update({
+        where: { id: entry.file.id },
+        data: {
+          fileHash,
+          fileName,
+          size: file.size,
+          mimeType: contentType,
+        },
+      }),
+      prisma.archiveEntry.update({
+        where: { id: entry.id },
+        data: {
+          extension: getArchiveExtension(fileName) || entry.extension,
+        },
+      }),
+    ]);
+
+    const refreshed = await refreshArchiveEditLock(normalizedLockId, {
+      ...lockPayload,
+      heartbeatAt: nowIso,
+    });
+    if (!refreshed) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    return {
+      success: true,
+      result: { updatedAt: nowIso },
+    };
+  } catch (error) {
+    console.error("Error syncing edited archive file:", error);
+    return { success: false, error: "Failed to sync edited archive file" };
+  }
+}
+
+export async function acquireArchiveGarageEditLock(
+  garageKey: string,
+  options?: ArchiveEditLockOptions,
+): Promise<
+  ActionResult<
+    {
+      lockId: string;
+      heartbeatIntervalMs: number;
+      syncIntervalMs: number;
+      expiresInSeconds: number;
+    },
+    ArchiveEditLockErrorResult
+  >
+> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedKey = normalizeGarageEditKey(garageKey);
+    if (!normalizedKey) {
+      return { success: false, error: "Garage file key is required" };
+    }
+
+    const requestDeviceId = normalizeDeviceId(options?.deviceId);
+    const lockKey = getArchiveGarageEditLockKey(normalizedKey);
+    const existing = parseArchiveGarageEditLockPayload(
+      await redisConnection.get(lockKey),
+    );
+    if (existing) {
+      const nowIso = new Date().toISOString();
+      if (
+        existing.userId === sessionValidation.result.id &&
+        requestDeviceId &&
+        existing.deviceId === requestDeviceId
+      ) {
+        const refreshed = await refreshArchiveGarageEditLock(existing.lockId, {
+          ...existing,
+          deviceId: requestDeviceId,
+          heartbeatAt: nowIso,
+        });
+
+        if (refreshed) {
+          return {
+            success: true,
+            result: {
+              lockId: existing.lockId,
+              heartbeatIntervalMs: ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS,
+              syncIntervalMs: ARCHIVE_EDIT_SYNC_INTERVAL_MS,
+              expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+            },
+          };
+        }
+
+        await clearArchiveEditLock(lockKey, existing.lockId);
+      } else if (isLockStale(existing.heartbeatAt)) {
+        await clearArchiveEditLock(lockKey, existing.lockId);
+      } else {
+        const lockedBySelf = existing.userId === sessionValidation.result.id;
+        return {
+          success: false,
+          error: lockedBySelf
+            ? `This file is already locked by you on another device (${existing.lockId.slice(0, 8)}).`
+            : `File is currently being edited by ${existing.userDisplayName}.`,
+          errorResult: {
+            code: "locked",
+            lockId: existing.lockId,
+            lockedBy: existing.userDisplayName,
+            lockDeviceId: existing.deviceId ?? null,
+          },
+        };
+      }
+    }
+
+    const lockId = randomUUID();
+    const nowIso = new Date().toISOString();
+    const payload: ArchiveGarageEditLockPayload = {
+      lockId,
+      garageKey: normalizedKey,
+      userId: sessionValidation.result.id,
+      userDisplayName:
+        sessionValidation.result.name ||
+        sessionValidation.result.email ||
+        "Unknown user",
+      deviceId: requestDeviceId,
+      acquiredAt: nowIso,
+      heartbeatAt: nowIso,
+    };
+
+    const acquired = await redisConnection.set(
+      lockKey,
+      JSON.stringify(payload),
+      "EX",
+      ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      "NX",
+    );
+    if (acquired !== "OK") {
+      return {
+        success: false,
+        error:
+          "Unable to acquire lock. Another user may have opened this file.",
+      };
+    }
+
+    await redisConnection.set(
+      getArchiveEditTokenKey(lockId),
+      getArchiveGarageLockScopeKey(normalizedKey),
+      "EX",
+      ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+    );
+
+    return {
+      success: true,
+      result: {
+        lockId,
+        heartbeatIntervalMs: ARCHIVE_EDIT_HEARTBEAT_INTERVAL_MS,
+        syncIntervalMs: ARCHIVE_EDIT_SYNC_INTERVAL_MS,
+        expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      },
+    };
+  } catch (error) {
+    console.error("Error acquiring archive garage edit lock:", error);
+    return { success: false, error: "Failed to lock archive garage file" };
+  }
+}
+
+export async function heartbeatArchiveGarageEditLock(
+  lockId: string,
+): Promise<ActionResult<{ expiresInSeconds: number }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    const lockScope = await redisConnection.get(
+      getArchiveEditTokenKey(normalizedLockId),
+    );
+    if (!lockScope) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    const allGarageLocks = await redisConnection.keys(
+      "archive:edit-lock:garage:*",
+    );
+    let payload: ArchiveGarageEditLockPayload | null = null;
+    for (const key of allGarageLocks) {
+      const candidate = parseArchiveGarageEditLockPayload(
+        await redisConnection.get(key),
+      );
+      if (candidate?.lockId === normalizedLockId) {
+        payload = candidate;
+        break;
+      }
+    }
+
+    if (!payload) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    if (payload.userId !== sessionValidation.result.id) {
+      return {
+        success: false,
+        error: "This lock belongs to another user.",
+      };
+    }
+
+    const refreshed = await refreshArchiveGarageEditLock(normalizedLockId, {
+      ...payload,
+      heartbeatAt: new Date().toISOString(),
+    });
+    if (!refreshed) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    return {
+      success: true,
+      result: {
+        expiresInSeconds: ARCHIVE_EDIT_LOCK_TTL_SECONDS,
+      },
+    };
+  } catch (error) {
+    console.error("Error heartbeat for archive garage edit lock:", error);
+    return { success: false, error: "Failed to refresh archive garage lock" };
+  }
+}
+
+export async function releaseArchiveGarageEditLock(
+  lockId: string,
+): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    const lockScope = await redisConnection.get(
+      getArchiveEditTokenKey(normalizedLockId),
+    );
+    if (!lockScope) {
+      return { success: true, result: undefined };
+    }
+
+    const allGarageLocks = await redisConnection.keys(
+      "archive:edit-lock:garage:*",
+    );
+    for (const key of allGarageLocks) {
+      const payload = parseArchiveGarageEditLockPayload(
+        await redisConnection.get(key),
+      );
+      if (
+        payload?.lockId === normalizedLockId &&
+        payload.userId === sessionValidation.result.id
+      ) {
+        await redisConnection.del(key);
+        break;
+      }
+    }
+
+    await redisConnection.del(getArchiveEditTokenKey(normalizedLockId));
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error releasing archive garage edit lock:", error);
+    return { success: false, error: "Failed to release archive garage lock" };
+  }
+}
+
+export async function syncArchiveGarageEditedFile(
+  lockId: string,
+  file: File,
+): Promise<ActionResult<{ updatedAt: string }>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const normalizedLockId = String(lockId || "").trim();
+    if (!normalizedLockId) {
+      return { success: false, error: "Lock id is required" };
+    }
+
+    if (!(file instanceof File)) {
+      return { success: false, error: "Edited file payload is required" };
+    }
+
+    const allGarageLocks = await redisConnection.keys(
+      "archive:edit-lock:garage:*",
+    );
+    let payload: ArchiveGarageEditLockPayload | null = null;
+    for (const key of allGarageLocks) {
+      const candidate = parseArchiveGarageEditLockPayload(
+        await redisConnection.get(key),
+      );
+      if (candidate?.lockId === normalizedLockId) {
+        payload = candidate;
+        break;
+      }
+    }
+
+    if (!payload) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    if (payload.userId !== sessionValidation.result.id) {
+      return {
+        success: false,
+        error: "This lock belongs to another user.",
+      };
+    }
+
+    const normalizedKey = normalizeGarageEditKey(payload.garageKey);
+    const contentType = file.type || "application/octet-stream";
+    const fileName = file.name || normalizedKey.split("/").pop() || "file";
+    const fileHash = createHash("sha256")
+      .update(Buffer.from(await file.arrayBuffer()))
+      .digest("hex");
+
+    const uploadResult = await uploadFileToGarageTrusted(
+      file,
+      normalizedKey,
+      "",
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
+
+    if (!uploadResult.success) {
+      // Trusted uploader rejects same-key updates if hash changed; fallback to direct overwrite.
+      const garageClient = await getGarageClient();
+      const scopedKey = joinArchivePath(ARCHIVE_GARAGE_ROOT, normalizedKey);
+      await garageClient.send(
+        new PutObjectCommand({
+          Bucket: ARCHIVE_GARAGE_BUCKET,
+          Key: scopedKey,
+          Body: new Uint8Array(await file.arrayBuffer()),
+          ContentType: contentType,
+        }),
+      );
+
+      const existing = await prisma.fileData.findUnique({
+        where: {
+          key: scopedKey,
+        },
+      });
+      if (existing) {
+        await prisma.fileData.update({
+          where: { id: existing.id },
+          data: {
+            fileHash,
+            fileName,
+            path: scopedKey.includes("/")
+              ? scopedKey.slice(0, scopedKey.lastIndexOf("/"))
+              : "",
+            size: file.size,
+            mimeType: contentType,
+          },
+        });
+      }
+    }
+
+    const refreshed = await refreshArchiveGarageEditLock(normalizedLockId, {
+      ...payload,
+      heartbeatAt: new Date().toISOString(),
+    });
+    if (!refreshed) {
+      return { success: false, error: "Archive edit lock has expired." };
+    }
+
+    return {
+      success: true,
+      result: { updatedAt: new Date().toISOString() },
+    };
+  } catch (error) {
+    console.error("Error syncing edited archive garage file:", error);
+    return {
+      success: false,
+      error: "Failed to sync edited garage archive file",
+    };
   }
 }
 
