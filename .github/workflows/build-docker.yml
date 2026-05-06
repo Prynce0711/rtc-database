@@ -21,9 +21,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build the WebServer image
-        run: docker build . --file WebServer/Dockerfile --tag ${{ secrets.DOCKER_USERNAME }}/rtc-database-webserver:latest
+        run: docker build . --file WebServer/DockerFile --tag ${{ secrets.DOCKER_USERNAME }}/rtc-database-webserver:latest
       - name: Build the RelayServer image
-        run: docker build . --file RelayServer/Dockerfile --tag ${{ secrets.DOCKER_USERNAME }}/rtc-database-relay:latest
+        run: docker build . --file RelayServer/DockerFile --tag ${{ secrets.DOCKER_USERNAME }}/rtc-database-relay:latest
       - name: Push the WebServer image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/rtc-database-webserver:latest
       - name: Push the RelayServer image
