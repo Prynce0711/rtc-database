@@ -112,6 +112,8 @@ export * from "./generated/prisma/browser";
 export * from "./generated/prisma/enums";
 
 export * from "./lib/electron/channels";
+export * from "./lib/batchUploadProgress";
+export * from "./lib/browserFilePicker";
 export * from "./lib/excel";
 export * from "./lib/nextCompat";
 export * from "./lib/PrismaHelper";

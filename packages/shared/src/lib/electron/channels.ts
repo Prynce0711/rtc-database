@@ -2,6 +2,7 @@ export const IPC_CHANNELS = {
   FILES_SELECT_BASE_FOLDER: "files:select-base-folder",
   FILES_CHECK_EXISTS: "files:check-exists",
   FILES_READ: "files:read",
+  FILES_READ_CHUNK: "files:read-chunk",
   ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION: "archive:open-external-edit-session",
   ARCHIVE_READ_EXTERNAL_EDIT_SESSION: "archive:read-external-edit-session",
   ARCHIVE_CLOSE_EXTERNAL_EDIT_SESSION: "archive:close-external-edit-session",
