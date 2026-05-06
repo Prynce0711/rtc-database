@@ -10,8 +10,13 @@ import React, {
 } from "react";
 import {
   FiChevronLeft,
+<<<<<<< HEAD
   FiChevronRight,
   FiCheck,
+=======
+  FiCheck,
+  FiClock,
+>>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   FiDownload,
   FiEdit2,
   FiFilePlus,
@@ -31,6 +36,12 @@ import {
 } from "react-icons/fi";
 import { ArchiveEntryType } from "../../generated/prisma/enums";
 import { IPC_CHANNELS } from "../../lib/electron/channels";
+import {
+  BatchUploadProgressPanel,
+  BatchUploadProgressState,
+  createBatchUploadProgressState,
+  createUploadBatches,
+} from "../../lib/batchUploadProgress";
 import {
   BatchUploadProgressPanel,
   BatchUploadProgressState,
