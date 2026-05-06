@@ -1,0 +1,39 @@
+services:
+  relay:
+    image: prynce0711/rtc-database-relay:latest
+    container_name: rtc-relay
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "3443:3443"
+      - "41234:41234/udp"
+    volumes:
+      - ./.relay-tls:/app/RelayServer/.relay-tls
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: rtc-tailscale-relay
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./tailscale:/var/lib/tailscale
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    network_mode: service:relay
+    depends_on:
+      - relay
+  watchtower:
+    image: ghcr.io/nicholas-fedor/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - --interval
+      - "300"
+      - --cleanup
+      - --remove-volumes
