@@ -1,0 +1,18 @@
+services:
+  webserver:
+    image: rtc-database-webserver:latest
+    env_file:
+      - ./WebServer/.env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./WebServer/dev.db:/app/WebServer/dev.db
+  relay:
+    image: rtc-database-relay:latest
+    env_file:
+      - ./RelayServer/.env
+    ports:
+      - "3443:3443"
+      - "41234:41234/udp"
+    volumes:
+      - ./RelayServer/.relay-tls:/app/RelayServer/.relay-tls

@@ -6,6 +6,7 @@
     "dev": "concurrently -k -n next,prisma,excelWorker \"next dev\" \"prisma studio --browser none\" \"pnpm dev:excelWorker\"",
     "dev:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts --watch",
     "build": "next build",
+    "build:docker": "docker build -f Dockerfile -t rtc-database-webserver ..",
     "start": "cross-env NODE_ENV=production concurrently -k -n next,worker \"next start\" \"pnpm start:excelWorker\"",
     "start:excelWorker": "cross-env IS_WORKER=true tsx app/lib/workers/Excel/ExcelWorker.ts",
     "lint": "eslint",
