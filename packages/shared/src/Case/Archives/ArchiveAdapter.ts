@@ -20,6 +20,17 @@ export type ArchiveGarageDirectoryItem = {
   isDirectory: boolean;
 };
 
+export type ArchiveEditLockOptions = {
+  deviceId?: string;
+};
+
+export type ArchiveEditLockErrorResult = {
+  code: "locked";
+  lockId: string;
+  lockedBy: string;
+  lockDeviceId?: string | null;
+};
+
 export interface ArchiveAdapter {
   getArchiveEntriesPage: (
     options?: ArchiveFilterOptions,
@@ -63,4 +74,50 @@ export interface ArchiveAdapter {
     key: string,
     newName: string,
   ) => Promise<ActionResult<{ movedCount: number }>>;
+  acquireArchiveEditLock?: (
+    entryId: number,
+    options?: ArchiveEditLockOptions,
+  ) => Promise<
+    ActionResult<
+      {
+        lockId: string;
+        heartbeatIntervalMs: number;
+        syncIntervalMs: number;
+        expiresInSeconds: number;
+      },
+      ArchiveEditLockErrorResult
+    >
+  >;
+  heartbeatArchiveEditLock?: (
+    lockId: string,
+  ) => Promise<ActionResult<{ expiresInSeconds: number }>>;
+  releaseArchiveEditLock?: (lockId: string) => Promise<ActionResult<void>>;
+  syncArchiveEditedFile?: (
+    lockId: string,
+    file: File,
+  ) => Promise<ActionResult<{ updatedAt: string }>>;
+  acquireArchiveGarageEditLock?: (
+    garageKey: string,
+    options?: ArchiveEditLockOptions,
+  ) => Promise<
+    ActionResult<
+      {
+        lockId: string;
+        heartbeatIntervalMs: number;
+        syncIntervalMs: number;
+        expiresInSeconds: number;
+      },
+      ArchiveEditLockErrorResult
+    >
+  >;
+  heartbeatArchiveGarageEditLock?: (
+    lockId: string,
+  ) => Promise<ActionResult<{ expiresInSeconds: number }>>;
+  releaseArchiveGarageEditLock?: (
+    lockId: string,
+  ) => Promise<ActionResult<void>>;
+  syncArchiveGarageEditedFile?: (
+    lockId: string,
+    file: File,
+  ) => Promise<ActionResult<{ updatedAt: string }>>;
 }

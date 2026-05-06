@@ -2,6 +2,8 @@
 
 import type { ArchiveAdapter } from "@rtc-database/shared";
 import {
+  acquireArchiveEditLock,
+  acquireArchiveGarageEditLock,
   createArchiveEntry,
   deleteArchiveGarageItems,
   deleteArchiveEntry,
@@ -12,8 +14,14 @@ import {
   getArchiveGarageDirectoryItems,
   getArchiveGarageFileUrl,
   getArchiveStats,
+  heartbeatArchiveEditLock,
+  heartbeatArchiveGarageEditLock,
   moveArchiveGarageItems,
+  releaseArchiveEditLock,
+  releaseArchiveGarageEditLock,
   renameArchiveGarageItem,
+  syncArchiveEditedFile,
+  syncArchiveGarageEditedFile,
   updateArchiveEntry,
 } from "./ArchiveActions";
 
@@ -31,6 +39,14 @@ export const archiveAdapter: ArchiveAdapter = {
   deleteArchiveGarageItems,
   moveArchiveGarageItems,
   renameArchiveGarageItem,
+  acquireArchiveEditLock,
+  heartbeatArchiveEditLock,
+  releaseArchiveEditLock,
+  syncArchiveEditedFile,
+  acquireArchiveGarageEditLock,
+  heartbeatArchiveGarageEditLock,
+  releaseArchiveGarageEditLock,
+  syncArchiveGarageEditedFile,
 };
 
 export default archiveAdapter;

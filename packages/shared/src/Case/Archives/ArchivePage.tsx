@@ -9,9 +9,8 @@ import React, {
   useState,
 } from "react";
 import {
-  FiChevronRight,
   FiChevronLeft,
-  FiClock,
+  FiChevronRight,
   FiDownload,
   FiEdit2,
   FiFilePlus,
@@ -19,7 +18,6 @@ import {
   FiFolder,
   FiFolderPlus,
   FiGrid,
-  FiHardDrive,
   FiImage,
   FiList,
   FiLock,
@@ -31,16 +29,26 @@ import {
   FiX,
 } from "react-icons/fi";
 import { ArchiveEntryType } from "../../generated/prisma/enums";
+import { IPC_CHANNELS } from "../../lib/electron/channels";
 import {
   useAdaptiveNavigation,
   useAdaptivePathname,
 } from "../../lib/nextCompat";
 import Roles from "../../lib/Roles";
-import ModalBase from "../../Popup/ModalBase";
 import FileViewerModal from "../../Popup/FileViewerModal";
+import ModalBase from "../../Popup/ModalBase";
 import { usePopup } from "../../Popup/PopupProvider";
 import Pagination from "../../Table/Pagination";
-import type { ArchiveAdapter, ArchiveGarageDirectoryItem } from "./ArchiveAdapter";
+import { useToast } from "../../Toast/ToastProvider";
+import type {
+  ArchiveAdapter,
+  ArchiveGarageDirectoryItem,
+} from "./ArchiveAdapter";
+import {
+  formatArchiveBytes,
+  formatArchiveDateTime,
+  getArchiveDescriptor,
+} from "./archiveExplorerUtils";
 import ArchiveRow from "./ArchiveRow";
 import {
   getArchiveExtension,
@@ -50,11 +58,6 @@ import {
   type ArchiveFilterOptions,
   type ArchiveStats,
 } from "./ArchiveSchema";
-import {
-  formatArchiveBytes,
-  formatArchiveDateTime,
-  getArchiveDescriptor,
-} from "./archiveExplorerUtils";
 
 type ViewMode = "list" | "grid";
 type EntryTypeFilter = ArchiveEntryType | "ALL";
@@ -81,9 +84,35 @@ type ArchiveContextMenuState = {
   entry: ArchiveEntryData;
 };
 
+type DesktopEditSessionState = {
+  sessionId: string;
+  lockId: string;
+  lockMode: "archive" | "garage";
+  entryId?: number;
+  garageKey?: string;
+  entryName: string;
+  mimeType: string;
+  heartbeatTimer: number;
+  syncTimer: number;
+  unlockCheckTimer: number;
+};
+
 const pageSize = 10;
 const acceptedArchiveUploadTypes =
   ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.csv,.txt,.json,.xml";
+const DEBUG_DESKTOP_EDIT = true;
+
+const logDesktopEdit = (...args: unknown[]) => {
+  if (DEBUG_DESKTOP_EDIT) {
+    console.log(...args);
+  }
+};
+
+const errorDesktopEdit = (...args: unknown[]) => {
+  if (DEBUG_DESKTOP_EDIT) {
+    console.error(...args);
+  }
+};
 
 const getCurrentQueryPath = (): string => {
   if (typeof window === "undefined") return "";
@@ -109,11 +138,7 @@ const initialFolderForm = (): FolderFormState => ({
   description: "",
 });
 
-const downloadCsv = (
-  fileName: string,
-  headers: string[],
-  rows: string[][],
-) => {
+const downloadCsv = (fileName: string, headers: string[], rows: string[][]) => {
   const escapeValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const csv = [headers, ...rows]
     .map((row) => row.map((value) => escapeValue(value ?? "")).join(","))
@@ -130,9 +155,7 @@ const downloadCsv = (
   URL.revokeObjectURL(url);
 };
 
-const getPreviewType = (
-  entry: ArchiveEntryData,
-): "pdf" | "image" | null => {
+const getPreviewType = (entry: ArchiveEntryData): "pdf" | "image" | null => {
   const mimeType = (entry.file?.mimeType ?? "").toLowerCase();
   const name = entry.name.toLowerCase();
 
@@ -161,7 +184,9 @@ const mapGarageItemToArchiveEntry = (
   const entryPath = item.isDirectory
     ? normalizedKey
     : joinArchivePath(normalizedParent, item.name || normalizedKey);
-  const timestamp = item.lastModified ? new Date(item.lastModified) : new Date();
+  const timestamp = item.lastModified
+    ? new Date(item.lastModified)
+    : new Date();
   const updatedAt = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp;
   const id = -(index + 1);
 
@@ -170,7 +195,9 @@ const mapGarageItemToArchiveEntry = (
     name: item.name || normalizedKey || "Untitled",
     parentPath: normalizedParent,
     fullPath: entryPath,
-    entryType: item.isDirectory ? ArchiveEntryType.FOLDER : ArchiveEntryType.FILE,
+    entryType: item.isDirectory
+      ? ArchiveEntryType.FOLDER
+      : ArchiveEntryType.FILE,
     description: null,
     extension: item.isDirectory ? null : getArchiveExtension(item.name),
     textContent: null,
@@ -200,10 +227,61 @@ const mapGarageItemToArchiveEntry = (
 const isSpreadsheetEntry = (entry: ArchiveEntryData) => {
   const mime = (entry.file?.mimeType ?? "").toLowerCase();
   const name = (entry.name ?? "").toLowerCase();
-  if (mime.includes("excel") || mime.includes("spreadsheet") || name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".csv") || name.endsWith(".ods")) {
+  if (
+    mime.includes("excel") ||
+    mime.includes("spreadsheet") ||
+    name.endsWith(".xls") ||
+    name.endsWith(".xlsx") ||
+    name.endsWith(".csv") ||
+    name.endsWith(".ods")
+  ) {
     return true;
   }
   return false;
+};
+
+const isWordOrExcelEntry = (entry: ArchiveEntryData) => {
+  const mime = (entry.file?.mimeType ?? "").toLowerCase();
+  const name = (entry.name ?? "").toLowerCase();
+  const extension = (getArchiveExtension(entry.name) || entry.extension || "")
+    .toLowerCase()
+    .trim();
+
+  if (["doc", "docx", "xls", "xlsx"].includes(extension)) {
+    return true;
+  }
+
+  return (
+    mime.includes("word") ||
+    mime.includes("wordprocessingml") ||
+    mime.includes("excel") ||
+    mime.includes("spreadsheet") ||
+    mime.includes("officedocument")
+  );
+};
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read downloaded file."));
+    reader.onload = () => {
+      const value = String(reader.result || "");
+      const marker = "base64,";
+      const index = value.indexOf(marker);
+      resolve(index >= 0 ? value.slice(index + marker.length) : value);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+const base64ToFile = (
+  base64: string,
+  fileName: string,
+  mimeType: string,
+): File => {
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  return new File([bytes], fileName, {
+    type: mimeType || "application/octet-stream",
+  });
 };
 
 const getSortLabel = (sortConfig: SortConfig) => {
@@ -244,6 +322,7 @@ const ArchivePage: React.FC<{
   const router = useAdaptiveNavigation();
   const pathname = useAdaptivePathname();
   const statusPopup = usePopup();
+  const toast = useToast();
   const canManage =
     role === Roles.ADMIN || role === Roles.NOTARIAL || role === Roles.ARCHIVE;
 
@@ -290,12 +369,10 @@ const ArchivePage: React.FC<{
   const [dragOverEntryId, setDragOverEntryId] = useState<number | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
-  const [uploadForm, setUploadForm] = useState<UploadFormState>(
-    initialUploadForm(),
-  );
-  const [folderForm, setFolderForm] = useState<FolderFormState>(
-    initialFolderForm(),
-  );
+  const [uploadForm, setUploadForm] =
+    useState<UploadFormState>(initialUploadForm());
+  const [folderForm, setFolderForm] =
+    useState<FolderFormState>(initialFolderForm());
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -325,6 +402,66 @@ const ArchivePage: React.FC<{
   });
 
   const deferredSearch = useDeferredValue(searchValue.trim());
+  const desktopEditSessionsRef = useRef<Map<string, DesktopEditSessionState>>(
+    new Map(),
+  );
+  const desktopEditSyncInFlightRef = useRef<Set<string>>(new Set());
+  const deviceIdRef = useRef<string | null>(null);
+
+  const getElectronIpc = () => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const ipc = (
+      window as unknown as {
+        ipcRenderer?: {
+          invoke?: (...args: unknown[]) => Promise<unknown>;
+          on?: (...args: unknown[]) => unknown;
+          off?: (...args: unknown[]) => unknown;
+        };
+      }
+    ).ipcRenderer;
+    return ipc?.invoke ? ipc : null;
+  };
+
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+  const extractDeviceId = (value: unknown): string | null => {
+    if (!isRecord(value) || value.success !== true) {
+      return null;
+    }
+
+    if (!isRecord(value.result) || typeof value.result.deviceId !== "string") {
+      return null;
+    }
+
+    return value.result.deviceId;
+  };
+
+  const getDeviceIdFromIpc = async (): Promise<string | null> => {
+    if (deviceIdRef.current) {
+      return deviceIdRef.current;
+    }
+
+    const ipc = getElectronIpc();
+    if (!ipc?.invoke) {
+      return null;
+    }
+
+    try {
+      const deviceIdResponse = await ipc.invoke(
+        IPC_CHANNELS.SESSION_GET_DEVICE_ID,
+      );
+      const deviceId = extractDeviceId(deviceIdResponse);
+      if (deviceId) {
+        deviceIdRef.current = deviceId;
+      }
+      return deviceId;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const syncPath = () => {
@@ -357,7 +494,10 @@ const ArchivePage: React.FC<{
   const refreshEntries = useCallback(
     async (page = currentPage) => {
       try {
-        if (displayMode === "explorer" && adapter.getArchiveGarageDirectoryItems) {
+        if (
+          displayMode === "explorer" &&
+          adapter.getArchiveGarageDirectoryItems
+        ) {
           const listResult =
             await adapter.getArchiveGarageDirectoryItems(currentPath);
 
@@ -444,7 +584,9 @@ const ArchivePage: React.FC<{
         }
 
         setEntries(listResult.result.items);
-        setTotalCount(listResult.result.total ?? listResult.result.items.length);
+        setTotalCount(
+          listResult.result.total ?? listResult.result.items.length,
+        );
         setError(null);
 
         if (statsResult.success && statsResult.result) {
@@ -481,7 +623,9 @@ const ArchivePage: React.FC<{
     setSelectedEntry((previous) => {
       if (entries.length === 0) return null;
       if (!previous) return entries[0] ?? null;
-      return entries.find((item) => item.id === previous.id) ?? entries[0] ?? null;
+      return (
+        entries.find((item) => item.id === previous.id) ?? entries[0] ?? null
+      );
     });
   }, [entries]);
 
@@ -531,27 +675,30 @@ const ArchivePage: React.FC<{
     return normalized.slice(0, normalized.lastIndexOf("/"));
   }, [currentPath]);
 
-  const navigateArchivePath = useCallback((path: string) => {
-    const normalized = normalizeArchivePath(path);
-    const href = buildArchiveHref(normalized);
+  const navigateArchivePath = useCallback(
+    (path: string) => {
+      const normalized = normalizeArchivePath(path);
+      const href = buildArchiveHref(normalized);
 
-    setCurrentPath(normalized);
-    setSelectedEntry(null);
-    setSelectedEntryIds([]);
-    setCurrentPage(1);
+      setCurrentPath(normalized);
+      setSelectedEntry(null);
+      setSelectedEntryIds([]);
+      setCurrentPage(1);
 
-    if (typeof window === "undefined") {
-      router.push(href);
-      return;
-    }
+      if (typeof window === "undefined") {
+        router.push(href);
+        return;
+      }
 
-    if (window.location.hash.startsWith("#/")) {
-      window.location.hash = href;
-      return;
-    }
+      if (window.location.hash.startsWith("#/")) {
+        window.location.hash = href;
+        return;
+      }
 
-    window.history.pushState(null, "", href);
-  }, [router]);
+      window.history.pushState(null, "", href);
+    },
+    [router],
+  );
 
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const activeFilterCount =
@@ -598,7 +745,9 @@ const ArchivePage: React.FC<{
 
   const handleEdit = (entry: ArchiveEntryData) => {
     if (isGarageArchiveEntry(entry)) {
-      statusPopup.showError("Garage-only files do not have archive metadata to edit yet.");
+      statusPopup.showError(
+        "Garage-only files do not have archive metadata to edit yet.",
+      );
       return;
     }
 
@@ -629,9 +778,530 @@ const ArchivePage: React.FC<{
     return adapter.getArchiveFileUrl(entry.id, options);
   };
 
+  const resolveServerUpdatedAtMs = (
+    entry: ArchiveEntryData,
+    response: Response,
+  ): number | undefined => {
+    const headerLastModified = response.headers.get("last-modified");
+    const headerUpdatedAtMs = headerLastModified
+      ? new Date(headerLastModified).getTime()
+      : undefined;
+    const serverTimestamp =
+      entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt;
+
+    if (headerUpdatedAtMs && !Number.isNaN(headerUpdatedAtMs)) {
+      return headerUpdatedAtMs;
+    }
+    if (!serverTimestamp) return undefined;
+    const parsed = new Date(serverTimestamp).getTime();
+    return Number.isNaN(parsed) ? undefined : parsed;
+  };
+
+  const syncDesktopEditSession = useCallback(
+    async (sessionId: string, force: boolean) => {
+      const session = desktopEditSessionsRef.current.get(sessionId);
+      if (!session) {
+        logDesktopEdit("[DESKTOP_EDIT] Session not found:", sessionId);
+        return;
+      }
+
+      if (
+        desktopEditSyncInFlightRef.current.has(sessionId) ||
+        (session.lockMode === "archive" && !adapter.syncArchiveEditedFile) ||
+        (session.lockMode === "garage" && !adapter.syncArchiveGarageEditedFile)
+      ) {
+        logDesktopEdit(
+          "[DESKTOP_EDIT] Sync skipped - in flight or adapter missing",
+        );
+        return;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        logDesktopEdit("[DESKTOP_EDIT] IPC not available");
+        return;
+      }
+
+      logDesktopEdit("[DESKTOP_EDIT] Starting sync for sessionId:", sessionId);
+      desktopEditSyncInFlightRef.current.add(sessionId);
+      try {
+        const readResult = (await ipc.invoke(
+          IPC_CHANNELS.ARCHIVE_READ_EXTERNAL_EDIT_SESSION,
+          {
+            sessionId,
+            force,
+          },
+        )) as
+          | {
+              success: true;
+              result: {
+                changed: boolean;
+                base64?: string;
+              };
+            }
+          | {
+              success: false;
+              error?: string;
+            };
+
+        if (!readResult?.success) {
+          errorDesktopEdit(
+            "[DESKTOP_EDIT] Failed to read file:",
+            readResult?.error,
+          );
+          statusPopup.showError(
+            readResult?.error ||
+              `Failed reading local edited file for ${session.entryName}.`,
+          );
+          return;
+        }
+
+        const { changed, base64 } = readResult.result;
+        logDesktopEdit(
+          "[DESKTOP_EDIT] File changed:",
+          changed,
+          "base64 length:",
+          base64?.length,
+        );
+
+        if (!changed || !base64) {
+          logDesktopEdit("[DESKTOP_EDIT] No changes to sync");
+          return;
+        }
+
+        const editedFile = base64ToFile(
+          base64,
+          session.entryName,
+          session.mimeType,
+        );
+        const syncResult =
+          session.lockMode === "archive"
+            ? await adapter.syncArchiveEditedFile?.(session.lockId, editedFile)
+            : await adapter.syncArchiveGarageEditedFile?.(
+                session.lockId,
+                editedFile,
+              );
+
+        logDesktopEdit("[DESKTOP_EDIT] Sync result:", syncResult);
+
+        if (!syncResult?.success) {
+          errorDesktopEdit("[DESKTOP_EDIT] Sync failed:", syncResult?.error);
+          statusPopup.showError(
+            syncResult?.error ||
+              `Failed syncing changes for ${session.entryName}.`,
+          );
+          return;
+        }
+
+        logDesktopEdit("[DESKTOP_EDIT] Sync completed successfully");
+      } finally {
+        desktopEditSyncInFlightRef.current.delete(sessionId);
+      }
+    },
+    [adapter, statusPopup],
+  );
+
+  const stopDesktopEditSession = useCallback(
+    async (
+      sessionId: string,
+      options?: {
+        releaseLock?: boolean;
+        removeFile?: boolean;
+        syncBeforeClose?: boolean;
+      },
+    ) => {
+      logDesktopEdit("[DESKTOP_EDIT] stopDesktopEditSession called:", {
+        sessionId,
+        options,
+      });
+
+      const session = desktopEditSessionsRef.current.get(sessionId);
+      if (!session) {
+        logDesktopEdit("[DESKTOP_EDIT] Session not found in map:", sessionId);
+        return;
+      }
+
+      window.clearInterval(session.heartbeatTimer);
+      window.clearInterval(session.syncTimer);
+      window.clearInterval(session.unlockCheckTimer);
+
+      if (options?.syncBeforeClose) {
+        logDesktopEdit("[DESKTOP_EDIT] Syncing before close...");
+        await syncDesktopEditSession(sessionId, true);
+        logDesktopEdit("[DESKTOP_EDIT] Sync complete");
+      }
+
+      const ipc = getElectronIpc();
+      if (ipc?.invoke) {
+        logDesktopEdit(
+          "[DESKTOP_EDIT] Invoking IPC close with removeFile:",
+          options?.removeFile,
+        );
+        await ipc.invoke(IPC_CHANNELS.ARCHIVE_CLOSE_EXTERNAL_EDIT_SESSION, {
+          sessionId,
+          removeFile: options?.removeFile ?? false,
+        });
+      }
+
+      if (options?.releaseLock) {
+        logDesktopEdit("[DESKTOP_EDIT] Releasing lock...");
+        if (session.lockMode === "archive") {
+          await adapter.releaseArchiveEditLock?.(session.lockId);
+        } else {
+          await adapter.releaseArchiveGarageEditLock?.(session.lockId);
+        }
+      }
+
+      desktopEditSessionsRef.current.delete(sessionId);
+      desktopEditSyncInFlightRef.current.delete(sessionId);
+      logDesktopEdit("[DESKTOP_EDIT] Session cleanup complete");
+    },
+    [adapter, syncDesktopEditSession],
+  );
+
+  const openDesktopReadOnly = useCallback(
+    async (entry: ArchiveEntryData, lockedBy?: string) => {
+      if (!entry.file) {
+        statusPopup.showError("File metadata is missing for desktop viewing.");
+        return false;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        statusPopup.showError("Desktop viewing is only available in Electron.");
+        return false;
+      }
+
+      const downloadResult = await getEntryFileUrl(entry, {
+        inline: false,
+        fileName: entry.name,
+        contentType: entry.file?.mimeType || undefined,
+      });
+
+      if (!downloadResult.success) {
+        statusPopup.showError(
+          downloadResult.error || "Failed to download file for read-only view.",
+        );
+        return false;
+      }
+
+      const response = await fetch(downloadResult.result, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        statusPopup.showError(
+          "Failed to fetch file payload for read-only view.",
+        );
+        return false;
+      }
+
+      const blob = await response.blob();
+      const base64 = await blobToBase64(blob);
+      if (!base64) {
+        statusPopup.showError(
+          "Failed to decode file payload for read-only view.",
+        );
+        return false;
+      }
+
+      const sessionId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `readonly-${entry.id}-${Date.now()}`;
+      const isGarage = isGarageArchiveEntry(entry);
+      const serverUpdatedAtMs = resolveServerUpdatedAtMs(entry, response);
+
+      const openResult = (await ipc.invoke(
+        IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
+        {
+          sessionId,
+          fileName: entry.name,
+          base64,
+          tempKey: isGarage
+            ? `garage:${entry.garageKey}`
+            : `archive:${entry.id}`,
+          serverUpdatedAtMs,
+          readOnly: true,
+        },
+      )) as
+        | { success: true; result: { sessionId: string } }
+        | { success: false; error?: string };
+
+      if (!openResult?.success) {
+        statusPopup.showError(
+          openResult?.error || "Failed to open file in read-only mode.",
+        );
+        return false;
+      }
+
+      const lockedLabel = lockedBy ? ` (locked by ${lockedBy})` : "";
+      toast.success(`${entry.name} opened read-only${lockedLabel}.`);
+      return true;
+    },
+    [getEntryFileUrl, resolveServerUpdatedAtMs, statusPopup, toast],
+  );
+
+  const handleOpenDesktopEditor = useCallback(
+    async (entry: ArchiveEntryData) => {
+      if (!entry.file) {
+        statusPopup.showError("File metadata is missing for desktop editing.");
+        return false;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        statusPopup.showError("Desktop editing is only available in Electron.");
+        return false;
+      }
+
+      const deviceId = await getDeviceIdFromIpc();
+      const isGarage = isGarageArchiveEntry(entry);
+      const hasArchiveDesktopEditActions =
+        !!adapter.acquireArchiveEditLock &&
+        !!adapter.heartbeatArchiveEditLock &&
+        !!adapter.releaseArchiveEditLock &&
+        !!adapter.syncArchiveEditedFile;
+      const hasGarageDesktopEditActions =
+        !!adapter.acquireArchiveGarageEditLock &&
+        !!adapter.heartbeatArchiveGarageEditLock &&
+        !!adapter.releaseArchiveGarageEditLock &&
+        !!adapter.syncArchiveGarageEditedFile;
+
+      if (
+        (isGarage && !hasGarageDesktopEditActions) ||
+        (!isGarage && !hasArchiveDesktopEditActions)
+      ) {
+        statusPopup.showError("Archive edit lock actions are not configured.");
+        return false;
+      }
+
+      const acquireLock = isGarage
+        ? (options?: { deviceId?: string }) =>
+            adapter.acquireArchiveGarageEditLock!(entry.garageKey, options)
+        : (options?: { deviceId?: string }) =>
+            adapter.acquireArchiveEditLock!(entry.id, options);
+      const releaseLock = isGarage
+        ? (lockId: string) => adapter.releaseArchiveGarageEditLock!(lockId)
+        : (lockId: string) => adapter.releaseArchiveEditLock!(lockId);
+      const heartbeatLock = isGarage
+        ? (lockId: string) => adapter.heartbeatArchiveGarageEditLock!(lockId)
+        : (lockId: string) => adapter.heartbeatArchiveEditLock!(lockId);
+
+      const lockResult = await acquireLock(deviceId ? { deviceId } : undefined);
+      if (!lockResult.success) {
+        if (lockResult.errorResult?.code === "locked") {
+          return await openDesktopReadOnly(
+            entry,
+            lockResult.errorResult.lockedBy,
+          );
+        }
+
+        statusPopup.showError(
+          lockResult.error || "Failed to lock this file for editing.",
+        );
+        return false;
+      }
+
+      if (desktopEditSessionsRef.current.has(lockResult.result.lockId)) {
+        toast.success(`${entry.name} is already open on this device.`);
+        return true;
+      }
+
+      const downloadResult = await getEntryFileUrl(entry, {
+        inline: false,
+        fileName: entry.name,
+        contentType: entry.file?.mimeType || undefined,
+      });
+      if (!downloadResult.success) {
+        await releaseLock(lockResult.result.lockId);
+        statusPopup.showError(
+          downloadResult.error ||
+            "Failed to download file for desktop editing.",
+        );
+        return false;
+      }
+
+      const response = await fetch(downloadResult.result, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        await releaseLock(lockResult.result.lockId);
+        statusPopup.showError(
+          "Failed to fetch file payload for desktop editing.",
+        );
+        return false;
+      }
+
+      const blob = await response.blob();
+      logDesktopEdit("[DESKTOP_EDIT] Downloaded blob:", {
+        size: blob.size,
+        type: blob.type,
+        name: entry.name,
+      });
+
+      const base64 = await blobToBase64(blob);
+      logDesktopEdit("[DESKTOP_EDIT] Base64 conversion:", {
+        originalSize: blob.size,
+        base64Length: base64.length,
+        isValid: base64.length > 0,
+        first50Chars: base64.slice(0, 50),
+      });
+
+      const sessionId = lockResult.result.lockId;
+      const serverUpdatedAtMs = resolveServerUpdatedAtMs(entry, response);
+      logDesktopEdit("[DESKTOP_EDIT] Invoking IPC handler with:", {
+        sessionId,
+        fileName: entry.name,
+        base64Length: base64.length,
+        serverUpdatedAtMs,
+        tempKey: isGarage ? `garage:${entry.garageKey}` : `archive:${entry.id}`,
+      });
+
+      const openResult = (await ipc.invoke(
+        IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
+        {
+          sessionId,
+          fileName: entry.name,
+          base64,
+          tempKey: isGarage
+            ? `garage:${entry.garageKey}`
+            : `archive:${entry.id}`,
+          serverUpdatedAtMs,
+        },
+      )) as
+        | { success: true; result: { sessionId: string } }
+        | { success: false; error?: string };
+
+      if (!openResult?.success) {
+        await releaseLock(lockResult.result.lockId);
+        statusPopup.showError(
+          openResult?.error || "Failed to open file in desktop app.",
+        );
+        return false;
+      }
+
+      const heartbeatTimer = window.setInterval(async () => {
+        const heartbeat = await heartbeatLock(lockResult.result.lockId);
+        if (!heartbeat?.success) {
+          window.clearInterval(heartbeatTimer);
+          statusPopup.showError(
+            heartbeat?.error ||
+              `Edit lock expired for ${entry.name}. Changes may no longer sync.`,
+          );
+          logDesktopEdit(
+            "[DESKTOP_EDIT] Heartbeat failed. Keeping session open.",
+          );
+        }
+      }, lockResult.result.heartbeatIntervalMs);
+
+      const syncIntervalMs = Math.max(
+        lockResult.result.syncIntervalMs || 15000,
+        5000,
+      );
+      const syncTimer = window.setInterval(() => {
+        void syncDesktopEditSession(sessionId, true);
+      }, syncIntervalMs);
+
+      const unlockCheckTimer = window.setInterval(async () => {
+        const ipc = getElectronIpc();
+        if (!ipc?.invoke) {
+          return;
+        }
+
+        const lockStatus = (await ipc.invoke(
+          IPC_CHANNELS.ARCHIVE_CHECK_EXTERNAL_EDIT_LOCK,
+          { sessionId },
+        )) as
+          | { success: true; result: { locked: boolean; exists: boolean } }
+          | { success: false; error?: string };
+
+        if (!lockStatus?.success || !lockStatus.result?.exists) {
+          return;
+        }
+
+        if (!lockStatus.result.locked) {
+          logDesktopEdit(
+            "[DESKTOP_EDIT] File unlocked. Syncing and releasing lock.",
+          );
+          await stopDesktopEditSession(sessionId, {
+            releaseLock: true,
+            removeFile: false,
+            syncBeforeClose: true,
+          });
+        }
+      }, 5000);
+
+      desktopEditSessionsRef.current.set(sessionId, {
+        sessionId,
+        lockId: lockResult.result.lockId,
+        lockMode: isGarage ? "garage" : "archive",
+        entryId: isGarage ? undefined : entry.id,
+        garageKey: isGarage ? entry.garageKey : undefined,
+        entryName: entry.name,
+        mimeType: entry.file?.mimeType || "application/octet-stream",
+        heartbeatTimer,
+        syncTimer,
+        unlockCheckTimer,
+      });
+
+      toast.success(
+        `${entry.name} opened in desktop editor. Changes sync every 15 seconds while open.`,
+      );
+      return true;
+    },
+    [
+      adapter,
+      getEntryFileUrl,
+      getDeviceIdFromIpc,
+      openDesktopReadOnly,
+      resolveServerUpdatedAtMs,
+      statusPopup,
+      toast,
+    ],
+  );
+
+  const syncDesktopEditSessionRef = useRef(syncDesktopEditSession);
+  const stopDesktopEditSessionRef = useRef(stopDesktopEditSession);
+
+  useEffect(() => {
+    syncDesktopEditSessionRef.current = syncDesktopEditSession;
+    stopDesktopEditSessionRef.current = stopDesktopEditSession;
+  }, [stopDesktopEditSession, syncDesktopEditSession]);
+
+  useEffect(() => {
+    const ipc = getElectronIpc();
+    if (!ipc?.on || !ipc?.off) {
+      return;
+    }
+
+    const onDirty = (
+      _event: unknown,
+      payload: { sessionId?: string } | null | undefined,
+    ) => {
+      const sessionId = String(payload?.sessionId || "").trim();
+      if (!sessionId) return;
+      void syncDesktopEditSessionRef.current(sessionId, false);
+    };
+
+    ipc.on(IPC_CHANNELS.ARCHIVE_EXTERNAL_EDIT_DIRTY_EVENT, onDirty);
+
+    return () => {
+      ipc.off?.(IPC_CHANNELS.ARCHIVE_EXTERNAL_EDIT_DIRTY_EVENT, onDirty);
+    };
+  }, []);
+
   const handlePreview = async (entry: ArchiveEntryData) => {
     if (!entry.file) {
       handleOpen(entry);
+      return;
+    }
+
+    if (isWordOrExcelEntry(entry) && getElectronIpc()?.invoke) {
+      await handleOpenDesktopEditor(entry);
       return;
     }
 
@@ -704,7 +1374,9 @@ const ArchivePage: React.FC<{
     });
 
     if (!result.success) {
-      statusPopup.showError(result.error || "Unable to print this archive file");
+      statusPopup.showError(
+        result.error || "Unable to print this archive file",
+      );
       return;
     }
 
@@ -714,7 +1386,9 @@ const ArchivePage: React.FC<{
 
   const deleteGarageEntries = async (items: GarageArchiveEntry[]) => {
     if (!adapter.deleteArchiveGarageItems) {
-      statusPopup.showError("Garage deletion is not available in Archive Explorer.");
+      statusPopup.showError(
+        "Garage deletion is not available in Archive Explorer.",
+      );
       return false;
     }
 
@@ -892,12 +1566,16 @@ const ArchivePage: React.FC<{
   ) => {
     const garageItems = items.filter(isGarageArchiveEntry);
     if (garageItems.length !== items.length) {
-      statusPopup.showError("Only Garage Explorer items can be moved by drag and drop.");
+      statusPopup.showError(
+        "Only Garage Explorer items can be moved by drag and drop.",
+      );
       return false;
     }
 
     if (!adapter.moveArchiveGarageItems) {
-      statusPopup.showError("Garage move is not available in Archive Explorer.");
+      statusPopup.showError(
+        "Garage move is not available in Archive Explorer.",
+      );
       return false;
     }
 
@@ -976,7 +1654,10 @@ const ArchivePage: React.FC<{
     const draggedEntry = entries.find((entry) => entry.id === draggedId);
     if (!draggedEntry) return;
 
-    await moveArchiveEntriesToFolder(getEntriesForDrag(draggedEntry), currentPath);
+    await moveArchiveEntriesToFolder(
+      getEntriesForDrag(draggedEntry),
+      currentPath,
+    );
   };
 
   const handleArchiveContextMenu = (
@@ -1002,7 +1683,9 @@ const ArchivePage: React.FC<{
     }
 
     if (!adapter.renameArchiveGarageItem) {
-      statusPopup.showError("Garage rename is not available in Archive Explorer.");
+      statusPopup.showError(
+        "Garage rename is not available in Archive Explorer.",
+      );
       return;
     }
 
@@ -1026,7 +1709,9 @@ const ArchivePage: React.FC<{
     basePath: string,
     folderSegments: string[],
     createdFolderPaths: Set<string>,
-  ): Promise<{ success: true; path: string } | { success: false; error: string }> => {
+  ): Promise<
+    { success: true; path: string } | { success: false; error: string }
+  > => {
     let parentPath = normalizeArchivePath(basePath);
 
     for (const rawSegment of folderSegments) {
@@ -1083,7 +1768,9 @@ const ArchivePage: React.FC<{
           (file as unknown as { webkitRelativePath?: string })
             .webkitRelativePath || file.name,
         );
-        const pathSegments = relativePath ? relativePath.split("/") : [file.name];
+        const pathSegments = relativePath
+          ? relativePath.split("/")
+          : [file.name];
         const fileName = pathSegments.pop() || file.name;
         // sequential upload to avoid overwhelming backend and to preserve folder order
         // eslint-disable-next-line no-await-in-loop
@@ -1110,7 +1797,9 @@ const ArchivePage: React.FC<{
       }
     }
 
-    statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    statusPopup.showSuccess(
+      `Uploaded ${successCount} of ${files.length} files.`,
+    );
     setCurrentPage(1);
     await refreshEntries(1);
   };
@@ -1157,7 +1846,9 @@ const ArchivePage: React.FC<{
 
     const result = await adapter.getArchiveEntriesByIds(selectedEntryIds);
     if (!result.success) {
-      statusPopup.showError(result.error || "Failed to load selected archive entries");
+      statusPopup.showError(
+        result.error || "Failed to load selected archive entries",
+      );
       return [] as ArchiveEntryData[];
     }
     return result.result;
@@ -1330,7 +2021,9 @@ const ArchivePage: React.FC<{
                         type="checkbox"
                         className="checkbox checkbox-sm"
                         checked={allVisibleEntriesSelected}
-                        onChange={(event) => toggleSelectAllVisible(event.target.checked)}
+                        onChange={(event) =>
+                          toggleSelectAllVisible(event.target.checked)
+                        }
                         aria-label="Select all visible archive entries"
                       />
                     </th>
@@ -1381,7 +2074,7 @@ const ArchivePage: React.FC<{
                         ? "border-primary/35 bg-primary/7"
                         : dragOverEntryId === entry.id
                           ? "border-primary/40 bg-primary/10"
-                        : "border-base-300 bg-base-100"
+                          : "border-base-300 bg-base-100"
                     }`}
                     onContextMenu={(event) =>
                       handleArchiveContextMenu(event, entry)
@@ -1404,9 +2097,12 @@ const ArchivePage: React.FC<{
                       setDragOverEntryId(entry.id);
                     }}
                     onDragLeave={() => {
-                      if (dragOverEntryId === entry.id) setDragOverEntryId(null);
+                      if (dragOverEntryId === entry.id)
+                        setDragOverEntryId(null);
                     }}
-                    onDrop={(event) => void handleArchiveDropOnFolder(event, entry)}
+                    onDrop={(event) =>
+                      void handleArchiveDropOnFolder(event, entry)
+                    }
                     onClick={() => setSelectedEntry(entry)}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -1457,7 +2153,9 @@ const ArchivePage: React.FC<{
                         </p>
                         <p className="mt-2 text-sm font-semibold text-base-content">
                           {formatArchiveDateTime(
-                            entry.file?.updatedAt ?? entry.updatedAt ?? entry.createdAt,
+                            entry.file?.updatedAt ??
+                              entry.updatedAt ??
+                              entry.createdAt,
                           )}
                         </p>
                       </div>
@@ -1646,14 +2344,18 @@ const ArchivePage: React.FC<{
                           setDragOverEntryId(null);
                         }}
                         onDragOver={(event) => {
-                          if (entry.entryType !== ArchiveEntryType.FOLDER) return;
+                          if (entry.entryType !== ArchiveEntryType.FOLDER)
+                            return;
                           event.preventDefault();
                           setDragOverEntryId(entry.id);
                         }}
                         onDragLeave={() => {
-                          if (dragOverEntryId === entry.id) setDragOverEntryId(null);
+                          if (dragOverEntryId === entry.id)
+                            setDragOverEntryId(null);
                         }}
-                        onDrop={(event) => void handleArchiveDropOnFolder(event, entry)}
+                        onDrop={(event) =>
+                          void handleArchiveDropOnFolder(event, entry)
+                        }
                         onClick={() => {
                           if (isSpreadsheetEntry(entry)) {
                             void handleDownload(entry);
@@ -1761,7 +2463,7 @@ const ArchivePage: React.FC<{
         onClose={closePreview}
         onDownload={
           previewState.entry
-          ? () => void handleDownload(previewState.entry as ArchiveEntryData)
+            ? () => void handleDownload(previewState.entry as ArchiveEntryData)
             : undefined
         }
       />
@@ -1967,7 +2669,10 @@ const ArchivePage: React.FC<{
                   />
                   <div className="mt-4 space-y-2 text-sm text-base-content/60">
                     <p>Role-based access is enforced server-side.</p>
-                    <p>Folder permissions and action visibility follow the active role.</p>
+                    <p>
+                      Folder permissions and action visibility follow the active
+                      role.
+                    </p>
                     <p>Preview and download links are generated securely.</p>
                   </div>
                 </div>
@@ -2429,7 +3134,11 @@ const ArchivePage: React.FC<{
                     Refresh
                   </button>
                   <div className="dropdown dropdown-end">
-                    <button type="button" tabIndex={0} className="btn btn-sm btn-outline min-w-0 gap-2">
+                    <button
+                      type="button"
+                      tabIndex={0}
+                      className="btn btn-sm btn-outline min-w-0 gap-2"
+                    >
                       <FiList className="h-4 w-4" />
                       Sort
                     </button>
@@ -2580,7 +3289,9 @@ const ArchivePage: React.FC<{
                     >
                       <option value="ALL">All Types</option>
                       <option value={ArchiveEntryType.FOLDER}>Folders</option>
-                      <option value={ArchiveEntryType.DOCUMENT}>Documents</option>
+                      <option value={ArchiveEntryType.DOCUMENT}>
+                        Documents
+                      </option>
                       <option value={ArchiveEntryType.SPREADSHEET}>
                         Spreadsheets
                       </option>
@@ -2618,7 +3329,8 @@ const ArchivePage: React.FC<{
                     Bulk Actions
                   </p>
                   <p className="mt-1 text-sm font-semibold text-base-content">
-                    {selectedCount} item{selectedCount !== 1 ? "s" : ""} selected
+                    {selectedCount} item{selectedCount !== 1 ? "s" : ""}{" "}
+                    selected
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
@@ -2800,7 +3512,8 @@ const ArchivePage: React.FC<{
                       [
                         "Date Created",
                         formatArchiveDateTime(
-                          selectedEntry.file?.createdAt ?? selectedEntry.createdAt,
+                          selectedEntry.file?.createdAt ??
+                            selectedEntry.createdAt,
                         ),
                       ],
                       [
@@ -2811,7 +3524,10 @@ const ArchivePage: React.FC<{
                             selectedEntry.createdAt,
                         ),
                       ],
-                      ["File Size", formatArchiveBytes(selectedEntry.file?.size)],
+                      [
+                        "File Size",
+                        formatArchiveBytes(selectedEntry.file?.size),
+                      ],
                       ["Full Path", selectedEntry.fullPath],
                     ].map(([label, value]) => (
                       <div

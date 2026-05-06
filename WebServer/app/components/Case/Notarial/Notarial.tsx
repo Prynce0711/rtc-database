@@ -1,6 +1,8 @@
 "use client";
 import { getArchiveFileUrl as getArchiveFileUrlArchive } from "@/app/components/Case/Archives/ArchiveActions";
 import {
+  acquireNotarialEditLock,
+  acquireNotarialGarageEditLock,
   createGarageFolder,
   createNotarial,
   deleteNotarial,
@@ -10,8 +12,14 @@ import {
   getNotarialGarageDirectoryItems,
   getNotarialGarageFileUrl,
   getNotarialPage,
+  heartbeatNotarialEditLock,
+  heartbeatNotarialGarageEditLock,
   moveNotarialGarageItems,
   renameNotarialGarageItem,
+  releaseNotarialEditLock,
+  releaseNotarialGarageEditLock,
+  syncNotarialEditedFile,
+  syncNotarialGarageEditedFile,
 } from "@/app/components/Case/Notarial/NotarialActions";
 
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
@@ -22,6 +30,7 @@ import {
   FilterDropdown,
   FilterOption,
   FilterValues,
+  IPC_CHANNELS,
   ModalBase,
   Pagination,
   usePopup,
@@ -118,6 +127,19 @@ export type NotarialFormEntry = {
   saved: boolean;
 };
 
+type NotarialDesktopEditSessionState = {
+  sessionId: string;
+  lockId: string;
+  lockMode: "notarial" | "garage";
+  recordId?: number;
+  garageKey?: string;
+  fileName: string;
+  mimeType: string;
+  heartbeatTimer: number;
+  syncTimer: number;
+  unlockCheckTimer: number;
+};
+
 const NOTARIAL_FILTER_OPTIONS: FilterOption[] = [
   { key: "title", label: "Document Title", type: "text" },
   { key: "name", label: "Client / Signatory", type: "text" },
@@ -199,6 +221,27 @@ const downloadCsv = (fileName: string, headers: string[], rows: string[][]) => {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+};
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read downloaded file."));
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+const base64ToFile = (base64: string, name: string, mimeType: string) => {
+  const bytes = atob(base64);
+  const buffer = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i += 1) {
+    buffer[i] = bytes.charCodeAt(i);
+  }
+  return new File([buffer], name, { type: mimeType });
 };
 
 const mapBackendRecord = (item: NotarialData): NotarialRecord => ({
@@ -352,6 +395,64 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   });
 
   const deferredSearch = useDeferredValue(searchInput.trim());
+  const desktopEditSessionsRef = useRef<Map<string, NotarialDesktopEditSessionState>>(
+    new Map(),
+  );
+  const desktopEditSyncInFlightRef = useRef<Set<string>>(new Set());
+  const deviceIdRef = useRef<string | null>(null);
+
+  const getElectronIpc = () => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const ipc = (window as unknown as {
+      ipcRenderer?: {
+        invoke?: (...args: unknown[]) => Promise<unknown>;
+        on?: (...args: unknown[]) => unknown;
+        off?: (...args: unknown[]) => unknown;
+      };
+    }).ipcRenderer;
+    return ipc?.invoke ? ipc : null;
+  };
+
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+  const extractDeviceId = (value: unknown): string | null => {
+    if (!isRecord(value) || value.success !== true) {
+      return null;
+    }
+
+    if (!isRecord(value.result) || typeof value.result.deviceId !== "string") {
+      return null;
+    }
+
+    return value.result.deviceId;
+  };
+
+  const getDeviceIdFromIpc = async (): Promise<string | null> => {
+    if (deviceIdRef.current) {
+      return deviceIdRef.current;
+    }
+
+    const ipc = getElectronIpc();
+    if (!ipc?.invoke) {
+      return null;
+    }
+
+    try {
+      const deviceIdResponse = await ipc.invoke(
+        IPC_CHANNELS.SESSION_GET_DEVICE_ID,
+      );
+      const deviceId = extractDeviceId(deviceIdResponse);
+      if (deviceId) {
+        deviceIdRef.current = deviceId;
+      }
+      return deviceId;
+    } catch {
+      return null;
+    }
+  };
 
   const toServerFilters = useCallback(
     (filters: NotarialFilterValues) => ({
@@ -619,9 +720,468 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     });
   };
 
+  const getRecordFileUrl = async (
+    record: NotarialRecord,
+    options: {
+      inline?: boolean;
+      fileName?: string;
+      contentType?: string;
+    },
+  ) => {
+    if (record.source === "archive") {
+      return getArchiveFileUrlArchive(record.id, options);
+    }
+    if (record.source === "garage") {
+      return getNotarialGarageFileUrl(record.link, options);
+    }
+    return getNotarialFileUrl(record.id, options);
+  };
+
+  const resolveServerUpdatedAtMs = (
+    record: NotarialRecord,
+    response: Response,
+  ): number | undefined => {
+    const headerLastModified = response.headers.get("last-modified");
+    const headerUpdatedAtMs = headerLastModified
+      ? new Date(headerLastModified).getTime()
+      : undefined;
+    const serverTimestamp = record.fileUpdatedAt || record.updatedAt || record.createdAt;
+
+    if (headerUpdatedAtMs && !Number.isNaN(headerUpdatedAtMs)) {
+      return headerUpdatedAtMs;
+    }
+    if (!serverTimestamp) return undefined;
+    const parsed = new Date(serverTimestamp).getTime();
+    return Number.isNaN(parsed) ? undefined : parsed;
+  };
+
+  const syncDesktopEditSession = useCallback(
+    async (sessionId: string, force: boolean) => {
+      const session = desktopEditSessionsRef.current.get(sessionId);
+      if (!session) {
+        console.log("[NOTARIAL_DESKTOP_EDIT] Session not found:", sessionId);
+        return;
+      }
+
+      if (
+        desktopEditSyncInFlightRef.current.has(sessionId) ||
+        (session.lockMode === "notarial" && !syncNotarialEditedFile) ||
+        (session.lockMode === "garage" && !syncNotarialGarageEditedFile)
+      ) {
+        return;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        return;
+      }
+
+      desktopEditSyncInFlightRef.current.add(sessionId);
+      try {
+        const readResult = (await ipc.invoke(
+          IPC_CHANNELS.ARCHIVE_READ_EXTERNAL_EDIT_SESSION,
+          {
+            sessionId,
+            force,
+          },
+        )) as
+          | {
+              success: true;
+              result: {
+                changed: boolean;
+                base64?: string;
+              };
+            }
+          | {
+              success: false;
+              error?: string;
+            };
+
+        if (!readResult?.success) {
+          statusPopup.showError(
+            readResult?.error ||
+              `Failed reading local edited file for ${session.fileName}.`,
+          );
+          return;
+        }
+
+        const { changed, base64 } = readResult.result;
+        if (!changed || !base64) {
+          return;
+        }
+
+        const editedFile = base64ToFile(
+          base64,
+          session.fileName,
+          session.mimeType,
+        );
+        const syncResult =
+          session.lockMode === "notarial"
+            ? await syncNotarialEditedFile(session.lockId, editedFile)
+            : await syncNotarialGarageEditedFile(session.lockId, editedFile);
+
+        if (!syncResult?.success) {
+          statusPopup.showError(
+            syncResult?.error ||
+              `Failed syncing changes for ${session.fileName}.`,
+          );
+          return;
+        }
+      } finally {
+        desktopEditSyncInFlightRef.current.delete(sessionId);
+      }
+    },
+    [statusPopup],
+  );
+
+  const stopDesktopEditSession = useCallback(
+    async (
+      sessionId: string,
+      options?: {
+        releaseLock?: boolean;
+        removeFile?: boolean;
+        syncBeforeClose?: boolean;
+      },
+    ) => {
+      const session = desktopEditSessionsRef.current.get(sessionId);
+      if (!session) {
+        return;
+      }
+
+      window.clearInterval(session.heartbeatTimer);
+      window.clearInterval(session.syncTimer);
+      window.clearInterval(session.unlockCheckTimer);
+
+      if (options?.syncBeforeClose) {
+        await syncDesktopEditSession(sessionId, true);
+      }
+
+      const ipc = getElectronIpc();
+      if (ipc?.invoke) {
+        await ipc.invoke(IPC_CHANNELS.ARCHIVE_CLOSE_EXTERNAL_EDIT_SESSION, {
+          sessionId,
+          removeFile: options?.removeFile ?? false,
+        });
+      }
+
+      if (options?.releaseLock) {
+        if (session.lockMode === "notarial") {
+          await releaseNotarialEditLock(session.lockId);
+        } else {
+          await releaseNotarialGarageEditLock(session.lockId);
+        }
+      }
+
+      desktopEditSessionsRef.current.delete(sessionId);
+      desktopEditSyncInFlightRef.current.delete(sessionId);
+    },
+    [syncDesktopEditSession],
+  );
+
+  const openDesktopReadOnly = useCallback(
+    async (record: NotarialRecord, lockedBy?: string) => {
+      if (record.isDirectory) {
+        return false;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        statusPopup.showError("Desktop viewing is only available in Electron.");
+        return false;
+      }
+
+      const fileName = record.fileName || record.link.split("/").pop() || "File";
+      const downloadResult = await getRecordFileUrl(record, {
+        inline: false,
+        fileName,
+        contentType: record.mimeType || undefined,
+      });
+
+      if (!downloadResult.success) {
+        statusPopup.showError(
+          downloadResult.error || "Failed to download file for read-only view.",
+        );
+        return false;
+      }
+
+      const response = await fetch(downloadResult.result, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        statusPopup.showError("Failed to fetch file payload for read-only view.");
+        return false;
+      }
+
+      const blob = await response.blob();
+      const base64 = await blobToBase64(blob);
+      if (!base64) {
+        statusPopup.showError("Failed to decode file payload for read-only view.");
+        return false;
+      }
+
+      const sessionId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `notarial-readonly-${record.id}-${Date.now()}`;
+      const tempKey =
+        record.source === "garage"
+          ? `notarial:garage:${record.link}`
+          : `notarial:${record.id}`;
+
+      const openResult = (await ipc.invoke(
+        IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
+        {
+          sessionId,
+          fileName,
+          base64,
+          tempKey,
+          serverUpdatedAtMs: resolveServerUpdatedAtMs(record, response),
+          readOnly: true,
+        },
+      )) as
+        | { success: true; result: { sessionId: string } }
+        | { success: false; error?: string };
+
+      if (!openResult?.success) {
+        statusPopup.showError(
+          openResult?.error || "Failed to open file in read-only mode.",
+        );
+        return false;
+      }
+
+      const lockedLabel = lockedBy ? ` (locked by ${lockedBy})` : "";
+      toast.success(`${fileName} opened read-only${lockedLabel}.`);
+      return true;
+    },
+    [getRecordFileUrl, resolveServerUpdatedAtMs, statusPopup, toast],
+  );
+
+  const handleOpenDesktopEditor = useCallback(
+    async (record: NotarialRecord) => {
+      if (record.isDirectory) {
+        return false;
+      }
+
+      if (record.source === "archive") {
+        statusPopup.showError(
+          "Desktop editing is only available for Notarial files.",
+        );
+        return false;
+      }
+
+      if (!record.link) {
+        statusPopup.showError("File metadata is missing for desktop editing.");
+        return false;
+      }
+
+      const ipc = getElectronIpc();
+      if (!ipc?.invoke) {
+        statusPopup.showError("Desktop editing is only available in Electron.");
+        return false;
+      }
+
+      const fileName = record.fileName || record.link.split("/").pop() || "File";
+      const deviceId = await getDeviceIdFromIpc();
+      const isGarage = record.source === "garage";
+
+      const lockResult = isGarage
+        ? await acquireNotarialGarageEditLock(record.link, deviceId ? { deviceId } : undefined)
+        : await acquireNotarialEditLock(record.id, deviceId ? { deviceId } : undefined);
+
+      if (!lockResult.success) {
+        if (lockResult.errorResult?.code === "locked") {
+          return await openDesktopReadOnly(record, lockResult.errorResult.lockedBy);
+        }
+
+        statusPopup.showError(
+          lockResult.error || "Failed to lock this file for editing.",
+        );
+        return false;
+      }
+
+      if (desktopEditSessionsRef.current.has(lockResult.result.lockId)) {
+        toast.success(`${fileName} is already open on this device.`);
+        return true;
+      }
+
+      const downloadResult = await getRecordFileUrl(record, {
+        inline: false,
+        fileName,
+        contentType: record.mimeType || undefined,
+      });
+
+      if (!downloadResult.success) {
+        if (isGarage) {
+          await releaseNotarialGarageEditLock(lockResult.result.lockId);
+        } else {
+          await releaseNotarialEditLock(lockResult.result.lockId);
+        }
+        statusPopup.showError(
+          downloadResult.error || "Failed to download file for desktop editing.",
+        );
+        return false;
+      }
+
+      const response = await fetch(downloadResult.result, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        if (isGarage) {
+          await releaseNotarialGarageEditLock(lockResult.result.lockId);
+        } else {
+          await releaseNotarialEditLock(lockResult.result.lockId);
+        }
+        statusPopup.showError("Failed to fetch file payload for desktop editing.");
+        return false;
+      }
+
+      const blob = await response.blob();
+      const base64 = await blobToBase64(blob);
+      const sessionId = lockResult.result.lockId;
+      const tempKey = isGarage ? `notarial:garage:${record.link}` : `notarial:${record.id}`;
+
+      const openResult = (await ipc.invoke(
+        IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
+        {
+          sessionId,
+          fileName,
+          base64,
+          tempKey,
+          serverUpdatedAtMs: resolveServerUpdatedAtMs(record, response),
+        },
+      )) as
+        | { success: true; result: { sessionId: string } }
+        | { success: false; error?: string };
+
+      if (!openResult?.success) {
+        if (isGarage) {
+          await releaseNotarialGarageEditLock(lockResult.result.lockId);
+        } else {
+          await releaseNotarialEditLock(lockResult.result.lockId);
+        }
+        statusPopup.showError(
+          openResult?.error || "Failed to open file in desktop app.",
+        );
+        return false;
+      }
+
+      const heartbeatTimer = window.setInterval(async () => {
+        const heartbeat = isGarage
+          ? await heartbeatNotarialGarageEditLock(lockResult.result.lockId)
+          : await heartbeatNotarialEditLock(lockResult.result.lockId);
+
+        if (!heartbeat?.success) {
+          window.clearInterval(heartbeatTimer);
+          statusPopup.showError(
+            heartbeat?.error ||
+              `Edit lock expired for ${fileName}. Changes may no longer sync.`,
+          );
+        }
+      }, lockResult.result.heartbeatIntervalMs);
+
+      const syncIntervalMs = Math.max(lockResult.result.syncIntervalMs || 15000, 5000);
+      const syncTimer = window.setInterval(() => {
+        void syncDesktopEditSession(sessionId, true);
+      }, syncIntervalMs);
+
+      const unlockCheckTimer = window.setInterval(async () => {
+        const ipc = getElectronIpc();
+        if (!ipc?.invoke) {
+          return;
+        }
+
+        const lockStatus = (await ipc.invoke(
+          IPC_CHANNELS.ARCHIVE_CHECK_EXTERNAL_EDIT_LOCK,
+          { sessionId },
+        )) as
+          | { success: true; result: { locked: boolean; exists: boolean } }
+          | { success: false; error?: string };
+
+        if (!lockStatus?.success || !lockStatus.result?.exists) {
+          return;
+        }
+
+        if (!lockStatus.result.locked) {
+          await stopDesktopEditSession(sessionId, {
+            releaseLock: true,
+            removeFile: false,
+            syncBeforeClose: true,
+          });
+        }
+      }, 5000);
+
+      desktopEditSessionsRef.current.set(sessionId, {
+        sessionId,
+        lockId: lockResult.result.lockId,
+        lockMode: isGarage ? "garage" : "notarial",
+        recordId: isGarage ? undefined : record.id,
+        garageKey: isGarage ? record.link : undefined,
+        fileName,
+        mimeType: record.mimeType || "application/octet-stream",
+        heartbeatTimer,
+        syncTimer,
+        unlockCheckTimer,
+      });
+
+      toast.success(
+        `${fileName} opened in desktop editor. Changes sync every 15 seconds while open.`,
+      );
+      return true;
+    },
+    [
+      getDeviceIdFromIpc,
+      getRecordFileUrl,
+      openDesktopReadOnly,
+      resolveServerUpdatedAtMs,
+      statusPopup,
+      toast,
+      syncDesktopEditSession,
+      stopDesktopEditSession,
+    ],
+  );
+
+  const syncDesktopEditSessionRef = useRef(syncDesktopEditSession);
+  const stopDesktopEditSessionRef = useRef(stopDesktopEditSession);
+
+  useEffect(() => {
+    syncDesktopEditSessionRef.current = syncDesktopEditSession;
+    stopDesktopEditSessionRef.current = stopDesktopEditSession;
+  }, [stopDesktopEditSession, syncDesktopEditSession]);
+
+  useEffect(() => {
+    const ipc = getElectronIpc();
+    if (!ipc?.on || !ipc?.off) {
+      return;
+    }
+
+    const onDirty = (
+      _event: unknown,
+      payload: { sessionId?: string } | null | undefined,
+    ) => {
+      const sessionId = String(payload?.sessionId || "").trim();
+      if (!sessionId) return;
+      void syncDesktopEditSessionRef.current(sessionId, false);
+    };
+
+    ipc.on(IPC_CHANNELS.ARCHIVE_EXTERNAL_EDIT_DIRTY_EVENT, onDirty);
+
+    return () => {
+      ipc.off?.(IPC_CHANNELS.ARCHIVE_EXTERNAL_EDIT_DIRTY_EVENT, onDirty);
+    };
+  }, []);
+
   const handlePreviewFile = async (record: NotarialRecord) => {
     if (openGarageDirectory(record)) return;
     if (!record.link) return;
+
+    if (isWordOrExcelRecord(record) && getElectronIpc()?.invoke) {
+      await handleOpenDesktopEditor(record);
+      return;
+    }
 
     const previewType = getPreviewType(record);
     if (!previewType) {
@@ -1043,6 +1603,24 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     clearSelection();
     setCurrentPage(1);
     await refreshFromBackend(1);
+  };
+
+  const isWordOrExcelRecord = (record: NotarialRecord) => {
+    const mime = (record.mimeType ?? "").toLowerCase();
+    const name = (record.fileName ?? record.link ?? "").toLowerCase();
+    const extension = name.includes(".") ? name.split(".").pop() || "" : "";
+
+    if (["doc", "docx", "xls", "xlsx"].includes(extension)) {
+      return true;
+    }
+
+    return (
+      mime.includes("word") ||
+      mime.includes("wordprocessingml") ||
+      mime.includes("excel") ||
+      mime.includes("spreadsheet") ||
+      mime.includes("officedocument")
+    );
   };
 
   // Detect Excel-like files by mime or extension
