@@ -25,6 +25,6 @@ jobs:
       - name: Build the RelayServer image
         run: docker build . --file RelayServer/DockerFile --tag ${{ secrets.DOCKER_USERNAME }}/rtc-database-relay:latest
       - name: Push the WebServer image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/rtc-database-webserver:latest
+        run: docker push prynce0711/rtc-database-webserver:latest
       - name: Push the RelayServer image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/rtc-database-relay:latest
+        run: docker push prynce0711/rtc-database-relay:latest
