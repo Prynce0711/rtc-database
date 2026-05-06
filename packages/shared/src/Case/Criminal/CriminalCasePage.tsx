@@ -51,9 +51,9 @@ import {
   formatImportFileSize,
   previewCriminalCaseImport,
   saveCaseImportDraft,
-  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
+  showImportFailedRowsToast,
 } from "../importPreview";
 import CriminalCaseRow from "./CriminalCaseRow";
 
@@ -63,6 +63,19 @@ type CaseFilters = NonNullable<CriminalCasesFilterOptions["filters"]>;
 
 const formatCaseCountLabel = (count: number): string =>
   `${count} ${count === 1 ? "case" : "cases"}`;
+
+const CASE_VIEW_OPTIONS = [
+  {
+    key: "criminal",
+    label: "Criminal",
+    description: "Criminal case records",
+  },
+  {
+    key: "appealed",
+    label: "Appealed",
+    description: "Appealed case records",
+  },
+] as const;
 
 const buildDirectImportSuccessMessage = (
   createdCount: number | undefined,
@@ -137,6 +150,8 @@ const CriminalCasePage: React.FC<{
     null,
   );
   const isSelecting = selectionMode !== null;
+  const [caseView, setCaseView] =
+    useState<(typeof CASE_VIEW_OPTIONS)[number]["key"]>("criminal");
 
   const urlFilterState = useMemo(
     () => getFilterStateFromSearchParams(searchParams),
@@ -763,6 +778,31 @@ const CriminalCasePage: React.FC<{
               </span>
             )}
           </button>
+
+          <div className="flex flex-wrap gap-2">
+            {CASE_VIEW_OPTIONS.map((view) => {
+              const isActive = caseView === view.key;
+              return (
+                <button
+                  key={view.key}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setCaseView(view.key)}
+                  className={[
+                    "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary shadow-sm"
+                      : "border-base-200 bg-base-100 text-base-content/65 hover:border-base-300 hover:bg-base-200/40",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-bold">{view.label}</div>
+                  <div className="mt-1 text-xs leading-4 opacity-75">
+                    {view.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
           {canManageCases &&
             (isSelecting ? (

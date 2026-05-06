@@ -42,9 +42,9 @@ import {
   formatImportFileSize,
   previewCivilCaseImport,
   saveCaseImportDraft,
-  showImportFailedRowsToast,
   shouldPreferDirectCaseImport,
   shouldPreferDirectCaseImportByRowCount,
+  showImportFailedRowsToast,
 } from "../importPreview";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import CivilCaseRow from "./CivilCaseRow";
@@ -72,6 +72,19 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
 ];
 
 const PAGE_SIZE = 10;
+
+const CASE_VIEW_OPTIONS = [
+  {
+    key: "civil",
+    label: "Civil",
+    description: "Civil case records",
+  },
+  {
+    key: "transmittal",
+    label: "Transmittal",
+    description: "Transmittal case records",
+  },
+] as const;
 
 const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   role,
@@ -104,6 +117,8 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<CaseFilterValues>({});
   const [exactMatchMap, setExactMatchMap] = useState<ExactMatchMap>({});
+  const [caseView, setCaseView] =
+    useState<(typeof CASE_VIEW_OPTIONS)[number]["key"]>("civil");
 
   const canManage = role === Roles.ADMIN || role === Roles.CRIMINAL;
   const supportsDirectExcelUpload =
@@ -589,6 +604,31 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
             )}
           </button>
 
+          <div className="flex flex-wrap gap-2">
+            {CASE_VIEW_OPTIONS.map((view) => {
+              const isActive = caseView === view.key;
+              return (
+                <button
+                  key={view.key}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setCaseView(view.key)}
+                  className={[
+                    "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
+                    isActive
+                      ? "border-primary bg-primary/10 text-primary shadow-sm"
+                      : "border-base-200 bg-base-100 text-base-content/65 hover:border-base-300 hover:bg-base-200/40",
+                  ].join(" ")}
+                >
+                  <div className="text-sm font-bold">{view.label}</div>
+                  <div className="mt-1 text-xs leading-4 opacity-75">
+                    {view.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
           {canManage &&
             (isSelecting ? (
               <div className="flex items-center gap-2 sm:ml-3">
@@ -760,9 +800,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
               key={caseItem.id}
               caseItem={caseItem}
               onView={(item) =>
-                router.push(
-                  `/user/cases/civil/${item.id}?page=${currentPage}`,
-                )
+                router.push(`/user/cases/civil/${item.id}?page=${currentPage}`)
               }
               selected={selectedCaseIds.includes(caseItem.id)}
               isSelecting={isSelecting}
@@ -794,4 +832,3 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
 };
 
 export default CivilCasePage;
-
