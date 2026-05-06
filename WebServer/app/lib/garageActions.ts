@@ -241,11 +241,18 @@ async function uploadFileToGarageCore(
       folderPath = getGarageParentPath(key);
     }
 
-    const maxSize = parseInt(process.env.MAX_FILE_SIZE || "50") * 1024 * 1024; // 50 MB
+    const configuredMaxSizeMb = Number.parseInt(
+      process.env.MAX_FILE_SIZE || "",
+      10,
+    );
+    const maxSizeMb = Number.isFinite(configuredMaxSizeMb)
+      ? Math.max(configuredMaxSizeMb, 250)
+      : 250;
+    const maxSize = maxSizeMb * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         success: false,
-        error: "File too large (max 50MB)",
+        error: `File too large (max ${maxSizeMb}MB)`,
       };
     }
 

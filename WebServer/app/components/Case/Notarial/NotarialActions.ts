@@ -857,13 +857,79 @@ export async function deleteNotarialGarageItems(
       return sessionResult;
     }
 
+    const normalizedKeys = Array.from(
+      new Set(
+        keys
+          .map((key) =>
+            String(key || "")
+              .replace(/\\/g, "/")
+              .trim()
+              .replace(/^\/+/, ""),
+          )
+          .filter((key) => key.length > 0),
+      ),
+    );
+    const fileKeyConditions: Prisma.FileDataWhereInput[] = [];
+    const exactStorageKeys: string[] = [];
+
+    for (const key of normalizedKeys) {
+      const isFolder = key.endsWith("/");
+      const normalizedKey = normalizeGaragePath(key);
+      if (!normalizedKey) continue;
+
+      const scopedKey = scopeNotarialStorageKey(normalizedKey);
+      if (isFolder) {
+        fileKeyConditions.push({
+          key: {
+            startsWith: `${scopedKey}/`,
+          },
+        });
+      } else {
+        exactStorageKeys.push(scopedKey);
+      }
+    }
+
+    if (exactStorageKeys.length > 0) {
+      fileKeyConditions.push({
+        key: {
+          in: exactStorageKeys,
+        },
+      });
+    }
+
+    const notarialRowsToDelete =
+      fileKeyConditions.length > 0
+        ? await prisma.notarial.findMany({
+            where: {
+              file: {
+                is: {
+                  OR: fileKeyConditions,
+                },
+              },
+            },
+            select: {
+              id: true,
+            },
+          })
+        : [];
+
     const result = await deleteGarageKeys(
-      keys,
+      normalizedKeys,
       NOTARIAL_GARAGE_BUCKET,
       NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) {
       return { success: false, error: result.error };
+    }
+
+    if (notarialRowsToDelete.length > 0) {
+      await prisma.notarial.deleteMany({
+        where: {
+          id: {
+            in: notarialRowsToDelete.map((row) => row.id),
+          },
+        },
+      });
     }
 
     return {

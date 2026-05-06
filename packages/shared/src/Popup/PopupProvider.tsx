@@ -6,7 +6,7 @@ import LoadingPopup from "./LoadingPopup";
 import SuccessPopup from "./SuccessPopup";
 
 interface PopupProviderContextType {
-  showLoading: (message?: string) => void;
+  showLoading: (message?: string, content?: React.ReactNode) => void;
   showSuccess: (
     message: string,
     redirectTo?: string,
@@ -59,6 +59,7 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [onYes, setOnYes] = useState<(() => void) | null>(null);
   const [onNo, setOnNo] = useState<(() => void) | null>(null);
+  const [loadingContent, setLoadingContent] = useState<React.ReactNode | null>(null);
   // Keep a resolver for pending Yes/No prompts so callers can await the result
   const pendingResolveRef = useRef<((result: boolean) => void) | null>(null);
 
@@ -99,8 +100,9 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const popupContextValue: PopupProviderContextType = {
-    showLoading: (msg?: string) => {
+    showLoading: (msg?: string, content?: React.ReactNode) => {
       setMessage(msg || null);
+      setLoadingContent(content || null);
 
       setPopupType(PopupType.LOADING);
     },
@@ -147,13 +149,17 @@ const PopupProvider = ({ children }: { children: React.ReactNode }) => {
       setOnClose(null);
       setOnYes(null);
       setOnNo(null);
+      setLoadingContent(null);
     },
   };
 
   return (
     <PopupProviderContext.Provider value={popupContextValue}>
       {popupType === PopupType.LOADING && (
-        <LoadingPopup message={message || undefined} />
+        <LoadingPopup
+          message={message || undefined}
+          content={loadingContent || undefined}
+        />
       )}
       {popupType === PopupType.SUCCESS && (
         <SuccessPopup

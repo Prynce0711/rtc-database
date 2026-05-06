@@ -17,6 +17,10 @@ import { getArchiveFileUrl as getArchiveFileUrlArchive } from "@/app/components/
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import Roles from "@/app/lib/Roles";
 import {
+  BatchUploadProgressPanel,
+  BatchUploadProgressState,
+  createBatchUploadProgressState,
+  createUploadBatches,
   ExactMatchMap,
   FileViewerModal,
   FilterDropdown,
@@ -24,6 +28,7 @@ import {
   FilterValues,
   ModalBase,
   Pagination,
+  pickDirectoriesWithFileSystemAccess,
   usePopup,
   useToast,
 } from "@rtc-database/shared";
@@ -100,6 +105,12 @@ type GarageDirectoryItem = {
   size: number;
   lastModified: Date | string | null;
   isDirectory: boolean;
+};
+
+type NotarialUploadEntry = {
+  file: File;
+  title: string;
+  targetFolder: string;
 };
 
 type NotarialContextMenuState = {
@@ -327,7 +338,25 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     useState<UploadFormState>(initialUploadForm());
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [, setBatchUploadProgress] =
+    useState<BatchUploadProgressState | null>(null);
   const [showFolderModal, setShowFolderModal] = useState(false);
+
+  const showBatchUploadPopup = (state: BatchUploadProgressState | null) => {
+    if (!state) return;
+
+    statusPopup.showLoading(
+      undefined,
+      <BatchUploadProgressPanel
+        state={state}
+        onDismiss={() => {
+          statusPopup.hidePopup();
+          setBatchUploadProgress(null);
+        }}
+        className="max-w-xl"
+      />,
+    );
+  };
   const [folderForm, setFolderForm] = useState({
     name: "",
     parentPath: "",
@@ -1074,6 +1103,113 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     }
   }, []);
 
+  const runBatchedNotarialUpload = async (
+    entries: NotarialUploadEntry[],
+    title = "Processing",
+    onStatusUpdate?: (state: BatchUploadProgressState) => void,
+  ) => {
+    const batches = createUploadBatches(entries, (entry) => entry.file.size);
+    const totalBytes = entries.reduce(
+      (total, entry) => total + entry.file.size,
+      0,
+    );
+    let processedCount = 0;
+    let uploadedBytes = 0;
+    let successCount = 0;
+    const uploadErrors: string[] = [];
+
+    setUploading(true);
+    setUploadProgress(0);
+    let currentState = createBatchUploadProgressState(
+      entries.length,
+      totalBytes,
+      batches.length,
+      title,
+    );
+    setBatchUploadProgress(currentState);
+    onStatusUpdate?.(currentState);
+
+    for (const [batchIndex, batch] of batches.entries()) {
+      currentState = {
+        ...currentState,
+        currentBatch: batchIndex + 1,
+        currentFileName: undefined,
+      };
+      setBatchUploadProgress(currentState);
+      onStatusUpdate?.(currentState);
+
+      for (const entry of batch) {
+        currentState = {
+          ...currentState,
+          currentBatch: batchIndex + 1,
+          currentFileName: entry.title,
+        };
+        setBatchUploadProgress(currentState);
+        onStatusUpdate?.(currentState);
+
+        try {
+          // Upload sequentially inside each 250 MB batch to keep the backend steady.
+          const result = await createNotarial({
+            title: entry.title,
+            path: entry.targetFolder,
+            file: entry.file,
+          });
+          if (result.success) {
+            successCount++;
+          } else {
+            uploadErrors.push(result.error || "Upload failed");
+          }
+        } catch (err) {
+          uploadErrors.push(
+            err instanceof Error ? err.message : "Upload failed",
+          );
+        }
+
+        processedCount++;
+        uploadedBytes += entry.file.size;
+        const percentage = Math.round((processedCount / entries.length) * 100);
+        setUploadProgress(percentage);
+
+        currentState = {
+          ...currentState,
+          completedFiles: processedCount,
+          failedFiles: uploadErrors.length,
+          uploadedBytes,
+        };
+        setBatchUploadProgress(currentState);
+        onStatusUpdate?.(currentState);
+      }
+    }
+
+    const hasErrors = uploadErrors.length > 0;
+    currentState = {
+      ...currentState,
+      phase: hasErrors ? "failed" : "completed",
+      completedFiles: processedCount,
+      failedFiles: uploadErrors.length,
+      uploadedBytes,
+      currentFileName: undefined,
+      error: hasErrors
+        ? `Uploaded ${successCount} of ${entries.length} files. ${
+            uploadErrors[0] || "Upload failed"
+          }`
+        : undefined,
+    };
+    setBatchUploadProgress(currentState);
+    onStatusUpdate?.(currentState);
+
+    if (!hasErrors) {
+      window.setTimeout(() => {
+        setBatchUploadProgress((previous) =>
+          previous?.phase === "completed" ? null : previous,
+        );
+      }, 2600);
+    }
+
+    setUploading(false);
+    return { successCount, uploadErrors };
+  };
+
   const handleUploadFolderFiles = async (files: File[] | null) => {
     if (!files || files.length === 0) {
       statusPopup.showError("No files found in the selected folder.");
@@ -1098,7 +1234,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       return;
     }
 
-    const basePath = "";
+    const basePath = currentGaragePath;
     const fileEntries = files.map((file) => {
       const relativePath = normalizeGaragePath(
         (file as unknown as { webkitRelativePath?: string })
@@ -1156,29 +1292,13 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       await ensureFolderPath(relativeDir);
     }
 
-    statusPopup.showLoading(`Uploading ${fileEntries.length} files...`);
-    let successCount = 0;
-    const uploadErrors: string[] = [];
+    const { successCount, uploadErrors } = await runBatchedNotarialUpload(
+      fileEntries,
+      "Processing",
+      showBatchUploadPopup,
+    );
 
-    for (const entry of fileEntries) {
-      try {
-        // Upload sequentially to avoid overwhelming the backend.
-        const result = await createNotarial({
-          title: entry.title,
-          path: entry.targetFolder,
-          file: entry.file,
-        });
-        if (result.success) {
-          successCount++;
-        } else {
-          uploadErrors.push(result.error || "Upload failed");
-        }
-      } catch (err) {
-        uploadErrors.push(
-          err instanceof Error ? err.message : "Upload failed",
-        );
-      }
-    }
+    statusPopup.hidePopup();
 
     if (uploadErrors.length > 0 || folderErrors.length > 0) {
       const firstError = uploadErrors[0] || folderErrors[0] || "Upload failed";
@@ -1194,27 +1314,46 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     await refreshFromBackend(1);
   };
 
-  // Garage drop upload handler: accepts a single File and uploads immediately
-  const handleGarageDrop = async (file: File | null) => {
-    if (!file) return;
+  const handleOpenNotarialFolderPicker = async () => {
+    const pickedFiles = await pickDirectoriesWithFileSystemAccess({
+      allowMultiple: true,
+    });
+
+    if (pickedFiles === null) {
+      folderInputRef.current?.click();
+      return;
+    }
+
+    await handleUploadFolderFiles(pickedFiles.length > 0 ? pickedFiles : null);
+  };
+
+  const handleGarageFilesUpload = async (files: File[] | null) => {
+    if (!files || files.length === 0) return;
+
     try {
-      setUploading(true);
-      setUploadProgress(12);
-
-      const result = await createNotarial({
-        title: file.name,
-        path: currentGaragePath,
+      const uploadEntries = files.map((file) => ({
         file,
-      });
+        title: file.name,
+        targetFolder: currentGaragePath,
+      }));
+      const { successCount, uploadErrors } = await runBatchedNotarialUpload(
+        uploadEntries,
+        "Processing",
+        showBatchUploadPopup,
+      );
 
-      setUploadProgress(result.success ? 100 : 0);
+      statusPopup.hidePopup();
 
-      if (!result.success) {
-        statusPopup.showError(result.error || "Upload failed");
-        return;
+      if (uploadErrors.length > 0) {
+        statusPopup.showError(
+          `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+        );
+      } else {
+        statusPopup.showSuccess(
+          `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
+        );
       }
 
-      toast.success("Notarial file uploaded.");
       setUploadForm(initialUploadForm());
       clearSelection();
       setCurrentPage(1);
@@ -1225,6 +1364,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
       );
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1246,29 +1386,32 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     const files = Array.from(fileList);
     if (files.length === 0) return false;
 
-    statusPopup.showLoading(
-      `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
+    const uploadEntries = files.map((file) => ({
+      file,
+      title: file.name,
+      targetFolder: targetPath,
+    }));
+    const { successCount, uploadErrors } = await runBatchedNotarialUpload(
+      uploadEntries,
+      "Processing",
+      showBatchUploadPopup,
     );
-    let successCount = 0;
 
-    for (const file of files) {
-      const result = await createNotarial({
-        title: file.name,
-        path: targetPath,
-        file,
-      });
+    statusPopup.hidePopup();
 
-      if (result.success) {
-        successCount++;
-      }
+    if (uploadErrors.length > 0) {
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+      );
+    } else {
+      statusPopup.showSuccess(
+        `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
+      );
     }
 
-    statusPopup.showSuccess(
-      `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
-    );
     setCurrentPage(1);
     await refreshFromBackend(1);
-    return true;
+    return successCount > 0;
   };
 
   const moveNotarialRecordsToFolder = async (
@@ -1946,6 +2089,20 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
 
                   <button
                     type="button"
+                    className={`btn btn-sm min-w-0 gap-2 ${
+                      allVisibleRecordsSelected ? "btn-primary" : "btn-outline"
+                    }`}
+                    onClick={() =>
+                      toggleSelectAllVisible(!allVisibleRecordsSelected)
+                    }
+                    disabled={visibleRecordIds.length === 0}
+                  >
+                    <FiCheck className="h-4 w-4" />
+                    {allVisibleRecordsSelected ? "Clear All" : "Select All"}
+                  </button>
+
+                  <button
+                    type="button"
                     className={`btn btn-sm btn-outline min-w-0 gap-2 ${refreshing ? "loading" : ""}`}
                     onClick={() => void handleRefresh()}
                     disabled={refreshing}
@@ -2389,33 +2546,45 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </button>
                   <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
                     <FiUpload className="h-4 w-4" />
-                    Upload
+                    Upload Files
                     <input
-                      type="file"
-                      className="hidden"
-                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        if (f) void handleGarageDrop(f);
-                      }}
-                    />
-                  </label>
-                  {/* <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
-                    <FiFolder className="h-4 w-4" />
-                    Upload Folder
-                    <input
-                      ref={folderInputRef}
                       type="file"
                       multiple
                       className="hidden"
+                      accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
                       onChange={(e) => {
-                        const files = e.currentTarget.files ?? null;
-                        void handleUploadFolderFiles(files);
-                        // reset so same folder can be chosen again
+                        const files = Array.from(e.currentTarget.files ?? []);
+                        void handleGarageFilesUpload(
+                          files.length > 0 ? files : null,
+                        );
                         e.currentTarget.value = "";
                       }}
                     />
-                  </label> */}
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center justify-center gap-2"
+                    onClick={() => void handleOpenNotarialFolderPicker()}
+                  >
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folders
+                  </button>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    // @ts-expect-error -- non-standard attribute required for folder selection
+                    webkitdirectory=""
+                    directory=""
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.currentTarget.files ?? []);
+                      void handleUploadFolderFiles(
+                        files.length > 0 ? files : null,
+                      );
+                      e.currentTarget.value = "";
+                    }}
+                  />
 
                   
                   <button
@@ -2672,41 +2841,45 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                   </button>
                   <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
                     <FiUpload className="h-4 w-4" />
-                    Upload
+                    Upload Files
                     <input
                       type="file"
+                      multiple
                       className="hidden"
                       accept={ACCEPTED_NOTARIAL_UPLOAD_TYPES || undefined}
                       onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        if (f) void handleGarageDrop(f);
-                      }}
-                    />
-                  </label>
-                  <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
-                    <FiFolder className="h-4 w-4" />
-                    Upload Folder
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      multiple
-                      // @ts-expect-error -- non-standard attribute required for folder selection
-                      webkitdirectory=""
-                     
-                      directory=""
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(
-                          e.currentTarget.files ?? [],
-                        );
-                        void handleUploadFolderFiles(
+                        const files = Array.from(e.currentTarget.files ?? []);
+                        void handleGarageFilesUpload(
                           files.length > 0 ? files : null,
                         );
-                        // reset so same folder can be chosen again
                         e.currentTarget.value = "";
                       }}
                     />
                   </label>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex items-center justify-center gap-2"
+                    onClick={() => void handleOpenNotarialFolderPicker()}
+                  >
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folders
+                  </button>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    // @ts-expect-error -- non-standard attribute required for folder selection
+                    webkitdirectory=""
+                    directory=""
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.currentTarget.files ?? []);
+                      void handleUploadFolderFiles(
+                        files.length > 0 ? files : null,
+                      );
+                      e.currentTarget.value = "";
+                    }}
+                  />
                   <button
                     type="button"
                     className="btn btn-sm btn-outline flex items-center justify-center gap-2"

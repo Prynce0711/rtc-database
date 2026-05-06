@@ -11,6 +11,7 @@ import React, {
 import {
   FiChevronRight,
   FiChevronLeft,
+  FiCheck,
   FiClock,
   FiDownload,
   FiEdit2,
@@ -31,6 +32,12 @@ import {
   FiX,
 } from "react-icons/fi";
 import { ArchiveEntryType } from "../../generated/prisma/enums";
+import {
+  BatchUploadProgressPanel,
+  BatchUploadProgressState,
+  createBatchUploadProgressState,
+  createUploadBatches,
+} from "../../lib/batchUploadProgress";
 import {
   useAdaptiveNavigation,
   useAdaptivePathname,
@@ -70,6 +77,11 @@ type UploadFormState = {
 type FolderFormState = {
   name: string;
   description: string;
+};
+type ArchiveUploadEntry = {
+  file: File;
+  name: string;
+  parentPath: string;
 };
 type GarageArchiveEntry = ArchiveEntryData & {
   source: "garage";
@@ -297,6 +309,8 @@ const ArchivePage: React.FC<{
     initialFolderForm(),
   );
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [batchUploadProgress, setBatchUploadProgress] =
+    useState<BatchUploadProgressState | null>(null);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [stats, setStats] = useState<ArchiveStats>({
@@ -834,15 +848,169 @@ const ArchivePage: React.FC<{
     await refreshEntries(1);
   };
 
-  // Garage drop handler: quick-set file and open upload modal
-  const handleGarageDrop = async (file: File | null) => {
-    if (!file) return;
-    setUploadForm((previous) => ({
-      ...previous,
+  const runBatchedArchiveUpload = async (
+    uploadEntries: ArchiveUploadEntry[],
+    title = "Processing",
+  ) => {
+    const batches = createUploadBatches(
+      uploadEntries,
+      (entry) => entry.file.size,
+    );
+    const totalBytes = uploadEntries.reduce(
+      (total, entry) => total + entry.file.size,
+      0,
+    );
+    const getBatchBytes = (batch: ArchiveUploadEntry[]) =>
+      batch.reduce((total, entry) => total + entry.file.size, 0);
+    let processedCount = 0;
+    let uploadedBytes = 0;
+    let successCount = 0;
+    const uploadErrors: string[] = [];
+
+    setUploading(true);
+    setUploadProgress(0);
+    setBatchUploadProgress(
+      createBatchUploadProgressState(
+        uploadEntries.length,
+        totalBytes,
+        batches.length,
+        title,
+        batches[0] ? getBatchBytes(batches[0]) : totalBytes,
+      ),
+    );
+
+    for (const [batchIndex, batch] of batches.entries()) {
+      const currentBatchBytes = getBatchBytes(batch);
+      let uploadedBatchBytes = 0;
+
+      setBatchUploadProgress((previous) =>
+        previous
+          ? {
+              ...previous,
+              currentBatch: batchIndex + 1,
+              currentBatchBytes,
+              uploadedBatchBytes: 0,
+            }
+          : previous,
+      );
+
+      for (const entry of batch) {
+        setBatchUploadProgress((previous) =>
+          previous
+            ? {
+                ...previous,
+                currentBatch: batchIndex + 1,
+                currentFileName: entry.name,
+              }
+            : previous,
+        );
+
+        try {
+          // Upload sequentially inside each 250 MB batch to keep the backend steady.
+          const result = await adapter.createArchiveEntry({
+            name: entry.name,
+            parentPath: entry.parentPath,
+            entryType: ArchiveEntryType.FILE,
+            description: undefined,
+            file: entry.file,
+          });
+
+          if (result.success) {
+            successCount++;
+          } else {
+            uploadErrors.push(result.error || "Upload failed");
+          }
+        } catch (error) {
+          uploadErrors.push(
+            error instanceof Error ? error.message : "Upload failed",
+          );
+        }
+
+        processedCount++;
+        uploadedBytes += entry.file.size;
+        uploadedBatchBytes += entry.file.size;
+        setUploadProgress(
+          Math.round((processedCount / uploadEntries.length) * 100),
+        );
+        setBatchUploadProgress((previous) =>
+          previous
+            ? {
+                ...previous,
+                completedFiles: processedCount,
+                failedFiles: uploadErrors.length,
+                uploadedBytes,
+                currentBatchBytes,
+                uploadedBatchBytes,
+              }
+            : previous,
+        );
+      }
+    }
+
+    const hasErrors = uploadErrors.length > 0;
+    setBatchUploadProgress((previous) =>
+      previous
+        ? {
+            ...previous,
+            phase: hasErrors ? "failed" : "completed",
+            completedFiles: processedCount,
+            failedFiles: uploadErrors.length,
+            uploadedBytes,
+            uploadedBatchBytes: previous.currentBatchBytes,
+            currentFileName: undefined,
+            error: hasErrors
+              ? `Uploaded ${successCount} of ${uploadEntries.length} files. ${
+                  uploadErrors[0] || "Upload failed"
+                }`
+              : undefined,
+          }
+        : previous,
+    );
+
+    if (!hasErrors) {
+      window.setTimeout(() => {
+        setBatchUploadProgress((previous) =>
+          previous?.phase === "completed" ? null : previous,
+        );
+      }, 2600);
+    }
+
+    setUploading(false);
+    return { successCount, uploadErrors };
+  };
+
+  const handleUploadFiles = async (files: File[] | null) => {
+    if (!files || files.length === 0) {
+      statusPopup.showError("No files selected.");
+      return;
+    }
+
+    statusPopup.showLoading(
+      `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
+    );
+
+    const uploadEntries = files.map((file) => ({
       file,
-      name: previous.name || file.name,
+      name: file.name,
+      parentPath: currentPath,
     }));
-    setShowUploadModal(true);
+    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
+      uploadEntries,
+      "Processing",
+    );
+
+    if (uploadErrors.length > 0) {
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+      );
+    } else {
+      statusPopup.showSuccess(
+        `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
+      );
+    }
+
+    setCurrentPage(1);
+    await refreshEntries(1);
   };
 
   const getEntriesForDrag = (entry: ArchiveEntryData) => {
@@ -864,26 +1032,29 @@ const ArchivePage: React.FC<{
       `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
     );
 
-    let successCount = 0;
-    for (const file of files) {
-      const result = await adapter.createArchiveEntry({
-        name: file.name,
-        parentPath: targetPath,
-        entryType: ArchiveEntryType.FILE,
-        file,
-      });
+    const uploadEntries = files.map((file) => ({
+      file,
+      name: file.name,
+      parentPath: targetPath,
+    }));
+    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
+      uploadEntries,
+      "Processing",
+    );
 
-      if (result.success) {
-        successCount++;
-      }
+    if (uploadErrors.length > 0) {
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
+      );
+    } else {
+      statusPopup.showSuccess(
+        `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
+      );
     }
 
-    statusPopup.showSuccess(
-      `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
-    );
     setCurrentPage(1);
     await refreshEntries(1);
-    return true;
+    return successCount > 0;
   };
 
   const moveArchiveEntriesToFolder = async (
@@ -1074,8 +1245,9 @@ const ArchivePage: React.FC<{
     }
 
     statusPopup.showLoading(`Uploading ${files.length} files...`);
-    let successCount = 0;
     const createdFolderPaths = new Set<string>();
+    const folderErrors: string[] = [];
+    const uploadEntries: ArchiveUploadEntry[] = [];
 
     for (const file of files) {
       try {
@@ -1085,34 +1257,57 @@ const ArchivePage: React.FC<{
         );
         const pathSegments = relativePath ? relativePath.split("/") : [file.name];
         const fileName = pathSegments.pop() || file.name;
-        // sequential upload to avoid overwhelming backend and to preserve folder order
-        // eslint-disable-next-line no-await-in-loop
         const folderResult = await ensureArchiveFolderPath(
           currentPath,
           pathSegments,
           createdFolderPaths,
         );
         if (!folderResult.success) {
+          folderErrors.push(folderResult.error || "Failed to create folder");
           continue;
         }
 
-        // eslint-disable-next-line no-await-in-loop
-        const result = await adapter.createArchiveEntry({
+        uploadEntries.push({
+          file,
           name: fileName,
           parentPath: folderResult.path,
-          entryType: ArchiveEntryType.FILE,
-          description: undefined,
-          file,
         });
-        if (result.success) successCount++;
-      } catch {
-        // continue
+      } catch (error) {
+        folderErrors.push(
+          error instanceof Error ? error.message : "Failed to prepare upload",
+        );
       }
     }
 
-    statusPopup.showSuccess(`Uploaded ${successCount} of ${files.length} files.`);
+    if (uploadEntries.length === 0) {
+      statusPopup.showError(folderErrors[0] || "No files could be uploaded.");
+      return;
+    }
+
+    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
+      uploadEntries,
+      "Processing",
+    );
+    const failedCount = uploadErrors.length + folderErrors.length;
+
+    if (failedCount > 0) {
+      statusPopup.showError(
+        `Uploaded ${successCount} of ${files.length} files. ${
+          uploadErrors[0] || folderErrors[0] || "Upload failed"
+        }`,
+      );
+    } else {
+      statusPopup.showSuccess(
+        `Uploaded ${successCount} of ${files.length} files.`,
+      );
+    }
+
     setCurrentPage(1);
     await refreshEntries(1);
+  };
+
+  const handleOpenArchiveFolderPicker = async () => {
+    folderInputRef.current?.click();
   };
 
   const toggleEntrySelection = (entryId: number, checked: boolean) => {
@@ -1538,47 +1733,42 @@ const ArchivePage: React.FC<{
 
             <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
               <FiUpload className="h-4 w-4" />
-              Upload
+              Upload Files
               <input
                 type="file"
+                multiple
                 accept={acceptedArchiveUploadTypes}
                 className="hidden"
                 onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  if (file) {
-                    setUploadForm((previous) => ({
-                      ...previous,
-                      file,
-                      name: previous.name || file.name,
-                    }));
-                    setShowUploadModal(true);
-                    e.currentTarget.value = "";
-                  }
-                }}
-              />
-            </label>
-
-            <label className="btn btn-sm btn-outline flex items-center justify-center gap-2">
-              <FiFolder className="h-4 w-4" />
-              Upload Folder
-              <input
-                ref={folderInputRef}
-                type="file"
-                multiple
-                // @ts-expect-error -- non-standard attribute required for folder selection
-                webkitdirectory=""
-               
-                directory=""
-                className="hidden"
-                onChange={(e) => {
                   const files = Array.from(e.currentTarget.files ?? []);
-                  void handleUploadFolderFiles(
-                    files.length > 0 ? files : null,
-                  );
+                  void handleUploadFiles(files.length > 0 ? files : null);
                   e.currentTarget.value = "";
                 }}
               />
             </label>
+
+            <button
+              type="button"
+              className="btn btn-sm btn-outline flex items-center justify-center gap-2"
+              onClick={() => void handleOpenArchiveFolderPicker()}
+            >
+              <FiFolder className="h-4 w-4" />
+              Upload Folders
+            </button>
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              // @ts-expect-error -- non-standard attribute required for folder selection
+              webkitdirectory=""
+              directory=""
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.currentTarget.files ?? []);
+                void handleUploadFolderFiles(files.length > 0 ? files : null);
+                e.currentTarget.value = "";
+              }}
+            />
 
             <button
               type="button"
@@ -2370,41 +2560,15 @@ const ArchivePage: React.FC<{
                   </div>
                   <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
                     <FiUpload className="h-4 w-4" />
-                    Upload
+                    Upload Files
                     <input
                       type="file"
+                      multiple
                       className="hidden"
                       accept={acceptedArchiveUploadTypes}
                       onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        if (f) {
-                          setUploadForm((previous) => ({
-                            ...previous,
-                            file: f,
-                            name: previous.name || f.name,
-                          }));
-                          setShowUploadModal(true);
-                        }
-                      }}
-                    />
-                  </label>
-                  <label className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2">
-                    <FiFolder className="h-4 w-4" />
-                    Upload Folder
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      multiple
-                      // @ts-expect-error -- non-standard attribute required for folder selection
-                      webkitdirectory=""
-                   
-                      directory=""
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(
-                          e.currentTarget.files ?? [],
-                        );
-                        void handleUploadFolderFiles(
+                        const files = Array.from(e.currentTarget.files ?? []);
+                        void handleUploadFiles(
                           files.length > 0 ? files : null,
                         );
                         e.currentTarget.value = "";
@@ -2413,11 +2577,48 @@ const ArchivePage: React.FC<{
                   </label>
                   <button
                     type="button"
+                    className="btn btn-sm btn-outline flex min-w-0 items-center justify-center gap-2"
+                    onClick={() => void handleOpenArchiveFolderPicker()}
+                  >
+                    <FiFolder className="h-4 w-4" />
+                    Upload Folders
+                  </button>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    // @ts-expect-error -- non-standard attribute required for folder selection
+                    webkitdirectory=""
+                    directory=""
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.currentTarget.files ?? []);
+                      void handleUploadFolderFiles(
+                        files.length > 0 ? files : null,
+                      );
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
                     className="btn btn-sm btn-outline min-w-0 gap-2"
                     onClick={() => setShowFolderModal(true)}
                   >
                     <FiFolderPlus className="h-4 w-4" />
                     New Folder
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm min-w-0 gap-2 ${
+                      allVisibleEntriesSelected ? "btn-primary" : "btn-outline"
+                    }`}
+                    onClick={() =>
+                      toggleSelectAllVisible(!allVisibleEntriesSelected)
+                    }
+                    disabled={visibleEntryIds.length === 0}
+                  >
+                    <FiCheck className="h-4 w-4" />
+                    {allVisibleEntriesSelected ? "Clear All" : "Select All"}
                   </button>
                   <button
                     type="button"
@@ -2609,6 +2810,12 @@ const ArchivePage: React.FC<{
               )}
             </div>
           </div>
+
+          <BatchUploadProgressPanel
+            state={batchUploadProgress}
+            onDismiss={() => setBatchUploadProgress(null)}
+            className="max-w-xl"
+          />
 
           {selectedCount > 0 && (
             <div className="rounded-[26px] border border-primary/20 bg-primary/8 p-4 shadow-sm">

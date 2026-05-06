@@ -44,6 +44,15 @@ const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
 
+const scopeArchiveStorageKey = (key: string): string => {
+  const normalized = normalizeArchivePath(key);
+  if (!normalized) return ARCHIVE_GARAGE_ROOT;
+  return normalized === ARCHIVE_GARAGE_ROOT ||
+    normalized.startsWith(`${ARCHIVE_GARAGE_ROOT}/`)
+    ? normalized
+    : `${ARCHIVE_GARAGE_ROOT}/${normalized}`;
+};
+
 const SPREADSHEET_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const SPREADSHEET_EXTENSIONS = new Set(["xlsx", "xls", "csv"]);
@@ -914,19 +923,39 @@ export async function deleteArchiveGarageItems(
       return { success: false, error: "No archive items selected" };
     }
 
-    const deleteResult = await deleteGarageKeys(
-      normalizedKeys,
-      ARCHIVE_GARAGE_BUCKET,
-      ARCHIVE_GARAGE_ROOT,
-    );
-    if (!deleteResult.success) {
-      return { success: false, error: deleteResult.error };
-    }
-
-    const exactPaths = normalizedKeys.map((key) => key.replace(/\/$/, ""));
+    const exactPaths: string[] = [];
     const folderPrefixes = normalizedKeys
       .filter((key) => key.endsWith("/"))
-      .map((key) => key.replace(/\/$/, ""));
+      .map((key) => normalizeArchivePath(key.replace(/\/$/, "")))
+      .filter((key) => key.length > 0);
+    const exactStorageKeys: string[] = [];
+    const fileKeyConditions: Prisma.FileDataWhereInput[] = [];
+
+    for (const key of normalizedKeys) {
+      const isFolder = key.endsWith("/");
+      const normalizedPath = normalizeArchivePath(key.replace(/\/$/, ""));
+      if (!normalizedPath) continue;
+
+      if (isFolder) {
+        fileKeyConditions.push({
+          key: {
+            startsWith: `${scopeArchiveStorageKey(normalizedPath)}/`,
+          },
+        });
+      } else {
+        exactPaths.push(normalizedPath);
+        exactStorageKeys.push(scopeArchiveStorageKey(normalizedPath));
+      }
+    }
+
+    if (exactStorageKeys.length > 0) {
+      fileKeyConditions.push({
+        key: {
+          in: exactStorageKeys,
+        },
+      });
+    }
+
     const deleteConditions: Prisma.ArchiveEntryWhereInput[] = [
       {
         fullPath: {
@@ -943,11 +972,43 @@ export async function deleteArchiveGarageItems(
       });
     }
 
-    await prisma.archiveEntry.deleteMany({
+    if (fileKeyConditions.length > 0) {
+      deleteConditions.push({
+        file: {
+          is: {
+            OR: fileKeyConditions,
+          },
+        },
+      });
+    }
+
+    const archiveRowsToDelete = await prisma.archiveEntry.findMany({
       where: {
         OR: deleteConditions,
       },
+      select: {
+        id: true,
+      },
     });
+
+    const deleteResult = await deleteGarageKeys(
+      normalizedKeys,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
+    if (!deleteResult.success) {
+      return { success: false, error: deleteResult.error };
+    }
+
+    if (archiveRowsToDelete.length > 0) {
+      await prisma.archiveEntry.deleteMany({
+        where: {
+          id: {
+            in: archiveRowsToDelete.map((row) => row.id),
+          },
+        },
+      });
+    }
 
     return {
       success: true,
