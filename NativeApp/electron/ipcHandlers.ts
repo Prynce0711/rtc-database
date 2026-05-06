@@ -3,6 +3,7 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { exec } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs, watch as fsWatch, type FSWatcher } from "node:fs";
+import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
 import {
@@ -42,6 +43,22 @@ const RELAY_TRUST_BACKEND_CHANNEL = "relay:trust-backend";
 const RELAY_NAVIGATE_BACKEND_CHANNEL = "relay:navigate-backend";
 const RELAY_GET_STARTUP_SETTINGS_CHANNEL = "relay:get-startup-settings";
 const RELAY_SET_STARTUP_SETTINGS_CHANNEL = "relay:set-startup-settings";
+const DEFAULT_FILE_READ_CHUNK_BYTES = 8 * 1024 * 1024;
+const MAX_FILE_READ_CHUNK_BYTES = 16 * 1024 * 1024;
+
+const toSafeFileReadOffset = (value: unknown): number => {
+  const offset = Number(value);
+  return Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
+};
+
+const toSafeFileReadLength = (value: unknown): number => {
+  const requestedLength = Number(value);
+  if (!Number.isFinite(requestedLength) || requestedLength <= 0) {
+    return DEFAULT_FILE_READ_CHUNK_BYTES;
+  }
+
+  return Math.min(Math.floor(requestedLength), MAX_FILE_READ_CHUNK_BYTES);
+};
 
 type ExternalArchiveEditSession = {
   sessionId: string;
@@ -487,6 +504,82 @@ ipcMain.handle(
         success: false,
         error: error instanceof Error ? error.message : "Failed to read file",
       };
+    }
+  },
+);
+
+ipcMain.handle(
+  IPC_CHANNELS.FILES_READ_CHUNK,
+  async (
+    _event,
+    args: {
+      baseFolder: string;
+      relativePath: string;
+      offset?: number;
+      length?: number;
+    },
+  ) => {
+    const fullPath = resolveSafePath(args.baseFolder, args.relativePath);
+    if (!fullPath) {
+      return { success: false, error: "Invalid path." };
+    }
+
+    let fileHandle: FileHandle | null = null;
+
+    try {
+      const fileStat = await fs.stat(fullPath);
+      if (!fileStat.isFile()) {
+        return { success: false, error: "Requested path is not a file." };
+      }
+
+      const offset = toSafeFileReadOffset(args.offset);
+      if (offset >= fileStat.size) {
+        return {
+          success: true,
+          result: {
+            base64: "",
+            name: path.basename(fullPath),
+            size: fileStat.size,
+            offset,
+            bytesRead: 0,
+            nextOffset: fileStat.size,
+            done: true,
+          },
+        };
+      }
+
+      const requestedLength = toSafeFileReadLength(args.length);
+      const bytesToRead = Math.min(requestedLength, fileStat.size - offset);
+      const buffer = Buffer.allocUnsafe(bytesToRead);
+
+      fileHandle = await fs.open(fullPath, "r");
+      const { bytesRead } = await fileHandle.read(
+        buffer,
+        0,
+        bytesToRead,
+        offset,
+      );
+      const nextOffset = offset + bytesRead;
+
+      return {
+        success: true,
+        result: {
+          base64: buffer.subarray(0, bytesRead).toString("base64"),
+          name: path.basename(fullPath),
+          size: fileStat.size,
+          offset,
+          bytesRead,
+          nextOffset,
+          done: nextOffset >= fileStat.size,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to read file",
+      };
+    } finally {
+      await fileHandle?.close();
     }
   },
 );
