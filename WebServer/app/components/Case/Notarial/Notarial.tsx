@@ -15,9 +15,9 @@ import {
   heartbeatNotarialEditLock,
   heartbeatNotarialGarageEditLock,
   moveNotarialGarageItems,
-  renameNotarialGarageItem,
   releaseNotarialEditLock,
   releaseNotarialGarageEditLock,
+  renameNotarialGarageItem,
   syncNotarialEditedFile,
   syncNotarialGarageEditedFile,
 } from "@/app/components/Case/Notarial/NotarialActions";
@@ -395,9 +395,9 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
   });
 
   const deferredSearch = useDeferredValue(searchInput.trim());
-  const desktopEditSessionsRef = useRef<Map<string, NotarialDesktopEditSessionState>>(
-    new Map(),
-  );
+  const desktopEditSessionsRef = useRef<
+    Map<string, NotarialDesktopEditSessionState>
+  >(new Map());
   const desktopEditSyncInFlightRef = useRef<Set<string>>(new Set());
   const deviceIdRef = useRef<string | null>(null);
 
@@ -405,13 +405,15 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     if (typeof window === "undefined") {
       return null;
     }
-    const ipc = (window as unknown as {
-      ipcRenderer?: {
-        invoke?: (...args: unknown[]) => Promise<unknown>;
-        on?: (...args: unknown[]) => unknown;
-        off?: (...args: unknown[]) => unknown;
-      };
-    }).ipcRenderer;
+    const ipc = (
+      window as unknown as {
+        ipcRenderer?: {
+          invoke?: (...args: unknown[]) => Promise<unknown>;
+          on?: (...args: unknown[]) => unknown;
+          off?: (...args: unknown[]) => unknown;
+        };
+      }
+    ).ipcRenderer;
     return ipc?.invoke ? ipc : null;
   };
 
@@ -745,7 +747,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
     const headerUpdatedAtMs = headerLastModified
       ? new Date(headerLastModified).getTime()
       : undefined;
-    const serverTimestamp = record.fileUpdatedAt || record.updatedAt || record.createdAt;
+    const serverTimestamp =
+      record.fileUpdatedAt || record.updatedAt || record.createdAt;
 
     if (headerUpdatedAtMs && !Number.isNaN(headerUpdatedAtMs)) {
       return headerUpdatedAtMs;
@@ -890,7 +893,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         return false;
       }
 
-      const fileName = record.fileName || record.link.split("/").pop() || "File";
+      const fileName =
+        record.fileName || record.link.split("/").pop() || "File";
       const downloadResult = await getRecordFileUrl(record, {
         inline: false,
         fileName,
@@ -910,14 +914,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         cache: "no-store",
       });
       if (!response.ok) {
-        statusPopup.showError("Failed to fetch file payload for read-only view.");
+        statusPopup.showError(
+          "Failed to fetch file payload for read-only view.",
+        );
         return false;
       }
 
       const blob = await response.blob();
       const base64 = await blobToBase64(blob);
       if (!base64) {
-        statusPopup.showError("Failed to decode file payload for read-only view.");
+        statusPopup.showError(
+          "Failed to decode file payload for read-only view.",
+        );
         return false;
       }
 
@@ -982,17 +990,27 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         return false;
       }
 
-      const fileName = record.fileName || record.link.split("/").pop() || "File";
+      const fileName =
+        record.fileName || record.link.split("/").pop() || "File";
       const deviceId = await getDeviceIdFromIpc();
       const isGarage = record.source === "garage";
 
       const lockResult = isGarage
-        ? await acquireNotarialGarageEditLock(record.link, deviceId ? { deviceId } : undefined)
-        : await acquireNotarialEditLock(record.id, deviceId ? { deviceId } : undefined);
+        ? await acquireNotarialGarageEditLock(
+            record.link,
+            deviceId ? { deviceId } : undefined,
+          )
+        : await acquireNotarialEditLock(
+            record.id,
+            deviceId ? { deviceId } : undefined,
+          );
 
       if (!lockResult.success) {
         if (lockResult.errorResult?.code === "locked") {
-          return await openDesktopReadOnly(record, lockResult.errorResult.lockedBy);
+          return await openDesktopReadOnly(
+            record,
+            lockResult.errorResult.lockedBy,
+          );
         }
 
         statusPopup.showError(
@@ -1019,7 +1037,8 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           await releaseNotarialEditLock(lockResult.result.lockId);
         }
         statusPopup.showError(
-          downloadResult.error || "Failed to download file for desktop editing.",
+          downloadResult.error ||
+            "Failed to download file for desktop editing.",
         );
         return false;
       }
@@ -1035,14 +1054,18 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         } else {
           await releaseNotarialEditLock(lockResult.result.lockId);
         }
-        statusPopup.showError("Failed to fetch file payload for desktop editing.");
+        statusPopup.showError(
+          "Failed to fetch file payload for desktop editing.",
+        );
         return false;
       }
 
       const blob = await response.blob();
       const base64 = await blobToBase64(blob);
       const sessionId = lockResult.result.lockId;
-      const tempKey = isGarage ? `notarial:garage:${record.link}` : `notarial:${record.id}`;
+      const tempKey = isGarage
+        ? `notarial:garage:${record.link}`
+        : `notarial:${record.id}`;
 
       const openResult = (await ipc.invoke(
         IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
@@ -1083,7 +1106,10 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
         }
       }, lockResult.result.heartbeatIntervalMs);
 
-      const syncIntervalMs = Math.max(lockResult.result.syncIntervalMs || 15000, 5000);
+      const syncIntervalMs = Math.max(
+        lockResult.result.syncIntervalMs || 15000,
+        5000,
+      );
       const syncTimer = window.setInterval(() => {
         void syncDesktopEditSession(sessionId, true);
       }, syncIntervalMs);

@@ -2,30 +2,30 @@
 
 import { validateSession } from "@/app/lib/authActions";
 import { GetFileOptions, getGarageClient } from "@/app/lib/garage";
-import { redisConnection } from "@/app/lib/redis";
 import {
-  uploadFileToGarageTrusted,
+  createGarageFolderMarker,
   deleteGarageFile,
   deleteGarageKeys,
+  GARAGE_NOTARIAL_ROOT,
   getFileHash,
   getGarageFileUrl,
   listGarageFolder,
-  moveGarageKeys,
   moveGarageFile,
+  moveGarageKeys,
   renameGarageKey,
   uploadFileToGarage,
-  createGarageFolderMarker,
-  GARAGE_NOTARIAL_ROOT,
+  uploadFileToGarageTrusted,
   type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
+import { redisConnection } from "@/app/lib/redis";
 import Roles from "@/app/lib/Roles";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   ActionResult,
   FilterOptions,
   PaginatedResult,
 } from "@rtc-database/shared";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { Prisma } from "@rtc-database/shared/prisma/client";
 import { createHash, randomUUID } from "crypto";
 import { prettifyError } from "zod";
@@ -180,7 +180,8 @@ const parseNotarialEditLockPayload = (
       return null;
     }
 
-    const deviceId = typeof parsed.deviceId === "string" ? parsed.deviceId : null;
+    const deviceId =
+      typeof parsed.deviceId === "string" ? parsed.deviceId : null;
 
     return {
       lockId: parsed.lockId,
@@ -214,7 +215,8 @@ const parseNotarialGarageEditLockPayload = (
       return null;
     }
 
-    const deviceId = typeof parsed.deviceId === "string" ? parsed.deviceId : null;
+    const deviceId =
+      typeof parsed.deviceId === "string" ? parsed.deviceId : null;
 
     return {
       lockId: parsed.lockId,
@@ -255,7 +257,10 @@ const isOfficeEditableNotarialFile = (record: {
 }): boolean => {
   const fileName = record.file?.fileName || record.title || "";
   const extension = fileName.includes(".")
-    ? fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase().trim()
+    ? fileName
+        .slice(fileName.lastIndexOf(".") + 1)
+        .toLowerCase()
+        .trim()
     : "";
 
   if (OFFICE_EDITABLE_EXTENSIONS.has(extension)) {
@@ -790,12 +795,7 @@ export async function createNotarial(
       };
     }
 
-    const {
-      file,
-      path,
-      removeFile,
-      ...notarialFields
-    } = parsedData.data;
+    const { file, path, removeFile, ...notarialFields } = parsedData.data;
     void removeFile;
 
     if (!file) {
@@ -806,9 +806,10 @@ export async function createNotarial(
     try {
       const fileHash = await getFileHash(file);
       const targetFolder = normalizeGaragePath(path);
-      const uploadKey = path != null
-        ? buildFolderUploadKey(targetFolder, file)
-        : generateFileKey({ ...parsedData.data, fileHash });
+      const uploadKey =
+        path != null
+          ? buildFolderUploadKey(targetFolder, file)
+          : generateFileKey({ ...parsedData.data, fileHash });
       uploadResult = await uploadFileToGarage(
         file,
         uploadKey,
@@ -941,12 +942,13 @@ export async function updateNotarial(
 
       const incomingFileHash = await getFileHash(incomingFile);
       const targetFolder = normalizeGaragePath(parsedData.data.path);
-      const uploadKey = parsedData.data.path != null
-        ? buildFolderUploadKey(targetFolder, incomingFile)
-        : generateFileKey({
-            ...mergedData,
-            fileHash: incomingFileHash,
-          });
+      const uploadKey =
+        parsedData.data.path != null
+          ? buildFolderUploadKey(targetFolder, incomingFile)
+          : generateFileKey({
+              ...mergedData,
+              fileHash: incomingFileHash,
+            });
       if (!uploadKey) {
         return {
           success: false,
@@ -1199,7 +1201,8 @@ export async function acquireNotarialEditLock(
     if (acquired !== "OK") {
       return {
         success: false,
-        error: "Unable to acquire lock. Another user may have opened this file.",
+        error:
+          "Unable to acquire lock. Another user may have opened this file.",
       };
     }
 
@@ -1247,7 +1250,9 @@ export async function heartbeatNotarialEditLock(
     }
 
     const lockKey = getNotarialEditLockKey(recordId);
-    const payload = parseNotarialEditLockPayload(await redisConnection.get(lockKey));
+    const payload = parseNotarialEditLockPayload(
+      await redisConnection.get(lockKey),
+    );
     if (!payload || payload.lockId !== normalizedLockId) {
       return { success: false, error: "Notarial edit lock has expired." };
     }
@@ -1395,13 +1400,15 @@ export async function syncNotarialEditedFile(
     if (!isOfficeEditableNotarialFile(record)) {
       return {
         success: false,
-        error: "Only Word and Excel files can be synced through desktop editing.",
+        error:
+          "Only Word and Excel files can be synced through desktop editing.",
       };
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = createHash("sha256").update(buffer).digest("hex");
-    const contentType = file.type || record.file.mimeType || "application/octet-stream";
+    const contentType =
+      file.type || record.file.mimeType || "application/octet-stream";
     const fileName = file.name || record.file.fileName || "notarial-file";
 
     const garageClient = await getGarageClient();
@@ -1544,7 +1551,8 @@ export async function acquireNotarialGarageEditLock(
     if (acquired !== "OK") {
       return {
         success: false,
-        error: "Unable to acquire lock. Another user may have opened this file.",
+        error:
+          "Unable to acquire lock. Another user may have opened this file.",
       };
     }
 
@@ -2009,7 +2017,8 @@ export async function createGarageFolder(
     if (
       existingItems.success &&
       existingItems.result.some(
-        (item) => item.isDirectory && item.name.toLowerCase() === name.toLowerCase(),
+        (item) =>
+          item.isDirectory && item.name.toLowerCase() === name.toLowerCase(),
       )
     ) {
       return { success: false, error: "A folder already exists at that path" };
@@ -2036,4 +2045,3 @@ export async function createGarageFolder(
     return { success: false, error: "Failed to create folder" };
   }
 }
-
