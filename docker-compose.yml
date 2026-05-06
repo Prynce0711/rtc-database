@@ -1,18 +1,78 @@
 services:
-  webserver:
-    image: rtc-database-webserver:latest
+  garage:
+    image: dxflrs/garage:v2.0.0
+    container_name: garage
+    restart: unless-stopped
+    volumes:
+      - ./garage.toml:/etc/garage.toml
+      - ./meta:/var/lib/garage/meta
+      - ./data:/var/lib/garage/data
+    ports:
+      - 3900:3900
+      - 3901:3901
+      - 3902:3902
+      - 3903:3903
+
+  webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    restart: unless-stopped
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+    ports:
+      - 3909:3909
     env_file:
-      - ./WebServer/.env
+      - .env
+    depends_on:
+      - garage
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+  webserver:
+    image: prynce0711/rtc-database-webserver:latest
+    container_name: rtc-webserver
+    restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3000:3000"
     volumes:
       - ./WebServer/dev.db:/app/WebServer/dev.db
+      - ./WebServer/dev.db-wal:/app/WebServer/dev.db-wal
+      - ./WebServer/dev.db-shm:/app/WebServer/dev.db-shm
+    depends_on:
+      - redis
   relay:
-    image: rtc-database-relay:latest
+    image: prynce0711/rtc-database-relay:latest
+    container_name: rtc-relay
+    restart: unless-stopped
     env_file:
-      - ./RelayServer/.env
+      - .env
     ports:
       - "3443:3443"
       - "41234:41234/udp"
     volumes:
-      - ./RelayServer/.relay-tls:/app/RelayServer/.relay-tls
+      - ./.relay-tls:/app/RelayServer/.relay-tls
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: rtc-tailscale
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./tailscale:/var/lib/tailscale
+      - ./serve-config.json:/config/serve-config.json
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    network_mode: service:webserver
+    depends_on:
+      - webserver
