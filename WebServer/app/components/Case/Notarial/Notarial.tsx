@@ -1,18 +1,18 @@
 "use client";
+import { getArchiveFileUrl as getArchiveFileUrlArchive } from "@/app/components/Case/Archives/ArchiveActions";
 import {
+  createGarageFolder,
   createNotarial,
   deleteNotarial,
+  deleteNotarialGarageItems,
   getNotarialByIds,
   getNotarialFileUrl,
-  getNotarialPage,
-  createGarageFolder,
   getNotarialGarageDirectoryItems,
   getNotarialGarageFileUrl,
-  deleteNotarialGarageItems,
+  getNotarialPage,
   moveNotarialGarageItems,
   renameNotarialGarageItem,
 } from "@/app/components/Case/Notarial/NotarialActions";
-import { getArchiveFileUrl as getArchiveFileUrlArchive } from "@/app/components/Case/Archives/ArchiveActions";
 
 import { NotarialData } from "@/app/components/Case/Notarial/schema";
 import Roles from "@/app/lib/Roles";
@@ -37,8 +37,10 @@ import React, {
   useState,
 } from "react";
 import {
-  FiChevronRight,
+  FiCheck,
   FiChevronLeft,
+  FiChevronRight,
+  FiChevronsDown,
   FiDownload,
   FiEdit2,
   FiFileText,
@@ -55,8 +57,6 @@ import {
   FiTrash2,
   FiUpload,
   FiX,
-  FiChevronsDown,
-  FiCheck,
 } from "react-icons/fi";
 import NotarialRow, { NotarialRecord } from "./NotarialRow";
 import {
@@ -65,8 +65,6 @@ import {
   getExplorerDescriptor,
   getExplorerPathSegments,
 } from "./notarialExplorerUtils";
-
-
 
 type NotarialFilterValues = {
   title?: string;
@@ -1174,9 +1172,7 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
           uploadErrors.push(result.error || "Upload failed");
         }
       } catch (err) {
-        uploadErrors.push(
-          err instanceof Error ? err.message : "Upload failed",
-        );
+        uploadErrors.push(err instanceof Error ? err.message : "Upload failed");
       }
     }
 
@@ -2417,7 +2413,6 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                     />
                   </label> */}
 
-                  
                   <button
                     type="button"
                     className="btn btn-sm btn-outline flex items-center justify-center gap-2"
@@ -2692,13 +2687,10 @@ const NotarialPage: React.FC<{ role: Roles }> = ({ role }) => {
                       multiple
                       // @ts-expect-error -- non-standard attribute required for folder selection
                       webkitdirectory=""
-                     
                       directory=""
                       className="hidden"
                       onChange={(e) => {
-                        const files = Array.from(
-                          e.currentTarget.files ?? [],
-                        );
+                        const files = Array.from(e.currentTarget.files ?? []);
                         void handleUploadFolderFiles(
                           files.length > 0 ? files : null,
                         );
