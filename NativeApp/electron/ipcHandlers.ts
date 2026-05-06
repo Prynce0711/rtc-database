@@ -1,12 +1,8 @@
 import { IPC_CHANNELS } from "@rtc-database/shared";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-<<<<<<< HEAD
 import { exec } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs, watch as fsWatch, type FSWatcher } from "node:fs";
-=======
-import { promises as fs } from "node:fs";
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
@@ -63,7 +59,6 @@ const toSafeFileReadLength = (value: unknown): number => {
 
   return Math.min(Math.floor(requestedLength), MAX_FILE_READ_CHUNK_BYTES);
 };
-<<<<<<< HEAD
 
 type ExternalArchiveEditSession = {
   sessionId: string;
@@ -199,8 +194,6 @@ const closeExternalArchiveEditSession = async (
     }
   }
 };
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
 
 const bringWindowToFront = (window: BrowserWindow | null): void => {
   if (!window || window.isDestroyed()) {
@@ -592,7 +585,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-<<<<<<< HEAD
   IPC_CHANNELS.ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION,
   async (
     event,
@@ -1122,8 +1114,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   IPC_CHANNELS.RCLONE_AUTHORIZE_PROVIDER,
   async (event, args: { provider: string }) => {
     try {

@@ -10,13 +10,8 @@ import React, {
 } from "react";
 import {
   FiChevronLeft,
-<<<<<<< HEAD
   FiChevronRight,
   FiCheck,
-=======
-  FiCheck,
-  FiClock,
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   FiDownload,
   FiEdit2,
   FiFilePlus,
@@ -41,12 +36,6 @@ import {
   BatchUploadProgressPanel,
   BatchUploadProgressState,
   MAX_UPLOAD_BATCH_BYTES,
-  createBatchUploadProgressState,
-  createUploadBatches,
-} from "../../lib/batchUploadProgress";
-import {
-  BatchUploadProgressPanel,
-  BatchUploadProgressState,
   createBatchUploadProgressState,
   createUploadBatches,
 } from "../../lib/batchUploadProgress";
