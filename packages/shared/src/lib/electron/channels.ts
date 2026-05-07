@@ -3,14 +3,11 @@ export const IPC_CHANNELS = {
   FILES_CHECK_EXISTS: "files:check-exists",
   FILES_READ: "files:read",
   FILES_READ_CHUNK: "files:read-chunk",
-<<<<<<< HEAD
   ARCHIVE_OPEN_EXTERNAL_EDIT_SESSION: "archive:open-external-edit-session",
   ARCHIVE_READ_EXTERNAL_EDIT_SESSION: "archive:read-external-edit-session",
   ARCHIVE_CLOSE_EXTERNAL_EDIT_SESSION: "archive:close-external-edit-session",
   ARCHIVE_CHECK_EXTERNAL_EDIT_LOCK: "archive:check-external-edit-lock",
   ARCHIVE_EXTERNAL_EDIT_DIRTY_EVENT: "archive:external-edit-dirty",
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   RCLONE_AUTHORIZE_PROVIDER: "rclone:authorize-provider",
   SESSION_SYNC_USER_MINIMAL: "session:sync-user-minimal",
   SESSION_GET_DEVICE_ID: "session:get-device-id",

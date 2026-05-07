@@ -129,20 +129,8 @@ export const pickDirectoriesWithFileSystemAccess = async (options?: {
     return null;
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   const allowMultiple = options?.allowMultiple ?? false;
   const confirmAnother = options?.confirmAnother ?? (() => false);
-=======
-  const allowMultiple = options?.allowMultiple ?? true;
-  const confirmAnother =
-    options?.confirmAnother ??
-    (() => window.confirm("Select another folder for this upload?"));
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-  const allowMultiple = options?.allowMultiple ?? false;
-  const confirmAnother = options?.confirmAnother ?? (() => false);
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
   const selectedFiles: File[] = [];
 
   while (true) {

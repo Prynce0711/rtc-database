@@ -10,13 +10,8 @@ import React, {
 } from "react";
 import {
   FiChevronLeft,
-<<<<<<< HEAD
   FiChevronRight,
   FiCheck,
-=======
-  FiCheck,
-  FiClock,
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
   FiDownload,
   FiEdit2,
   FiFilePlus,
@@ -38,16 +33,6 @@ import { ArchiveEntryType } from "../../generated/prisma/enums";
 import { IPC_CHANNELS } from "../../lib/electron/channels";
 import {
   BatchUploadFailure,
-<<<<<<< HEAD
-  BatchUploadProgressPanel,
-  BatchUploadProgressState,
-  MAX_UPLOAD_BATCH_BYTES,
-  createBatchUploadProgressState,
-  createUploadBatches,
-} from "../../lib/batchUploadProgress";
-import {
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
   BatchUploadProgressPanel,
   BatchUploadProgressState,
   MAX_UPLOAD_BATCH_BYTES,
@@ -1610,14 +1595,7 @@ const ArchivePage: React.FC<{
     let uploadedBytes = 0;
     let successCount = 0;
     const uploadErrors: string[] = [];
-<<<<<<< HEAD
-<<<<<<< HEAD
     const uploadFailures: BatchUploadFailure[] = [];
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-    const uploadFailures: BatchUploadFailure[] = [];
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
 
     setUploading(true);
     setUploadProgress(0);
@@ -1657,10 +1635,6 @@ const ArchivePage: React.FC<{
             : previous,
         );
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
         let currentEntryUploadedBytes = 0;
         const updateCurrentEntryProgress = (entryUploadedBytes: number) => {
           currentEntryUploadedBytes = Math.min(
@@ -1680,38 +1654,15 @@ const ArchivePage: React.FC<{
           );
         };
 
-<<<<<<< HEAD
         try {
           const result = await uploadArchiveEntryFile(
             entry,
             updateCurrentEntryProgress,
           );
-=======
-        try {
-          // Upload sequentially inside each 250 MB batch to keep the backend steady.
-          const result = await adapter.createArchiveEntry({
-            name: entry.name,
-            parentPath: entry.parentPath,
-            entryType: ArchiveEntryType.FILE,
-            description: undefined,
-            file: entry.file,
-          });
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-        try {
-          const result = await uploadArchiveEntryFile(
-            entry,
-            updateCurrentEntryProgress,
-          );
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
 
           if (result.success) {
             successCount++;
           } else {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
             const message = result.error || "Upload failed";
             uploadErrors.push(message);
             uploadFailures.push({
@@ -1719,7 +1670,6 @@ const ArchivePage: React.FC<{
               error: message,
               kind: "file",
             });
-<<<<<<< HEAD
           }
         } catch (error) {
           const message =
@@ -1730,26 +1680,6 @@ const ArchivePage: React.FC<{
             error: message,
             kind: "file",
           });
-=======
-            uploadErrors.push(result.error || "Upload failed");
-          }
-        } catch (error) {
-          uploadErrors.push(
-            error instanceof Error ? error.message : "Upload failed",
-          );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-          }
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Upload failed";
-          uploadErrors.push(message);
-          uploadFailures.push({
-            name: entry.name,
-            error: message,
-            kind: "file",
-          });
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
         }
 
         processedCount++;
@@ -1764,14 +1694,7 @@ const ArchivePage: React.FC<{
                 ...previous,
                 completedFiles: processedCount,
                 failedFiles: uploadErrors.length,
-<<<<<<< HEAD
-<<<<<<< HEAD
                 failedItems: uploadFailures.slice(),
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-                failedItems: uploadFailures.slice(),
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
                 uploadedBytes,
                 currentBatchBytes,
                 uploadedBatchBytes,
@@ -1789,14 +1712,7 @@ const ArchivePage: React.FC<{
             phase: hasErrors ? "failed" : "completed",
             completedFiles: processedCount,
             failedFiles: uploadErrors.length,
-<<<<<<< HEAD
-<<<<<<< HEAD
             failedItems: uploadFailures,
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-            failedItems: uploadFailures,
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
             uploadedBytes,
             uploadedBatchBytes: previous.currentBatchBytes,
             currentFileName: undefined,
@@ -1818,15 +1734,7 @@ const ArchivePage: React.FC<{
     }
 
     setUploading(false);
-<<<<<<< HEAD
-<<<<<<< HEAD
     return { successCount, uploadErrors, uploadFailures };
-=======
-    return { successCount, uploadErrors };
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-    return { successCount, uploadErrors, uploadFailures };
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
   };
 
   const handleUploadFiles = async (files: File[] | null) => {
@@ -1850,17 +1758,7 @@ const ArchivePage: React.FC<{
     );
 
     if (uploadErrors.length > 0) {
-<<<<<<< HEAD
-<<<<<<< HEAD
       statusPopup.hidePopup();
-=======
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
-      );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-      statusPopup.hidePopup();
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
     } else {
       statusPopup.showSuccess(
         `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
@@ -1901,17 +1799,7 @@ const ArchivePage: React.FC<{
     );
 
     if (uploadErrors.length > 0) {
-<<<<<<< HEAD
-<<<<<<< HEAD
       statusPopup.hidePopup();
-=======
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
-      );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-      statusPopup.hidePopup();
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
     } else {
       statusPopup.showSuccess(
         `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
@@ -2123,14 +2011,7 @@ const ArchivePage: React.FC<{
     statusPopup.showLoading(`Uploading ${files.length} files...`);
     const createdFolderPaths = new Set<string>();
     const folderErrors: string[] = [];
-<<<<<<< HEAD
-<<<<<<< HEAD
     const folderFailures: BatchUploadFailure[] = [];
-=======
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-    const folderFailures: BatchUploadFailure[] = [];
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
     const uploadEntries: ArchiveUploadEntry[] = [];
 
     for (const file of files) {
@@ -2149,10 +2030,6 @@ const ArchivePage: React.FC<{
           createdFolderPaths,
         );
         if (!folderResult.success) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
           const message = folderResult.error || "Failed to create folder";
           folderErrors.push(message);
           folderFailures.push({
@@ -2160,12 +2037,6 @@ const ArchivePage: React.FC<{
             error: message,
             kind: "folder",
           });
-<<<<<<< HEAD
-=======
-          folderErrors.push(folderResult.error || "Failed to create folder");
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
           continue;
         }
 
@@ -2175,10 +2046,6 @@ const ArchivePage: React.FC<{
           parentPath: folderResult.path,
         });
       } catch (error) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
         const message =
           error instanceof Error ? error.message : "Failed to prepare upload";
         folderErrors.push(message);
@@ -2187,22 +2054,10 @@ const ArchivePage: React.FC<{
           error: message,
           kind: "file",
         });
-<<<<<<< HEAD
-=======
-        folderErrors.push(
-          error instanceof Error ? error.message : "Failed to prepare upload",
-        );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
       }
     }
 
     if (uploadEntries.length === 0) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
       statusPopup.hidePopup();
       setBatchUploadProgress({
         ...createBatchUploadProgressState(
@@ -2218,7 +2073,6 @@ const ArchivePage: React.FC<{
         error: folderErrors[0] || "No files could be uploaded.",
       });
       setUploading(false);
-<<<<<<< HEAD
       return;
     }
 
@@ -2241,40 +2095,6 @@ const ArchivePage: React.FC<{
               }`,
             }
           : previous,
-=======
-      statusPopup.showError(folderErrors[0] || "No files could be uploaded.");
-=======
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
-      return;
-    }
-
-    const { successCount, uploadErrors, uploadFailures } =
-      await runBatchedArchiveUpload(uploadEntries, "Processing");
-    const failedItems = [...uploadFailures, ...folderFailures];
-    const failedCount = failedItems.length;
-
-    if (failedCount > 0) {
-<<<<<<< HEAD
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${
-          uploadErrors[0] || folderErrors[0] || "Upload failed"
-        }`,
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-      statusPopup.hidePopup();
-      setBatchUploadProgress((previous) =>
-        previous
-          ? {
-              ...previous,
-              phase: "failed",
-              failedFiles: failedCount,
-              failedItems,
-              error: `Uploaded ${successCount} of ${files.length} files. ${
-                uploadErrors[0] || folderErrors[0] || "Upload failed"
-              }`,
-            }
-          : previous,
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
       );
     } else {
       statusPopup.showSuccess(
@@ -2735,19 +2555,9 @@ const ArchivePage: React.FC<{
                 className="hidden"
                 onChange={(e) => {
                   const files = Array.from(e.currentTarget.files ?? []);
-<<<<<<< HEAD
-<<<<<<< HEAD
                   if (files.length > 0) {
                     void handleUploadFiles(files);
                   }
-=======
-                  void handleUploadFiles(files.length > 0 ? files : null);
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-                  if (files.length > 0) {
-                    void handleUploadFiles(files);
-                  }
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
                   e.currentTarget.value = "";
                 }}
               />
@@ -2771,19 +2581,9 @@ const ArchivePage: React.FC<{
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.currentTarget.files ?? []);
-<<<<<<< HEAD
-<<<<<<< HEAD
                 if (files.length > 0) {
                   void handleUploadFolderFiles(files);
                 }
-=======
-                void handleUploadFolderFiles(files.length > 0 ? files : null);
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-                if (files.length > 0) {
-                  void handleUploadFolderFiles(files);
-                }
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
                 e.currentTarget.value = "";
               }}
             />
@@ -3600,21 +3400,9 @@ const ArchivePage: React.FC<{
                       accept={acceptedArchiveUploadTypes}
                       onChange={(e) => {
                         const files = Array.from(e.currentTarget.files ?? []);
-<<<<<<< HEAD
-<<<<<<< HEAD
                         if (files.length > 0) {
                           void handleUploadFiles(files);
                         }
-=======
-                        void handleUploadFiles(
-                          files.length > 0 ? files : null,
-                        );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-                        if (files.length > 0) {
-                          void handleUploadFiles(files);
-                        }
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
                         e.currentTarget.value = "";
                       }}
                     />
@@ -3637,21 +3425,9 @@ const ArchivePage: React.FC<{
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.currentTarget.files ?? []);
-<<<<<<< HEAD
-<<<<<<< HEAD
                       if (files.length > 0) {
                         void handleUploadFolderFiles(files);
                       }
-=======
-                      void handleUploadFolderFiles(
-                        files.length > 0 ? files : null,
-                      );
->>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
-=======
-                      if (files.length > 0) {
-                        void handleUploadFolderFiles(files);
-                      }
->>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
                       e.currentTarget.value = "";
                     }}
                   />
