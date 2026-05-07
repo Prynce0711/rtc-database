@@ -235,6 +235,94 @@ model CivilCase {
   @@unique([updatedAt, id])
 }
 
+model CivilCourtOfFirstInstanceTransmittal {
+  id           Int       @id @default(autoincrement())
+  caseNumber   String?
+  branchJudge  String?
+  date         DateTime?
+  plaintiffs   String?
+  defendants   String?
+  status       String?
+  note         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@index([date])
+  @@unique([updatedAt, id])
+}
+
+model CivilTransmittalRecord {
+  id                        Int       @id @default(autoincrement())
+  caseNumber                String?
+  transmittedRaffledToBranch String?
+  dateReceived              DateTime?
+  petitioners               String?
+  defendants                String?
+  issuedTransmittedByBranch  String?
+  toBeRaffledOn             DateTime?
+  natureOfTransmittal       String?
+  orderResolutionDated      DateTime?
+  attorney1                 String?
+  officeAddress1            String?
+  attorney2                 String?
+  officeAddress2            String?
+  attorney3                 String?
+  officeAddress3            String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@index([dateReceived])
+  @@index([toBeRaffledOn])
+  @@unique([updatedAt, id])
+}
+
+model CriminalAppealedCase {
+  id                Int       @id @default(autoincrement())
+  date              DateTime?
+  referenceToBranch String?
+  mtcCaseNo         String?
+  raffleDate        DateTime?
+  fromMtcRtcJudge   String?
+  orderDate         DateTime?
+  branch            String?
+  caseNo            String?
+  dateFiled         DateTime?
+  accused           String?
+  charge            String?
+  ao                String?
+  appealedId        String?
+  name1             String?
+  address1          String?
+  name2             String?
+  address2          String?
+  name3             String?
+  address3          String?
+  name4             String?
+  address4          String?
+  name5             String?
+  address5          String?
+  name6             String?
+  address6          String?
+  name7             String?
+  address7          String?
+  name8             String?
+  address8          String?
+  name9             String?
+  address9          String?
+  name10            String?
+  address10         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@index([date])
+  @@index([raffleDate])
+  @@index([dateFiled])
+  @@unique([updatedAt, id])
+}
+
 model Petition {
   id         Int       @id @default(autoincrement())
   baseCaseID Int       @unique
@@ -486,7 +574,7 @@ model RecievingLog {
   updatedAt    DateTime? @updatedAt
 }
 
-model CriminalTransmittal {
+model CriminalDiversion {
   id            Int       @id @default(autoincrement())
   sourceRecordId Int
   caseNumber    String?
@@ -501,7 +589,7 @@ model CriminalTransmittal {
   @@unique([updatedAt, id])
 }
 
-model CivilTransmittal {
+model CivilDiversion {
   id            Int       @id @default(autoincrement())
   sourceRecordId Int
   caseNumber    String?
@@ -516,7 +604,7 @@ model CivilTransmittal {
   @@unique([updatedAt, id])
 }
 
-model RecievingLogTransmittal {
+model RecievingLogDiversion {
   id            Int       @id @default(autoincrement())
   sourceRecordId Int
   caseNumber    String?
@@ -531,7 +619,7 @@ model RecievingLogTransmittal {
   @@unique([updatedAt, id])
 }
 
-model SheriffTransmittal {
+model SheriffDiversion {
   id            Int       @id @default(autoincrement())
   sourceRecordId Int
   caseNumber    String?
@@ -546,7 +634,7 @@ model SheriffTransmittal {
   @@unique([updatedAt, id])
 }
 
-model SpecialProceedingTransmittal {
+model SpecialProceedingDiversion {
   id            Int       @id @default(autoincrement())
   sourceRecordId Int
   caseNumber    String?
@@ -867,7 +955,6 @@ model SystemSettings {
 
   backupFrequency BackupFrequency @default(MANUAL)
   logRetention    LogRetention    @default(THREE_MONTHS)
-
   passwordExpiration PasswordExpiration @default(NEVER)
   lockoutThreshold   LockoutThreshold   @default(NONE)
   sessionTimeout     SessionTimeout     @default(NEVER)

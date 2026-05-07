@@ -13,6 +13,13 @@ import {
   getCriminalCaseStats,
   updateCriminalCase,
 } from "./CriminalCasesActions";
+import {
+  createCriminalAppealedCase,
+  deleteCriminalAppealedCase,
+  getCriminalAppealedCaseById,
+  getCriminalAppealedCases,
+  updateCriminalAppealedCase,
+} from "./CriminalAppealedActions";
 import { exportCasesExcel, uploadCriminalCaseExcel } from "./ExcelActions";
 
 export const criminalCaseAdapter: CriminalCaseAdapter = {
@@ -29,6 +36,11 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
   getCriminalCaseById,
   getCriminalCasesByIds,
   getCriminalCasesByCaseNumbers,
+  getCriminalAppealedCases,
+  getCriminalAppealedCaseById,
+  createCriminalAppealedCase,
+  updateCriminalAppealedCase,
+  deleteCriminalAppealedCase,
   uploadExcel: uploadCriminalCaseExcel,
   exportCasesExcel,
 };

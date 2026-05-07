@@ -105,23 +105,23 @@ export async function getDiversionDashboardData(): Promise<
       sheriffRecords,
       proceedingRecords,
     ] = await Promise.all([
-      prisma.criminalTransmittal.findMany({
+      prisma.criminalDiversion.findMany({
         select: { sourceRecordId: true, payload: true },
         orderBy: { transmittedAt: "desc" },
       }),
-      prisma.civilTransmittal.findMany({
+      prisma.civilDiversion.findMany({
         select: { sourceRecordId: true, payload: true },
         orderBy: { transmittedAt: "desc" },
       }),
-      prisma.recievingLogTransmittal.findMany({
+      prisma.recievingLogDiversion.findMany({
         select: { sourceRecordId: true, payload: true },
         orderBy: { transmittedAt: "desc" },
       }),
-      prisma.sheriffTransmittal.findMany({
+      prisma.sheriffDiversion.findMany({
         select: { sourceRecordId: true, payload: true },
         orderBy: { transmittedAt: "desc" },
       }),
-      prisma.specialProceedingTransmittal.findMany({
+      prisma.specialProceedingDiversion.findMany({
         select: { sourceRecordId: true, payload: true },
         orderBy: { transmittedAt: "desc" },
       }),

@@ -13,9 +13,11 @@ import {
   FiCalendar,
   FiCheck,
   FiDownload,
+  FiEdit2,
   FiFileText,
   FiLock,
   FiSearch,
+  FiTrash2,
   FiUsers,
   FiX,
 } from "react-icons/fi";
@@ -35,6 +37,8 @@ import {
   Table,
   usePopup,
   useToast,
+  CRIMINAL_APPEALED_CASE_FIELDS,
+  type CriminalAppealedCaseData,
   type CriminalCaseData,
   type CriminalCaseFilters,
   type CriminalCasesFilterOptions,
@@ -76,6 +80,188 @@ const CASE_VIEW_OPTIONS = [
     description: "Appealed case records",
   },
 ] as const;
+
+type CaseView = (typeof CASE_VIEW_OPTIONS)[number]["key"];
+
+const getInitialCaseView = (): CaseView => {
+  if (typeof window === "undefined") return "criminal";
+  const view = new URLSearchParams(window.location.search).get("view");
+  return view === "appealed" ? "appealed" : "criminal";
+};
+
+const formatAppealedValue = (
+  record: CriminalAppealedCaseData,
+  field: (typeof CRIMINAL_APPEALED_CASE_FIELDS)[number],
+): string => {
+  const value = record[field.key];
+  if (value == null || value === "") return "-";
+
+  if (field.type === "date") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? String(value)
+      : date.toLocaleDateString();
+  }
+
+  return String(value);
+};
+
+const CriminalAppealedCasesSection = ({
+  adapter,
+  canManageCases,
+}: {
+  adapter: CriminalCaseAdapter;
+  canManageCases: boolean;
+}) => {
+  const router = useAdaptiveNavigation();
+  const popup = usePopup();
+  const [records, setRecords] = useState<CriminalAppealedCaseData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAppealedCases = useCallback(async () => {
+    if (!adapter.getCriminalAppealedCases) {
+      setError("Appealed case records are not configured.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const result = await adapter.getCriminalAppealedCases();
+
+    if (!result.success) {
+      setError(result.error || "Failed to fetch appealed case records");
+      setLoading(false);
+      return;
+    }
+
+    setRecords(result.result ?? []);
+    setError(null);
+    setLoading(false);
+  }, [adapter]);
+
+  useEffect(() => {
+    void fetchAppealedCases();
+  }, [fetchAppealedCases]);
+
+  const handleDeleteAppealedCase = async (id: number) => {
+    if (!adapter.deleteCriminalAppealedCase) {
+      popup.showError("Appealed case deletion is not configured.");
+      return;
+    }
+
+    if (!(await popup.showConfirm("Delete this appealed case record?"))) {
+      return;
+    }
+
+    const result = await adapter.deleteCriminalAppealedCase(id);
+    if (!result.success) {
+      popup.showError(result.error || "Failed to delete appealed case record");
+      return;
+    }
+
+    popup.showSuccess("Appealed case record deleted successfully");
+    await fetchAppealedCases();
+  };
+
+  if (loading) {
+    return <PageListSkeleton statCards={2} tableColumns={8} tableRows={8} />;
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-error">
+        <span>{error}</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/40">
+            Total Appealed
+          </p>
+          <p className="mt-2 text-2xl font-black tracking-tight text-base-content">
+            {records.length.toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm md:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/40">
+            Current View
+          </p>
+          <p className="mt-2 text-lg font-bold text-base-content">
+            Criminal Appealed Case Records
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-base-100 rounded-xl overflow-hidden border border-base-200 shadow-lg">
+        <Table
+          headers={[
+            { key: "id", label: "ID" },
+            ...CRIMINAL_APPEALED_CASE_FIELDS.map((field) => ({
+              key: field.key,
+              label: field.label,
+            })),
+            ...(canManageCases ? [{ key: "actions", label: "Actions" }] : []),
+          ]}
+          data={records as unknown as Record<string, unknown>[]}
+          rowsPerPage={10}
+          resizableColumns
+          disableCellTooltips={false}
+          minColumnWidth={120}
+          renderRow={(item) => {
+            const record = item as unknown as CriminalAppealedCaseData;
+
+            return (
+              <tr key={record.id} className="hover">
+                <td className="px-4 py-3 text-sm font-semibold text-base-content">
+                  {record.id}
+                </td>
+                {CRIMINAL_APPEALED_CASE_FIELDS.map((field) => (
+                  <td
+                    key={field.key}
+                    className="px-4 py-3 text-sm text-base-content/75 align-top"
+                  >
+                    {formatAppealedValue(record, field)}
+                  </td>
+                ))}
+                {canManageCases && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() =>
+                          router.push(
+                            `/user/cases/criminal/appealed/add?id=${record.id}`,
+                          )
+                        }
+                      >
+                        <FiEdit2 className="h-4 w-4" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm text-error"
+                        onClick={() => void handleDeleteAppealedCase(record.id)}
+                      >
+                        <FiTrash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          }}
+        />
+      </div>
+    </>
+  );
+};
 
 const buildDirectImportSuccessMessage = (
   createdCount: number | undefined,
@@ -150,8 +336,7 @@ const CriminalCasePage: React.FC<{
     null,
   );
   const isSelecting = selectionMode !== null;
-  const [caseView, setCaseView] =
-    useState<(typeof CASE_VIEW_OPTIONS)[number]["key"]>("criminal");
+  const [caseView, setCaseView] = useState<CaseView>(getInitialCaseView);
 
   const urlFilterState = useMemo(
     () => getFilterStateFromSearchParams(searchParams),
@@ -191,6 +376,11 @@ const CriminalCasePage: React.FC<{
       return nextExactMatchMap;
     });
   }, [urlFilterState]);
+
+  useEffect(() => {
+    const view = searchParams.get("view");
+    setCaseView(view === "appealed" ? "appealed" : "criminal");
+  }, [searchParams]);
 
   const caseFilterOptions: FilterOption[] = [
     { key: "branch", label: "Branch", type: "text" },
@@ -462,6 +652,30 @@ const CriminalCasePage: React.FC<{
     setCurrentPage(1);
   };
 
+  const handleCaseViewChange = (nextView: CaseView) => {
+    setCaseView(nextView);
+    setSelectionMode(null);
+    setSelectedCaseIds([]);
+
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    params.delete("page");
+    if (nextView === "appealed") {
+      params.set("view", "appealed");
+    } else {
+      params.delete("view");
+    }
+
+    const query = params.toString();
+    window.history.pushState(
+      {},
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
+    );
+    setSearchParams(params);
+  };
+
   const handleEditSelectedCases = () => {
     if (selectedCaseIds.length === 0) {
       statusPopup.showError("Select at least one row to edit.");
@@ -676,11 +890,11 @@ const CriminalCasePage: React.FC<{
     [appliedFilters],
   );
 
-  if (loading) {
+  if (loading && caseView === "criminal") {
     return <PageListSkeleton statCards={4} tableColumns={10} tableRows={8} />;
   }
 
-  if (error) {
+  if (error && caseView === "criminal") {
     return (
       <div className="alert alert-error">
         <span>Error: {error}</span>
@@ -711,19 +925,27 @@ const CriminalCasePage: React.FC<{
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <button
-                className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
-                onClick={handleExportExcel}
-                disabled={exporting}
-              >
-                <FiDownload className="h-5 w-5" />
-                {exporting ? "Exporting..." : "Export Excel"}
-              </button>
+              {caseView === "criminal" && (
+                <button
+                  className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+                  onClick={handleExportExcel}
+                  disabled={exporting}
+                >
+                  <FiDownload className="h-5 w-5" />
+                  {exporting ? "Exporting..." : "Export Excel"}
+                </button>
+              )}
 
               {canManageCases && (
                 <button
                   className={ButtonStyles.primary}
-                  onClick={() => router.push("/user/cases/criminal/add")}
+                  onClick={() =>
+                    router.push(
+                      caseView === "appealed"
+                        ? "/user/cases/criminal/appealed/add"
+                        : "/user/cases/criminal/add",
+                    )
+                  }
                 >
                   <FiFileText className="h-5 w-5" />
                   Add Record
@@ -737,49 +959,59 @@ const CriminalCasePage: React.FC<{
       {/* Search and Filter Toolbar */}
       <div className="relative">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-            <input
-              type="text"
-              placeholder="Search by case number..."
-              className="input input-bordered w-full pl-11"
-              value={appliedFilters?.caseNumber || ""}
-              disabled={isSelecting}
-              onChange={(e) =>
-                setAppliedFilters((prev) => ({
-                  ...prev,
-                  caseNumber: e.target.value,
-                }))
-              }
-            />
-          </div>
+          {caseView === "criminal" && (
+            <>
+              <div className="relative flex-1 max-w-md">
+                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+                <input
+                  type="text"
+                  placeholder="Search by case number..."
+                  className="input input-bordered w-full pl-11"
+                  value={appliedFilters?.caseNumber || ""}
+                  disabled={isSelecting}
+                  onChange={(e) =>
+                    setAppliedFilters((prev) => ({
+                      ...prev,
+                      caseNumber: e.target.value,
+                    }))
+                  }
+                />
+              </div>
 
-          <button
-            type="button"
-            className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-            onClick={() => setFilterModalOpen((prev) => !prev)}
+              <button
+                type="button"
+                className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+                onClick={() => setFilterModalOpen((prev) => !prev)}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Filter
+                {activeFilterCount > 0 && (
+                  <span className="badge badge-sm badge-primary ml-1">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
+
+          <div
+            className={
+              caseView === "appealed"
+                ? "flex flex-wrap gap-2 sm:ml-auto"
+                : "flex flex-wrap gap-2"
+            }
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Filter
-            {activeFilterCount > 0 && (
-              <span className="badge badge-sm badge-primary ml-1">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          <div className="flex flex-wrap gap-2">
             {CASE_VIEW_OPTIONS.map((view) => {
               const isActive = caseView === view.key;
               return (
@@ -787,7 +1019,7 @@ const CriminalCasePage: React.FC<{
                   key={view.key}
                   type="button"
                   aria-pressed={isActive}
-                  onClick={() => setCaseView(view.key)}
+                  onClick={() => handleCaseViewChange(view.key)}
                   className={[
                     "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
                     isActive
@@ -805,6 +1037,7 @@ const CriminalCasePage: React.FC<{
           </div>
 
           {canManageCases &&
+            caseView === "criminal" &&
             (isSelecting ? (
               <div className="flex items-center gap-2 sm:ml-3">
                 <span className="text-sm text-base-content/60 whitespace-nowrap">
@@ -835,68 +1068,79 @@ const CriminalCasePage: React.FC<{
               </div>
             ) : null)}
 
-          <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
-            {totalCount} case{totalCount !== 1 && "s"}
-          </span>
+          {caseView === "criminal" && (
+            <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+              {totalCount} case{totalCount !== 1 && "s"}
+            </span>
+          )}
         </div>
 
-        <FilterDropdown
-          isOpen={filterModalOpen}
-          onClose={() => setFilterModalOpen(false)}
-          options={caseFilterOptions}
-          onApply={handleApplyFilters}
-          searchValue={appliedFilters}
-          getSuggestions={getCaseSuggestions}
-        />
+        {caseView === "criminal" && (
+          <FilterDropdown
+            isOpen={filterModalOpen}
+            onClose={() => setFilterModalOpen(false)}
+            options={caseFilterOptions}
+            onApply={handleApplyFilters}
+            searchValue={appliedFilters}
+            getSuggestions={getCaseSuggestions}
+          />
+        )}
       </div>
 
-      {/* Stats Cards (KPI style) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatsCard
-          label="TOTAL CASES"
-          value={(stats.totalCases ?? 0).toLocaleString()}
-          subtitle="All criminal cases"
-          icon={
-            FiBarChart2 as unknown as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >
-          }
-          delay={0}
+      {caseView === "appealed" ? (
+        <CriminalAppealedCasesSection
+          adapter={adapter}
+          canManageCases={canManageCases}
         />
-        <StatsCard
-          label="RECENTLY FILED"
-          value={(stats.recentlyFiled ?? 0).toLocaleString()}
-          subtitle="Filed in the last 30 days"
-          icon={
-            FiFileText as unknown as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >
-          }
-          delay={100}
-        />
-        <StatsCard
-          label="IN DETENTION"
-          value={(stats.detainedCases ?? 0).toLocaleString()}
-          subtitle="Cases currently detained"
-          icon={
-            FiLock as unknown as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >
-          }
-          delay={200}
-        />
-        <StatsCard
-          label="PENDING RAFFLE"
-          value={(stats.pendingCases ?? 0).toLocaleString()}
-          subtitle="Waiting raffle assignment"
-          icon={
-            FiUsers as unknown as React.ComponentType<
-              React.SVGProps<SVGSVGElement>
-            >
-          }
-          delay={300}
-        />
-      </div>
+      ) : (
+        <>
+          {/* Stats Cards (KPI style) */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <StatsCard
+              label="TOTAL CASES"
+              value={(stats.totalCases ?? 0).toLocaleString()}
+              subtitle="All criminal cases"
+              icon={
+                FiBarChart2 as unknown as React.ComponentType<
+                  React.SVGProps<SVGSVGElement>
+                >
+              }
+              delay={0}
+            />
+            <StatsCard
+              label="RECENTLY FILED"
+              value={(stats.recentlyFiled ?? 0).toLocaleString()}
+              subtitle="Filed in the last 30 days"
+              icon={
+                FiFileText as unknown as React.ComponentType<
+                  React.SVGProps<SVGSVGElement>
+                >
+              }
+              delay={100}
+            />
+            <StatsCard
+              label="IN DETENTION"
+              value={(stats.detainedCases ?? 0).toLocaleString()}
+              subtitle="Cases currently detained"
+              icon={
+                FiLock as unknown as React.ComponentType<
+                  React.SVGProps<SVGSVGElement>
+                >
+              }
+              delay={200}
+            />
+            <StatsCard
+              label="PENDING RAFFLE"
+              value={(stats.pendingCases ?? 0).toLocaleString()}
+              subtitle="Waiting raffle assignment"
+              icon={
+                FiUsers as unknown as React.ComponentType<
+                  React.SVGProps<SVGSVGElement>
+                >
+              }
+              delay={300}
+            />
+          </div>
 
       {/* Cases Table */}
       {/* Selected Cases Bar */}
@@ -1062,6 +1306,8 @@ const CriminalCasePage: React.FC<{
           }}
         />
       </div>
+        </>
+      )}
     </div>
   );
 };

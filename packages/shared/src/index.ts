@@ -40,6 +40,7 @@ export {
   default as CriminalCaseRow,
 } from "./Case/Criminal/CriminalCaseRow";
 export type { CaseSortConfig } from "./Case/Criminal/CriminalCaseRow";
+export * from "./Case/Criminal/CriminalAppealedCaseSchema";
 export * from "./Case/Criminal/CriminalCaseSchema";
 export {
   default as CriminalCaseUpdatePage,
