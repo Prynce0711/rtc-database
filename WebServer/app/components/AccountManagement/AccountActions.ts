@@ -225,6 +225,51 @@ export async function cancelPendingAccount(
   }
 }
 
+export async function deleteAccount(userId: string): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession([Roles.ADMIN]);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    if (sessionValidation.result.id === userId) {
+      throw new Error("You cannot delete your own account");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await auth.api.removeUser({
+      body: {
+        userId: user.id,
+      },
+      headers: await headers(),
+    });
+
+    await createLog({
+      action: LogAction.DELETE_USER,
+      details: {
+        id: user.id,
+      },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error deleting account:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to delete account",
+    };
+  }
+}
+
 export async function deactivateAccount(
   userId: string[],
   banReason?: string,

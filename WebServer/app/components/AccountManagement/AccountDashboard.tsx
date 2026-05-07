@@ -452,6 +452,7 @@ const AccountDashboard = () => {
                     <td className="py-4 px-5 text-center">
                       <AccountActionsButton
                         user={user}
+                        currentUserId={session.data?.user?.id}
                         updateUser={(updated) =>
                           setUsers((prev) =>
                             prev.map((u) =>

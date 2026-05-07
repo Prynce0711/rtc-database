@@ -14,6 +14,7 @@ import {
 import {
   cancelPendingAccount,
   deactivateAccount,
+  deleteAccount,
   reactivateAccount,
   sendMagicEmail,
 } from "./AccountActions";
@@ -22,12 +23,15 @@ const AccountActionsButton = ({
   user,
   updateUser,
   onRemove,
+  currentUserId,
 }: {
   user: User;
   updateUser: (user: User) => void;
   onRemove?: (userId: string) => void;
+  currentUserId?: string;
 }) => {
   const statusPopup = usePopup();
+  const canDeleteAccount = currentUserId !== user.id;
 
   const handleResendLink = async (user: User) => {
     const confirm = await statusPopup.showConfirm(
@@ -97,6 +101,24 @@ const AccountActionsButton = ({
     } else {
       updateUser({ ...user, status: Status.DEACTIVATED });
       statusPopup.showSuccess("Account deactivated successfully");
+    }
+  };
+
+  const handleDelete = async (user: User) => {
+    const confirm = await statusPopup.showConfirm(
+      `Permanently delete ${user.name}'s account? This cannot be undone.`,
+    );
+    if (!confirm) return;
+
+    const result = await deleteAccount(user.id);
+    if (!result.success) {
+      statusPopup.showError(
+        "Failed to delete account" +
+          (result.error ? `: ${result.error}` : ""),
+      );
+    } else {
+      onRemove?.(user.id);
+      statusPopup.showSuccess("Account deleted successfully");
     }
   };
 
@@ -184,6 +206,18 @@ const AccountActionsButton = ({
                 </button>
               </li>
             </>
+          )}
+
+          {canDeleteAccount && (
+            <li>
+              <button
+                className="flex items-center gap-3 text-error text-sm py-2"
+                onClick={() => handleDelete(user)}
+              >
+                <FiTrash2 size={14} />
+                Delete Account
+              </button>
+            </li>
           )}
         </ul>
       </div>
