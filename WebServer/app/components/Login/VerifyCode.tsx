@@ -1,6 +1,10 @@
 "use client";
 
 import { authClient } from "@/app/lib/authClient";
+import {
+  AUTH_REDIRECT_STORAGE_KEY,
+  getSafeRedirectTarget,
+} from "@/app/lib/redirectTarget";
 import { isDarkMode, usePopup } from "@rtc-database/shared";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -10,6 +14,12 @@ import { useEffect, useMemo, useState } from "react";
 const VerifyCode = () => {
   const router = useRouter();
   const statusPopup = usePopup();
+  const redirectTarget =
+    typeof window === "undefined"
+      ? "/user/dashboard"
+      : getSafeRedirectTarget(
+          window.sessionStorage.getItem(AUTH_REDIRECT_STORAGE_KEY),
+        );
 
   const [darkMode, setDarkMode] = useState(isDarkMode());
   const [method, setMethod] = useState<"totp" | "backup">("totp");
@@ -72,7 +82,7 @@ const VerifyCode = () => {
     }
 
     statusPopup.showSuccess("Two-factor verification complete.");
-    router.push("/user/dashboard");
+    router.push(redirectTarget);
   };
 
   return (

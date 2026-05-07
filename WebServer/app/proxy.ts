@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "./lib/auth";
+import { AUTH_REDIRECT_PARAM } from "./lib/redirectTarget";
 
 const allowedOrigins = new Set([
   process.env.NEXT_PUBLIC_URL || "http://localhost:3000",
@@ -44,7 +45,12 @@ export async function proxy(request: NextRequest) {
   });
 
   if (!session) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const loginUrl = new URL("/", request.url);
+    loginUrl.searchParams.set(
+      AUTH_REDIRECT_PARAM,
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

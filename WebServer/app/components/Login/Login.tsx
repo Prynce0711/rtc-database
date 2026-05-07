@@ -12,6 +12,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { authClient, signIn } from "../../lib/authClient";
+import {
+  AUTH_REDIRECT_PARAM,
+  AUTH_REDIRECT_STORAGE_KEY,
+  getSafeRedirectTarget,
+} from "../../lib/redirectTarget";
 
 const MAGIC_CODE_LENGTH = 10;
 const MAGIC_CODE_GROUP_SIZE = 5;
@@ -43,14 +48,17 @@ const getMagicCodeErrorMessage = (errorCode: string): string => {
 };
 
 const Login: React.FC = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [magicCode, setMagicCode] = useState("");
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string>(() => {
+    const errorCode = searchParams.get("error");
+    return errorCode ? getMagicCodeErrorMessage(errorCode) : "";
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isVerifyingMagicCode, setIsVerifyingMagicCode] = useState(false);
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -109,10 +117,13 @@ const Login: React.FC = () => {
       return;
     }
 
-    setError(getMagicCodeErrorMessage(errorCode));
-
     if (typeof window !== "undefined") {
-      const cleanedUrl = `${window.location.pathname}${window.location.hash}`;
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.delete("error");
+      const queryString = nextParams.toString();
+      const cleanedUrl = `${window.location.pathname}${
+        queryString ? `?${queryString}` : ""
+      }${window.location.hash}`;
       window.history.replaceState({}, "", cleanedUrl);
     }
   }, [searchParams]);
@@ -121,7 +132,16 @@ const Login: React.FC = () => {
     () => normalizeMagicCode(magicCode),
     [magicCode],
   );
+  const redirectTarget = useMemo(
+    () => getSafeRedirectTarget(searchParams.get(AUTH_REDIRECT_PARAM)),
+    [searchParams],
+  );
   const isBusy = isLoading || isVerifyingMagicCode;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(AUTH_REDIRECT_STORAGE_KEY, redirectTarget);
+  }, [redirectTarget]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +151,7 @@ const Login: React.FC = () => {
 
     try {
       try {
-        const { data, error: signInError } = await signIn.email({
+        const { error: signInError } = await signIn.email({
           email,
           password,
           rememberMe,
@@ -145,9 +165,14 @@ const Login: React.FC = () => {
 
           return;
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         setIsLoading(false);
-        const status = e?.response?.status ?? e?.status ?? null;
+        const errorObject =
+          typeof e === "object" && e !== null
+            ? (e as { response?: { status?: number }; status?: number })
+            : null;
+        const status =
+          errorObject?.response?.status ?? errorObject?.status ?? null;
         if (status && status >= 500) {
           setError("Server error. Please try again later.");
         } else {
@@ -167,8 +192,8 @@ const Login: React.FC = () => {
       // small delay to let overlay settle
       await new Promise((r) => setTimeout(r, 120));
 
-      router.push("/user/dashboard");
-    } catch (err) {
+      router.push(redirectTarget);
+    } catch {
       setError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
@@ -205,7 +230,7 @@ const Login: React.FC = () => {
       }
 
       setIsVerifyingMagicCode(false);
-      router.push("/user/dashboard");
+      router.push(redirectTarget);
     } catch (error) {
       setIsVerifyingMagicCode(false);
       console.error("Error during magic code verification:", error);
