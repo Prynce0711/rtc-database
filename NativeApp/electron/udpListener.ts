@@ -5,7 +5,7 @@ import {
 } from "@rtc-database/shared-relay";
 import dgram from "dgram";
 import { BrowserWindow } from "electron";
-import { inspectBackendTrust, probeRelayReachability } from "./relayTrust";
+import { inspectBackendTrust, probeBackendReachability } from "./relayTrust";
 
 let socket: dgram.Socket | null = null;
 const DEBUG_UDP = false;
@@ -114,7 +114,7 @@ const resolveReachableBackend = async (
   const reachabilityResults = await Promise.all(
     candidateBackends.map(async (backend) => ({
       backend,
-      reachable: await probeRelayReachability(backend.url),
+      reachable: await probeBackendReachability(backend.url),
     })),
   );
 
@@ -170,7 +170,7 @@ export function startUdpListener(mainWindow: BrowserWindow) {
       );
       if (!resolvedBackend) {
         warnUdp(
-          `[udp] Relay announcement from ${rinfo.address}:${rinfo.port} did not produce a reachable relay candidate.`,
+          `[udp] Relay announcement from ${rinfo.address}:${rinfo.port} did not produce a backend-ready relay candidate.`,
         );
         return;
       }

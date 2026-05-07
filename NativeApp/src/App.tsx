@@ -793,6 +793,14 @@ export default function App() {
         console.log(
           `[startup] Backend discovered while waiting for user retry: ${discoveredBackend.url}`,
         );
+
+        if (!discoveredBackend.isPreferred) {
+          return;
+        }
+
+        waitingForUserRetryRef.current = false;
+        setAutoOfflineReason(null);
+        redirectToBackend(discoveredBackend.url);
         return;
       }
 
