@@ -7,14 +7,20 @@ export const MAX_UPLOAD_BATCH_BYTES = 250 * 1024 * 1024;
 export type BatchUploadPhase = "processing" | "completed" | "failed";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
 export type BatchUploadFailure = {
   name: string;
   error: string;
   kind?: "file" | "folder";
 };
 
+<<<<<<< HEAD
 =======
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
 export type BatchUploadProgressState = {
   phase: BatchUploadPhase;
   totalFiles: number;
@@ -30,9 +36,13 @@ export type BatchUploadProgressState = {
   title?: string;
   error?: string;
 <<<<<<< HEAD
+<<<<<<< HEAD
   failedItems?: BatchUploadFailure[];
 =======
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+  failedItems?: BatchUploadFailure[];
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
 };
 
 export const createUploadBatches = <T,>(
@@ -142,14 +152,20 @@ const getSubcopy = (state: BatchUploadProgressState) => {
 
   if (state.phase === "failed") {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
     const firstFailure = state.failedItems?.[0];
     if (firstFailure) {
       const label = firstFailure.kind === "folder" ? "Folder" : "File";
       return `${label} "${firstFailure.name}" failed: ${firstFailure.error}`;
     }
 
+<<<<<<< HEAD
 =======
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
     return state.error || "Some files could not be uploaded.";
   }
 
@@ -175,9 +191,13 @@ export function BatchUploadProgressPanel({
 
   const percent = getBatchUploadProgressPercent(state);
 <<<<<<< HEAD
+<<<<<<< HEAD
   const failedItems = state.failedItems ?? [];
 =======
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+  const failedItems = state.failedItems ?? [];
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
   const progressColor =
     state.phase === "failed"
       ? "bg-error"
@@ -225,6 +245,9 @@ export function BatchUploadProgressPanel({
             {getSubcopy(state)}
           </p>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
           {failedItems.length > 0 && (
             <div className="mt-3 max-h-32 space-y-2 overflow-y-auto rounded-md border border-error/20 bg-error/5 p-2">
               {failedItems.slice(0, 5).map((item, index) => (
@@ -245,8 +268,11 @@ export function BatchUploadProgressPanel({
               )}
             </div>
           )}
+<<<<<<< HEAD
 =======
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/45">
             <span>{percent}% this batch</span>
             {state.totalBatches > 1 && (

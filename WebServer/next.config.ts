@@ -74,10 +74,14 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
 <<<<<<< HEAD
+<<<<<<< HEAD
       bodySizeLimit: "500mb",
 =======
       bodySizeLimit: "300mb",
 >>>>>>> c7ef26b (feat: add file and folder upload functionality with progress tracking)
+=======
+      bodySizeLimit: "500mb",
+>>>>>>> a69614b (feat: add tutorial status tracking and multipart upload functionality)
       allowedOrigins: [...allowedServerActionOrigins],
     },
     proxyClientMaxBodySize: "500mb",
