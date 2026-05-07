@@ -446,6 +446,7 @@ export default function App() {
   const autoOfflineIntervalRef = useRef<number | null>(null);
   const backendListenerAttachedRef = useRef(false);
   const attemptedSavedRelayUrlRef = useRef<string | null>(null);
+  const waitingForUserRetryRef = useRef(false);
 
   const clearAutoOfflineTimers = () => {
     if (typeof window === "undefined") {
@@ -788,6 +789,13 @@ export default function App() {
         return;
       }
 
+      if (waitingForUserRetryRef.current) {
+        console.log(
+          `[startup] Backend discovered while waiting for user retry: ${discoveredBackend.url}`,
+        );
+        return;
+      }
+
       console.log(
         `[startup] Backend discovered via UDP: ${discoveredBackend.url} (${discoveredBackend.relayTrustState ?? "unknown"})`,
       );
@@ -809,12 +817,26 @@ export default function App() {
 
     let isSubscribed = true;
 
-    if (OFFLINE_MODE_ENABLED && autoOfflineReason === "disconnected") {
+    if (autoOfflineReason === "disconnected") {
+      waitingForUserRetryRef.current = true;
       console.warn(
-        "[startup] Backend disconnected. Waiting for reconnect before switching to offline mode.",
+        "[startup] Backend disconnected. Waiting for user retry.",
       );
-      startAutoOfflineCountdown("disconnected");
+
+      return () => {
+        isSubscribed = false;
+
+        clearAutoOfflineTimers();
+        pendingRedirectUrlRef.current = null;
+
+        if (redirectTimerRef.current !== null) {
+          window.clearTimeout(redirectTimerRef.current);
+          redirectTimerRef.current = null;
+        }
+      };
     }
+
+    waitingForUserRetryRef.current = false;
 
     const trySavedPinnedRelay = async (): Promise<boolean> => {
       if (!autoConnectPinnedRelay || !savedPinnedRelayUrl) {
@@ -947,7 +969,7 @@ export default function App() {
           );
         }
 
-        if (OFFLINE_MODE_ENABLED && autoOfflineReason !== "disconnected") {
+        if (OFFLINE_MODE_ENABLED) {
           console.warn(
             "[startup] Backend not found. Waiting before switching to offline mode.",
           );
@@ -1008,6 +1030,67 @@ export default function App() {
           "[offline] Failed to reconnect to backend:",
           error instanceof Error ? error.message : error,
         );
+      }
+    })();
+  };
+
+  const retryBackendConnection = () => {
+    clearAutoOfflineTimers();
+    setAutoOfflineCountdown(null);
+    setBackendApprovalError(null);
+    setManualConnectError(null);
+    setStatus("locating");
+    setMode("connecting");
+    modeRef.current = "connecting";
+    pendingRedirectUrlRef.current = null;
+    waitingForUserRetryRef.current = false;
+
+    void (async () => {
+      const retryTargetUrl =
+        availableOfflineBackend?.url ?? savedPinnedRelayUrl ?? null;
+
+      if (!retryTargetUrl) {
+        setManualConnectError(
+          "No server is available to retry yet. Enter the server address manually.",
+        );
+        waitingForUserRetryRef.current = true;
+        return;
+      }
+
+      setIsTryingSavedRelay(true);
+
+      try {
+        const inspectedBackend: BackendInfo = {
+          ...(await inspectBackendBeforeConnect(retryTargetUrl, {
+            requireReachable: true,
+            throwOnFailure: true,
+          })),
+          source: availableOfflineBackend?.source ?? "saved",
+        };
+
+        setAvailableOfflineBackend(inspectedBackend);
+        setDiscoveredBackends((previousBackends) =>
+          upsertDiscoveredBackend(previousBackends, inspectedBackend),
+        );
+
+        if (!inspectedBackend.isPreferred) {
+          setSelectedReviewBackendKey(getBackendKey(inspectedBackend));
+          setAutoOfflineReason(null);
+          return;
+        }
+
+        setAutoOfflineReason(null);
+        redirectToBackend(inspectedBackend.url);
+      } catch (error) {
+        waitingForUserRetryRef.current = true;
+        setAutoOfflineReason("disconnected");
+        setManualConnectError(
+          error instanceof Error
+            ? error.message
+            : "Unable to reconnect to that server right now.",
+        );
+      } finally {
+        setIsTryingSavedRelay(false);
       }
     })();
   };
@@ -1180,6 +1263,8 @@ export default function App() {
 
   const connectionHint = !startupSettingsLoaded
     ? "Loading startup preferences..."
+    : autoOfflineReason === "disconnected"
+      ? "Connection to the server was lost."
     : isTryingSavedRelay
       ? "Trying the usual saved server first."
       : reviewBackends.length > 0
@@ -1189,9 +1274,7 @@ export default function App() {
           : hasDismissedUnexpectedBackend
             ? "You chose not to connect to that server. You can pick it again below or keep waiting for the usual server."
             : OFFLINE_MODE_ENABLED
-              ? autoOfflineReason === "disconnected"
-                ? "Connection to backend was lost. Waiting for it to come back."
-                : autoOfflineReason === "not-found"
+              ? autoOfflineReason === "not-found"
                   ? "Backend not found yet. Waiting for a health check or UDP relay announcement."
                   : isDevMode
                     ? "Checking the dev backend, then listening for a UDP relay announcement."
@@ -1200,8 +1283,14 @@ export default function App() {
                 ? "Checking the dev backend, then waiting for a relay announcement."
                 : "Listening for a UDP relay announcement from the gateway.";
 
+  const shouldShowDisconnectedRetry =
+    status === "locating" &&
+    autoOfflineReason === "disconnected" &&
+    reviewBackends.length === 0;
+
   const shouldHideLoaderForWarning =
-    status === "locating" && reviewBackends.length > 0;
+    status === "locating" &&
+    (reviewBackends.length > 0 || shouldShowDisconnectedRetry);
 
   return (
     <div className="min-h-screen bg-base-200 flex flex-col items-center justify-center gap-6 animate-fade-in px-4">
@@ -1212,101 +1301,135 @@ export default function App() {
           <>
             {reviewBackends.length === 0 && (
               <>
-                <p className="text-xl font-semibold">Locating backend...</p>
-                <p className="text-sm opacity-70">{connectionHint}</p>
-                {OFFLINE_MODE_ENABLED && autoOfflineCountdown !== null && (
-                  <p className="text-sm text-warning font-medium">
-                    Auto-switching to offline mode in {autoOfflineCountdown}s...
-                  </p>
-                )}
-
-                {relayUnavailableBackend && (
-                  <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-warning/30 bg-base-100 p-5 text-left shadow-lg space-y-2">
-                    <p className="text-base font-semibold text-warning">
-                      The usual server can't be reached right now
-                    </p>
-                    <p className="text-sm opacity-80">
-                      {relayUnavailableBackendLabel
-                        ? `This device usually connects to ${relayUnavailableBackendLabel}, but we could not reach it right now.`
-                        : "We could not reach the usual saved server for this device right now."}
-                    </p>
-                    <p className="text-xs opacity-70">
-                      If your admin gave you a new server address, you can enter
-                      it below. Otherwise, keep waiting and try the usual server
-                      again.
-                    </p>
-                  </div>
-                )}
-
-                {selectableBackends.length > 0 && (
-                  <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-3">
-                    <div className="space-y-1">
-                      <p className="text-base font-semibold">
-                        Servers we found
-                      </p>
-                      <p className="text-sm opacity-70">
-                        If you want to try a server again or choose another one
-                        we found, pick it here.
-                      </p>
+                {shouldShowDisconnectedRetry ? (
+                  <div className="mx-auto w-full max-w-xl rounded-lg border border-error/30 bg-base-100 p-6 text-left shadow-lg">
+                    <div className="alert alert-error items-start">
+                      <div className="space-y-1">
+                        <p className="font-semibold">
+                          Server connection lost
+                        </p>
+                        <p className="text-sm opacity-80">
+                          {connectionHint} Check the relay or server, then try
+                          reconnecting.
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      {selectableBackends.map((backend) => {
-                        const backendKey = getBackendKey(backend);
-                        const isDismissed =
-                          dismissedUnexpectedBackendKeys.includes(backendKey);
+                    <div className="mt-5 flex justify-end">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={retryBackendConnection}
+                        disabled={!startupSettingsLoaded || isTryingSavedRelay}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xl font-semibold">Locating backend...</p>
+                    <p className="text-sm opacity-70">{connectionHint}</p>
+                    {OFFLINE_MODE_ENABLED && autoOfflineCountdown !== null && (
+                      <p className="text-sm text-warning font-medium">
+                        Auto-switching to offline mode in{" "}
+                        {autoOfflineCountdown}s...
+                      </p>
+                    )}
 
-                        return (
-                          <div
-                            key={backendKey}
-                            className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-200/60 px-4 py-3 md:flex-row md:items-center md:justify-between"
-                          >
-                            <div className="space-y-1 min-w-0">
-                              <p className="font-medium break-all">
-                                {backend.url}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span
-                                  className={`badge badge-sm ${getBackendSelectionBadgeClass(backend)}`}
+                    {relayUnavailableBackend && (
+                      <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-warning/30 bg-base-100 p-5 text-left shadow-lg space-y-2">
+                        <p className="text-base font-semibold text-warning">
+                          The usual server can't be reached right now
+                        </p>
+                        <p className="text-sm opacity-80">
+                          {relayUnavailableBackendLabel
+                            ? `This device usually connects to ${relayUnavailableBackendLabel}, but we could not reach it right now.`
+                            : "We could not reach the usual saved server for this device right now."}
+                        </p>
+                        <p className="text-xs opacity-70">
+                          If your admin gave you a new server address, you can
+                          enter it below. Otherwise, keep waiting and try the
+                          usual server again.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectableBackends.length > 0 && (
+                      <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-3">
+                        <div className="space-y-1">
+                          <p className="text-base font-semibold">
+                            Servers we found
+                          </p>
+                          <p className="text-sm opacity-70">
+                            If you want to try a server again or choose another
+                            one we found, pick it here.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          {selectableBackends.map((backend) => {
+                            const backendKey = getBackendKey(backend);
+                            const isDismissed =
+                              dismissedUnexpectedBackendKeys.includes(
+                                backendKey,
+                              );
+
+                            return (
+                              <div
+                                key={backendKey}
+                                className="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-200/60 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                              >
+                                <div className="space-y-1 min-w-0">
+                                  <p className="font-medium break-all">
+                                    {backend.url}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <span
+                                      className={`badge badge-sm ${getBackendSelectionBadgeClass(backend)}`}
+                                    >
+                                      {getBackendSelectionStatusLabel(backend)}
+                                    </span>
+                                    {isDismissed && (
+                                      <span className="text-warning font-medium">
+                                        Dismissed earlier
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm md:self-center"
+                                  onClick={() =>
+                                    selectDiscoveredBackend(backend)
+                                  }
+                                  disabled={
+                                    isManualConnectPending || isTryingSavedRelay
+                                  }
                                 >
-                                  {getBackendSelectionStatusLabel(backend)}
-                                </span>
-                                {isDismissed && (
-                                  <span className="text-warning font-medium">
-                                    Dismissed earlier
-                                  </span>
-                                )}
+                                  {getBackendSelectionActionLabel(
+                                    backend,
+                                    isDismissed,
+                                  )}
+                                </button>
                               </div>
-                            </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
-                            <button
-                              type="button"
-                              className="btn btn-outline btn-sm md:self-center"
-                              onClick={() => selectDiscoveredBackend(backend)}
-                              disabled={isManualConnectPending || isTryingSavedRelay}
-                            >
-                              {getBackendSelectionActionLabel(
-                                backend,
-                                isDismissed,
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-base font-semibold">
-                      Connect to a server manually
-                    </p>
-                    <p className="text-sm opacity-70">
-                      If automatic discovery is not finding the server, enter
-                      the server address and port here.
-                    </p>
-                  </div>
+                    <div className="mx-auto mt-5 w-full max-w-2xl rounded-2xl border border-base-300 bg-base-100 p-5 text-left shadow-sm space-y-4">
+                      <div className="space-y-1">
+                        <p className="text-base font-semibold">
+                          Connect to a server manually
+                        </p>
+                        <p className="text-sm opacity-70">
+                          If automatic discovery is not finding the server,
+                          enter the server address and port here.
+                        </p>
+                      </div>
 
                   {/* <div className="rounded-xl border border-base-300 bg-base-200/60 px-4 py-3 space-y-2">
                     <label className="flex cursor-pointer items-start gap-3">
@@ -1423,6 +1546,8 @@ export default function App() {
                     </p>
                   )}
                 </div>
+              </>
+            )}
               </>
             )}
 

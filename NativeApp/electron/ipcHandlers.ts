@@ -8,7 +8,7 @@ import { authorizeBackupProviderWithRclone } from "./RcloneAuthorizer";
 import {
   getPinnedRelayBaseUrl,
   inspectBackendTrust,
-  probeRelayReachability,
+  probeBackendReachability,
   savePinnedRelayCertificatePin,
 } from "./relayTrust";
 import { doesCaseExist, getCases, getCaseStats } from "./Sync/BaseCaseActions";
@@ -212,7 +212,7 @@ ipcMain.handle(RELAY_INSPECT_BACKEND_CHANNEL, async (_event, args: unknown) => {
 
     if (
       args.requireReachable === true &&
-      !(await probeRelayReachability(args.url))
+      !(await probeBackendReachability(args.url))
     ) {
       return {
         success: false,

@@ -7,6 +7,7 @@ export const UDP_DISCOVERY_PORT = 41234;
 export const UDP_DISCOVERY_MULTICAST_GROUP = "239.255.67.89";
 export const UDP_DISCOVERY_MULTICAST_TTL = 1;
 export const RELAY_HEALTH_PATH = "/_rtc/relay-health";
+export const RELAY_BACKEND_HEALTH_PATH = "/_rtc/backend-health";
 
 export const UdpDiscoveryRequest = z.object({
   type: z.literal(UDP_DISCOVERY_REQUEST_TYPE),

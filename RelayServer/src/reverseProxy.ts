@@ -1,4 +1,7 @@
-import { RELAY_HEALTH_PATH } from "@rtc-database/shared-relay";
+import {
+  RELAY_BACKEND_HEALTH_PATH,
+  RELAY_HEALTH_PATH,
+} from "@rtc-database/shared-relay";
 import httpProxy from "http-proxy";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -12,6 +15,8 @@ const RELAY_HOP_HEADER = "x-rtc-relay-hop";
 const RELAY_HOP_TOKEN_HEADER = "x-rtc-relay-hop-token";
 const MAX_RELAY_HOPS = 1;
 const RELAY_HOP_RUNTIME_TOKEN = randomUUID();
+const BACKEND_HEALTH_PATH = "/api/health";
+const BACKEND_HEALTH_TIMEOUT_MS = 5000;
 
 const toPort = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
@@ -314,6 +319,48 @@ const applyOriginForwarding = (
   proxyReq.setHeader("x-forwarded-port", forwardedPort);
 };
 
+const checkUpstreamBackendHealth = async (
+  config: RelayConfig,
+  agent: https.Agent | undefined,
+): Promise<boolean> => {
+  const target = new URL(config.targetUrl);
+  const requestImpl = target.protocol === "https:" ? https.request : http.request;
+
+  return new Promise<boolean>((resolve) => {
+    const request = requestImpl(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || undefined,
+        path: `${target.pathname.replace(/\/+$/, "")}${BACKEND_HEALTH_PATH}`,
+        method: "GET",
+        rejectUnauthorized: !config.insecureTls,
+        ...(agent ? { agent } : {}),
+      },
+      (response) => {
+        response.resume();
+        response.once("end", () => {
+          resolve(
+            response.statusCode !== undefined &&
+              response.statusCode >= 200 &&
+              response.statusCode < 300,
+          );
+        });
+      },
+    );
+
+    request.setTimeout(BACKEND_HEALTH_TIMEOUT_MS, () => {
+      request.destroy(new Error("Backend health check timed out"));
+    });
+
+    request.once("error", () => {
+      resolve(false);
+    });
+
+    request.end();
+  });
+};
+
 let proxy: httpProxy | null = null;
 let server: http.Server | https.Server | null = null;
 
@@ -409,6 +456,25 @@ export async function startReverseProxy(): Promise<void> {
           timestamp: Date.now(),
         }),
       );
+      return;
+    }
+
+    if (requestPath === RELAY_BACKEND_HEALTH_PATH) {
+      void (async () => {
+        const healthy = await checkUpstreamBackendHealth(config, upstreamAgent);
+        response.writeHead(healthy ? 200 : 503, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        });
+        response.end(
+          JSON.stringify({
+            ok: healthy,
+            relay: true,
+            backend: healthy,
+            timestamp: Date.now(),
+          }),
+        );
+      })();
       return;
     }
 

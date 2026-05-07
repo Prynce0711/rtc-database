@@ -1,4 +1,5 @@
 import {
+  RELAY_BACKEND_HEALTH_PATH,
   RELAY_HEALTH_PATH,
   type BackendInfo,
 } from "@rtc-database/shared-relay";
@@ -243,17 +244,20 @@ const buildPinnedRelayUrl = (relay: RelayCertificatePin): string | null => {
   return `${protocol}://${relay.hostname}:${String(port)}`;
 };
 
-export const probeRelayReachability = async (
+type RelayHealthProbeResult = "healthy" | "unhealthy" | "missing";
+
+const probeRelayHealthPath = async (
   baseUrl: string,
-): Promise<boolean> => {
+  healthPath: string,
+): Promise<RelayHealthProbeResult> => {
   try {
     const target = new URL(baseUrl);
 
     if (target.protocol !== "http:" && target.protocol !== "https:") {
-      return false;
+      return "unhealthy";
     }
 
-    return await new Promise<boolean>((resolve) => {
+    return await new Promise<RelayHealthProbeResult>((resolve) => {
       const requestImpl =
         target.protocol === "https:" ? https.request : http.request;
 
@@ -262,7 +266,7 @@ export const probeRelayReachability = async (
           protocol: target.protocol,
           hostname: target.hostname,
           port: target.port || undefined,
-          path: `${target.pathname.replace(/\/+$/, "")}${RELAY_HEALTH_PATH}`,
+          path: `${target.pathname.replace(/\/+$/, "")}${healthPath}`,
           method: "GET",
           rejectUnauthorized: false,
         },
@@ -272,7 +276,11 @@ export const probeRelayReachability = async (
             resolve(
               response.statusCode !== undefined &&
                 response.statusCode >= 200 &&
-                response.statusCode < 300,
+                response.statusCode < 300
+                ? "healthy"
+                : response.statusCode === 404
+                  ? "missing"
+                  : "unhealthy",
             );
           });
         },
@@ -283,14 +291,34 @@ export const probeRelayReachability = async (
       });
 
       request.once("error", () => {
-        resolve(false);
+        resolve("unhealthy");
       });
 
       request.end();
     });
   } catch {
-    return false;
+    return "unhealthy";
   }
+};
+
+export const probeRelayReachability = async (
+  baseUrl: string,
+): Promise<boolean> =>
+  (await probeRelayHealthPath(baseUrl, RELAY_HEALTH_PATH)) === "healthy";
+
+export const probeBackendReachability = async (
+  baseUrl: string,
+): Promise<boolean> => {
+  const backendHealth = await probeRelayHealthPath(
+    baseUrl,
+    RELAY_BACKEND_HEALTH_PATH,
+  );
+
+  if (backendHealth !== "missing") {
+    return backendHealth === "healthy";
+  }
+
+  return (await probeRelayHealthPath(baseUrl, "/api/health")) === "healthy";
 };
 
 export const inspectLocalRelayCertificate = async (

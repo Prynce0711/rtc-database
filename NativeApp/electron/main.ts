@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { startDevDisconnectMonitor } from "./BackendMonitor";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { startBackendDisconnectMonitor } from "./BackendMonitor";
 import { ensureNativeDatabaseReady } from "./databaseBootstrap";
 import "./ipcHandlers";
 import { configureRelayCertificatePinning } from "./relayTrust";
@@ -112,11 +112,15 @@ async function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     await win.loadURL(VITE_DEV_SERVER_URL);
-    startDevDisconnectMonitor(win, VITE_DEV_SERVER_URL);
   } else {
     // win.loadFile('dist/index.html')
     await win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
+
+  const localAppUrl =
+    VITE_DEV_SERVER_URL ||
+    pathToFileURL(path.join(RENDERER_DIST, "index.html")).toString();
+  startBackendDisconnectMonitor(win, localAppUrl);
 
   startUdpListener(win);
 }

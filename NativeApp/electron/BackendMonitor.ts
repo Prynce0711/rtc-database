@@ -1,3 +1,4 @@
+import { RELAY_BACKEND_HEALTH_PATH } from "@rtc-database/shared-relay";
 import type { BrowserWindow } from "electron";
 import { X509Certificate } from "node:crypto";
 import type { ClientRequest } from "node:http";
@@ -97,14 +98,19 @@ const resolveWindowHttpOrigin = (
   }
 };
 
-const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
+type HealthCheckResult = "healthy" | "unhealthy" | "missing";
+
+const requestHealthEndpoint = async (
+  baseUrl: string,
+  healthPath: string,
+): Promise<HealthCheckResult> => {
   const target = new URL(baseUrl);
 
   if (target.protocol !== "http:" && target.protocol !== "https:") {
-    return false;
+    return "unhealthy";
   }
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<HealthCheckResult>((resolve) => {
     const requestImpl =
       target.protocol === "https:" ? https.request : http.request;
     const timeoutId = setTimeout(() => {
@@ -118,7 +124,7 @@ const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
         protocol: target.protocol,
         hostname: target.hostname,
         port: target.port || undefined,
-        path: `${target.pathname.replace(/\/+$/, "")}${HEALTH_PATH}`,
+        path: `${target.pathname.replace(/\/+$/, "")}${healthPath}`,
         method: "GET",
         rejectUnauthorized: false,
       },
@@ -131,7 +137,7 @@ const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
           if (!fingerprint256) {
             response.resume();
             clearTimeout(timeoutId);
-            resolve(false);
+            resolve("unhealthy");
             return;
           }
 
@@ -144,7 +150,7 @@ const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
             );
             response.resume();
             clearTimeout(timeoutId);
-            resolve(false);
+            resolve("unhealthy");
             return;
           }
         }
@@ -155,7 +161,11 @@ const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
           resolve(
             response.statusCode !== undefined &&
               response.statusCode >= 200 &&
-              response.statusCode < 300,
+              response.statusCode < 300
+              ? "healthy"
+              : response.statusCode === 404
+                ? "missing"
+                : "unhealthy",
           );
         });
       },
@@ -163,19 +173,82 @@ const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
 
     request.on("error", () => {
       clearTimeout(timeoutId);
-      resolve(false);
+      resolve("unhealthy");
     });
 
     request.end();
   });
 };
 
-export const startDevDisconnectMonitor = (
+const isBackendHealthy = async (baseUrl: string): Promise<boolean> => {
+  const relayBackendHealth = await requestHealthEndpoint(
+    baseUrl,
+    RELAY_BACKEND_HEALTH_PATH,
+  );
+
+  if (relayBackendHealth !== "missing") {
+    return relayBackendHealth === "healthy";
+  }
+
+  return (await requestHealthEndpoint(baseUrl, HEALTH_PATH)) === "healthy";
+};
+
+export const startBackendDisconnectMonitor = (
   browserWindow: BrowserWindow,
-  viteLocalUrl: string,
+  localAppUrl: string,
 ): void => {
   let consecutiveFailures = 0;
-  const viteBaseUrl = normalizeBaseUrl(viteLocalUrl);
+  let isRedirectingToLocalApp = false;
+  const localAppBaseUrl = normalizeBaseUrl(localAppUrl);
+  const fallbackUrl = withOfflineReason(localAppUrl);
+
+  const redirectToLocalApp = async (reason: string): Promise<void> => {
+    if (browserWindow.isDestroyed() || isRedirectingToLocalApp) {
+      return;
+    }
+
+    isRedirectingToLocalApp = true;
+    console.warn(`[health] ${reason}. Switching back to local app ${fallbackUrl}.`);
+
+    try {
+      await browserWindow.loadURL(fallbackUrl);
+    } catch (error) {
+      console.warn(
+        "[health] Failed to switch back to local app URL:",
+        formatError(error),
+      );
+    } finally {
+      isRedirectingToLocalApp = false;
+    }
+  };
+
+  browserWindow.webContents.session.webRequest.onCompleted(
+    { urls: ["http://*/*", "https://*/*"] },
+    (details) => {
+      if (
+        browserWindow.isDestroyed() ||
+        details.webContentsId !== browserWindow.webContents.id ||
+        details.resourceType !== "mainFrame" ||
+        details.statusCode < 500
+      ) {
+        return;
+      }
+
+      try {
+        const failedUrl = new URL(details.url);
+        if (normalizeBaseUrl(failedUrl.origin) === localAppBaseUrl) {
+          return;
+        }
+      } catch {
+        return;
+      }
+
+      consecutiveFailures = 0;
+      void redirectToLocalApp(
+        `Main page returned HTTP ${String(details.statusCode)} for ${details.url}`,
+      );
+    },
+  );
 
   const runHealthCheck = async (): Promise<void> => {
     if (browserWindow.isDestroyed()) {
@@ -184,7 +257,10 @@ export const startDevDisconnectMonitor = (
 
     const currentOrigin = resolveWindowHttpOrigin(browserWindow);
 
-    if (!currentOrigin || normalizeBaseUrl(currentOrigin) === viteBaseUrl) {
+    if (
+      !currentOrigin ||
+      normalizeBaseUrl(currentOrigin) === localAppBaseUrl
+    ) {
       consecutiveFailures = 0;
       setTimeout(() => {
         void runHealthCheck();
@@ -214,23 +290,8 @@ export const startDevDisconnectMonitor = (
     );
 
     if (consecutiveFailures >= HEALTH_FAILURE_THRESHOLD) {
-      const fallbackUrl = withOfflineReason(viteLocalUrl);
-
-      console.warn(
-        `[health] Backend disconnected. Switching back to Vite local ${fallbackUrl}.`,
-      );
       consecutiveFailures = 0;
-
-      if (!browserWindow.isDestroyed()) {
-        try {
-          await browserWindow.loadURL(fallbackUrl);
-        } catch (error) {
-          console.warn(
-            "[health] Failed to switch back to Vite local URL:",
-            formatError(error),
-          );
-        }
-      }
+      await redirectToLocalApp("Backend disconnected");
     }
 
     setTimeout(() => {
@@ -242,3 +303,5 @@ export const startDevDisconnectMonitor = (
     void runHealthCheck();
   }, HEALTH_CHECK_INTERVAL_MS);
 };
+
+export const startDevDisconnectMonitor = startBackendDisconnectMonitor;
