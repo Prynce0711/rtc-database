@@ -129,10 +129,8 @@ export const pickDirectoriesWithFileSystemAccess = async (options?: {
     return null;
   }
 
-  const allowMultiple = options?.allowMultiple ?? true;
-  const confirmAnother =
-    options?.confirmAnother ??
-    (() => window.confirm("Select another folder for this upload?"));
+  const allowMultiple = options?.allowMultiple ?? false;
+  const confirmAnother = options?.confirmAnother ?? (() => false);
   const selectedFiles: File[] = [];
 
   while (true) {

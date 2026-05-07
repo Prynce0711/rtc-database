@@ -46,6 +46,12 @@ interface NavItem {
   dropdowns?: DropdownItem[];
 }
 
+const toTourId = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 // --- Tooltip ------------------------------------------------------------------
 const Tooltip = ({ label }: { label: string }) => (
   <motion.div
@@ -93,6 +99,7 @@ const NavBtn = ({
     : activeView === item.href || pathname.startsWith(itemBasePath);
   const open = openDropdown === item.href;
   const [hovered, setHovered] = useState(false);
+  const navTourId = `sidebar-nav-${toTourId(item.href)}`;
 
   // Clear flyout/dropdown when sidebar expands (user will see inline dropdowns)
   useEffect(() => {
@@ -117,6 +124,7 @@ const NavBtn = ({
             }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            data-tour={navTourId}
             className={[
               "relative flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all duration-150",
               isActive
@@ -131,6 +139,7 @@ const NavBtn = ({
             href={`/user/${item.href}`}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
+            data-tour={navTourId}
             className={[
               "relative flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all duration-150",
               isActive
@@ -165,6 +174,7 @@ const NavBtn = ({
           onClick={() =>
             setOpenDropdown(openDropdown === item.href ? null : item.href)
           }
+          data-tour={navTourId}
           className={btnClass}
         >
           <span className="text-[17px] shrink-0">{item.icon}</span>
@@ -180,7 +190,11 @@ const NavBtn = ({
           </motion.span>
         </button>
       ) : (
-        <Link href={`/user/${item.href}`} className={btnClass}>
+        <Link
+          href={`/user/${item.href}`}
+          data-tour={navTourId}
+          className={btnClass}
+        >
           <span className="text-[17px] shrink-0">{item.icon}</span>
           <span className="text-[13px] font-semibold flex-1 text-left whitespace-nowrap truncate">
             {item.label}
@@ -213,6 +227,7 @@ const NavBtn = ({
                   <Link
                     key={d.href}
                     href={`/user/${item.href}${d.href ? `/${d.href}` : ""}`}
+                    data-tour={`sidebar-subnav-${toTourId(`${item.href}-${d.href || "index"}`)}`}
                     className={[
                       "group relative flex items-center pl-5 pr-3 py-1.5 rounded-r-lg transition-colors duration-150",
                       isSubActive
@@ -279,6 +294,7 @@ const ActionBtn = ({
   danger?: boolean;
 }) => {
   const [hovered, setHovered] = useState(false);
+  const actionTourId = `sidebar-action-${toTourId(label)}`;
 
   // -- Collapsed --
   if (!isExpanded) {
@@ -288,6 +304,7 @@ const ActionBtn = ({
           onClick={onClick}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
+          data-tour={actionTourId}
           className={[
             "relative flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all duration-150",
             danger
@@ -315,6 +332,7 @@ const ActionBtn = ({
   return (
     <button
       onClick={onClick}
+      data-tour={actionTourId}
       className={[
         "relative group flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 w-full overflow-hidden",
         danger
@@ -1105,6 +1123,7 @@ const UserCard = ({
   return (
     <div
       className="relative"
+      data-tour="sidebar-user-card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -1246,6 +1265,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <motion.aside
         animate={{ width: isExpanded ? 264 : 72 }}
         transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+        data-tour="app-sidebar"
         className="sticky top-0 h-screen flex flex-col shrink-0 z-30 overflow-hidden sidebar-gradient"
       >
         {/* Animated accent glow at top */}
@@ -1255,6 +1275,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* -- Header ------------------------------------ */}
         <div
+          data-tour="sidebar-brand"
           className={[
             "flex flex-col items-center transition-all duration-300 relative z-10",
             isExpanded ? "px-5 pt-6 pb-5" : "px-0 pt-5 pb-4",
@@ -1304,6 +1325,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setCollapsed((c) => !c)}
             whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.06)" }}
             whileTap={{ scale: 0.96 }}
+            data-tour="sidebar-collapse"
             className={[
               "flex items-center w-full rounded-xl transition-all duration-200 group",
               "bg-base-content/3 hover:bg-base-content/7 text-center",
@@ -1339,6 +1361,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         {/* -- Nav --------------------------------------- */}
         <nav
+          data-tour="sidebar-navigation"
           className={[
             "flex-1 overflow-y-auto relative z-10",
             isExpanded
@@ -1390,7 +1413,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* -------------------- MAIN CONTENT -------------------- */}
       <div className="flex-1 min-w-0 overflow-hidden">
-        <main className="min-h-screen p-6 lg:p-12 animate-fadeIn">
+        <main
+          data-tour="app-main"
+          className="min-h-screen p-6 lg:p-12 animate-fadeIn"
+        >
           {children}
         </main>
       </div>

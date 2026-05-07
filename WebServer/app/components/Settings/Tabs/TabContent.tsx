@@ -7,6 +7,7 @@ import NotificationsTab from "./NotificationsTab";
 import ProfileTab from "./ProfileTab";
 import SecurityTab from "./SecurityTab";
 import SystemTab from "./SystemTab";
+import TutorialTab from "./TutorialTab";
 
 const TabContent = ({ tabId, role }: { tabId: string; role: string }) => {
   switch (tabId) {
@@ -24,6 +25,8 @@ const TabContent = ({ tabId, role }: { tabId: string; role: string }) => {
       return <BackupTab />;
     case "calendar":
       return <CalendarTab />;
+    case "tutorial":
+      return <TutorialTab />;
     default:
       return null;
   }

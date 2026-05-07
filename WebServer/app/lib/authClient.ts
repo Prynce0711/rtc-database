@@ -37,6 +37,22 @@ export const authClient = createAuthClient({
           type: "boolean",
           input: false,
         },
+        tutorialStatus: {
+          type: "string",
+          input: false,
+        },
+        tutorialCompletedAt: {
+          type: "date",
+          input: false,
+        },
+        tutorialSkippedAt: {
+          type: "date",
+          input: false,
+        },
+        tutorialLastStartedAt: {
+          type: "date",
+          input: false,
+        },
         branch: {
           type: "string",
           input: false,
