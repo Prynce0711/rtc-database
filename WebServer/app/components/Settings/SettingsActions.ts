@@ -5,6 +5,8 @@ import type { GarageInfo } from "@/app/lib/garage";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
+import { createLog } from "../ActivityLogs/LogActions";
 import {
   defaultSystemSettings,
   SystemSettingsSchema,
@@ -95,6 +97,13 @@ export async function updateSystemSettings(
     const { syncNotarialRemote } =
       await import("@/app/lib/backup/backupScheduler");
     await syncNotarialRemote();
+
+    await createLog({
+      action: LogAction.UPDATE_SYSTEM_SETTINGS,
+      details: {
+        changedFields: Object.keys(parsedPatch.data),
+      },
+    });
 
     return { success: true, result: normalized };
   } catch (error) {

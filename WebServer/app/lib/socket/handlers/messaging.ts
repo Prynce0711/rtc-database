@@ -3,6 +3,7 @@ import "server-only";
 import { messageSchema } from "@/app/components/Messages/schema";
 import { prisma } from "@/app/lib/prisma";
 import ClientSocketServer from "@/app/lib/socket/ClientSocketServer";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { createHash } from "crypto";
 import { WebSocket } from "ws";
 import { uploadFileToGarageTrusted } from "../../garageActions";
@@ -155,6 +156,18 @@ export async function receiveMessage(
   await prisma.chat.update({
     where: { id: payload.chatId },
     data: { lastMessageAt: new Date() },
+  });
+
+  await prisma.log.create({
+    data: {
+      action: LogAction.SEND_MESSAGE,
+      userId: client.socketUser.id,
+      details: {
+        id: newMessage.id,
+        chatId: payload.chatId,
+        hasFile: Boolean(newMessage.fileId),
+      },
+    },
   });
 
   for (const ws of client.server.clients) {

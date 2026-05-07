@@ -9,7 +9,9 @@ import {
   ExportExcelData,
   UploadExcelResult,
 } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
+import { createLog } from "../../ActivityLogs/LogActions";
 
 const toNumber = (value: unknown): number => {
   if (value === undefined || value === null || value === "") return 0;
@@ -265,10 +267,19 @@ export async function uploadMunicipalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.MUNICIPAL_JUDGEMENT,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "municipal-judgement-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Municipal judgement Excel upload failed:", error);
     return { success: false, error: "Municipal judgement Excel upload failed" };
@@ -318,6 +329,11 @@ export async function exportMunicipalJudgementExcel(): Promise<
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
 
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: { type: "municipal-judgement", count: records.length },
+    });
+
     return {
       success: true,
       result: {
@@ -338,10 +354,19 @@ export async function uploadRegionalJudgementExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.REGIONAL_JUDGEMENT,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "regional-judgement-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Regional judgement Excel upload failed:", error);
     return { success: false, error: "Regional judgement Excel upload failed" };
@@ -397,6 +422,11 @@ export async function exportRegionalJudgementExcel(): Promise<
     XLSX.utils.book_append_sheet(workbook, worksheet, "Regional Judgement");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: { type: "regional-judgement", count: records.length },
+    });
 
     return {
       success: true,

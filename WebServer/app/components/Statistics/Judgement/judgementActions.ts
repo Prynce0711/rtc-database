@@ -4,6 +4,8 @@ import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 // zod doesn't export a `prettifyError` helper in all versions — provide a small local formatter
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
+import { createLog } from "../../ActivityLogs/LogActions";
 import {
   MTCJudgementRow,
   MTCJudgementRowSchema,
@@ -141,6 +143,11 @@ export async function createMunicipalJudgement(
       },
     });
 
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "municipal-judgement" },
+    });
+
     return {
       success: true,
       result: {
@@ -193,6 +200,10 @@ export async function updateMunicipalJudgement(
       return { success: false, error: prettifyError(validation.error) };
     }
 
+    const existing = await prisma.judgementMunicipal.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.judgementMunicipal.update({
       where: { id },
       data: {
@@ -221,6 +232,11 @@ export async function updateMunicipalJudgement(
         pdlOthers: toNumber(validation.data.pdlOthers) || 0,
         total: toNumber(validation.data.total) || 0,
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: { id, type: "municipal-judgement", from: existing, to: record },
     });
 
     return {
@@ -270,6 +286,10 @@ export async function deleteMunicipalJudgement(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.judgementMunicipal.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "municipal-judgement" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting municipal judgement:", error);
@@ -380,6 +400,11 @@ export async function createRegionalJudgement(
       },
     });
 
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "regional-judgement" },
+    });
+
     return {
       success: true,
       result: {
@@ -439,6 +464,10 @@ export async function updateRegionalJudgement(
       return { success: false, error: prettifyError(validation.error) };
     }
 
+    const existing = await prisma.judgementRegional.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.judgementRegional.update({
       where: { id },
       data: {
@@ -474,6 +503,11 @@ export async function updateRegionalJudgement(
         fine: toNumber(validation.data.fine) || 0,
         total: toNumber(validation.data.total) || 0,
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: { id, type: "regional-judgement", from: existing, to: record },
     });
 
     return {
@@ -530,6 +564,10 @@ export async function deleteRegionalJudgement(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.judgementRegional.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "regional-judgement" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting regional judgement:", error);

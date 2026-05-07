@@ -47,7 +47,9 @@ import {
   PaginatedResult,
 } from "@rtc-database/shared";
 import { Prisma } from "@rtc-database/shared/prisma/client";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { createHash, randomUUID } from "crypto";
+import { createLog } from "../../ActivityLogs/LogActions";
 import * as XLSX from "xlsx";
 
 const ARCHIVE_ACCESS_ROLES = [Roles.ARCHIVE, Roles.ADMIN, Roles.NOTARIAL];
@@ -2001,6 +2003,14 @@ export async function deleteArchiveGarageItems(
       });
     }
 
+    await createLog({
+      action: LogAction.DELETE_FILE,
+      details: {
+        keys: normalizedKeys,
+        deletedCount: deleteResult.result.deletedCount,
+      },
+    });
+
     return {
       success: true,
       result: {
@@ -2035,6 +2045,15 @@ export async function moveArchiveGarageItems(
 
     await syncArchiveMovedGarageKeys(result.result.movedKeys);
 
+    await createLog({
+      action: LogAction.MOVE_FILE,
+      details: {
+        keys,
+        targetFolderPath,
+        movedCount: result.result.movedCount,
+      },
+    });
+
     return {
       success: true,
       result: {
@@ -2068,6 +2087,15 @@ export async function renameArchiveGarageItem(
     }
 
     await syncArchiveMovedGarageKeys(result.result.movedKeys);
+
+    await createLog({
+      action: LogAction.RENAME_FILE,
+      details: {
+        key,
+        newName,
+        movedCount: result.result.movedCount,
+      },
+    });
 
     return {
       success: true,
@@ -2256,6 +2284,11 @@ export async function completeArchiveLargeFileUpload(
       include: ARCHIVE_INCLUDE,
     });
 
+    await createLog({
+      action: LogAction.UPLOAD_FILE,
+      details: { id: createdEntry.id, fullPath: createdEntry.fullPath },
+    });
+
     return {
       success: true,
       result: createdEntry,
@@ -2382,6 +2415,14 @@ export async function createArchiveEntry(
         fileId,
       },
       include: ARCHIVE_INCLUDE,
+    });
+
+    await createLog({
+      action:
+        createdEntry.entryType === ArchiveEntryType.FOLDER
+          ? LogAction.CREATE_FOLDER
+          : LogAction.UPLOAD_FILE,
+      details: { id: createdEntry.id, fullPath: createdEntry.fullPath },
     });
 
     return {
@@ -2538,6 +2579,15 @@ export async function updateArchiveEntry(
         };
       }
 
+      await createLog({
+        action: LogAction.UPDATE_FILE,
+        details: {
+          id,
+          from: { fullPath: existingEntry.fullPath },
+          to: { fullPath: updatedFolder.fullPath },
+        },
+      });
+
       return { success: true, result: updatedFolder };
     }
 
@@ -2597,6 +2647,15 @@ export async function updateArchiveEntry(
     if (replacedFile && replacedFile.id !== updatedEntry.fileId) {
       await deleteFileIfUnreferenced(replacedFile);
     }
+
+    await createLog({
+      action: LogAction.UPDATE_FILE,
+      details: {
+        id,
+        from: { fullPath: existingEntry.fullPath, fileId: existingEntry.fileId },
+        to: { fullPath: updatedEntry.fullPath, fileId: updatedEntry.fileId },
+      },
+    });
 
     return {
       success: true,
@@ -2659,6 +2718,15 @@ export async function deleteArchiveEntry(
     for (const file of fileReferences) {
       await deleteFileIfUnreferenced(file);
     }
+
+    await createLog({
+      action: LogAction.DELETE_FILE,
+      details: {
+        id,
+        fullPath: entry.fullPath,
+        deletedCount: entriesToDelete.length,
+      },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {

@@ -7,7 +7,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
-import { setInitialPassword } from "../AccountManagement/AccountActions";
+import {
+  recordPasswordChange,
+  setInitialPassword,
+} from "../AccountManagement/AccountActions";
 import RequirementUI from "./RequirementUI";
 import StrengthMeter from "./StrengthMeter";
 
@@ -30,7 +33,6 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
 
-  const [error, setError] = useState("");
   const [darkMode, setDarkMode] = useState(isDarkMode());
   // NEW STATES
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -70,14 +72,8 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
       window.removeEventListener("themeChange", handleThemeChange);
     };
   }, []);
-  // Check mismatch
-  useEffect(() => {
-    if (confirm && password && password !== confirm) {
-      setError("Passwords do not match");
-    } else {
-      setError("");
-    }
-  }, [password, confirm]);
+  const error =
+    confirm && password && password !== confirm ? "Passwords do not match" : "";
 
   const cardVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
@@ -105,7 +101,7 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
     }
 
     if (type === UpdatePasswordType.CHANGE_PASSWORD) {
-      const { data, error } = await authClient.changePassword({
+      const { error } = await authClient.changePassword({
         newPassword: password, // required
         currentPassword: UpdatePasswordType.CHANGE_PASSWORD ? current : "", // required
         revokeOtherSessions: true,
@@ -114,6 +110,11 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
       if (error) {
         statusPopup.showError(error.message || "Failed to update password");
         return;
+      }
+
+      const logResult = await recordPasswordChange();
+      if (!logResult.success) {
+        console.error(logResult.error || "Failed to log password change");
       }
     } else {
       const result = await setInitialPassword(password);

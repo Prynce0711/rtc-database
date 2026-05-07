@@ -35,11 +35,6 @@ export async function updateDarkMode(
       return sessionValidation;
     }
 
-    const darkModeEnabled = await prisma.user.findUnique({
-      where: { id: sessionValidation.result.id },
-      select: { darkMode: true },
-    });
-
     await prisma.user.update({
       where: { id: sessionValidation.result.id },
       data: { darkMode: { set: newTheme === "dim" } },

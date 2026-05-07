@@ -194,6 +194,11 @@ export async function createRegionalTrialCourt(
           validation.data.percentageOfDisposition?.toString(),
       },
     });
+
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "regional-trial-court" },
+    });
     return {
       success: true,
       result: {
@@ -228,6 +233,10 @@ export async function updateRegionalTrialCourt(
       throw new Error("Invalid data: " + prettifyError(validation.error));
     }
 
+    const existing = await prisma.regionalTrialCourt.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.regionalTrialCourt.update({
       where: { id },
       data: {
@@ -240,6 +249,11 @@ export async function updateRegionalTrialCourt(
         percentageOfDisposition:
           validation.data.percentageOfDisposition?.toString(),
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: { id, type: "regional-trial-court", from: existing, to: record },
     });
     return {
       success: true,
@@ -270,6 +284,10 @@ export async function deleteRegionalTrialCourt(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.regionalTrialCourt.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "regional-trial-court" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting regional trial court:", error);
@@ -332,6 +350,11 @@ export async function createMunicipalTrialCourt(
           validation.data.percentageOfDisposition?.toString(),
       },
     });
+
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "municipal-trial-court" },
+    });
     return {
       success: true,
       result: {
@@ -366,6 +389,10 @@ export async function updateMunicipalTrialCourt(
       throw new Error("Invalid data: " + prettifyError(validation.error));
     }
 
+    const existing = await prisma.municipalTrialCourt.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.municipalTrialCourt.update({
       where: { id },
       data: {
@@ -377,6 +404,16 @@ export async function updateMunicipalTrialCourt(
         pendingThisYear: validation.data.pendingThisYear?.toString(),
         percentageOfDisposition:
           validation.data.percentageOfDisposition?.toString(),
+      },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: {
+        id,
+        type: "municipal-trial-court",
+        from: existing,
+        to: record,
       },
     });
     return {
@@ -405,6 +442,10 @@ export async function deleteMunicipalTrialCourt(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.municipalTrialCourt.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "municipal-trial-court" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting municipal trial court:", error);
@@ -473,6 +514,11 @@ export async function createInventoryDocument(
           : undefined,
       },
     });
+
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "inventory-document" },
+    });
     return {
       success: true,
       result: {
@@ -506,6 +552,10 @@ export async function updateInventoryDocument(
       throw new Error("Invalid data: " + prettifyError(validation.error));
     }
 
+    const existing = await prisma.inventoryDocument.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.inventoryDocument.update({
       where: { id },
       data: {
@@ -525,6 +575,11 @@ export async function updateInventoryDocument(
           ? new Date(validation.data.dateRecorded)
           : undefined,
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: { id, type: "inventory-document", from: existing, to: record },
     });
     return {
       success: true,
@@ -554,6 +609,10 @@ export async function deleteInventoryDocument(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.inventoryDocument.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "inventory-document" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting inventory document:", error);

@@ -7,6 +7,8 @@ import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { Recipient } from "@/app/lib/socket/SocketEvents";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
+import { createLog } from "../ActivityLogs/LogActions";
 
 // TODO: Make it so chat name is dependent on the other user's name if it is direct
 
@@ -296,6 +298,11 @@ export async function createGroupChat(
       },
     });
 
+    await createLog({
+      action: LogAction.CREATE_CHAT,
+      details: { id: chat.id, type: ChatType.GROUP, memberCount: memberIds.length + 1 },
+    });
+
     return { success: true, result: chat.id };
   } catch (err) {
     console.error("Error in createGroupChat:", err);
@@ -334,6 +341,11 @@ export async function leaveChat(
         chatId,
         userId: sessionResult.result.id,
       },
+    });
+
+    await createLog({
+      action: LogAction.LEAVE_CHAT,
+      details: { id: chatId },
     });
 
     return { success: true, result: undefined };
@@ -378,6 +390,11 @@ export async function deleteChat(
           },
         },
       },
+    });
+
+    await createLog({
+      action: LogAction.DELETE_CHAT,
+      details: { id: chatId },
     });
 
     return { success: true, result: undefined };

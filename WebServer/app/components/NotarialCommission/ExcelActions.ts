@@ -10,7 +10,9 @@ import {
   ExportExcelData,
   UploadExcelResult,
 } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
+import { createLog } from "../ActivityLogs/LogActions";
 import { getCommissionYearLabel } from "./schema";
 
 const NOTARIAL_COMMISSION_ROLES = [Roles.ADMIN, Roles.NOTARIAL] as const;
@@ -24,10 +26,19 @@ export async function uploadNotarialCommissionExcel(
       return sessionResult;
     }
 
-    return await startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.NOTARIAL_COMMISSION,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_NOTARIAL_COMMISSION,
+        details: { fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Notarial commission upload error:", error);
     return { success: false, error: "Upload failed" };
@@ -97,6 +108,11 @@ export async function exportNotarialCommissionsExcel(): Promise<
     const base64 = XLSX.write(workbook, {
       type: "base64",
       bookType: "xlsx",
+    });
+
+    await createLog({
+      action: LogAction.EXPORT_NOTARIAL_COMMISSION,
+      details: { count: records.length },
     });
 
     return {

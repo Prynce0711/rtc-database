@@ -19,6 +19,47 @@ function createUpdateSchema<T>(schema: z.ZodType<T>) {
   });
 }
 
+const LogDetails = z.record(z.string(), z.unknown()).nullable();
+
+const ResourceLogAction = z.enum([
+  LogAction.UPDATE_STATUS,
+  LogAction.UPDATE_TUTORIAL,
+  LogAction.UPDATE_SYSTEM_SETTINGS,
+  LogAction.UPDATE_BACKUP_SETTINGS,
+  LogAction.RUN_BACKUP,
+  LogAction.RESTORE_BACKUP,
+  LogAction.CREATE_BACKUP_ACCOUNT,
+  LogAction.UPDATE_BACKUP_ACCOUNT,
+  LogAction.DELETE_BACKUP_ACCOUNT,
+  LogAction.CREATE_NOTARIAL,
+  LogAction.UPDATE_NOTARIAL,
+  LogAction.DELETE_NOTARIAL,
+  LogAction.CREATE_NOTARIAL_COMMISSION,
+  LogAction.UPDATE_NOTARIAL_COMMISSION,
+  LogAction.DELETE_NOTARIAL_COMMISSION,
+  LogAction.IMPORT_NOTARIAL_COMMISSION,
+  LogAction.EXPORT_NOTARIAL_COMMISSION,
+  LogAction.CREATE_STATISTICS,
+  LogAction.UPDATE_STATISTICS,
+  LogAction.DELETE_STATISTICS,
+  LogAction.IMPORT_STATISTICS,
+  LogAction.EXPORT_STATISTICS,
+  LogAction.CLEAR_STATISTICS,
+  LogAction.UPLOAD_FILE,
+  LogAction.UPDATE_FILE,
+  LogAction.DELETE_FILE,
+  LogAction.MOVE_FILE,
+  LogAction.RENAME_FILE,
+  LogAction.CREATE_FOLDER,
+  LogAction.CREATE_CHAT,
+  LogAction.DELETE_CHAT,
+  LogAction.LEAVE_CHAT,
+  LogAction.SEND_MESSAGE,
+  LogAction.DELETE_MESSAGE,
+  LogAction.UPDATE_SYNC_STATE,
+  LogAction.RESET_SYNC_STATE,
+] as const);
+
 export const CreateLogData = z
   .object({
     action: z
@@ -129,6 +170,12 @@ export const CreateLogData = z
       details: z.object({
         id: z.string(),
       }),
+    }),
+  )
+  .or(
+    z.object({
+      action: ResourceLogAction,
+      details: LogDetails,
     }),
   );
 export type CreateLogData = z.infer<typeof CreateLogData>;

@@ -10,6 +10,8 @@ import {
 import { prisma } from "@/app/lib/prisma";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
+import { createLog } from "../ActivityLogs/LogActions";
 import {
   buildNotarialCommissionKey,
   extractCommissionYears,
@@ -407,6 +409,11 @@ export async function createNotarialCommission(
       };
     }
 
+    await createLog({
+      action: LogAction.CREATE_NOTARIAL_COMMISSION,
+      details: { id: createdRecord.id, imageFileId: createdRecord.imageFileId },
+    });
+
     return { success: true, result: createdRecord };
   } catch (error) {
     console.error("Error creating notarial commission:", error);
@@ -498,6 +505,15 @@ export async function updateNotarialCommission(
       };
     }
 
+    await createLog({
+      action: LogAction.UPDATE_NOTARIAL_COMMISSION,
+      details: {
+        id,
+        from: existing,
+        to: reloadedRecord,
+      },
+    });
+
     return { success: true, result: reloadedRecord };
   } catch (error) {
     console.error("Error updating notarial commission:", error);
@@ -535,6 +551,11 @@ export async function deleteNotarialCommission(
         );
       }
     }
+
+    await createLog({
+      action: LogAction.DELETE_NOTARIAL_COMMISSION,
+      details: { id },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {

@@ -3,7 +3,9 @@ import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { prettifyError, z } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 import { MonthlyRow, MonthlyRowSchema } from "./Schema";
 
 // ─── Get ────────────────────────────────────────────────────────────────────
@@ -70,6 +72,11 @@ export async function createMonthlyStatistic(
       },
     });
 
+    await createLog({
+      action: LogAction.CREATE_STATISTICS,
+      details: { id: record.id, type: "monthly" },
+    });
+
     return { success: true, result: record };
   } catch (error) {
     console.error("Error creating monthly statistic:", error);
@@ -95,6 +102,10 @@ export async function updateMonthlyStatistic(
       return { success: false, error: prettifyError(validation.error) };
     }
 
+    const existing = await prisma.monthlyStatistics.findUnique({
+      where: { id },
+    });
+
     const record = await prisma.monthlyStatistics.update({
       where: { id },
       data: {
@@ -105,6 +116,11 @@ export async function updateMonthlyStatistic(
         civil: validation.data.civil,
         total: validation.data.total,
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATISTICS,
+      details: { id, type: "monthly", from: existing, to: record },
     });
 
     return { success: true, result: record };
@@ -127,6 +143,10 @@ export async function deleteMonthlyStatistic(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.monthlyStatistics.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "monthly" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting monthly statistic:", error);
@@ -186,6 +206,11 @@ export async function upsertMonthlyStatistics(
       });
     }
 
+    await createLog({
+      action: LogAction.IMPORT_STATISTICS,
+      details: { type: "monthly", count: results.length },
+    });
+
     return { success: true, result: { upserted: results.length } };
   } catch (error) {
     console.error("Error upserting monthly statistics:", error);
@@ -207,6 +232,11 @@ export async function clearMonthlyStatistics(
 
     const { count } = await prisma.monthlyStatistics.deleteMany({
       where: month ? { month } : undefined,
+    });
+
+    await createLog({
+      action: LogAction.CLEAR_STATISTICS,
+      details: { type: "monthly", month: month ?? null, count },
     });
 
     return { success: true, result: { deleted: count } };

@@ -128,6 +128,11 @@ export async function sendMagicEmail(
       headers: await headers(),
     });
 
+    await createLog({
+      action: LogAction.SEND_MAGIC_LINK,
+      details: { email },
+    });
+
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error sending magic email: ", (error as Error).message);
@@ -391,10 +396,34 @@ export async function setInitialPassword(
       data: { status: Status.ACTIVE },
     });
 
+    await createLog({
+      action: LogAction.SET_INITIAL_PASSWORD,
+      details: { id: sessionValidation.result.id },
+    });
+
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error setting password:", error);
     return { success: false, error: "Failed to set password" };
+  }
+}
+
+export async function recordPasswordChange(): Promise<ActionResult<void>> {
+  try {
+    const sessionValidation = await validateSession();
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    await createLog({
+      action: LogAction.CHANGE_PASSWORD,
+      details: { id: sessionValidation.result.id },
+    });
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Error logging password change:", error);
+    return { success: false, error: "Failed to log password change" };
   }
 }
 
@@ -413,9 +442,23 @@ export async function updateStatus(
       throw new Error("Invalid status: " + prettifyError(validation.error));
     }
 
+    const existingUser = await prisma.user.findUnique({
+      where: { id: sessionValidation.result.id },
+      select: { status: true },
+    });
+
     await prisma.user.update({
       where: { id: sessionValidation.result.id },
       data: { status: status },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_STATUS,
+      details: {
+        id: sessionValidation.result.id,
+        from: existingUser?.status ?? null,
+        to: status,
+      },
     });
 
     return { success: true, result: undefined };

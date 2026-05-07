@@ -39,7 +39,9 @@ import {
 } from "@/app/lib/backup/remotes/onedrive";
 import Roles from "@/app/lib/Roles";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { z } from "zod";
+import { createLog } from "../ActivityLogs/LogActions";
 
 export interface BackupDashboardData {
   config: BackupConfig;
@@ -60,6 +62,10 @@ export type BackupNotarialSnapshot = NotarialSnapshot;
 const BACKUP_INTERVAL_VALUE_SET = new Set(
   BACKUP_INTERVAL_OPTIONS.map((option) => option.value),
 );
+const isBackupIntervalValue = (
+  value: string,
+): value is BackupIntervalOption["value"] =>
+  BACKUP_INTERVAL_VALUE_SET.has(value as BackupIntervalOption["value"]);
 
 const SaveBackupSchema = z.object({
   enabled: z.boolean(),
@@ -70,7 +76,7 @@ const SaveBackupSchema = z.object({
   notarialSelectedRemoteNames: z.array(z.string()).default([]),
   notarialSnapshotRetentionInterval: z
     .string()
-    .refine((value) => BACKUP_INTERVAL_VALUE_SET.has(value as any), {
+    .refine(isBackupIntervalValue, {
       message: "Invalid notarial snapshot retention interval",
     }),
   remotePath: z.string(),
@@ -180,6 +186,15 @@ export async function saveBackupConfiguration(
       remotePath: parsed.data.remotePath,
     });
 
+    await createLog({
+      action: LogAction.UPDATE_BACKUP_SETTINGS,
+      details: {
+        enabled: parsed.data.enabled,
+        caseEnabled: parsed.data.caseEnabled,
+        notarialEnabled: parsed.data.notarialEnabled,
+      },
+    });
+
     return {
       success: true,
       result: await getDashboardData(),
@@ -207,6 +222,11 @@ export async function runBackupNowAction(): Promise<
 
     await startBackupScheduler();
     await runBackupNow();
+
+    await createLog({
+      action: LogAction.RUN_BACKUP,
+      details: null,
+    });
 
     return {
       success: true,
@@ -238,6 +258,14 @@ export async function importBackupFromRemoteAction(
 
     await startBackupScheduler();
     await importBackupFromRemote(parsed.data.remoteName, parsed.data.source);
+
+    await createLog({
+      action: LogAction.RESTORE_BACKUP,
+      details: {
+        source: "remote",
+        remoteName: parsed.data.remoteName,
+      },
+    });
 
     return {
       success: true,
@@ -277,6 +305,14 @@ export async function importBackupFromLocalFileAction(
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     await importBackupFromLocalUpload(file.name, fileBytes);
+
+    await createLog({
+      action: LogAction.RESTORE_BACKUP,
+      details: {
+        source: "local",
+        fileName: file.name,
+      },
+    });
 
     return {
       success: true,
@@ -342,6 +378,14 @@ export async function createBackupAccount(
       parsed.data.remoteBasePath,
     );
 
+    await createLog({
+      action: LogAction.CREATE_BACKUP_ACCOUNT,
+      details: {
+        remoteName: parsed.data.remoteName,
+        provider: parsed.data.provider,
+      },
+    });
+
     return {
       success: true,
       result: await getDashboardData(),
@@ -381,6 +425,15 @@ export async function updateBackupAccount(
       parsed.data.remoteBasePath,
     );
 
+    await createLog({
+      action: LogAction.UPDATE_BACKUP_ACCOUNT,
+      details: {
+        from: parsed.data.currentRemoteName,
+        to: parsed.data.nextRemoteName,
+        provider: parsed.data.provider,
+      },
+    });
+
     return {
       success: true,
       result: await getDashboardData(),
@@ -416,6 +469,14 @@ export async function reloginBackupAccount(
 
     await startBackupScheduler();
     await reloginBackupRemote(parsed.data.remoteName, parsed.data.forceRestart);
+
+    await createLog({
+      action: LogAction.UPDATE_BACKUP_ACCOUNT,
+      details: {
+        remoteName: parsed.data.remoteName,
+        operation: "relogin",
+      },
+    });
 
     return {
       success: true,
@@ -454,6 +515,14 @@ export async function deleteBackupAccount(
     await startBackupScheduler();
     await deleteBackupRemote(remoteName, deleteBackupFiles);
 
+    await createLog({
+      action: LogAction.DELETE_BACKUP_ACCOUNT,
+      details: {
+        remoteName,
+        deleteBackupFiles,
+      },
+    });
+
     return {
       success: true,
       result: await getDashboardData(),
@@ -485,6 +554,14 @@ export async function clearBackupAccountFiles(
 
     await startBackupScheduler();
     await clearBackupRemoteFiles(remoteName);
+
+    await createLog({
+      action: LogAction.DELETE_BACKUP_ACCOUNT,
+      details: {
+        remoteName,
+        operation: "clear-files",
+      },
+    });
 
     return {
       success: true,
@@ -651,6 +728,15 @@ export async function restoreNotarialSnapshotAction(
       parsed.data.remoteName.trim(),
       parsed.data.snapshotId.trim(),
     );
+
+    await createLog({
+      action: LogAction.RESTORE_BACKUP,
+      details: {
+        source: "notarial-snapshot",
+        remoteName: parsed.data.remoteName.trim(),
+        snapshotId: parsed.data.snapshotId.trim(),
+      },
+    });
 
     return {
       success: true,

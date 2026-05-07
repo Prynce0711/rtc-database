@@ -4,7 +4,9 @@ import Roles from "@/app/lib/Roles";
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 import { SummaryRow, SummaryRowArraySchema } from "./Schema";
 import { computeSummaryTotal } from "./SummaryImportUtils";
 
@@ -193,6 +195,11 @@ export async function upsertSummaryStatistics(
       upserted += 1;
     }
 
+    await createLog({
+      action: LogAction.IMPORT_STATISTICS,
+      details: { type: "summary", count: upserted },
+    });
+
     return { success: true, result: { upserted } };
   } catch (error) {
     console.error("Error saving summary statistics:", error);
@@ -211,6 +218,10 @@ export async function deleteSummaryStatistic(
     if (!sessionValidation.success) return sessionValidation;
 
     await prisma.summaryStatistic.delete({ where: { id } });
+    await createLog({
+      action: LogAction.DELETE_STATISTICS,
+      details: { id, type: "summary" },
+    });
     return { success: true, result: undefined };
   } catch (error) {
     console.error("Error deleting summary statistic:", error);

@@ -33,8 +33,10 @@ import {
   PaginatedResult,
 } from "@rtc-database/shared";
 import { Prisma } from "@rtc-database/shared/prisma/client";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { createHash, randomUUID } from "crypto";
 import { prettifyError } from "zod";
+import { createLog } from "../../ActivityLogs/LogActions";
 import { generateFileKey, NotarialData, NotarialSchema } from "./schema";
 
 type NotarialListFilterShape = {
@@ -869,6 +871,11 @@ export async function createNotarial(
       };
     }
 
+    await createLog({
+      action: LogAction.CREATE_NOTARIAL,
+      details: { id: notarialWithFile.id, fileId: notarialWithFile.fileId },
+    });
+
     return { success: true, result: notarialWithFile };
   } catch (error) {
     console.error("Error creating notarial data:", error);
@@ -1002,6 +1009,11 @@ export async function completeNotarialLargeFileUpload(
         error: "Notarial created but failed to retrieve with file data",
       };
     }
+
+    await createLog({
+      action: LogAction.CREATE_NOTARIAL,
+      details: { id: notarialWithFile.id, fileId: notarialWithFile.fileId },
+    });
 
     return { success: true, result: notarialWithFile };
   } catch (error) {
@@ -1176,6 +1188,27 @@ export async function updateNotarial(
       };
     }
 
+    await createLog({
+      action: LogAction.UPDATE_NOTARIAL,
+      details: {
+        id,
+        from: {
+          title: existingNotarial.title,
+          name: existingNotarial.name,
+          attorney: existingNotarial.attorney,
+          date: existingNotarial.date,
+          fileId: existingNotarial.fileId,
+        },
+        to: {
+          title: notarialWithFile.title,
+          name: notarialWithFile.name,
+          attorney: notarialWithFile.attorney,
+          date: notarialWithFile.date,
+          fileId: notarialWithFile.fileId,
+        },
+      },
+    });
+
     return { success: true, result: notarialWithFile };
   } catch (error) {
     console.error("Error updating notarial data:", error);
@@ -1204,6 +1237,11 @@ export async function deleteNotarial(id: number): Promise<ActionResult<void>> {
     if (notarial.file) {
       await deleteFileIfUnreferenced(notarial.file.id, notarial.file.key);
     }
+
+    await createLog({
+      action: LogAction.DELETE_NOTARIAL,
+      details: { id },
+    });
 
     return { success: true, result: undefined };
   } catch (error) {
@@ -2098,6 +2136,14 @@ export async function deleteNotarialGarageItems(
       });
     }
 
+    await createLog({
+      action: LogAction.DELETE_FILE,
+      details: {
+        keys: normalizedKeys,
+        deletedCount: result.result.deletedCount,
+      },
+    });
+
     return {
       success: true,
       result: {
@@ -2130,6 +2176,15 @@ export async function moveNotarialGarageItems(
       return { success: false, error: result.error };
     }
 
+    await createLog({
+      action: LogAction.MOVE_FILE,
+      details: {
+        keys,
+        targetFolderPath,
+        movedCount: result.result.movedCount,
+      },
+    });
+
     return {
       success: true,
       result: {
@@ -2161,6 +2216,15 @@ export async function renameNotarialGarageItem(
     if (!result.success) {
       return { success: false, error: result.error };
     }
+
+    await createLog({
+      action: LogAction.RENAME_FILE,
+      details: {
+        key,
+        newName,
+        movedCount: result.result.movedCount,
+      },
+    });
 
     return {
       success: true,
@@ -2266,6 +2330,11 @@ export async function createGarageFolder(
       NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) return { success: false, error: result.error };
+
+    await createLog({
+      action: LogAction.CREATE_FOLDER,
+      details: { fullPath },
+    });
 
     return {
       success: true,

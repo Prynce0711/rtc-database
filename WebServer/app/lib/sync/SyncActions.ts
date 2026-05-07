@@ -7,7 +7,9 @@ import {
   UpdateSyncStatePayload,
   type DeviceID,
 } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import { prettifyError } from "zod/v4/core";
+import { createLog } from "@/app/components/ActivityLogs/LogActions";
 import { validateSession } from "../authActions";
 import { prisma } from "../prisma";
 
@@ -73,6 +75,11 @@ export async function upsertSyncStateForDevice(
       },
     });
 
+    await createLog({
+      action: LogAction.UPDATE_SYNC_STATE,
+      details: { deviceId: validatedDeviceId, operation: "upsert" },
+    });
+
     return {
       success: true,
       result: newSyncState,
@@ -127,6 +134,14 @@ export async function updateLastSyncedAtForDevice(
       },
     });
 
+    await createLog({
+      action: LogAction.UPDATE_SYNC_STATE,
+      details: {
+        deviceId: validation.data.deviceId,
+        operation: "lastSyncedAt",
+      },
+    });
+
     return {
       success: true,
       result: undefined,
@@ -153,6 +168,11 @@ export async function resetSyncStateForAllDevices(): Promise<
       where: {
         userId: sessionResult.result.id,
       },
+    });
+
+    await createLog({
+      action: LogAction.RESET_SYNC_STATE,
+      details: { scope: "all-devices" },
     });
 
     return {
@@ -204,6 +224,11 @@ export async function resetSyncStateForDevice(
         deviceId,
         userId: sessionResult.result.id,
       },
+    });
+
+    await createLog({
+      action: LogAction.RESET_SYNC_STATE,
+      details: { scope: "device", deviceId: validation.data },
     });
 
     return {

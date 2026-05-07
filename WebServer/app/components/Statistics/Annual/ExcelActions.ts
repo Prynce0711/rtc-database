@@ -12,7 +12,9 @@ import {
   isValidDate,
   UploadExcelResult,
 } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
+import { createLog } from "../../ActivityLogs/LogActions";
 
 const toText = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim();
@@ -199,10 +201,19 @@ export async function uploadMunicipalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.MUNICIPAL_TRIAL_COURT,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "municipal-trial-court-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Municipal Trial Court Excel upload failed:", error);
     return {
@@ -238,6 +249,10 @@ export async function exportMunicipalTrialCourtExcel(): Promise<
     XLSX.utils.book_append_sheet(workbook, worksheet, "MTC Annual");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: { type: "municipal-trial-court", count: records.length },
+    });
     return {
       success: true,
       result: {
@@ -261,10 +276,19 @@ export async function uploadRegionalTrialCourtExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.REGIONAL_TRIAL_COURT,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "regional-trial-court-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Regional Trial Court Excel upload failed:", error);
     return {
@@ -300,6 +324,10 @@ export async function exportRegionalTrialCourtExcel(): Promise<
     XLSX.utils.book_append_sheet(workbook, worksheet, "RTC Annual");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: { type: "regional-trial-court", count: records.length },
+    });
     return {
       success: true,
       result: {
@@ -323,10 +351,19 @@ export async function uploadInventoryDocumentExcel(
     const sessionValidation = await validateSession();
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.INVENTORY_DOCUMENT,
       file,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "inventory-document-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Inventory Excel upload failed:", error);
     return { success: false, error: "Inventory Excel upload failed" };
@@ -364,6 +401,10 @@ export async function exportInventoryDocumentExcel(): Promise<
     XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory Annual");
 
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: { type: "inventory-document", count: records.length },
+    });
     return {
       success: true,
       result: {

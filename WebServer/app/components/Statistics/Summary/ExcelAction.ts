@@ -10,7 +10,9 @@ import {
   ExportExcelData,
   UploadExcelResult,
 } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
 import * as XLSX from "xlsx";
+import { createLog } from "../../ActivityLogs/LogActions";
 import { SUMMARY_COURT_TYPES, type SummaryCourtType } from "./SummaryConstants";
 
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
@@ -36,12 +38,21 @@ export async function uploadSummaryExcel(
     ]);
     if (!sessionValidation.success) return sessionValidation;
 
-    return startExcelUpload({
+    const result = await startExcelUpload({
       type: ExcelTypes.SUMMARY_STATISTICS,
       file,
       fallbackMonth,
       fallbackYear,
     });
+
+    if (result.success) {
+      await createLog({
+        action: LogAction.IMPORT_STATISTICS,
+        details: { type: "summary-excel", fileName: file.name },
+      });
+    }
+
+    return result;
   } catch (error) {
     console.error("Summary Excel upload failed:", error);
     return { success: false, error: "Summary Excel upload failed" };
@@ -124,6 +135,17 @@ export async function exportSummaryExcel(
     const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
     const periodSuffix =
       typeof year === "number" && month ? `-${year}-${month}` : "";
+
+    await createLog({
+      action: LogAction.EXPORT_STATISTICS,
+      details: {
+        type: "summary",
+        month: month ?? null,
+        year: year ?? null,
+        courtType: courtType ?? null,
+        count: records.length,
+      },
+    });
 
     return {
       success: true,

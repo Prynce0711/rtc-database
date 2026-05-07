@@ -3,6 +3,8 @@
 import { validateSession } from "@/app/lib/authActions";
 import { prisma } from "@/app/lib/prisma";
 import { ActionResult } from "@rtc-database/shared";
+import { LogAction } from "@rtc-database/shared/prisma/enums";
+import { createLog } from "../ActivityLogs/LogActions";
 
 export type TutorialStatus = "PENDING" | "COMPLETED" | "SKIPPED";
 
@@ -81,6 +83,11 @@ export async function startTutorial(): Promise<ActionResult<TutorialProgress>> {
       },
     });
 
+    await createLog({
+      action: LogAction.UPDATE_TUTORIAL,
+      details: { id: sessionValidation.result.id, status: "PENDING" },
+    });
+
     return { success: true, result: toTutorialProgress(updated) };
   } catch (error) {
     console.error("Error starting tutorial:", error);
@@ -109,6 +116,11 @@ export async function completeTutorial(): Promise<ActionResult<TutorialProgress>
       },
     });
 
+    await createLog({
+      action: LogAction.UPDATE_TUTORIAL,
+      details: { id: sessionValidation.result.id, status: "COMPLETED" },
+    });
+
     return { success: true, result: toTutorialProgress(updated) };
   } catch (error) {
     console.error("Error completing tutorial:", error);
@@ -135,6 +147,11 @@ export async function skipTutorial(): Promise<ActionResult<TutorialProgress>> {
         tutorialSkippedAt: true,
         tutorialLastStartedAt: true,
       },
+    });
+
+    await createLog({
+      action: LogAction.UPDATE_TUTORIAL,
+      details: { id: sessionValidation.result.id, status: "SKIPPED" },
     });
 
     return { success: true, result: toTutorialProgress(updated) };
