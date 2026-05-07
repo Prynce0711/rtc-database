@@ -15,31 +15,29 @@ const LoadingPopup = ({
       role="status"
       aria-live="polite"
     >
-      <div className="pointer-events-auto overflow-hidden rounded-lg border border-base-300 bg-base-100 text-base-content shadow-2xl">
-        {content ? (
-          <div className="p-4">{content}</div>
-        ) : (
-          <>
-            <div className="flex items-start gap-3 px-4 py-3">
-              <span className="loading loading-spinner loading-sm mt-1 text-primary" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-semibold">Processing</p>
-                  <p className="shrink-0 text-xs text-base-content/60">
-                    In progress
-                  </p>
-                </div>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-base-content/70">
-                  {displayMessage}
+      {content ? (
+        <div className="pointer-events-auto">{content}</div>
+      ) : (
+        <div className="pointer-events-auto overflow-hidden rounded-lg border border-base-300 bg-base-100 text-base-content shadow-2xl">
+          <div className="flex items-start gap-3 px-4 py-3">
+            <span className="loading loading-spinner loading-sm mt-1 text-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="truncate text-sm font-semibold">Processing</p>
+                <p className="shrink-0 text-xs text-base-content/60">
+                  In progress
                 </p>
               </div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-base-content/70">
+                {displayMessage}
+              </p>
             </div>
-            <div className="h-1.5 w-full overflow-hidden bg-base-300">
-              <div className="h-full w-2/5 animate-[progress-slide_1.15s_ease-in-out_infinite] rounded-r-full bg-primary" />
-            </div>
-          </>
-        )}
-      </div>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden bg-base-300">
+            <div className="h-full w-2/5 animate-[progress-slide_1.15s_ease-in-out_infinite] rounded-r-full bg-primary" />
+          </div>
+        </div>
+      )}
       {!content ? (
         <style>{`
           @keyframes progress-slide {

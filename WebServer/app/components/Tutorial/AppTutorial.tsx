@@ -316,42 +316,16 @@ const AppTutorial = ({ initialStatus, role }: AppTutorialProps) => {
         aria-live="polite"
       >
         {targetRect ? (
-          <>
-            <div
-              className="fixed left-0 right-0 top-0 bg-black/55"
-              style={{ height: targetRect.top }}
-            />
-            <div
-              className="fixed left-0 bg-black/55"
-              style={{
-                top: targetRect.top,
-                width: targetRect.left,
-                height: targetRect.height,
-              }}
-            />
-            <div
-              className="fixed right-0 bg-black/55"
-              style={{
-                top: targetRect.top,
-                left: targetRect.right,
-                height: targetRect.height,
-              }}
-            />
-            <div
-              className="fixed left-0 right-0 bottom-0 bg-black/55"
-              style={{ top: targetRect.bottom }}
-            />
-            <motion.div
-              layout
-              className="fixed rounded-2xl border-2 border-primary bg-transparent shadow-[0_0_0_4px_rgba(255,255,255,0.35),0_18px_60px_rgba(0,0,0,0.35)] pointer-events-none"
-              style={{
-                top: targetRect.top,
-                left: targetRect.left,
-                width: targetRect.width,
-                height: targetRect.height,
-              }}
-            />
-          </>
+          <motion.div
+            layout
+            className="fixed rounded-2xl border-2 border-primary bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.55),0_0_0_4px_rgba(255,255,255,0.35),0_18px_60px_rgba(0,0,0,0.35)] pointer-events-none"
+            style={{
+              top: targetRect.top,
+              left: targetRect.left,
+              width: targetRect.width,
+              height: targetRect.height,
+            }}
+          />
         ) : (
           <div className="fixed inset-0 bg-black/55" />
         )}
