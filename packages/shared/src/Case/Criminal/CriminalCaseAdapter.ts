@@ -12,6 +12,10 @@ import type {
   CriminalCasesFilterOptions,
   CriminalCaseStats,
 } from "./CriminalCaseSchema";
+import type {
+  CriminalAppealedCaseData,
+  CriminalAppealedCaseInput,
+} from "./CriminalAppealedCaseSchema";
 
 export type CriminalImportConflictMode = CaseImportConflictMode;
 
@@ -44,6 +48,20 @@ export interface CriminalCaseAdapter extends BaseCaseAdapter {
   getCriminalCasesByCaseNumbers: (
     caseNumbers: string[],
   ) => Promise<ActionResult<CriminalCaseData[]>>;
+  getCriminalAppealedCases?: () => Promise<
+    ActionResult<CriminalAppealedCaseData[]>
+  >;
+  getCriminalAppealedCaseById?: (
+    id: string | number,
+  ) => Promise<ActionResult<CriminalAppealedCaseData>>;
+  createCriminalAppealedCase?: (
+    data: Partial<CriminalAppealedCaseInput>,
+  ) => Promise<ActionResult<CriminalAppealedCaseData>>;
+  updateCriminalAppealedCase?: (
+    id: number,
+    data: Partial<CriminalAppealedCaseInput>,
+  ) => Promise<ActionResult<CriminalAppealedCaseData>>;
+  deleteCriminalAppealedCase?: (id: number) => Promise<ActionResult<void>>;
   uploadExcel: (
     file: File,
     overrideValidation?: boolean,
