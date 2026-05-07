@@ -79,11 +79,6 @@ const NotarialRow = ({
         isSelected ? "bg-primary/8" : ""
       }`}
       onClick={() => onSelectRecord(record)}
-      onDoubleClick={() => {
-        if (isDirectory) {
-          onOpenRecord(record);
-        }
-      }}
     >
       <td
         className="px-4 py-4 text-center"

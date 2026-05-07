@@ -17,6 +17,15 @@ const MAX_RELAY_HOPS = 1;
 const RELAY_HOP_RUNTIME_TOKEN = randomUUID();
 const BACKEND_HEALTH_PATH = "/api/health";
 const BACKEND_HEALTH_TIMEOUT_MS = 5000;
+const BACKEND_HEALTH_CACHE_MS = 15000;
+
+type BackendHealthCacheEntry = {
+  healthy: boolean;
+  expiresAtMs: number;
+};
+
+let backendHealthCache: BackendHealthCacheEntry | null = null;
+let backendHealthInFlight: Promise<boolean> | null = null;
 
 const toPort = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
@@ -323,10 +332,19 @@ const checkUpstreamBackendHealth = async (
   config: RelayConfig,
   agent: https.Agent | undefined,
 ): Promise<boolean> => {
+  const now = Date.now();
+  if (backendHealthCache && backendHealthCache.expiresAtMs > now) {
+    return backendHealthCache.healthy;
+  }
+
+  if (backendHealthInFlight) {
+    return backendHealthInFlight;
+  }
+
   const target = new URL(config.targetUrl);
   const requestImpl = target.protocol === "https:" ? https.request : http.request;
 
-  return new Promise<boolean>((resolve) => {
+  backendHealthInFlight = new Promise<boolean>((resolve) => {
     const request = requestImpl(
       {
         protocol: target.protocol,
@@ -358,7 +376,19 @@ const checkUpstreamBackendHealth = async (
     });
 
     request.end();
-  });
+  })
+    .then((healthy) => {
+      backendHealthCache = {
+        healthy,
+        expiresAtMs: Date.now() + BACKEND_HEALTH_CACHE_MS,
+      };
+      return healthy;
+    })
+    .finally(() => {
+      backendHealthInFlight = null;
+    });
+
+  return backendHealthInFlight;
 };
 
 let proxy: httpProxy | null = null;

@@ -16,13 +16,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   className = "",
 }) => {
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen" data-tour="page-shell">
       <main
+        data-tour="page-content"
         className={`w-full max-w-[1600px] mx-auto ${className}`}
         style={{ padding: "var(--space-page-y) var(--space-page-x)" }}
       >
         {title && (
-          <div className="mb-6">
+          <div className="mb-6" data-tour="page-header">
             <h2 className="text-3xl lg:text-4xl font-bold text-base-content tracking-tight">
               {title}
             </h2>

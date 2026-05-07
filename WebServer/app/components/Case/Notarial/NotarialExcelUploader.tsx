@@ -4,7 +4,7 @@ import { createNotarial } from "@/app/components/Case/Notarial/NotarialActions";
 import { NotarialSchema as NotarialExcelSchema } from "@/app/components/Case/Notarial/schema";
 import { isMappedRowEmpty, normalizeRowBySchema } from "@rtc-database/shared";
 import { IPC_CHANNELS, ModalBase } from "@rtc-database/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
 type UploadRow = {
@@ -113,13 +113,122 @@ const findFileForRow = (index: FileIndex, pathValue: string) => {
   return null;
 };
 
-const base64ToFile = (base64: string, name: string) => {
+const reconcileRowsWithFileIndex = (
+  rows: UploadRow[],
+  index: FileIndex,
+): UploadRow[] =>
+  rows.map((row) => {
+    if (row.status === "uploaded") return row;
+    const file = row.path ? findFileForRow(index, row.path) : null;
+
+    if (!row.path) {
+      return {
+        ...row,
+        status: "missing" as const,
+        message: "Missing file path.",
+      };
+    }
+
+    return file
+      ? {
+          ...row,
+          status: "pending" as const,
+          message: "File found.",
+        }
+      : {
+          ...row,
+          status: "missing" as const,
+          message: "File not found in selected files.",
+        };
+  });
+
+const ELECTRON_FILE_READ_CHUNK_BYTES = 8 * 1024 * 1024;
+
+type ElectronReadChunkResponse = {
+  success: boolean;
+  result?: {
+    base64: string;
+    name: string;
+    size: number;
+    offset: number;
+    bytesRead: number;
+    nextOffset: number;
+    done: boolean;
+  };
+  error?: string;
+};
+
+type ElectronReadFileResponse = {
+  success: boolean;
+  result?: { file: File; name: string; size: number };
+  error?: string;
+};
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return new File([bytes], name);
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  );
+};
+
+const readElectronFileInChunks = async (
+  ipc: NonNullable<Window["ipcRenderer"]>,
+  baseFolder: string,
+  relativePath: string,
+): Promise<ElectronReadFileResponse> => {
+  const parts: ArrayBuffer[] = [];
+  let offset = 0;
+  let fileName = relativePath.split("/").pop() || "upload";
+  let fileSize = 0;
+
+  while (true) {
+    const response = (await ipc.invoke(IPC_CHANNELS.FILES_READ_CHUNK, {
+      baseFolder,
+      relativePath,
+      offset,
+      length: ELECTRON_FILE_READ_CHUNK_BYTES,
+    })) as ElectronReadChunkResponse;
+
+    if (!response.success || !response.result) {
+      return {
+        success: false,
+        error: response.error || "Failed to read file chunk.",
+      };
+    }
+
+    fileName = response.result.name || fileName;
+    fileSize = response.result.size;
+
+    if (response.result.base64) {
+      parts.push(base64ToArrayBuffer(response.result.base64));
+    }
+
+    offset = response.result.nextOffset;
+    if (response.result.done) {
+      break;
+    }
+
+    if (response.result.bytesRead <= 0) {
+      return {
+        success: false,
+        error: "File read stopped before the file was complete.",
+      };
+    }
+  }
+
+  return {
+    success: true,
+    result: {
+      file: new File(parts, fileName),
+      name: fileName,
+      size: fileSize,
+    },
+  };
 };
 
 const getFolderFromExcelFile = (file: File): string | null => {
@@ -189,8 +298,9 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
   const setManualFileForRow = (index: number, file: File | null) => {
     setManualFiles((prev) => {
       if (!file) {
-        const { [index]: _removed, ...rest } = prev;
-        return rest;
+        const next = { ...prev };
+        delete next[index];
+        return next;
       }
 
       return {
@@ -210,37 +320,6 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
       }),
     );
   };
-
-  useEffect(() => {
-    if (isElectron || excelRows.length === 0) return;
-
-    setExcelRows((prev) =>
-      prev.map((row) => {
-        if (row.status === "uploaded") return row;
-        const file = row.path ? findFileForRow(fileIndex, row.path) : null;
-
-        if (!row.path) {
-          return {
-            ...row,
-            status: "missing" as const,
-            message: "Missing file path.",
-          };
-        }
-
-        return file
-          ? {
-              ...row,
-              status: "pending" as const,
-              message: "File found.",
-            }
-          : {
-              ...row,
-              status: "missing" as const,
-              message: "File not found in selected files.",
-            };
-      }),
-    );
-  }, [excelRows.length, fileIndex, isElectron]);
 
   const updateElectronExistence = async (
     rows: UploadRow[],
@@ -356,7 +435,7 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
 
       const rowsWithExistence = isElectron
         ? await updateElectronExistence(parsedRows, defaultBaseFolder)
-        : parsedRows;
+        : reconcileRowsWithFileIndex(parsedRows, fileIndex);
 
       setExcelRows(rowsWithExistence);
       setExcelMessage({
@@ -387,7 +466,11 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
 
   const handleFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
+    const nextFileIndex = buildFileIndex(files);
     setSelectedFiles(files);
+    setExcelRows((previous) =>
+      reconcileRowsWithFileIndex(previous, nextFileIndex),
+    );
     setExcelMessage(null);
   };
 
@@ -457,25 +540,32 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
       }
 
       if (!fileToUpload && isElectron) {
-        const candidates = getPathCandidates(row.normalizedPath, baseFolder);
-        let readResult:
-          | {
-              success: boolean;
-              result?: { base64: string; name: string };
-              error?: string;
-            }
-          | undefined;
+        const electronBaseFolder = baseFolder;
+        if (!electronBaseFolder) {
+          nextRows[index] = {
+            ...row,
+            status: "missing",
+            message: "Select a base folder first.",
+          };
+          completed += 1;
+          setExcelRows([...nextRows]);
+          setProgress({ completed, total: targets.length, success });
+          continue;
+        }
+
+        const candidates = getPathCandidates(
+          row.normalizedPath,
+          electronBaseFolder,
+        );
+        let readResult: ElectronReadFileResponse | undefined;
         let resolvedPath: string | null = null;
 
         for (const candidate of candidates) {
-          const attempt = (await ipc.invoke(IPC_CHANNELS.FILES_READ, {
-            baseFolder,
-            relativePath: candidate,
-          })) as {
-            success: boolean;
-            result?: { base64: string; name: string };
-            error?: string;
-          };
+          const attempt = await readElectronFileInChunks(
+            ipc,
+            electronBaseFolder,
+            candidate,
+          );
 
           if (attempt.success && attempt.result) {
             readResult = attempt;
@@ -509,10 +599,7 @@ export default function NotarialExcelUploader({ onUploadCompleted }: Props) {
           };
         }
 
-        fileToUpload = base64ToFile(
-          readResult.result.base64,
-          readResult.result.name,
-        );
+        fileToUpload = readResult.result.file;
       } else if (!fileToUpload) {
         fileToUpload = findFileForRow(fileIndex, row.path);
         if (!fileToUpload) {

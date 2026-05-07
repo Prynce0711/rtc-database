@@ -19,11 +19,21 @@ export default defineConfig({
               // Keep rclone.js as a runtime dependency so its CommonJS internals
               // execute in their native environment instead of being ESM-bundled.
               external: [
+                "electron-updater",
                 "rclone.js",
                 "better-sqlite3",
                 "@prisma/adapter-better-sqlite3",
                 "@prisma/client",
                 "@prisma/client/runtime/client",
+                "@prisma/client-runtime-utils",
+                "@prisma/debug",
+                "@prisma/driver-adapter-utils",
+                "@prisma/engines",
+                "@prisma/fetch-engine",
+                "@prisma/get-platform",
+                "@electric-sql/pglite",
+                "@electric-sql/pglite-socket",
+                "@electric-sql/pglite-tools",
               ],
             },
           },

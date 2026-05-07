@@ -3,6 +3,9 @@
 import { validateSession } from "@/app/lib/authActions";
 import { getGarageClient } from "@/app/lib/garage";
 import {
+  abortGarageMultipartUploadTrusted,
+  completeGarageMultipartUploadTrusted,
+  createGarageMultipartUploadTrusted,
   createGarageFolderMarker,
   deleteGarageFile,
   deleteGarageKeys,
@@ -11,8 +14,11 @@ import {
   listGarageFolder,
   moveGarageKeys,
   renameGarageKey,
+  uploadGarageMultipartPartTrusted,
   uploadFileToGarage,
   uploadFileToGarageTrusted,
+  type GarageMultipartUploadPart,
+  type GarageMultipartUploadSession,
   type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
@@ -50,6 +56,15 @@ const ARCHIVE_GARAGE_ROOT = GARAGE_ARCHIVES_ROOT;
 const ARCHIVE_INCLUDE = {
   file: true,
 } satisfies Prisma.ArchiveEntryInclude;
+
+const scopeArchiveStorageKey = (key: string): string => {
+  const normalized = normalizeArchivePath(key);
+  if (!normalized) return ARCHIVE_GARAGE_ROOT;
+  return normalized === ARCHIVE_GARAGE_ROOT ||
+    normalized.startsWith(`${ARCHIVE_GARAGE_ROOT}/`)
+    ? normalized
+    : `${ARCHIVE_GARAGE_ROOT}/${normalized}`;
+};
 
 const SPREADSHEET_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -1899,19 +1914,39 @@ export async function deleteArchiveGarageItems(
       return { success: false, error: "No archive items selected" };
     }
 
-    const deleteResult = await deleteGarageKeys(
-      normalizedKeys,
-      ARCHIVE_GARAGE_BUCKET,
-      ARCHIVE_GARAGE_ROOT,
-    );
-    if (!deleteResult.success) {
-      return { success: false, error: deleteResult.error };
-    }
-
-    const exactPaths = normalizedKeys.map((key) => key.replace(/\/$/, ""));
+    const exactPaths: string[] = [];
     const folderPrefixes = normalizedKeys
       .filter((key) => key.endsWith("/"))
-      .map((key) => key.replace(/\/$/, ""));
+      .map((key) => normalizeArchivePath(key.replace(/\/$/, "")))
+      .filter((key) => key.length > 0);
+    const exactStorageKeys: string[] = [];
+    const fileKeyConditions: Prisma.FileDataWhereInput[] = [];
+
+    for (const key of normalizedKeys) {
+      const isFolder = key.endsWith("/");
+      const normalizedPath = normalizeArchivePath(key.replace(/\/$/, ""));
+      if (!normalizedPath) continue;
+
+      if (isFolder) {
+        fileKeyConditions.push({
+          key: {
+            startsWith: `${scopeArchiveStorageKey(normalizedPath)}/`,
+          },
+        });
+      } else {
+        exactPaths.push(normalizedPath);
+        exactStorageKeys.push(scopeArchiveStorageKey(normalizedPath));
+      }
+    }
+
+    if (exactStorageKeys.length > 0) {
+      fileKeyConditions.push({
+        key: {
+          in: exactStorageKeys,
+        },
+      });
+    }
+
     const deleteConditions: Prisma.ArchiveEntryWhereInput[] = [
       {
         fullPath: {
@@ -1928,11 +1963,43 @@ export async function deleteArchiveGarageItems(
       });
     }
 
-    await prisma.archiveEntry.deleteMany({
+    if (fileKeyConditions.length > 0) {
+      deleteConditions.push({
+        file: {
+          is: {
+            OR: fileKeyConditions,
+          },
+        },
+      });
+    }
+
+    const archiveRowsToDelete = await prisma.archiveEntry.findMany({
       where: {
         OR: deleteConditions,
       },
+      select: {
+        id: true,
+      },
     });
+
+    const deleteResult = await deleteGarageKeys(
+      normalizedKeys,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
+    if (!deleteResult.success) {
+      return { success: false, error: deleteResult.error };
+    }
+
+    if (archiveRowsToDelete.length > 0) {
+      await prisma.archiveEntry.deleteMany({
+        where: {
+          id: {
+            in: archiveRowsToDelete.map((row) => row.id),
+          },
+        },
+      });
+    }
 
     return {
       success: true,
@@ -2012,6 +2079,213 @@ export async function renameArchiveGarageItem(
     console.error("Error renaming archive garage item:", error);
     return { success: false, error: "Failed to rename archive Garage item" };
   }
+}
+
+type LargeArchiveUploadFileInfo = {
+  fileName: string;
+  fileSize: number;
+  mimeType?: string;
+};
+
+const resolveLargeArchiveUploadTarget = async (
+  data: Record<string, unknown>,
+  fileName: string,
+): Promise<
+  ActionResult<{
+    parentPath: string;
+    resolvedName: string;
+    fullPath: string;
+    extension: string | null;
+    description: string | null;
+  }>
+> => {
+  const parsed = ArchiveEntryInputSchema.safeParse(data);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid archive entry payload" };
+  }
+
+  if (parsed.data.entryType !== ArchiveEntryType.FILE) {
+    return {
+      success: false,
+      error: "Large multipart uploads are only supported for file entries",
+    };
+  }
+
+  const parentPath = normalizeArchivePath(parsed.data.parentPath);
+  const extension = getArchiveExtension(fileName) || null;
+  const resolvedName = resolveArchiveEntryName(
+    parsed.data.name || fileName,
+    ArchiveEntryType.FILE,
+    extension,
+  );
+  const fullPath = joinArchivePath(parentPath, resolvedName);
+
+  if (!resolvedName) {
+    return { success: false, error: "Archive name is required" };
+  }
+
+  const existing = await prisma.archiveEntry.findFirst({
+    where: {
+      parentPath,
+      name: resolvedName,
+    },
+  });
+  if (existing) {
+    return {
+      success: false,
+      error: "An archive entry with the same name already exists here",
+    };
+  }
+
+  return {
+    success: true,
+    result: {
+      parentPath,
+      resolvedName,
+      fullPath,
+      extension,
+      description: normalizeNullableString(parsed.data.description),
+    },
+  };
+};
+
+export async function startArchiveLargeFileUpload(
+  data: Record<string, unknown>,
+  fileInfo: LargeArchiveUploadFileInfo,
+): Promise<ActionResult<GarageMultipartUploadSession>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const target = await resolveLargeArchiveUploadTarget(
+      data,
+      fileInfo.fileName,
+    );
+    if (!target.success) {
+      return target;
+    }
+
+    const key = buildArchiveStorageKey(
+      target.result.parentPath,
+      target.result.resolvedName,
+    );
+
+    return createGarageMultipartUploadTrusted(
+      key,
+      fileInfo.fileName,
+      fileInfo.fileSize,
+      fileInfo.mimeType || "application/octet-stream",
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
+  } catch (error) {
+    console.error("Error starting large archive upload:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to start large archive upload",
+    };
+  }
+}
+
+export async function uploadArchiveLargeFilePart(
+  upload: GarageMultipartUploadSession,
+  partNumber: number,
+  chunk: File,
+): Promise<ActionResult<GarageMultipartUploadPart>> {
+  const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+  if (!sessionValidation.success) {
+    return sessionValidation;
+  }
+
+  return uploadGarageMultipartPartTrusted(
+    upload.uploadId,
+    upload.key,
+    partNumber,
+    chunk,
+    ARCHIVE_GARAGE_BUCKET,
+    ARCHIVE_GARAGE_ROOT,
+  );
+}
+
+export async function completeArchiveLargeFileUpload(
+  data: Record<string, unknown>,
+  upload: GarageMultipartUploadSession,
+  parts: GarageMultipartUploadPart[],
+): Promise<ActionResult<ArchiveEntryData>> {
+  try {
+    const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+    if (!sessionValidation.success) {
+      return sessionValidation;
+    }
+
+    const target = await resolveLargeArchiveUploadTarget(data, upload.fileName);
+    if (!target.success) {
+      return target;
+    }
+
+    const uploadResult = await completeGarageMultipartUploadTrusted(
+      upload,
+      parts,
+      ARCHIVE_GARAGE_BUCKET,
+      ARCHIVE_GARAGE_ROOT,
+    );
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        error: uploadResult.error || "Failed to upload archive file",
+      };
+    }
+
+    const createdEntry = await prisma.archiveEntry.create({
+      data: {
+        name: target.result.resolvedName,
+        parentPath: target.result.parentPath,
+        fullPath: target.result.fullPath,
+        entryType: ArchiveEntryType.FILE,
+        description: target.result.description,
+        extension: target.result.extension,
+        textContent: null,
+        sheetData: Prisma.JsonNull,
+        fileId: uploadResult.result.id,
+      },
+      include: ARCHIVE_INCLUDE,
+    });
+
+    return {
+      success: true,
+      result: createdEntry,
+    };
+  } catch (error) {
+    console.error("Error completing large archive upload:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to complete large archive upload",
+    };
+  }
+}
+
+export async function abortArchiveLargeFileUpload(
+  upload: GarageMultipartUploadSession,
+): Promise<ActionResult<void>> {
+  const sessionValidation = await validateSession(ARCHIVE_ACCESS_ROLES);
+  if (!sessionValidation.success) {
+    return sessionValidation;
+  }
+
+  return abortGarageMultipartUploadTrusted(
+    upload.uploadId,
+    upload.key,
+    ARCHIVE_GARAGE_BUCKET,
+    ARCHIVE_GARAGE_ROOT,
+  );
 }
 
 export async function createArchiveEntry(

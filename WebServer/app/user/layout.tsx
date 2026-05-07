@@ -4,8 +4,11 @@ import { redirect } from "next/navigation";
 import React from "react";
 import { hasPassword } from "../components/AccountManagement/AccountActions";
 import { updateDarkMode } from "../components/Sidebar/DarkModeActions";
+import AppTutorial from "../components/Tutorial/AppTutorial";
+import type { TutorialStatus } from "../components/Tutorial/TutorialActions";
 import { auth } from "../lib/auth";
 import { signOut } from "../lib/authActions";
+import { prisma } from "../lib/prisma";
 
 const layout = async ({ children }: { children: React.ReactNode }) => {
   // if they switch to accounts page while having the two factor cookie, we want to remove it for security purposes
@@ -33,6 +36,13 @@ const layout = async ({ children }: { children: React.ReactNode }) => {
     redirect("/firstlogin");
   }
 
+  const tutorialProgress = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { tutorialStatus: true },
+  });
+  const tutorialStatus = (tutorialProgress?.tutorialStatus ??
+    "PENDING") as TutorialStatus;
+
   return (
     // <SyncProvider>
     <Sidebar
@@ -41,6 +51,7 @@ const layout = async ({ children }: { children: React.ReactNode }) => {
       onSignOut={signOut}
     >
       {children}
+      <AppTutorial initialStatus={tutorialStatus} role={session.user.role} />
     </Sidebar>
     // </SyncProvider>
   );

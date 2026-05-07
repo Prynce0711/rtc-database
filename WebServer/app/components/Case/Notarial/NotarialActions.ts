@@ -3,6 +3,9 @@
 import { validateSession } from "@/app/lib/authActions";
 import { GetFileOptions, getGarageClient } from "@/app/lib/garage";
 import {
+  abortGarageMultipartUploadTrusted,
+  completeGarageMultipartUploadTrusted,
+  createGarageMultipartUploadTrusted,
   createGarageFolderMarker,
   deleteGarageFile,
   deleteGarageKeys,
@@ -13,8 +16,11 @@ import {
   moveGarageFile,
   moveGarageKeys,
   renameGarageKey,
+  uploadGarageMultipartPartTrusted,
   uploadFileToGarage,
   uploadFileToGarageTrusted,
+  type GarageMultipartUploadPart,
+  type GarageMultipartUploadSession,
   type GarageItem,
 } from "@/app/lib/garageActions";
 import { prisma } from "@/app/lib/prisma";
@@ -131,6 +137,14 @@ const normalizeGaragePath = (path?: string | null): string =>
 const buildFolderUploadKey = (folderPath: string, file: File): string => {
   const fileName = file.name.trim() || `upload-${Date.now()}`;
   return folderPath ? `${folderPath}/${fileName}` : fileName;
+};
+
+const buildFolderUploadKeyFromName = (
+  folderPath: string,
+  fileName: string,
+): string => {
+  const normalizedFileName = fileName.trim() || `upload-${Date.now()}`;
+  return folderPath ? `${folderPath}/${normalizedFileName}` : normalizedFileName;
 };
 
 const scopeNotarialStorageKey = (key: string): string => {
@@ -860,6 +874,162 @@ export async function createNotarial(
     console.error("Error creating notarial data:", error);
     return { success: false, error: "Error creating notarial data" };
   }
+}
+
+type LargeNotarialUploadFileInfo = {
+  fileName: string;
+  fileSize: number;
+  mimeType?: string;
+};
+
+export async function startNotarialLargeFileUpload(
+  data: Record<string, unknown>,
+  fileInfo: LargeNotarialUploadFileInfo,
+): Promise<ActionResult<GarageMultipartUploadSession>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const parsedData = NotarialSchema.safeParse(data);
+    if (!parsedData.success) {
+      return {
+        success: false,
+        error: "Invalid notarial data: " + prettifyError(parsedData.error),
+      };
+    }
+
+    const { fileName, fileSize, mimeType } = fileInfo;
+    const targetFolder = normalizeGaragePath(parsedData.data.path);
+    const uploadKey =
+      parsedData.data.path != null
+        ? buildFolderUploadKeyFromName(targetFolder, fileName)
+        : generateFileKey(parsedData.data);
+
+    return createGarageMultipartUploadTrusted(
+      uploadKey,
+      fileName,
+      fileSize,
+      mimeType || "application/octet-stream",
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
+  } catch (error) {
+    console.error("Error starting large notarial upload:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to start large notarial upload",
+    };
+  }
+}
+
+export async function uploadNotarialLargeFilePart(
+  upload: GarageMultipartUploadSession,
+  partNumber: number,
+  chunk: File,
+): Promise<ActionResult<GarageMultipartUploadPart>> {
+  const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+  if (!sessionResult.success) {
+    return sessionResult;
+  }
+
+  return uploadGarageMultipartPartTrusted(
+    upload.uploadId,
+    upload.key,
+    partNumber,
+    chunk,
+    NOTARIAL_GARAGE_BUCKET,
+    NOTARIAL_GARAGE_ROOT,
+  );
+}
+
+export async function completeNotarialLargeFileUpload(
+  data: Record<string, unknown>,
+  upload: GarageMultipartUploadSession,
+  parts: GarageMultipartUploadPart[],
+): Promise<ActionResult<NotarialData>> {
+  try {
+    const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const parsedData = NotarialSchema.safeParse(data);
+    if (!parsedData.success) {
+      return {
+        success: false,
+        error: "Invalid notarial data: " + prettifyError(parsedData.error),
+      };
+    }
+
+    const { file, path, removeFile, ...notarialFields } = parsedData.data;
+    void file;
+    void path;
+    void removeFile;
+
+    const uploadResult = await completeGarageMultipartUploadTrusted(
+      upload,
+      parts,
+      NOTARIAL_GARAGE_BUCKET,
+      NOTARIAL_GARAGE_ROOT,
+    );
+    if (!uploadResult.success) {
+      return {
+        success: false,
+        error: "Notarial file upload failed: " + uploadResult.error,
+      };
+    }
+
+    const createdNotarial = await prisma.notarial.create({
+      data: {
+        ...notarialFields,
+        fileId: uploadResult.result.id,
+      },
+    });
+
+    const notarialWithFile = await prisma.notarial.findUnique({
+      where: { id: createdNotarial.id },
+      include: { file: true },
+    });
+
+    if (!notarialWithFile) {
+      return {
+        success: false,
+        error: "Notarial created but failed to retrieve with file data",
+      };
+    }
+
+    return { success: true, result: notarialWithFile };
+  } catch (error) {
+    console.error("Error completing large notarial upload:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to complete large notarial upload",
+    };
+  }
+}
+
+export async function abortNotarialLargeFileUpload(
+  upload: GarageMultipartUploadSession,
+): Promise<ActionResult<void>> {
+  const sessionResult = await validateSession([...NOTARIAL_ACCESS_ROLES]);
+  if (!sessionResult.success) {
+    return sessionResult;
+  }
+
+  return abortGarageMultipartUploadTrusted(
+    upload.uploadId,
+    upload.key,
+    NOTARIAL_GARAGE_BUCKET,
+    NOTARIAL_GARAGE_ROOT,
+  );
 }
 
 export async function updateNotarial(
@@ -1853,13 +2023,79 @@ export async function deleteNotarialGarageItems(
       return sessionResult;
     }
 
+    const normalizedKeys = Array.from(
+      new Set(
+        keys
+          .map((key) =>
+            String(key || "")
+              .replace(/\\/g, "/")
+              .trim()
+              .replace(/^\/+/, ""),
+          )
+          .filter((key) => key.length > 0),
+      ),
+    );
+    const fileKeyConditions: Prisma.FileDataWhereInput[] = [];
+    const exactStorageKeys: string[] = [];
+
+    for (const key of normalizedKeys) {
+      const isFolder = key.endsWith("/");
+      const normalizedKey = normalizeGaragePath(key);
+      if (!normalizedKey) continue;
+
+      const scopedKey = scopeNotarialStorageKey(normalizedKey);
+      if (isFolder) {
+        fileKeyConditions.push({
+          key: {
+            startsWith: `${scopedKey}/`,
+          },
+        });
+      } else {
+        exactStorageKeys.push(scopedKey);
+      }
+    }
+
+    if (exactStorageKeys.length > 0) {
+      fileKeyConditions.push({
+        key: {
+          in: exactStorageKeys,
+        },
+      });
+    }
+
+    const notarialRowsToDelete =
+      fileKeyConditions.length > 0
+        ? await prisma.notarial.findMany({
+            where: {
+              file: {
+                is: {
+                  OR: fileKeyConditions,
+                },
+              },
+            },
+            select: {
+              id: true,
+            },
+          })
+        : [];
+
     const result = await deleteGarageKeys(
-      keys,
+      normalizedKeys,
       NOTARIAL_GARAGE_BUCKET,
       NOTARIAL_GARAGE_ROOT,
     );
     if (!result.success) {
       return { success: false, error: result.error };
+    }
+
+    if (notarialRowsToDelete.length > 0) {
+      await prisma.notarial.deleteMany({
+        where: {
+          id: {
+            in: notarialRowsToDelete.map((row) => row.id),
+          },
+        },
+      });
     }
 
     return {

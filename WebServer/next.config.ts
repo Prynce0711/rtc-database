@@ -73,10 +73,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "50mb",
+      bodySizeLimit: "500mb",
       allowedOrigins: [...allowedServerActionOrigins],
     },
-    proxyClientMaxBodySize: "50mb",
+    proxyClientMaxBodySize: "500mb",
   },
   allowedDevOrigins: [...allowedDevOrigins],
 };

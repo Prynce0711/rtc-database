@@ -5,12 +5,17 @@ import "server-only";
 // This will prevent unauthorized users from even being able to call these functions and
 // will simplify the code by not having to validate session in each function.
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
   CopyObjectCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
+  UploadPartCommand,
+  type CompletedPart,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ActionResult } from "@rtc-database/shared";
@@ -33,6 +38,22 @@ export async function getFileHash(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
   return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
 }
+
+export type GarageMultipartUploadSession = {
+  uploadId: string;
+  key: string;
+  fileName: string;
+  path: string;
+  size: number;
+  mimeType: string;
+};
+
+export type GarageMultipartUploadPart = {
+  partNumber: number;
+  eTag: string;
+  checksum: string;
+  size: number;
+};
 
 const normalizeGarageKey = (key: string): string => {
   const cleaned = String(key || "")
@@ -96,6 +117,37 @@ const addGarageScopeToKey = (key: string, scopePrefix?: string): string => {
   return `${scope}/${normalizedKey}`;
 };
 
+const resolveGarageUploadLocation = (
+  rawKey: string,
+  rawFileName: string,
+  scopePrefix?: string,
+) => {
+  const fallbackName = rawFileName.trim() || `upload-${Date.now()}`;
+  let key = normalizeGarageKey(rawKey || fallbackName);
+  if (!key || key.endsWith("/")) {
+    throw new Error("Invalid upload key.");
+  }
+
+  const originalExt = fallbackName.includes(".")
+    ? fallbackName.slice(fallbackName.lastIndexOf("."))
+    : "";
+  const currentName = getGarageBaseName(key);
+
+  if (
+    originalExt &&
+    !currentName.toLowerCase().endsWith(originalExt.toLowerCase())
+  ) {
+    key = joinGaragePath(getGarageParentPath(key), `${currentName}${originalExt}`);
+  }
+
+  const scopedKey = addGarageScopeToKey(key, scopePrefix);
+  return {
+    key: scopedKey,
+    fileName: getGarageBaseName(scopedKey) || fallbackName,
+    path: getGarageParentPath(scopedKey),
+  };
+};
+
 const removeGarageScopeFromKey = (
   key: string,
   scopePrefix?: string,
@@ -140,6 +192,233 @@ const ensureGarageScopeFolderMarker = async (
     }),
   );
 };
+
+export async function createGarageMultipartUploadTrusted(
+  key: string,
+  fileName: string,
+  fileSize: number,
+  mimeType = "application/octet-stream",
+  bucketParam?: string,
+  scopePrefix?: string,
+): Promise<ActionResult<GarageMultipartUploadSession>> {
+  try {
+    const bucket = bucketParam || (await getGarageBucket());
+    const location = resolveGarageUploadLocation(key, fileName, scopePrefix);
+    const existingFile = await prisma.fileData.findUnique({
+      where: { key: location.key },
+    });
+
+    if (existingFile) {
+      return {
+        success: false,
+        error: `A file already exists for key: ${location.key}`,
+      };
+    }
+
+    await ensureGarageScopeFolderMarker(bucket, scopePrefix);
+    const garageClient = await getGarageClient();
+    const response = await garageClient.send(
+      new CreateMultipartUploadCommand({
+        Bucket: bucket,
+        Key: location.key,
+        ContentType: mimeType,
+      }),
+    );
+
+    if (!response.UploadId) {
+      return {
+        success: false,
+        error: "Garage did not return a multipart upload id.",
+      };
+    }
+
+    return {
+      success: true,
+      result: {
+        uploadId: response.UploadId,
+        key: location.key,
+        fileName: location.fileName,
+        path: location.path,
+        size: fileSize,
+        mimeType,
+      },
+    };
+  } catch (error) {
+    console.error("Multipart upload start error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to start multipart upload",
+    };
+  }
+}
+
+export async function uploadGarageMultipartPartTrusted(
+  uploadId: string,
+  key: string,
+  partNumber: number,
+  chunk: File,
+  bucketParam?: string,
+  scopePrefix?: string,
+): Promise<ActionResult<GarageMultipartUploadPart>> {
+  try {
+    const normalizedUploadId = String(uploadId || "").trim();
+    const normalizedPartNumber = Number(partNumber);
+    if (!normalizedUploadId || !Number.isInteger(normalizedPartNumber)) {
+      return { success: false, error: "Invalid multipart upload part." };
+    }
+
+    const scopedKey = addGarageScopeToKey(key, scopePrefix);
+    const bucket = bucketParam || (await getGarageBucket());
+    const buffer = Buffer.from(await chunk.arrayBuffer());
+    const checksum = createHash("sha256").update(buffer).digest("hex");
+    const garageClient = await getGarageClient();
+    const response = await garageClient.send(
+      new UploadPartCommand({
+        Bucket: bucket,
+        Key: scopedKey,
+        UploadId: normalizedUploadId,
+        PartNumber: normalizedPartNumber,
+        Body: new Uint8Array(buffer),
+      }),
+    );
+
+    if (!response.ETag) {
+      return {
+        success: false,
+        error: "Garage did not return an ETag for the uploaded part.",
+      };
+    }
+
+    return {
+      success: true,
+      result: {
+        partNumber: normalizedPartNumber,
+        eTag: response.ETag,
+        checksum,
+        size: chunk.size,
+      },
+    };
+  } catch (error) {
+    console.error("Multipart upload part error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to upload multipart chunk",
+    };
+  }
+}
+
+export async function completeGarageMultipartUploadTrusted(
+  upload: GarageMultipartUploadSession,
+  parts: GarageMultipartUploadPart[],
+  bucketParam?: string,
+  scopePrefix?: string,
+): Promise<ActionResult<FileData>> {
+  try {
+    const uploadId = String(upload.uploadId || "").trim();
+    const key = addGarageScopeToKey(upload.key, scopePrefix);
+    if (!uploadId || !key || parts.length === 0) {
+      return { success: false, error: "Invalid multipart completion data." };
+    }
+
+    const existingFile = await prisma.fileData.findUnique({ where: { key } });
+    if (existingFile) {
+      return {
+        success: false,
+        error: `A file already exists for key: ${key}`,
+      };
+    }
+
+    const sortedParts = [...parts].sort(
+      (left, right) => left.partNumber - right.partNumber,
+    );
+    const completedParts: CompletedPart[] = sortedParts.map((part) => ({
+      ETag: part.eTag,
+      PartNumber: part.partNumber,
+    }));
+    const bucket = bucketParam || (await getGarageBucket());
+    const garageClient = await getGarageClient();
+
+    await garageClient.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: completedParts,
+        },
+      }),
+    );
+
+    const fileHash = createHash("sha256");
+    for (const part of sortedParts) {
+      fileHash.update(part.checksum);
+    }
+
+    const fileData = await prisma.fileData.create({
+      data: {
+        fileHash: fileHash.digest("hex"),
+        fileName: upload.fileName || getGarageBaseName(key),
+        path: getGarageParentPath(key),
+        key,
+        size: upload.size,
+        mimeType: upload.mimeType || "application/octet-stream",
+      },
+    });
+
+    return { success: true, result: fileData };
+  } catch (error) {
+    console.error("Multipart upload completion error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to complete multipart upload",
+    };
+  }
+}
+
+export async function abortGarageMultipartUploadTrusted(
+  uploadId: string,
+  key: string,
+  bucketParam?: string,
+  scopePrefix?: string,
+): Promise<ActionResult<void>> {
+  try {
+    const normalizedUploadId = String(uploadId || "").trim();
+    const scopedKey = addGarageScopeToKey(key, scopePrefix);
+    if (!normalizedUploadId || !scopedKey) {
+      return { success: true, result: undefined };
+    }
+
+    const bucket = bucketParam || (await getGarageBucket());
+    const garageClient = await getGarageClient();
+    await garageClient.send(
+      new AbortMultipartUploadCommand({
+        Bucket: bucket,
+        Key: scopedKey,
+        UploadId: normalizedUploadId,
+      }),
+    );
+
+    return { success: true, result: undefined };
+  } catch (error) {
+    console.error("Multipart upload abort error:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to abort multipart upload",
+    };
+  }
+}
 
 export async function uploadFileToGarage(
   file: File,
@@ -241,11 +520,18 @@ async function uploadFileToGarageCore(
       folderPath = getGarageParentPath(key);
     }
 
-    const maxSize = parseInt(process.env.MAX_FILE_SIZE || "50") * 1024 * 1024; // 50 MB
+    const configuredMaxSizeMb = Number.parseInt(
+      process.env.MAX_FILE_SIZE || "",
+      10,
+    );
+    const maxSizeMb = Number.isFinite(configuredMaxSizeMb)
+      ? Math.max(configuredMaxSizeMb, 250)
+      : 250;
+    const maxSize = maxSizeMb * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         success: false,
-        error: "File too large (max 50MB)",
+        error: `File too large (max ${maxSizeMb}MB)`,
       };
     }
 
