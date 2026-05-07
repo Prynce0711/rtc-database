@@ -54,4 +54,4 @@ WORKDIR /app/WebServer
 
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy --schema /app/packages/shared/prisma/schema.prisma && pnpm start"]
