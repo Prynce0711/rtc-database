@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { configureAutoUpdates } from "./autoUpdater";
 import { startBackendDisconnectMonitor } from "./BackendMonitor";
 import { ensureNativeDatabaseReady } from "./databaseBootstrap";
 import "./ipcHandlers";
@@ -155,5 +156,6 @@ app.whenReady().then(async () => {
   }
 
   configureRelayCertificatePinning();
+  configureAutoUpdates();
   void createWindow();
 });
