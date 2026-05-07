@@ -57,6 +57,12 @@ enum Status {
   TERMINATED
 }
 
+enum TutorialStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
 enum BloodType {
   A_Positive
   A_Negative
@@ -359,6 +365,10 @@ model User {
   banExpires    DateTime?
   branch        String?
   darkMode      Boolean?  @default(false)
+  tutorialStatus TutorialStatus @default(PENDING)
+  tutorialCompletedAt DateTime?
+  tutorialSkippedAt DateTime?
+  tutorialLastStartedAt DateTime?
 
   sessions Session[]
   accounts Account[]

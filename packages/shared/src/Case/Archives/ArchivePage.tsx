@@ -32,8 +32,10 @@ import {
 import { ArchiveEntryType } from "../../generated/prisma/enums";
 import { IPC_CHANNELS } from "../../lib/electron/channels";
 import {
+  BatchUploadFailure,
   BatchUploadProgressPanel,
   BatchUploadProgressState,
+  MAX_UPLOAD_BATCH_BYTES,
   createBatchUploadProgressState,
   createUploadBatches,
 } from "../../lib/batchUploadProgress";
@@ -235,23 +237,6 @@ const mapGarageItemToArchiveEntry = (
   } as GarageArchiveEntry;
 };
 
-// Treat common spreadsheet file types as 'excel' for single-click download behavior
-const isSpreadsheetEntry = (entry: ArchiveEntryData) => {
-  const mime = (entry.file?.mimeType ?? "").toLowerCase();
-  const name = (entry.name ?? "").toLowerCase();
-  if (
-    mime.includes("excel") ||
-    mime.includes("spreadsheet") ||
-    name.endsWith(".xls") ||
-    name.endsWith(".xlsx") ||
-    name.endsWith(".csv") ||
-    name.endsWith(".ods")
-  ) {
-    return true;
-  }
-  return false;
-};
-
 const isWordOrExcelEntry = (entry: ArchiveEntryData) => {
   const mime = (entry.file?.mimeType ?? "").toLowerCase();
   const name = (entry.name ?? "").toLowerCase();
@@ -414,6 +399,37 @@ const ArchivePage: React.FC<{
     error: "",
     entry: null,
   });
+
+  const showNonBlockingSuccessProgress = (message: string) => {
+    statusPopup.showLoading(
+      undefined,
+      <div className="overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-lg">
+        <div className="flex items-start gap-3 px-4 py-4">
+          <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success text-success-content">
+            <FiCheck className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <p className="truncate text-sm font-bold text-base-content">
+                Completed
+              </p>
+              <span className="shrink-0 text-xs font-medium text-success">
+                Success
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-base-content/55">{message}</p>
+          </div>
+        </div>
+        <div className="h-1.5 bg-base-200">
+          <div className="h-full w-full rounded-r-full bg-success" />
+        </div>
+      </div>,
+    );
+
+    window.setTimeout(() => {
+      statusPopup.hidePopup();
+    }, 2200);
+  };
 
   const deferredSearch = useDeferredValue(searchValue.trim());
   const desktopEditSessionsRef = useRef<Map<string, DesktopEditSessionState>>(
@@ -1418,7 +1434,7 @@ const ArchivePage: React.FC<{
       return false;
     }
 
-    statusPopup.showSuccess(
+    showNonBlockingSuccessProgress(
       `Deleted ${result.result.deletedCount.toLocaleString()} Garage object${
         result.result.deletedCount !== 1 ? "s" : ""
       }.`,
@@ -1459,7 +1475,7 @@ const ArchivePage: React.FC<{
     if (selectedEntry?.id === entry.id) {
       setSelectedEntry(null);
     }
-    statusPopup.showSuccess("Archive entry deleted.");
+    showNonBlockingSuccessProgress("Archive entry deleted.");
     await refreshEntries();
   };
 
@@ -1490,22 +1506,61 @@ const ArchivePage: React.FC<{
     await refreshEntries(1);
   };
 
+  const uploadArchiveEntryFile = async (
+    entry: ArchiveUploadEntry & { description?: string },
+    onProgress?: (uploadedBytes: number) => void,
+  ) => {
+    const payload = {
+      name: entry.name,
+      parentPath: entry.parentPath,
+      entryType: ArchiveEntryType.FILE,
+      description: entry.description,
+      file: entry.file,
+    };
+
+    if (entry.file.size > MAX_UPLOAD_BATCH_BYTES) {
+      if (!adapter.uploadLargeArchiveEntry) {
+        return {
+          success: false as const,
+          error:
+            "This file is larger than 250MB and large-file upload is not available.",
+        };
+      }
+
+      return adapter.uploadLargeArchiveEntry(payload, (progress) => {
+        onProgress?.(progress.uploadedBytes);
+      });
+    }
+
+    return adapter.createArchiveEntry(payload);
+  };
+
   const handleUploadFile = async () => {
     if (!uploadForm.file) {
       statusPopup.showError("Select a file first.");
       return;
     }
 
+    const selectedFile = uploadForm.file;
     setUploading(true);
     setUploadProgress(18);
 
-    const result = await adapter.createArchiveEntry({
-      name: uploadForm.name.trim() || uploadForm.file.name,
-      parentPath: currentPath,
-      entryType: ArchiveEntryType.FILE,
-      description: uploadForm.description.trim() || undefined,
-      file: uploadForm.file,
-    });
+    const result = await uploadArchiveEntryFile(
+      {
+        file: selectedFile,
+        name: uploadForm.name.trim() || selectedFile.name,
+        parentPath: currentPath,
+        description: uploadForm.description.trim() || undefined,
+      },
+      (uploadedBytes) => {
+        setUploadProgress(
+          Math.max(
+            1,
+            Math.round((uploadedBytes / selectedFile.size) * 100),
+          ),
+        );
+      },
+    );
 
     setUploading(false);
     setUploadProgress(result.success ? 100 : 0);
@@ -1540,6 +1595,7 @@ const ArchivePage: React.FC<{
     let uploadedBytes = 0;
     let successCount = 0;
     const uploadErrors: string[] = [];
+    const uploadFailures: BatchUploadFailure[] = [];
 
     setUploading(true);
     setUploadProgress(0);
@@ -1579,25 +1635,51 @@ const ArchivePage: React.FC<{
             : previous,
         );
 
+        let currentEntryUploadedBytes = 0;
+        const updateCurrentEntryProgress = (entryUploadedBytes: number) => {
+          currentEntryUploadedBytes = Math.min(
+            entry.file.size,
+            Math.max(0, entryUploadedBytes),
+          );
+          setBatchUploadProgress((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  uploadedBytes: uploadedBytes + currentEntryUploadedBytes,
+                  currentBatchBytes,
+                  uploadedBatchBytes:
+                    uploadedBatchBytes + currentEntryUploadedBytes,
+                }
+              : previous,
+          );
+        };
+
         try {
-          // Upload sequentially inside each 250 MB batch to keep the backend steady.
-          const result = await adapter.createArchiveEntry({
-            name: entry.name,
-            parentPath: entry.parentPath,
-            entryType: ArchiveEntryType.FILE,
-            description: undefined,
-            file: entry.file,
-          });
+          const result = await uploadArchiveEntryFile(
+            entry,
+            updateCurrentEntryProgress,
+          );
 
           if (result.success) {
             successCount++;
           } else {
-            uploadErrors.push(result.error || "Upload failed");
+            const message = result.error || "Upload failed";
+            uploadErrors.push(message);
+            uploadFailures.push({
+              name: entry.name,
+              error: message,
+              kind: "file",
+            });
           }
         } catch (error) {
-          uploadErrors.push(
-            error instanceof Error ? error.message : "Upload failed",
-          );
+          const message =
+            error instanceof Error ? error.message : "Upload failed";
+          uploadErrors.push(message);
+          uploadFailures.push({
+            name: entry.name,
+            error: message,
+            kind: "file",
+          });
         }
 
         processedCount++;
@@ -1612,6 +1694,7 @@ const ArchivePage: React.FC<{
                 ...previous,
                 completedFiles: processedCount,
                 failedFiles: uploadErrors.length,
+                failedItems: uploadFailures.slice(),
                 uploadedBytes,
                 currentBatchBytes,
                 uploadedBatchBytes,
@@ -1629,6 +1712,7 @@ const ArchivePage: React.FC<{
             phase: hasErrors ? "failed" : "completed",
             completedFiles: processedCount,
             failedFiles: uploadErrors.length,
+            failedItems: uploadFailures,
             uploadedBytes,
             uploadedBatchBytes: previous.currentBatchBytes,
             currentFileName: undefined,
@@ -1650,7 +1734,7 @@ const ArchivePage: React.FC<{
     }
 
     setUploading(false);
-    return { successCount, uploadErrors };
+    return { successCount, uploadErrors, uploadFailures };
   };
 
   const handleUploadFiles = async (files: File[] | null) => {
@@ -1674,9 +1758,7 @@ const ArchivePage: React.FC<{
     );
 
     if (uploadErrors.length > 0) {
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
-      );
+      statusPopup.hidePopup();
     } else {
       statusPopup.showSuccess(
         `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
@@ -1717,9 +1799,7 @@ const ArchivePage: React.FC<{
     );
 
     if (uploadErrors.length > 0) {
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${uploadErrors[0]}`,
-      );
+      statusPopup.hidePopup();
     } else {
       statusPopup.showSuccess(
         `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
@@ -1918,7 +1998,6 @@ const ArchivePage: React.FC<{
 
   const handleUploadFolderFiles = async (files: File[] | null) => {
     if (!files || files.length === 0) {
-      statusPopup.showError("No files found in the selected folder.");
       return;
     }
     if (
@@ -1932,6 +2011,7 @@ const ArchivePage: React.FC<{
     statusPopup.showLoading(`Uploading ${files.length} files...`);
     const createdFolderPaths = new Set<string>();
     const folderErrors: string[] = [];
+    const folderFailures: BatchUploadFailure[] = [];
     const uploadEntries: ArchiveUploadEntry[] = [];
 
     for (const file of files) {
@@ -1950,7 +2030,13 @@ const ArchivePage: React.FC<{
           createdFolderPaths,
         );
         if (!folderResult.success) {
-          folderErrors.push(folderResult.error || "Failed to create folder");
+          const message = folderResult.error || "Failed to create folder";
+          folderErrors.push(message);
+          folderFailures.push({
+            name: pathSegments.join("/") || currentPath || file.name,
+            error: message,
+            kind: "folder",
+          });
           continue;
         }
 
@@ -1960,28 +2046,55 @@ const ArchivePage: React.FC<{
           parentPath: folderResult.path,
         });
       } catch (error) {
-        folderErrors.push(
-          error instanceof Error ? error.message : "Failed to prepare upload",
-        );
+        const message =
+          error instanceof Error ? error.message : "Failed to prepare upload";
+        folderErrors.push(message);
+        folderFailures.push({
+          name: file.name,
+          error: message,
+          kind: "file",
+        });
       }
     }
 
     if (uploadEntries.length === 0) {
-      statusPopup.showError(folderErrors[0] || "No files could be uploaded.");
+      statusPopup.hidePopup();
+      setBatchUploadProgress({
+        ...createBatchUploadProgressState(
+          files.length,
+          files.reduce((total, file) => total + file.size, 0),
+          1,
+          "Processing",
+        ),
+        phase: "failed",
+        completedFiles: 0,
+        failedFiles: Math.max(1, folderFailures.length),
+        failedItems: folderFailures,
+        error: folderErrors[0] || "No files could be uploaded.",
+      });
+      setUploading(false);
       return;
     }
 
-    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
-      uploadEntries,
-      "Processing",
-    );
-    const failedCount = uploadErrors.length + folderErrors.length;
+    const { successCount, uploadErrors, uploadFailures } =
+      await runBatchedArchiveUpload(uploadEntries, "Processing");
+    const failedItems = [...uploadFailures, ...folderFailures];
+    const failedCount = failedItems.length;
 
     if (failedCount > 0) {
-      statusPopup.showError(
-        `Uploaded ${successCount} of ${files.length} files. ${
-          uploadErrors[0] || folderErrors[0] || "Upload failed"
-        }`,
+      statusPopup.hidePopup();
+      setBatchUploadProgress((previous) =>
+        previous
+          ? {
+              ...previous,
+              phase: "failed",
+              failedFiles: failedCount,
+              failedItems,
+              error: `Uploaded ${successCount} of ${files.length} files. ${
+                uploadErrors[0] || folderErrors[0] || "Upload failed"
+              }`,
+            }
+          : previous,
       );
     } else {
       statusPopup.showSuccess(
@@ -2093,7 +2206,7 @@ const ArchivePage: React.FC<{
         `Deleted ${selectedEntryIds.length - failed.length} item(s), but ${failed.length} failed.`,
       );
     } else {
-      statusPopup.showSuccess("Selected archive items deleted.");
+      showNonBlockingSuccessProgress("Selected archive items deleted.");
     }
 
     clearSelection();
@@ -2297,6 +2410,11 @@ const ArchivePage: React.FC<{
                       void handleArchiveDropOnFolder(event, entry)
                     }
                     onClick={() => setSelectedEntry(entry)}
+                    onDoubleClick={() => {
+                      if (entry.entryType === ArchiveEntryType.FOLDER) {
+                        handleOpen(entry);
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
@@ -2437,7 +2555,9 @@ const ArchivePage: React.FC<{
                 className="hidden"
                 onChange={(e) => {
                   const files = Array.from(e.currentTarget.files ?? []);
-                  void handleUploadFiles(files.length > 0 ? files : null);
+                  if (files.length > 0) {
+                    void handleUploadFiles(files);
+                  }
                   e.currentTarget.value = "";
                 }}
               />
@@ -2461,7 +2581,9 @@ const ArchivePage: React.FC<{
               className="hidden"
               onChange={(e) => {
                 const files = Array.from(e.currentTarget.files ?? []);
-                void handleUploadFolderFiles(files.length > 0 ? files : null);
+                if (files.length > 0) {
+                  void handleUploadFolderFiles(files);
+                }
                 e.currentTarget.value = "";
               }}
             />
@@ -2544,18 +2666,10 @@ const ArchivePage: React.FC<{
                         onDrop={(event) =>
                           void handleArchiveDropOnFolder(event, entry)
                         }
-                        onClick={() => {
-                          if (isSpreadsheetEntry(entry)) {
-                            void handleDownload(entry);
-                          } else {
-                            setSelectedEntry(entry);
-                          }
-                        }}
+                        onClick={() => setSelectedEntry(entry)}
                         onDoubleClick={() => {
                           if (entry.entryType === ArchiveEntryType.FOLDER) {
                             handleOpen(entry);
-                          } else {
-                            void handlePreview(entry);
                           }
                         }}
                         className={`grid gap-3 px-3 py-3 transition hover:bg-base-200/40 sm:px-4 lg:grid-cols-[1.5rem_minmax(0,1fr)_9rem_6rem_9rem] lg:items-center lg:gap-4 ${
@@ -2682,6 +2796,21 @@ const ArchivePage: React.FC<{
             <FiFolder className="h-4 w-4" />
             Open
           </button>
+          {contextMenu.entry.entryType !== ArchiveEntryType.FOLDER &&
+            contextMenu.entry.file && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm w-full justify-start gap-2"
+                onClick={() => {
+                  const entry = contextMenu.entry;
+                  setContextMenu(null);
+                  void handleDownload(entry);
+                }}
+              >
+                <FiDownload className="h-4 w-4" />
+                Download
+              </button>
+            )}
           <button
             type="button"
             className="btn btn-ghost btn-sm w-full justify-start gap-2"
@@ -3271,9 +3400,9 @@ const ArchivePage: React.FC<{
                       accept={acceptedArchiveUploadTypes}
                       onChange={(e) => {
                         const files = Array.from(e.currentTarget.files ?? []);
-                        void handleUploadFiles(
-                          files.length > 0 ? files : null,
-                        );
+                        if (files.length > 0) {
+                          void handleUploadFiles(files);
+                        }
                         e.currentTarget.value = "";
                       }}
                     />
@@ -3296,9 +3425,9 @@ const ArchivePage: React.FC<{
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.currentTarget.files ?? []);
-                      void handleUploadFolderFiles(
-                        files.length > 0 ? files : null,
-                      );
+                      if (files.length > 0) {
+                        void handleUploadFolderFiles(files);
+                      }
                       e.currentTarget.value = "";
                     }}
                   />

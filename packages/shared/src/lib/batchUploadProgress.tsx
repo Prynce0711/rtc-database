@@ -6,6 +6,12 @@ export const MAX_UPLOAD_BATCH_BYTES = 250 * 1024 * 1024;
 
 export type BatchUploadPhase = "processing" | "completed" | "failed";
 
+export type BatchUploadFailure = {
+  name: string;
+  error: string;
+  kind?: "file" | "folder";
+};
+
 export type BatchUploadProgressState = {
   phase: BatchUploadPhase;
   totalFiles: number;
@@ -20,6 +26,7 @@ export type BatchUploadProgressState = {
   currentFileName?: string;
   title?: string;
   error?: string;
+  failedItems?: BatchUploadFailure[];
 };
 
 export const createUploadBatches = <T,>(
@@ -128,6 +135,12 @@ const getSubcopy = (state: BatchUploadProgressState) => {
   }
 
   if (state.phase === "failed") {
+    const firstFailure = state.failedItems?.[0];
+    if (firstFailure) {
+      const label = firstFailure.kind === "folder" ? "Folder" : "File";
+      return `${label} "${firstFailure.name}" failed: ${firstFailure.error}`;
+    }
+
     return state.error || "Some files could not be uploaded.";
   }
 
@@ -152,6 +165,7 @@ export function BatchUploadProgressPanel({
   if (!state) return null;
 
   const percent = getBatchUploadProgressPercent(state);
+  const failedItems = state.failedItems ?? [];
   const progressColor =
     state.phase === "failed"
       ? "bg-error"
@@ -198,6 +212,26 @@ export function BatchUploadProgressPanel({
           <p className="mt-1 truncate text-sm text-base-content/55">
             {getSubcopy(state)}
           </p>
+          {failedItems.length > 0 && (
+            <div className="mt-3 max-h-32 space-y-2 overflow-y-auto rounded-md border border-error/20 bg-error/5 p-2">
+              {failedItems.slice(0, 5).map((item, index) => (
+                <div key={`${item.name}-${index}`} className="min-w-0 text-xs">
+                  <p className="truncate font-semibold text-error">
+                    {(item.kind === "folder" ? "Folder" : "File")}: {item.name}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-base-content/60">
+                    {item.error}
+                  </p>
+                </div>
+              ))}
+              {failedItems.length > 5 && (
+                <p className="text-xs font-medium text-base-content/50">
+                  +{failedItems.length - 5} more failed item
+                  {failedItems.length - 5 !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/45">
             <span>{percent}% this batch</span>
             {state.totalBatches > 1 && (

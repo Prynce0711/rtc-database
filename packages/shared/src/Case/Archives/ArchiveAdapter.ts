@@ -31,6 +31,13 @@ export type ArchiveEditLockErrorResult = {
   lockDeviceId?: string | null;
 };
 
+export type LargeArchiveUploadProgress = {
+  uploadedBytes: number;
+  totalBytes: number;
+  partNumber: number;
+  totalParts: number;
+};
+
 export interface ArchiveAdapter {
   getArchiveEntriesPage: (
     options?: ArchiveFilterOptions,
@@ -40,6 +47,10 @@ export interface ArchiveAdapter {
   ) => Promise<ActionResult<ArchiveStats>>;
   createArchiveEntry: (
     data: Record<string, unknown>,
+  ) => Promise<ActionResult<ArchiveEntryData>>;
+  uploadLargeArchiveEntry?: (
+    data: Record<string, unknown> & { file: File },
+    onProgress?: (progress: LargeArchiveUploadProgress) => void,
   ) => Promise<ActionResult<ArchiveEntryData>>;
   updateArchiveEntry: (
     id: number,

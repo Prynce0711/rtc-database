@@ -18,6 +18,7 @@ const SettingsTab = ({ tabs, activeTab, onTabChange }: SettingsTabProps) => {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
+            data-tour={`settings-tab-${tab.id}`}
             className={[
               "relative flex items-center gap-3.5 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
               isActive
