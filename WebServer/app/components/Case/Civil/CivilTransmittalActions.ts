@@ -188,6 +188,28 @@ export async function createCivilCifTransmittalRecord(
   }
 }
 
+export async function createCivilCifTransmittalRecords(
+  rows: Partial<CivilCifTransmittalInput>[],
+): Promise<ActionResult<CivilCifTransmittalRecordData[]>> {
+  try {
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
+    if (!sessionResult.success) return sessionResult;
+
+    const records = await prisma.$transaction(
+      rows.map((data) =>
+        prisma.civilCourtOfFirstInstanceTransmittal.create({
+          data: toCifPayload(data),
+        }),
+      ),
+    );
+
+    return { success: true, result: records.map(serializeCif) };
+  } catch (error) {
+    console.error("Error creating CFI transmittal records:", error);
+    return { success: false, error: "Failed to create CFI transmittal records" };
+  }
+}
+
 export async function updateCivilCifTransmittalRecord(
   id: number,
   data: Partial<CivilCifTransmittalInput>,
@@ -276,6 +298,28 @@ export async function createCivilTransmittalRecord(
   } catch (error) {
     console.error("Error creating civil transmittal record:", error);
     return { success: false, error: "Failed to create civil transmittal record" };
+  }
+}
+
+export async function createCivilTransmittalRecords(
+  rows: Partial<CivilTransmittalInput>[],
+): Promise<ActionResult<CivilTransmittalRecordData[]>> {
+  try {
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
+    if (!sessionResult.success) return sessionResult;
+
+    const records = await prisma.$transaction(
+      rows.map((data) =>
+        prisma.civilTransmittalRecord.create({
+          data: toTransmittalPayload(data),
+        }),
+      ),
+    );
+
+    return { success: true, result: records.map(serializeTransmittal) };
+  } catch (error) {
+    console.error("Error creating civil transmittal records:", error);
+    return { success: false, error: "Failed to create civil transmittal records" };
   }
 }
 

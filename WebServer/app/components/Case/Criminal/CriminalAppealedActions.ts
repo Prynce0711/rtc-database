@@ -204,6 +204,28 @@ export async function createCriminalAppealedCase(
   }
 }
 
+export async function createCriminalAppealedCases(
+  rows: Partial<CriminalAppealedCaseInput>[],
+): Promise<ActionResult<CriminalAppealedCaseData[]>> {
+  try {
+    const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);
+    if (!sessionResult.success) return sessionResult;
+
+    const records = await prisma.$transaction(
+      rows.map((data) =>
+        prisma.criminalAppealedCase.create({
+          data: toPayload(data),
+        }),
+      ),
+    );
+
+    return { success: true, result: records.map(serializeAppealedCase) };
+  } catch (error) {
+    console.error("Error creating appealed criminal cases:", error);
+    return { success: false, error: "Failed to create appealed criminal cases" };
+  }
+}
+
 export async function updateCriminalAppealedCase(
   id: number,
   data: Partial<CriminalAppealedCaseInput>,
