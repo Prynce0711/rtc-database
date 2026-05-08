@@ -144,6 +144,14 @@ pnpm --filter rtc-database-webserver start
 
 - Build the Electron app (platform-specific artifacts) from the `NativeApp` package. See `NativeApp/package.json` `build` script — this uses `electron-builder`.
 
+- If you want Linux artifacts from Windows, use the Docker wrapper in `NativeApp`:
+
+```bash
+pnpm --dir NativeApp build:linux:docker
+```
+
+This builds inside an `electronuserland/builder` container so you do not need local Linux-only tooling such as `mksquashfs`.
+
 Common troubleshooting
 
 - Next.js dev caching: When changing server actions or moving server code, stop and restart the Next.js dev server to clear cached action artifacts.

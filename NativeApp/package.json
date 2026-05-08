@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "build:win": "tsc && vite build && electron-builder --win nsis portable",
+    "build:linux": "node ./scripts/buildLinux.mjs",
+    "build:linux:docker": "node ./scripts/buildLinuxDocker.mjs",
     "build:win:publish": "tsc && vite build && electron-builder --win nsis --publish always",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -73,6 +75,23 @@
         },
         {
           "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "public/SupremeCourtLogo.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
           "arch": [
             "x64"
           ]
