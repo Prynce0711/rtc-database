@@ -6,7 +6,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..", "..");
 
-const dockerImage = process.env.ELECTRON_BUILDER_DOCKER_IMAGE ?? "electronuserland/builder:latest";
+const dockerImage =
+  process.env.ELECTRON_BUILDER_DOCKER_IMAGE ??
+  "electronuserland/builder:latest";
 const buildCommand =
   process.env.ELECTRON_BUILDER_DOCKER_COMMAND ??
   "corepack enable && pnpm install --frozen-lockfile && cd NativeApp && pnpm build:linux";
@@ -36,7 +38,10 @@ if (result.error) {
       "Docker was not found on PATH. Install Docker Engine or Docker Desktop, then run pnpm build:linux:docker again.",
     );
   } else {
-    console.error("Failed to launch the Docker-based Linux build:", result.error.message);
+    console.error(
+      "Failed to launch the Docker-based Linux build:",
+      result.error.message,
+    );
   }
 
   process.exit(1);
