@@ -73,6 +73,27 @@ const CASE_FILTER_OPTIONS: FilterOption[] = [
 
 const PAGE_SIZE = 10;
 
+const CIVIL_VIEW_OPTIONS = [
+  {
+    key: "civil",
+    label: "Civil Cases",
+    description: "Civil case records",
+    href: "/user/cases/civil",
+  },
+  {
+    key: "cif",
+    label: "CFI",
+    description: "CFI transmittal records",
+    href: "/user/cases/civil/cif",
+  },
+  {
+    key: "transmittal",
+    label: "Transmittal",
+    description: "Civil transmittal records",
+    href: "/user/cases/civil/transmittal",
+  },
+] as const;
+
 const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   role,
   adapter,
@@ -544,6 +565,31 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
           </div>
         </div>
       </header>
+
+      <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+        {CIVIL_VIEW_OPTIONS.map((view) => {
+          const isActive = view.key === "civil";
+          return (
+            <button
+              key={view.key}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => router.push(view.href)}
+              className={[
+                "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
+                isActive
+                  ? "border-primary bg-primary/10 text-primary shadow-sm"
+                  : "border-base-200 bg-base-100 text-base-content/65 hover:border-base-300 hover:bg-base-200/40",
+              ].join(" ")}
+            >
+              <div className="text-sm font-bold">{view.label}</div>
+              <div className="mt-1 text-xs leading-4 opacity-75">
+                {view.description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="relative">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
