@@ -371,7 +371,7 @@ const ArchivePage: React.FC<{
   const [folderForm, setFolderForm] =
     useState<FolderFormState>(initialFolderForm());
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [batchUploadProgress, setBatchUploadProgress] =
+  const [, setBatchUploadProgress] =
     useState<BatchUploadProgressState | null>(null);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -399,6 +399,22 @@ const ArchivePage: React.FC<{
     error: "",
     entry: null,
   });
+
+  const showBatchUploadPopup = (state: BatchUploadProgressState | null) => {
+    if (!state) return;
+
+    statusPopup.showLoading(
+      undefined,
+      <BatchUploadProgressPanel
+        state={state}
+        onDismiss={() => {
+          statusPopup.hidePopup();
+          setBatchUploadProgress(null);
+        }}
+        className="max-w-xl"
+      />,
+    );
+  };
 
   const showNonBlockingSuccessProgress = (message: string) => {
     statusPopup.showLoading(
@@ -1580,6 +1596,7 @@ const ArchivePage: React.FC<{
   const runBatchedArchiveUpload = async (
     uploadEntries: ArchiveUploadEntry[],
     title = "Processing",
+    onStatusUpdate?: (state: BatchUploadProgressState) => void,
   ) => {
     const batches = createUploadBatches(
       uploadEntries,
@@ -1599,41 +1616,38 @@ const ArchivePage: React.FC<{
 
     setUploading(true);
     setUploadProgress(0);
-    setBatchUploadProgress(
-      createBatchUploadProgressState(
-        uploadEntries.length,
-        totalBytes,
-        batches.length,
-        title,
-        batches[0] ? getBatchBytes(batches[0]) : totalBytes,
-      ),
+    let currentState = createBatchUploadProgressState(
+      uploadEntries.length,
+      totalBytes,
+      batches.length,
+      title,
+      batches[0] ? getBatchBytes(batches[0]) : totalBytes,
     );
+    setBatchUploadProgress(currentState);
+    onStatusUpdate?.(currentState);
 
     for (const [batchIndex, batch] of batches.entries()) {
       const currentBatchBytes = getBatchBytes(batch);
       let uploadedBatchBytes = 0;
 
-      setBatchUploadProgress((previous) =>
-        previous
-          ? {
-              ...previous,
-              currentBatch: batchIndex + 1,
-              currentBatchBytes,
-              uploadedBatchBytes: 0,
-            }
-          : previous,
-      );
+      currentState = {
+        ...currentState,
+        currentBatch: batchIndex + 1,
+        currentFileName: undefined,
+        currentBatchBytes,
+        uploadedBatchBytes: 0,
+      };
+      setBatchUploadProgress(currentState);
+      onStatusUpdate?.(currentState);
 
       for (const entry of batch) {
-        setBatchUploadProgress((previous) =>
-          previous
-            ? {
-                ...previous,
-                currentBatch: batchIndex + 1,
-                currentFileName: entry.name,
-              }
-            : previous,
-        );
+        currentState = {
+          ...currentState,
+          currentBatch: batchIndex + 1,
+          currentFileName: entry.name,
+        };
+        setBatchUploadProgress(currentState);
+        onStatusUpdate?.(currentState);
 
         let currentEntryUploadedBytes = 0;
         const updateCurrentEntryProgress = (entryUploadedBytes: number) => {
@@ -1641,17 +1655,14 @@ const ArchivePage: React.FC<{
             entry.file.size,
             Math.max(0, entryUploadedBytes),
           );
-          setBatchUploadProgress((previous) =>
-            previous
-              ? {
-                  ...previous,
-                  uploadedBytes: uploadedBytes + currentEntryUploadedBytes,
-                  currentBatchBytes,
-                  uploadedBatchBytes:
-                    uploadedBatchBytes + currentEntryUploadedBytes,
-                }
-              : previous,
-          );
+          currentState = {
+            ...currentState,
+            uploadedBytes: uploadedBytes + currentEntryUploadedBytes,
+            currentBatchBytes,
+            uploadedBatchBytes: uploadedBatchBytes + currentEntryUploadedBytes,
+          };
+          setBatchUploadProgress(currentState);
+          onStatusUpdate?.(currentState);
         };
 
         try {
@@ -1688,53 +1699,51 @@ const ArchivePage: React.FC<{
         setUploadProgress(
           Math.round((processedCount / uploadEntries.length) * 100),
         );
-        setBatchUploadProgress((previous) =>
-          previous
-            ? {
-                ...previous,
-                completedFiles: processedCount,
-                failedFiles: uploadErrors.length,
-                failedItems: uploadFailures.slice(),
-                uploadedBytes,
-                currentBatchBytes,
-                uploadedBatchBytes,
-              }
-            : previous,
-        );
+        currentState = {
+          ...currentState,
+          completedFiles: processedCount,
+          failedFiles: uploadErrors.length,
+          failedItems: uploadFailures.slice(),
+          uploadedBytes,
+          currentBatchBytes,
+          uploadedBatchBytes,
+        };
+        setBatchUploadProgress(currentState);
+        onStatusUpdate?.(currentState);
       }
     }
 
     const hasErrors = uploadErrors.length > 0;
-    setBatchUploadProgress((previous) =>
-      previous
-        ? {
-            ...previous,
-            phase: hasErrors ? "failed" : "completed",
-            completedFiles: processedCount,
-            failedFiles: uploadErrors.length,
-            failedItems: uploadFailures,
-            uploadedBytes,
-            uploadedBatchBytes: previous.currentBatchBytes,
-            currentFileName: undefined,
-            error: hasErrors
-              ? `Uploaded ${successCount} of ${uploadEntries.length} files. ${
-                  uploadErrors[0] || "Upload failed"
-                }`
-              : undefined,
-          }
-        : previous,
-    );
+    currentState = {
+      ...currentState,
+      phase: hasErrors ? "failed" : "completed",
+      completedFiles: processedCount,
+      failedFiles: uploadErrors.length,
+      failedItems: uploadFailures,
+      uploadedBytes,
+      uploadedBatchBytes: currentState.currentBatchBytes,
+      currentFileName: undefined,
+      error: hasErrors
+        ? `Uploaded ${successCount} of ${uploadEntries.length} files. ${
+            uploadErrors[0] || "Upload failed"
+          }`
+        : undefined,
+    };
+    setBatchUploadProgress(currentState);
+    onStatusUpdate?.(currentState);
 
     if (!hasErrors) {
       window.setTimeout(() => {
-        setBatchUploadProgress((previous) =>
-          previous?.phase === "completed" ? null : previous,
-        );
+        setBatchUploadProgress((previous) => {
+          if (previous?.phase !== "completed") return previous;
+          statusPopup.hidePopup();
+          return null;
+        });
       }, 2600);
     }
 
     setUploading(false);
-    return { successCount, uploadErrors, uploadFailures };
+    return { successCount, uploadErrors, uploadFailures, state: currentState };
   };
 
   const handleUploadFiles = async (files: File[] | null) => {
@@ -1743,27 +1752,16 @@ const ArchivePage: React.FC<{
       return;
     }
 
-    statusPopup.showLoading(
-      `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
-    );
-
     const uploadEntries = files.map((file) => ({
       file,
       name: file.name,
       parentPath: currentPath,
     }));
-    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
+    await runBatchedArchiveUpload(
       uploadEntries,
       "Processing",
+      showBatchUploadPopup,
     );
-
-    if (uploadErrors.length > 0) {
-      statusPopup.hidePopup();
-    } else {
-      statusPopup.showSuccess(
-        `Uploaded ${successCount} file${successCount !== 1 ? "s" : ""}.`,
-      );
-    }
 
     setCurrentPage(1);
     await refreshEntries(1);
@@ -1784,27 +1782,16 @@ const ArchivePage: React.FC<{
     const files = Array.from(fileList);
     if (files.length === 0) return false;
 
-    statusPopup.showLoading(
-      `Uploading ${files.length} file${files.length !== 1 ? "s" : ""}...`,
-    );
-
     const uploadEntries = files.map((file) => ({
       file,
       name: file.name,
       parentPath: targetPath,
     }));
-    const { successCount, uploadErrors } = await runBatchedArchiveUpload(
+    const { successCount } = await runBatchedArchiveUpload(
       uploadEntries,
       "Processing",
+      showBatchUploadPopup,
     );
-
-    if (uploadErrors.length > 0) {
-      statusPopup.hidePopup();
-    } else {
-      statusPopup.showSuccess(
-        `Uploaded ${successCount} of ${files.length} file${files.length !== 1 ? "s" : ""}.`,
-      );
-    }
 
     setCurrentPage(1);
     await refreshEntries(1);
@@ -2008,7 +1995,6 @@ const ArchivePage: React.FC<{
       return;
     }
 
-    statusPopup.showLoading(`Uploading ${files.length} files...`);
     const createdFolderPaths = new Set<string>();
     const folderErrors: string[] = [];
     const folderFailures: BatchUploadFailure[] = [];
@@ -2058,8 +2044,7 @@ const ArchivePage: React.FC<{
     }
 
     if (uploadEntries.length === 0) {
-      statusPopup.hidePopup();
-      setBatchUploadProgress({
+      const failedState: BatchUploadProgressState = {
         ...createBatchUploadProgressState(
           files.length,
           files.reduce((total, file) => total + file.size, 0),
@@ -2071,35 +2056,35 @@ const ArchivePage: React.FC<{
         failedFiles: Math.max(1, folderFailures.length),
         failedItems: folderFailures,
         error: folderErrors[0] || "No files could be uploaded.",
-      });
+      };
+      setBatchUploadProgress(failedState);
+      showBatchUploadPopup(failedState);
       setUploading(false);
       return;
     }
 
-    const { successCount, uploadErrors, uploadFailures } =
-      await runBatchedArchiveUpload(uploadEntries, "Processing");
+    const { successCount, uploadErrors, uploadFailures, state } =
+      await runBatchedArchiveUpload(
+        uploadEntries,
+        "Processing",
+        showBatchUploadPopup,
+      );
     const failedItems = [...uploadFailures, ...folderFailures];
     const failedCount = failedItems.length;
 
     if (failedCount > 0) {
-      statusPopup.hidePopup();
-      setBatchUploadProgress((previous) =>
-        previous
-          ? {
-              ...previous,
-              phase: "failed",
-              failedFiles: failedCount,
-              failedItems,
-              error: `Uploaded ${successCount} of ${files.length} files. ${
-                uploadErrors[0] || folderErrors[0] || "Upload failed"
-              }`,
-            }
-          : previous,
-      );
-    } else {
-      statusPopup.showSuccess(
-        `Uploaded ${successCount} of ${files.length} files.`,
-      );
+      const failedState: BatchUploadProgressState = {
+        ...state,
+        phase: "failed",
+        failedFiles: failedCount,
+        failedItems,
+        currentFileName: undefined,
+        error: `Uploaded ${successCount} of ${files.length} files. ${
+          uploadErrors[0] || folderErrors[0] || "Upload failed"
+        }`,
+      };
+      setBatchUploadProgress(failedState);
+      showBatchUploadPopup(failedState);
     }
 
     setCurrentPage(1);
@@ -3648,12 +3633,6 @@ const ArchivePage: React.FC<{
               )}
             </div>
           </div>
-
-          <BatchUploadProgressPanel
-            state={batchUploadProgress}
-            onDismiss={() => setBatchUploadProgress(null)}
-            className="max-w-xl"
-          />
 
           {selectedCount > 0 && (
             <div className="rounded-[26px] border border-primary/20 bg-primary/8 p-4 shadow-sm">

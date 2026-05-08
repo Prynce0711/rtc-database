@@ -150,7 +150,7 @@ const caseManagementSteps: TutorialStep[] = [
   {
     id: "diversion",
     title: "Diversion",
-    body: "Diversion gathers transmitted and related case movement records so the court can review unload, consolidation, and reraffle activity.",
+    body: "Diversion gathers dedicated diversion records so the court can review unload, consolidation, reraffle, and related case movement activity.",
     route: "/user/cases/diversion",
     target: '[data-tour="sidebar-subnav-cases-diversion"]',
   },

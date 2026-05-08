@@ -85,7 +85,7 @@ const NavBtn = ({
   onExpandSidebar: () => void;
 }) => {
   const pathname = usePathname();
-  const currentSub = pathname.split("/")[3] || "";
+  const currentSubPath = pathname.split("/").slice(3).join("/");
   const hasDropdowns = !!item.dropdowns?.length;
   const itemBasePath = `/user/${item.href}`;
   const isActive = hasDropdowns
@@ -221,8 +221,18 @@ const NavBtn = ({
               <div className="absolute left-0 top-1 bottom-1 w-px bg-base-300" />
 
               {item.dropdowns!.map((d) => {
+                const hasMoreSpecificActiveChild = item.dropdowns!.some(
+                  (other) =>
+                    other.href !== d.href &&
+                    other.href.startsWith(`${d.href}/`) &&
+                    (currentSubPath === other.href ||
+                      currentSubPath.startsWith(`${other.href}/`)),
+                );
                 const isSubActive =
-                  currentSub === d.href || (!d.href && !currentSub && isActive);
+                  !hasMoreSpecificActiveChild &&
+                  (currentSubPath === d.href ||
+                    currentSubPath.startsWith(`${d.href}/`) ||
+                    (!d.href && !currentSubPath && isActive));
                 return (
                   <Link
                     key={d.href}
@@ -389,6 +399,8 @@ const caseNavItems: NavItem[] = [
     dropdowns: [
       { label: "Criminal Cases", href: "criminal" },
       { label: "Civil Cases", href: "civil" },
+      { label: "CFI Transmittal Record", href: "civil/cif" },
+      { label: "Civil Transmittal Record", href: "civil/transmittal" },
       { label: "Petition", href: "petition" },
       { label: "Special Proceedings", href: "proceedings" },
       { label: "Receiving Logs", href: "receiving" },
