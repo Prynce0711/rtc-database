@@ -27,7 +27,24 @@ import {
 } from "@rtc-database/shared";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
+import {
+  recordCaseBranchChange,
+  recordInitialCaseBranchHistory,
+} from "@/app/components/Case/CaseBranchHistoryUtils";
 import { IS_WORKER } from "../ExcelWorkerUtils";
+
+const withPreviousCriminalRaffleDate = (
+  detailData: Record<string, unknown>,
+  existing?: { previousRaffleDate?: Date | null; raffleDate?: Date | null },
+): Record<string, unknown> => ({
+  ...detailData,
+  previousRaffleDate:
+    existing?.previousRaffleDate ??
+    existing?.raffleDate ??
+    detailData.previousRaffleDate ??
+    detailData.raffleDate ??
+    null,
+});
 
 export async function uploadCriminalCaseExcel(
   file: File,
@@ -85,6 +102,14 @@ export async function uploadCriminalCaseExcel(
     }
 
     const existingCaseIdByCaseNumber = new Map<string, number>();
+    const existingCriminalRaffleByCaseId = new Map<
+      number,
+      {
+        branch: string | null;
+        previousRaffleDate: Date | null;
+        raffleDate: Date | null;
+      }
+    >();
 
     if (candidateCaseNumbers.size > 0) {
       const allCaseNumbers = Array.from(candidateCaseNumbers);
@@ -113,6 +138,11 @@ export async function uploadCriminalCaseExcel(
           const key = existingCase.caseNumber.trim();
           if (!key || existingCaseIdByCaseNumber.has(key)) continue;
           existingCaseIdByCaseNumber.set(key, existingCase.id);
+          existingCriminalRaffleByCaseId.set(existingCase.id, {
+            branch: existingCase.branch,
+            previousRaffleDate: existingCase.criminalCase.previousRaffleDate,
+            raffleDate: existingCase.criminalCase.raffleDate,
+          });
         }
       }
     }
@@ -122,6 +152,7 @@ export async function uploadCriminalCaseExcel(
 
       return {
         ...values,
+        previousRaffleDate: values.previousRaffleDate ?? values.raffleDate,
       };
     };
 
@@ -219,6 +250,11 @@ export async function uploadCriminalCaseExcel(
           for (const { row, caseId } of rowsToUpdate) {
             const { caseData, detailData } = splitCaseDataBySchema(row);
             const caseNumber = String(caseData.caseNumber ?? "").trim();
+            const existingState = existingCriminalRaffleByCaseId.get(caseId);
+            const normalizedDetailData = withPreviousCriminalRaffleDate(
+              detailData,
+              existingState,
+            );
 
             await tx.case.update({
               where: { id: caseId },
@@ -235,7 +271,22 @@ export async function uploadCriminalCaseExcel(
 
             await tx.criminalCase.update({
               where: { baseCaseID: caseId },
-              data: detailData as Prisma.CriminalCaseUpdateInput,
+              data: normalizedDetailData as Prisma.CriminalCaseUpdateInput,
+            });
+
+            await recordCaseBranchChange(tx, {
+              caseId,
+              previousBranch: existingState?.branch,
+              nextBranch: caseData.branch,
+              originalRaffleDate:
+                existingState?.previousRaffleDate ?? existingState?.raffleDate,
+              previousRaffleDate:
+                existingState?.raffleDate ?? existingState?.previousRaffleDate,
+              nextRaffleDate:
+                normalizedDetailData.raffleDate ??
+                normalizedDetailData.previousRaffleDate ??
+                caseData.dateFiled,
+              source: "excel",
             });
 
             affectedIds.push(caseId);
@@ -265,14 +316,35 @@ export async function uploadCriminalCaseExcel(
             const criminalRows: Prisma.CriminalCaseCreateManyInput[] =
               rowsToCreate.map((row, index) => {
                 const { detailData } = splitCaseDataBySchema(row);
+                const normalizedDetailData =
+                  withPreviousCriminalRaffleDate(detailData);
                 return {
-                  ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
+                  ...(normalizedDetailData as Prisma.CriminalCaseCreateWithoutCaseInput),
                   baseCaseID: created[index].id,
                 };
               });
 
             if (criminalRows.length > 0) {
               await tx.criminalCase.createMany({ data: criminalRows });
+            }
+
+            for (const [index, row] of rowsToCreate.entries()) {
+              const createdCase = created[index];
+              if (!createdCase) continue;
+
+              const { caseData, detailData } = splitCaseDataBySchema(row);
+              const normalizedDetailData =
+                withPreviousCriminalRaffleDate(detailData);
+
+              await recordInitialCaseBranchHistory(tx, {
+                caseId: createdCase.id,
+                branch: caseData.branch,
+                raffleDate:
+                  normalizedDetailData.previousRaffleDate ??
+                  normalizedDetailData.raffleDate ??
+                  caseData.dateFiled,
+                source: "excel",
+              });
             }
 
             if (conflictMode === "update-existing") {

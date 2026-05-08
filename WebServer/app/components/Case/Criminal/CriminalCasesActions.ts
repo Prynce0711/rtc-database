@@ -29,6 +29,23 @@ import {
 } from "@rtc-database/shared/lib/caseNumbering";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import {
+  recordCaseBranchChange,
+  recordInitialCaseBranchHistory,
+} from "../CaseBranchHistoryUtils";
+
+const withPreviousCriminalRaffleDate = (
+  detailData: Record<string, unknown>,
+  existing?: { previousRaffleDate?: Date | string | null; raffleDate?: Date | string | null },
+): Record<string, unknown> => ({
+  ...detailData,
+  previousRaffleDate:
+    existing?.previousRaffleDate ??
+    existing?.raffleDate ??
+    detailData.previousRaffleDate ??
+    detailData.raffleDate ??
+    null,
+});
 
 export async function getCriminalCases(
   options?: CriminalCasesFilterOptions,
@@ -244,6 +261,8 @@ export async function createCriminalCase(
     const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
+    const normalizedDetailData =
+      withPreviousCriminalRaffleDate(detailData);
 
     const requestedManual =
       typeof data.isManual === "boolean" ? data.isManual : true;
@@ -272,7 +291,7 @@ export async function createCriminalCase(
           parsedCaseNumber.year,
         );
 
-        return tx.case.create({
+        const createdCase = await tx.case.create({
           data: {
             ...casePayload,
             caseType: CaseType.CRIMINAL,
@@ -282,10 +301,23 @@ export async function createCriminalCase(
             year: next.year,
             isManual: false,
             criminalCase: {
-              create: detailData as Prisma.CriminalCaseCreateWithoutCaseInput,
+              create:
+              normalizedDetailData as Prisma.CriminalCaseCreateWithoutCaseInput,
             },
           },
         });
+
+        await recordInitialCaseBranchHistory(tx, {
+          caseId: createdCase.id,
+          branch: casePayload.branch,
+          raffleDate:
+            normalizedDetailData.previousRaffleDate ??
+            normalizedDetailData.raffleDate ??
+            casePayload.dateFiled,
+          source: "manual",
+        });
+
+        return createdCase;
       }
 
       const createdCase = await tx.case.create({
@@ -298,7 +330,8 @@ export async function createCriminalCase(
           year: null,
           isManual: true,
           criminalCase: {
-            create: detailData as Prisma.CriminalCaseCreateWithoutCaseInput,
+            create:
+              normalizedDetailData as Prisma.CriminalCaseCreateWithoutCaseInput,
           },
         },
       });
@@ -312,6 +345,16 @@ export async function createCriminalCase(
           parsedCaseNumber.number,
         );
       }
+
+      await recordInitialCaseBranchHistory(tx, {
+        caseId: createdCase.id,
+        branch: casePayload.branch,
+        raffleDate:
+          normalizedDetailData.previousRaffleDate ??
+          normalizedDetailData.raffleDate ??
+          casePayload.dateFiled,
+        source: "manual",
+      });
 
       return createdCase;
     });
@@ -415,6 +458,11 @@ export async function updateCriminalCase(
       throw new Error("Case not found");
     }
 
+    const normalizedDetailData = withPreviousCriminalRaffleDate(
+      detailData,
+      originalCase.criminalCase ?? undefined,
+    );
+
     const updatedCase = await prisma.$transaction(async (tx) => {
       const caseUpdateData: Prisma.CaseUpdateInput = {
         ...casePayload,
@@ -446,11 +494,30 @@ export async function updateCriminalCase(
 
       await tx.criminalCase.upsert({
         where: { baseCaseID: caseId },
-        update: detailData,
+        update: normalizedDetailData,
         create: {
-          ...(detailData as Prisma.CriminalCaseCreateWithoutCaseInput),
+          ...(normalizedDetailData as Prisma.CriminalCaseCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
+      });
+
+      await recordCaseBranchChange(tx, {
+        caseId,
+        previousBranch: originalCase.branch,
+        nextBranch: casePayload.branch,
+        originalRaffleDate:
+          originalCase.criminalCase?.previousRaffleDate ??
+          originalCase.criminalCase?.raffleDate ??
+          originalCase.dateFiled,
+        previousRaffleDate:
+          originalCase.criminalCase?.raffleDate ??
+          originalCase.criminalCase?.previousRaffleDate ??
+          originalCase.dateFiled,
+        nextRaffleDate:
+          normalizedDetailData.raffleDate ??
+          normalizedDetailData.previousRaffleDate ??
+          casePayload.dateFiled,
+        source: "manual",
       });
 
       if (parsedCaseNumber) {

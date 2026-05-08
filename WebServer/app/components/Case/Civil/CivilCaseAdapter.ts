@@ -3,6 +3,7 @@
 import type { CivilCaseAdapter } from "@rtc-database/shared";
 import { CaseType } from "@rtc-database/shared";
 import { doesCaseExist, getCases, getCaseStats } from "../BaseCaseActions";
+import { getCaseBranchHistory } from "../CaseBranchHistoryActions";
 import {
   createCivilCase,
   deleteCivilCase,
@@ -21,6 +22,7 @@ export const civilCaseAdapter: CivilCaseAdapter = {
   doesCaseExist,
   getCases,
   getCaseStats,
+  getCaseBranchHistory,
   getCivilCases,
   getCivilCaseStats,
   createCivilCase,

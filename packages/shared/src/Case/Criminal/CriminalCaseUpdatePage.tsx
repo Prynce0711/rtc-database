@@ -251,6 +251,14 @@ const TAB_GROUPS: TabGroup[] = [
         mono: true,
       },
       {
+        key: "previousRaffleDate",
+        label: "Previous Raffle Date",
+        placeholder: "",
+        type: "date",
+        width: 178,
+        mono: true,
+      },
+      {
         key: "infoSheet",
         label: "Info Sheet",
         placeholder: "IS-001",
@@ -736,6 +744,14 @@ function ReviewCard({
                 <div className="rv-field-value rv-mono">
                   {fmtDate(entry.raffleDate) || (
                     <span className="rv-empty">—</span>
+                  )}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Previous Raffle Date</div>
+                <div className="rv-field-value rv-mono">
+                  {fmtDate(entry.previousRaffleDate) || (
+                    <span className="rv-empty">â€”</span>
                   )}
                 </div>
               </div>
@@ -1602,6 +1618,9 @@ const CriminalCaseUpdatePage = ({
             raffleDate: payload.raffleDate
               ? new Date(payload.raffleDate).toISOString()
               : null,
+            previousRaffleDate: payload.previousRaffleDate
+              ? new Date(payload.previousRaffleDate).toISOString()
+              : null,
           });
 
           if (!response.success) {
@@ -1661,6 +1680,9 @@ const CriminalCaseUpdatePage = ({
               raffleDate: payload.raffleDate
                 ? new Date(payload.raffleDate).toISOString()
                 : null,
+              previousRaffleDate: payload.previousRaffleDate
+                ? new Date(payload.previousRaffleDate).toISOString()
+                : null,
             });
 
             if (!response.success) {
@@ -1696,6 +1718,9 @@ const CriminalCaseUpdatePage = ({
               : null,
             raffleDate: payload.raffleDate
               ? new Date(payload.raffleDate).toISOString()
+              : null,
+            previousRaffleDate: payload.previousRaffleDate
+              ? new Date(payload.previousRaffleDate).toISOString()
               : null,
           });
 

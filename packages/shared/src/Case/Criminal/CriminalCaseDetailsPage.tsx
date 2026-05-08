@@ -10,6 +10,8 @@ import {
   DetailSection,
   formatLongDate,
 } from "../CaseDetailsShared";
+import type { CaseBranchHistoryData } from "../CaseBranchHistory";
+import CaseBranchHistoryTimeline from "../CaseBranchHistoryTimeline";
 import NavButton from "../NavButton";
 import type { CriminalCaseAdapter } from "./CriminalCaseAdapter";
 import type { CriminalCaseData } from "./CriminalCaseSchema";
@@ -35,10 +37,13 @@ export default function CriminalCaseDetailsPage({
   const [caseData, setCaseData] = useState<CriminalCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<CriminalCaseData | null>(null);
   const [nextCase, setNextCase] = useState<CriminalCaseData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"details" | "additional">(
-    "details",
+  const [branchHistory, setBranchHistory] = useState<CaseBranchHistoryData[]>(
+    [],
   );
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<
+    "details" | "additional" | "history"
+  >("details");
 
   useEffect(() => {
     const fetchCase = async () => {
@@ -47,10 +52,13 @@ export default function CriminalCaseDetailsPage({
         const numId = Number(idParam);
 
         // Fetch current + adjacent cases in parallel
-        const [current, prev, next] = await Promise.allSettled([
+        const [current, prev, next, history] = await Promise.allSettled([
           adapter.getCriminalCaseById(numId),
           adapter.getCriminalCaseById(numId - 1),
           adapter.getCriminalCaseById(numId + 1),
+          adapter.getCaseBranchHistory
+            ? adapter.getCaseBranchHistory(numId)
+            : Promise.resolve({ success: true, result: [] }),
         ]);
 
         if (current.status === "fulfilled" && current.value.success)
@@ -61,6 +69,9 @@ export default function CriminalCaseDetailsPage({
         if (next.status === "fulfilled" && next.value.success)
           setNextCase(next.value.result);
         else setNextCase(null);
+        if (history.status === "fulfilled" && history.value.success)
+          setBranchHistory(history.value.result);
+        else setBranchHistory([]);
       } catch (err) {
         console.error(err);
       } finally {
@@ -264,7 +275,7 @@ export default function CriminalCaseDetailsPage({
 
         {/* ── Tabs ─────────────────────────────────────────── */}
         <div className="flex items-end border-b border-base-200 gap-1">
-          {(["details", "additional"] as const).map((tab) => (
+          {(["details", "additional", "history"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -275,7 +286,11 @@ export default function CriminalCaseDetailsPage({
                   : "border-transparent text-base-content/30 hover:text-base-content/55",
               ].join(" ")}
             >
-              {tab === "details" ? "Case Details" : "Additional Info"}
+              {tab === "details"
+                ? "Case Details"
+                : tab === "additional"
+                  ? "Additional Info"
+                  : "Branch History"}
             </button>
           ))}
         </div>
@@ -306,6 +321,10 @@ export default function CriminalCaseDetailsPage({
                 <DetailField
                   label="Date Filed"
                   value={formatLongDate(caseData.dateFiled)}
+                />
+                <DetailField
+                  label="Original Raffle Date"
+                  value={formatLongDate(caseData.previousRaffleDate)}
                 />
                 <DetailField
                   label="Raffle Date"
@@ -384,6 +403,12 @@ export default function CriminalCaseDetailsPage({
         )}
 
         {/* ── Prev / Next bottom nav ────────────────────────── */}
+        {activeTab === "history" && (
+          <div className="space-y-10 animate-slide-up">
+            <CaseBranchHistoryTimeline history={branchHistory} />
+          </div>
+        )}
+
         <div className="h-px bg-base-200" />
         <div className="flex items-stretch justify-between gap-3">
           <NavButton

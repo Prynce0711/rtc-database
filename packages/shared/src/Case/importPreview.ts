@@ -806,6 +806,7 @@ export const previewCivilCaseImport = async (
           caseNumber,
           assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
           caseType: CaseType.CIVIL,
+          previousRaffleDate: cells.previousRaffleDate ?? cells.reRaffleDate,
           undocketed: caseNumber.toLowerCase().includes("undocketed"),
         },
       };
@@ -847,6 +848,7 @@ export const previewCriminalCaseImport = async (
           ...cells,
           assistantBranch: cells.assistantBranch ?? cells.branch ?? null,
           caseType: CaseType.CRIMINAL,
+          previousRaffleDate: cells.previousRaffleDate ?? cells.raffleDate,
         },
       };
     },

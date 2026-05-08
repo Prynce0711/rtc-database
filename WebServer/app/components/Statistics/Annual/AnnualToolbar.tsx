@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FiCheck, FiEdit2, FiSearch, FiTrash2, FiX } from "react-icons/fi";
+import { FiCheck, FiSearch, FiX } from "react-icons/fi";
 
 export type AnnualSelectionMode = "edit" | "delete" | null;
 
@@ -27,8 +27,6 @@ const AnnualToolbar: React.FC<AnnualToolbarProps> = ({
   children,
   selectionMode,
   selectedCount = 0,
-  onStartEdit,
-  onStartDelete,
   onConfirmSelection,
   onCancelSelection,
 }) => {
@@ -49,7 +47,7 @@ const AnnualToolbar: React.FC<AnnualToolbarProps> = ({
       </div>
 
       {/* Actions */}
-      {isSelecting ? (
+      {isSelecting && (
         <div className="flex items-center gap-2 ml-auto">
           <span className="text-sm text-base-content/40 tabular-nums">
             {selectedCount} selected
@@ -70,28 +68,6 @@ const AnnualToolbar: React.FC<AnnualToolbarProps> = ({
           >
             <FiX className="h-4 w-4" />
           </button>
-        </div>
-      ) : (
-        // Visible action buttons beside the search input instead of a dropdown
-        <div className="flex items-center gap-3 ml-3">
-          {onStartEdit && (
-            <button
-              className="btn btn-md btn-outline gap-2"
-              onClick={onStartEdit}
-            >
-              <FiEdit2 className="h-4 w-4" />
-              Edit rows
-            </button>
-          )}
-          {onStartDelete && (
-            <button
-              className="btn btn-md btn-outline gap-2 text-error hover:bg-error/10"
-              onClick={onStartDelete}
-            >
-              <FiTrash2 className="h-4 w-4" />
-              Delete rows
-            </button>
-          )}
         </div>
       )}
 

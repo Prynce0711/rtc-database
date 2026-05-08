@@ -73,6 +73,7 @@ type FormEntry = {
   notes: string;
   nature: string;
   originCaseNumber: string;
+  previousRaffleDate: string;
   reRaffleDate: string;
   reRaffleBranch: string;
   consolitationDate: string;
@@ -197,6 +198,14 @@ const TAB_GROUPS: TabGroup[] = [
     id: "status",
     label: "Status",
     cols: [
+      {
+        key: "previousRaffleDate",
+        label: "Previous Raffle Date",
+        placeholder: "",
+        type: "date",
+        width: 180,
+        mono: true,
+      },
       {
         key: "reRaffleDate",
         label: "Re-Raffle Date",
@@ -546,6 +555,14 @@ function ReviewCard({
                 <div className="rv-field-value rv-mono">
                   {entry.originCaseNumber || (
                     <span className="rv-empty">—</span>
+                  )}
+                </div>
+              </div>
+              <div className="rv-field">
+                <div className="rv-field-label">Previous Raffle Date</div>
+                <div className="rv-field-value rv-mono">
+                  {fmtDate(entry.previousRaffleDate) || (
+                    <span className="rv-empty">â€”</span>
                   )}
                 </div>
               </div>

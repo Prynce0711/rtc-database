@@ -2,6 +2,7 @@
 
 import type { CriminalCaseAdapter } from "@rtc-database/shared";
 import { doesCaseExist, getCases, getCaseStats } from "../BaseCaseActions";
+import { getCaseBranchHistory } from "../CaseBranchHistoryActions";
 import {
   createCriminalCase,
   deleteCriminalCase,
@@ -27,6 +28,7 @@ export const criminalCaseAdapter: CriminalCaseAdapter = {
   doesCaseExist,
   getCases,
   getCaseStats,
+  getCaseBranchHistory,
   getCriminalCases,
   getCriminalCaseStats,
   createCriminalCase,

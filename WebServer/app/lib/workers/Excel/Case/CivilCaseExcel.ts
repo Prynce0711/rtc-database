@@ -22,7 +22,67 @@ import {
 } from "@rtc-database/shared/lib/caseNumbering";
 import * as XLSX from "xlsx";
 import { prettifyError } from "zod";
+import {
+  recordCaseBranchChange,
+  recordCaseBranchHistory,
+  recordInitialCaseBranchHistory,
+} from "@/app/components/Case/CaseBranchHistoryUtils";
 import { IS_WORKER } from "../ExcelWorkerUtils";
+
+const recordCivilDetailBranchHistory = async (
+  client: Pick<Prisma.TransactionClient, "caseBranchHistory">,
+  caseId: number,
+  fromBranch: string | null | undefined,
+  detailData: Record<string, unknown>,
+  source: string,
+) => {
+  const reRaffleBranch = detailData.reRaffleBranch as string | null | undefined;
+  const reRaffleDate = detailData.reRaffleDate as Date | string | null | undefined;
+  const consolidationBranch = detailData.consolidationBranch as
+    | string
+    | null
+    | undefined;
+  const consolitationDate = detailData.consolitationDate as
+    | Date
+    | string
+    | null
+    | undefined;
+
+  if (reRaffleBranch || reRaffleDate) {
+    await recordCaseBranchHistory(client, {
+      caseId,
+      eventType: "RERAFFLE",
+      fromBranch,
+      toBranch: reRaffleBranch ?? fromBranch,
+      raffleDate: reRaffleDate,
+      source,
+    });
+  }
+
+  if (consolidationBranch || consolitationDate) {
+    await recordCaseBranchHistory(client, {
+      caseId,
+      eventType: "CONSOLIDATED",
+      fromBranch: reRaffleBranch ?? fromBranch,
+      toBranch: consolidationBranch ?? reRaffleBranch ?? fromBranch,
+      raffleDate: consolitationDate,
+      source,
+    });
+  }
+};
+
+const withPreviousCivilRaffleDate = (
+  detailData: Record<string, unknown>,
+  existing?: { previousRaffleDate?: Date | null; reRaffleDate?: Date | null },
+): Record<string, unknown> => ({
+  ...detailData,
+  previousRaffleDate:
+    existing?.previousRaffleDate ??
+    existing?.reRaffleDate ??
+    detailData.previousRaffleDate ??
+    detailData.reRaffleDate ??
+    null,
+});
 
 export async function uploadCivilCaseExcel(
   file: File,
@@ -42,6 +102,7 @@ export async function uploadCivilCaseExcel(
       const values = normalizeRowBySchema(CivilCaseSchema, row);
       return {
         ...values,
+        previousRaffleDate: values.previousRaffleDate ?? values.reRaffleDate,
       };
     };
 
@@ -100,6 +161,14 @@ export async function uploadCivilCaseExcel(
     }
 
     const existingCaseIdByCaseNumber = new Map<string, number>();
+    const existingCivilRaffleByCaseId = new Map<
+      number,
+      {
+        branch: string | null;
+        previousRaffleDate: Date | null;
+        reRaffleDate: Date | null;
+      }
+    >();
 
     if (candidateCaseNumbers.size > 0) {
       const allCaseNumbers = Array.from(candidateCaseNumbers);
@@ -128,6 +197,11 @@ export async function uploadCivilCaseExcel(
           const key = existingCase.caseNumber.trim();
           if (!key || existingCaseIdByCaseNumber.has(key)) continue;
           existingCaseIdByCaseNumber.set(key, existingCase.id);
+          existingCivilRaffleByCaseId.set(existingCase.id, {
+            branch: existingCase.branch,
+            previousRaffleDate: existingCase.civilCase.previousRaffleDate,
+            reRaffleDate: existingCase.civilCase.reRaffleDate,
+          });
         }
       }
     }
@@ -220,6 +294,11 @@ export async function uploadCivilCaseExcel(
           for (const { row, caseId } of rowsToUpdate) {
             const { caseData, detailData } = splitCaseDataBySchema(row);
             const caseNumber = String(caseData.caseNumber ?? "").trim();
+            const existingState = existingCivilRaffleByCaseId.get(caseId);
+            const normalizedDetailData = withPreviousCivilRaffleDate(
+              detailData,
+              existingState,
+            );
 
             await tx.case.update({
               where: { id: caseId },
@@ -236,8 +315,31 @@ export async function uploadCivilCaseExcel(
 
             await tx.civilCase.update({
               where: { baseCaseID: caseId },
-              data: detailData as Prisma.CivilCaseUpdateInput,
+              data: normalizedDetailData as Prisma.CivilCaseUpdateInput,
             });
+
+            await recordCaseBranchChange(tx, {
+              caseId,
+              previousBranch: existingState?.branch,
+              nextBranch: caseData.branch,
+              originalRaffleDate:
+                existingState?.previousRaffleDate ?? existingState?.reRaffleDate,
+              previousRaffleDate:
+                existingState?.reRaffleDate ?? existingState?.previousRaffleDate,
+              nextRaffleDate:
+                normalizedDetailData.reRaffleDate ??
+                normalizedDetailData.previousRaffleDate ??
+                caseData.dateFiled,
+              source: "excel",
+            });
+
+            await recordCivilDetailBranchHistory(
+              tx,
+              caseId,
+              existingState?.branch,
+              normalizedDetailData,
+              "excel",
+            );
 
             affectedIds.push(caseId);
             updatedCount += 1;
@@ -266,14 +368,43 @@ export async function uploadCivilCaseExcel(
             const civilRows: Prisma.CivilCaseCreateManyInput[] =
               rowsToCreate.map((row, index) => {
                 const { detailData } = splitCaseDataBySchema(row);
+                const normalizedDetailData =
+                  withPreviousCivilRaffleDate(detailData);
                 return {
-                  ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
+                  ...(normalizedDetailData as Prisma.CivilCaseCreateWithoutCaseInput),
                   baseCaseID: created[index].id,
                 };
               });
 
             if (civilRows.length > 0) {
               await tx.civilCase.createMany({ data: civilRows });
+            }
+
+            for (const [index, row] of rowsToCreate.entries()) {
+              const createdCase = created[index];
+              if (!createdCase) continue;
+
+              const { caseData, detailData } = splitCaseDataBySchema(row);
+              const normalizedDetailData =
+                withPreviousCivilRaffleDate(detailData);
+
+              await recordInitialCaseBranchHistory(tx, {
+                caseId: createdCase.id,
+                branch: caseData.branch,
+                raffleDate:
+                  normalizedDetailData.previousRaffleDate ??
+                  normalizedDetailData.reRaffleDate ??
+                  caseData.dateFiled,
+                source: "excel",
+              });
+
+              await recordCivilDetailBranchHistory(
+                tx,
+                createdCase.id,
+                caseData.branch,
+                normalizedDetailData,
+                "excel",
+              );
             }
 
             if (conflictMode === "update-existing") {

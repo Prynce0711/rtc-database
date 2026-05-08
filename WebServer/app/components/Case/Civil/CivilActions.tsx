@@ -29,6 +29,69 @@ import {
 } from "@rtc-database/shared/prisma/client";
 import { prettifyError } from "zod";
 import { createLog } from "../../ActivityLogs/LogActions";
+import {
+  recordCaseBranchChange,
+  recordCaseBranchHistory,
+  recordInitialCaseBranchHistory,
+} from "../CaseBranchHistoryUtils";
+
+const recordCivilDetailBranchHistory = async (
+  client: Pick<Prisma.TransactionClient, "caseBranchHistory">,
+  caseId: number,
+  fromBranch: string | null | undefined,
+  detailData: Record<string, unknown>,
+  source: string,
+) => {
+  const reRaffleBranch = detailData.reRaffleBranch as string | null | undefined;
+  const reRaffleDate = detailData.reRaffleDate as Date | string | null | undefined;
+  const consolidationBranch = detailData.consolidationBranch as
+    | string
+    | null
+    | undefined;
+  const consolitationDate = detailData.consolitationDate as
+    | Date
+    | string
+    | null
+    | undefined;
+
+  if (reRaffleBranch || reRaffleDate) {
+    await recordCaseBranchHistory(client, {
+      caseId,
+      eventType: "RERAFFLE",
+      fromBranch,
+      toBranch: reRaffleBranch ?? fromBranch,
+      raffleDate: reRaffleDate,
+      source,
+    });
+  }
+
+  if (consolidationBranch || consolitationDate) {
+    await recordCaseBranchHistory(client, {
+      caseId,
+      eventType: "CONSOLIDATED",
+      fromBranch: reRaffleBranch ?? fromBranch,
+      toBranch: consolidationBranch ?? reRaffleBranch ?? fromBranch,
+      raffleDate: consolitationDate,
+      source,
+    });
+  }
+};
+
+const withPreviousCivilRaffleDate = (
+  detailData: Record<string, unknown>,
+  existing?: {
+    previousRaffleDate?: Date | string | null;
+    reRaffleDate?: Date | string | null;
+  },
+): Record<string, unknown> => ({
+  ...detailData,
+  previousRaffleDate:
+    existing?.previousRaffleDate ??
+    existing?.reRaffleDate ??
+    detailData.previousRaffleDate ??
+    detailData.reRaffleDate ??
+    null,
+});
 
 export async function getCivilCases(
   options?: CivilCasesFilterOptions,
@@ -175,6 +238,7 @@ export async function createCivilCase(
     const { caseData: casePayload, detailData } = splitCaseDataBySchema(
       caseData.data,
     );
+    const normalizedDetailData = withPreviousCivilRaffleDate(detailData);
 
     const requestedManual =
       typeof data.isManual === "boolean" ? data.isManual : true;
@@ -203,7 +267,7 @@ export async function createCivilCase(
           parsedCaseNumber.year,
         );
 
-        return tx.case.create({
+        const createdCase = await tx.case.create({
           data: {
             ...casePayload,
             caseType: CaseType.CIVIL,
@@ -213,10 +277,31 @@ export async function createCivilCase(
             year: next.year,
             isManual: false,
             civilCase: {
-              create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
+              create:
+              normalizedDetailData as Prisma.CivilCaseCreateWithoutCaseInput,
             },
           },
         });
+
+        await recordInitialCaseBranchHistory(tx, {
+          caseId: createdCase.id,
+          branch: casePayload.branch,
+          raffleDate:
+            normalizedDetailData.previousRaffleDate ??
+            normalizedDetailData.reRaffleDate ??
+            casePayload.dateFiled,
+          source: "manual",
+        });
+
+        await recordCivilDetailBranchHistory(
+          tx,
+          createdCase.id,
+          casePayload.branch,
+          normalizedDetailData,
+          "manual",
+        );
+
+        return createdCase;
       }
 
       const createdCase = await tx.case.create({
@@ -229,7 +314,8 @@ export async function createCivilCase(
           year: null,
           isManual: true,
           civilCase: {
-            create: detailData as Prisma.CivilCaseCreateWithoutCaseInput,
+            create:
+              normalizedDetailData as Prisma.CivilCaseCreateWithoutCaseInput,
           },
         },
       });
@@ -243,6 +329,24 @@ export async function createCivilCase(
           parsedCaseNumber.number,
         );
       }
+
+      await recordInitialCaseBranchHistory(tx, {
+        caseId: createdCase.id,
+        branch: casePayload.branch,
+        raffleDate:
+          normalizedDetailData.previousRaffleDate ??
+          normalizedDetailData.reRaffleDate ??
+          casePayload.dateFiled,
+        source: "manual",
+      });
+
+      await recordCivilDetailBranchHistory(
+        tx,
+        createdCase.id,
+        casePayload.branch,
+        normalizedDetailData,
+        "manual",
+      );
 
       return createdCase;
     });
@@ -346,6 +450,11 @@ export async function updateCivilCase(
       throw new Error("Case not found");
     }
 
+    const normalizedDetailData = withPreviousCivilRaffleDate(
+      detailData,
+      originalCase.civilCase ?? undefined,
+    );
+
     const updatedCase = await prisma.$transaction(async (tx) => {
       const caseUpdateData: Prisma.CaseUpdateInput = {
         ...casePayload,
@@ -377,12 +486,39 @@ export async function updateCivilCase(
 
       await tx.civilCase.upsert({
         where: { baseCaseID: caseId },
-        update: detailData,
+        update: normalizedDetailData,
         create: {
-          ...(detailData as Prisma.CivilCaseCreateWithoutCaseInput),
+          ...(normalizedDetailData as Prisma.CivilCaseCreateWithoutCaseInput),
           case: { connect: { id: caseId } },
         },
       });
+
+      await recordCaseBranchChange(tx, {
+        caseId,
+        previousBranch: originalCase.branch,
+        nextBranch: casePayload.branch,
+        originalRaffleDate:
+          originalCase.civilCase?.previousRaffleDate ??
+          originalCase.civilCase?.reRaffleDate ??
+          originalCase.dateFiled,
+        previousRaffleDate:
+          originalCase.civilCase?.reRaffleDate ??
+          originalCase.civilCase?.previousRaffleDate ??
+          originalCase.dateFiled,
+        nextRaffleDate:
+          normalizedDetailData.reRaffleDate ??
+          normalizedDetailData.previousRaffleDate ??
+          casePayload.dateFiled,
+        source: "manual",
+      });
+
+      await recordCivilDetailBranchHistory(
+        tx,
+        caseId,
+        originalCase.branch,
+        normalizedDetailData,
+        "manual",
+      );
 
       if (parsedCaseNumber) {
         await syncCaseCounterToAtLeast(

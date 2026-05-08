@@ -1,6 +1,7 @@
 import type ActionResult from "../ActionResult";
 import type { PaginatedResult } from "../Filter/FilterTypes";
 import type { CaseType } from "../generated/prisma/browser";
+import type { CaseBranchHistoryData } from "./CaseBranchHistory";
 import type {
   UnifiedCaseData,
   UnifiedCasesOptions,
@@ -18,4 +19,7 @@ export interface BaseCaseAdapter {
   getCaseStats: (
     options?: Pick<UnifiedCasesOptions, "caseType">,
   ) => Promise<ActionResult<UnifiedCaseStats>>;
+  getCaseBranchHistory?: (
+    caseId: string | number,
+  ) => Promise<ActionResult<CaseBranchHistoryData[]>>;
 }

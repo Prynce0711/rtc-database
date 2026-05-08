@@ -10,6 +10,8 @@ import {
   DetailSection,
   formatLongDate,
 } from "../CaseDetailsShared";
+import type { CaseBranchHistoryData } from "../CaseBranchHistory";
+import CaseBranchHistoryTimeline from "../CaseBranchHistoryTimeline";
 import NavButton from "../NavButton";
 import type { CivilCaseAdapter } from "./CivilCaseAdapter";
 import type { CivilCaseData } from "./CivilCaseSchema";
@@ -34,6 +36,9 @@ export default function CivilDetailsPage({
   const [caseData, setCaseData] = useState<CivilCaseData | null>(null);
   const [prevCase, setPrevCase] = useState<CivilCaseData | null>(null);
   const [nextCase, setNextCase] = useState<CivilCaseData | null>(null);
+  const [branchHistory, setBranchHistory] = useState<CaseBranchHistoryData[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,10 +47,13 @@ export default function CivilDetailsPage({
         setLoading(true);
         const numId = Number(idParam);
 
-        const [current, prev, next] = await Promise.allSettled([
+        const [current, prev, next, history] = await Promise.allSettled([
           adapter.getCivilCaseById(numId),
           adapter.getCivilCaseById(numId - 1),
           adapter.getCivilCaseById(numId + 1),
+          adapter.getCaseBranchHistory
+            ? adapter.getCaseBranchHistory(numId)
+            : Promise.resolve({ success: true, result: [] }),
         ]);
 
         if (current.status === "fulfilled" && current.value.success) {
@@ -64,6 +72,12 @@ export default function CivilDetailsPage({
           setNextCase(next.value.result);
         } else {
           setNextCase(null);
+        }
+
+        if (history.status === "fulfilled" && history.value.success) {
+          setBranchHistory(history.value.result);
+        } else {
+          setBranchHistory([]);
         }
       } catch (err) {
         console.error(err);
@@ -236,10 +250,32 @@ export default function CivilDetailsPage({
                 label="Date Filed"
                 value={formatLongDate(caseData.dateFiled)}
               />
+              <DetailField
+                label="Original Raffle Date"
+                value={formatLongDate(caseData.previousRaffleDate)}
+              />
+              <DetailField
+                label="Re-Raffle Date"
+                value={formatLongDate(caseData.reRaffleDate)}
+              />
+              <DetailField
+                label="Re-Raffle Branch"
+                value={caseData.reRaffleBranch}
+              />
+              <DetailField
+                label="Consolidation Date"
+                value={formatLongDate(caseData.consolitationDate)}
+              />
+              <DetailField
+                label="Consolidation Branch"
+                value={caseData.consolidationBranch}
+              />
               <DetailField label="Notes/Appealed" value={caseData.notes} />
               <DetailField label="Nature of Petition" value={caseData.nature} />
             </div>
           </DetailSection>
+
+          <CaseBranchHistoryTimeline history={branchHistory} />
         </div>
 
         <div className="h-px bg-base-200" />

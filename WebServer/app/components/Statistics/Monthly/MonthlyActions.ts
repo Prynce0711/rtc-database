@@ -1,247 +1,337 @@
 "use server";
-import Roles from "@/app/lib/Roles";
-import { validateSession } from "@/app/lib/authActions";
-import { prisma } from "@/app/lib/prisma";
-import { ActionResult } from "@rtc-database/shared";
-import { LogAction } from "@rtc-database/shared/prisma/enums";
-import { prettifyError, z } from "zod";
-import { createLog } from "../../ActivityLogs/LogActions";
-import { MonthlyRow, MonthlyRowSchema } from "./Schema";
 
-// ─── Get ────────────────────────────────────────────────────────────────────
+import type {
+  ActionResult,
+  CivilCaseData,
+  CriminalCaseData,
+} from "@rtc-database/shared";
+import { getCivilCases } from "../../Case/Civil/CivilActions";
+import { getCriminalCases } from "../../Case/Criminal/CriminalCasesActions";
+import type { MonthlyRow } from "./Schema";
+
+type MonthlyCategory =
+  | "New Cases Filed"
+  | "Cases Disposed"
+  | "Pending Cases";
+
+type CountedCaseKind = "criminal" | "civil";
+type PreviousRaffleDateSource = {
+  previousRaffleDate?: Date | string | null;
+};
+
+const MONTHLY_CASE_PAGE_SIZE = 100000;
+const CATEGORY_ORDER: MonthlyCategory[] = [
+  "New Cases Filed",
+  "Cases Disposed",
+  "Pending Cases",
+];
+
+const isMonthValue = (month: string): boolean =>
+  /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+
+const toMonthValue = (date: Date): string => {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${date.getFullYear()}-${month}`;
+};
+
+const parseMonthEnd = (month: string): Date => {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+  if (!match) {
+    throw new Error("Month must be in YYYY-MM format");
+  }
+
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+
+  if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) {
+    throw new Error("Invalid month");
+  }
+
+  return new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+};
+
+const asDate = (value: Date | string | null | undefined): Date | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const normalizeBranch = (value: unknown): string =>
+  String(value ?? "").trim();
+
+const getPreviousRaffleDate = (
+  caseItem: unknown,
+): Date | string | null | undefined =>
+  (caseItem as PreviousRaffleDateSource).previousRaffleDate;
+
+const compareBranch = (a: string, b: string): number => {
+  const aNumber = Number(a);
+  const bNumber = Number(b);
+
+  if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
+    return aNumber - bNumber;
+  }
+
+  return a.localeCompare(b, undefined, { numeric: true });
+};
+
+const getCategoriesForCase = ({
+  currentDate,
+  dateFiled,
+  previousRaffleDate,
+  updatedRaffleDate,
+  branch,
+}: {
+  currentDate: Date;
+  dateFiled?: Date | string | null;
+  previousRaffleDate?: Date | string | null;
+  updatedRaffleDate?: Date | string | null;
+  branch?: string | null;
+}): MonthlyCategory[] => {
+  const filed = asDate(dateFiled);
+  if (filed && filed.getTime() > currentDate.getTime()) {
+    return [];
+  }
+
+  const original =
+    asDate(previousRaffleDate) ?? asDate(updatedRaffleDate) ?? filed;
+  if (!original) {
+    return [];
+  }
+
+  const updated = asDate(updatedRaffleDate) ?? original;
+  const hasBranch = Boolean(normalizeBranch(branch));
+  const currentTime = currentDate.getTime();
+  const originalTime = original.getTime();
+  const updatedTime = updated.getTime();
+  const categories: MonthlyCategory[] = [];
+
+  if (currentTime <= originalTime && !hasBranch) {
+    categories.push("New Cases Filed");
+  }
+
+  if (
+    (currentTime > originalTime && !hasBranch) ||
+    (currentTime <= updatedTime && !hasBranch)
+  ) {
+    categories.push("Pending Cases");
+  }
+
+  if (
+    (currentTime > originalTime && hasBranch) ||
+    (currentTime > updatedTime && hasBranch)
+  ) {
+    categories.push("Cases Disposed");
+  }
+
+  return categories;
+};
+
+const buildLiveMonthlyRows = (
+  month: string,
+  criminalCases: CriminalCaseData[],
+  civilCases: CivilCaseData[],
+): Omit<MonthlyRow, "id">[] => {
+  const currentDate = parseMonthEnd(month);
+  const rowsByKey = new Map<string, Omit<MonthlyRow, "id">>();
+  const countedCaseKeys = new Set<string>();
+
+  const addCount = (
+    category: MonthlyCategory,
+    branch: string,
+    kind: CountedCaseKind,
+    caseId: string | number,
+  ) => {
+    const branchLabel = branch || "Unassigned";
+    const countedKey = `${category}|${branchLabel}|${kind}|${caseId}`;
+    if (countedCaseKeys.has(countedKey)) return;
+    countedCaseKeys.add(countedKey);
+
+    const key = `${category}|${branchLabel}`;
+    const existing =
+      rowsByKey.get(key) ??
+      ({
+        month,
+        category,
+        branch: branchLabel,
+        criminal: 0,
+        civil: 0,
+        total: 0,
+      } satisfies Omit<MonthlyRow, "id">);
+
+    existing[kind] += 1;
+    existing.total = existing.criminal + existing.civil;
+    rowsByKey.set(key, existing);
+  };
+
+  criminalCases.forEach((caseItem) => {
+    const branch = normalizeBranch(caseItem.branch);
+    const categories = getCategoriesForCase({
+      currentDate,
+      dateFiled: caseItem.dateFiled,
+      previousRaffleDate: getPreviousRaffleDate(caseItem),
+      updatedRaffleDate: caseItem.raffleDate,
+      branch,
+    });
+
+    categories.forEach((category) =>
+      addCount(category, branch, "criminal", caseItem.id),
+    );
+  });
+
+  civilCases.forEach((caseItem) => {
+    const branch = normalizeBranch(caseItem.branch);
+    const categories = getCategoriesForCase({
+      currentDate,
+      dateFiled: caseItem.dateFiled,
+      previousRaffleDate: getPreviousRaffleDate(caseItem),
+      updatedRaffleDate: caseItem.reRaffleDate,
+      branch,
+    });
+
+    categories.forEach((category) =>
+      addCount(category, branch, "civil", caseItem.id),
+    );
+  });
+
+  return Array.from(rowsByKey.values()).sort((a, b) => {
+    const categoryDiff =
+      CATEGORY_ORDER.indexOf(a.category as MonthlyCategory) -
+      CATEGORY_ORDER.indexOf(b.category as MonthlyCategory);
+    return categoryDiff || compareBranch(a.branch, b.branch);
+  });
+};
+
+const withRowIds = (rows: Omit<MonthlyRow, "id">[]): MonthlyRow[] =>
+  rows.map((row, index) => ({
+    id: index + 1,
+    ...row,
+  }));
+
+const getMonthRangeFromCases = (
+  criminalCases: CriminalCaseData[],
+  civilCases: CivilCaseData[],
+): string[] => {
+  const now = new Date();
+  const nowTime = now.getTime();
+  let earliestTime: number | null = null;
+
+  const collect = (value: Date | string | null | undefined) => {
+    const date = asDate(value);
+    if (!date) return;
+
+    const time = date.getTime();
+    if (time > nowTime) return;
+
+    if (earliestTime === null || time < earliestTime) {
+      earliestTime = time;
+    }
+  };
+
+  criminalCases.forEach((caseItem) => {
+    collect(caseItem.dateFiled);
+    collect(getPreviousRaffleDate(caseItem));
+    collect(caseItem.raffleDate);
+  });
+
+  civilCases.forEach((caseItem) => {
+    collect(caseItem.dateFiled);
+    collect(getPreviousRaffleDate(caseItem));
+    collect(caseItem.reRaffleDate);
+  });
+
+  if (earliestTime === null) {
+    return [toMonthValue(now)];
+  }
+
+  const months: string[] = [];
+  const earliest = new Date(earliestTime);
+  const cursor = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  while (cursor.getTime() <= end.getTime()) {
+    months.push(toMonthValue(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return months;
+};
+
+const getMonthlyCases = async (): Promise<
+  ActionResult<{
+    criminalCases: CriminalCaseData[];
+    civilCases: CivilCaseData[];
+  }>
+> => {
+  const [criminalResult, civilResult] = await Promise.all([
+    getCriminalCases({
+      page: 1,
+      pageSize: MONTHLY_CASE_PAGE_SIZE,
+      sortKey: "dateFiled",
+      sortOrder: "asc",
+    }),
+    getCivilCases({
+      page: 1,
+      pageSize: MONTHLY_CASE_PAGE_SIZE,
+      sortKey: "dateFiled",
+      sortOrder: "asc",
+    }),
+  ]);
+
+  if (!criminalResult.success) {
+    return { success: false, error: criminalResult.error };
+  }
+
+  if (!civilResult.success) {
+    return { success: false, error: civilResult.error };
+  }
+
+  return {
+    success: true,
+    result: {
+      criminalCases: criminalResult.result.items,
+      civilCases: civilResult.result.items,
+    },
+  };
+};
+
+export async function getLiveMonthlyCaseStatistics(
+  month: string,
+): Promise<ActionResult<MonthlyRow[]>> {
+  return getMonthlyStatistics(month);
+}
 
 export async function getMonthlyStatistics(
   month?: string,
 ): Promise<ActionResult<MonthlyRow[]>> {
   try {
-    const sessionValidation = await validateSession();
-    if (!sessionValidation.success) return sessionValidation;
+    if (month && !isMonthValue(month)) {
+      return { success: true, result: [] };
+    }
 
-    const orderBy = month
-      ? [{ id: "asc" as const }]
-      : [{ month: "desc" as const }, { id: "asc" as const }];
+    const casesResult = await getMonthlyCases();
+    if (!casesResult.success) {
+      return casesResult;
+    }
 
-    const rows = await prisma.monthlyStatistics.findMany({
-      where: month ? { month } : undefined,
-      orderBy,
-    });
+    const { criminalCases, civilCases } = casesResult.result;
+    const months = month
+      ? [month]
+      : getMonthRangeFromCases(criminalCases, civilCases).reverse();
 
     return {
       success: true,
-      result: rows.map((r) => ({
-        id: r.id,
-        month: r.month,
-        category: r.category,
-        branch: r.branch,
-        criminal: r.criminal,
-        civil: r.civil,
-        total: r.total,
-      })),
+      result: withRowIds(
+        months.flatMap((monthValue) =>
+          buildLiveMonthlyRows(monthValue, criminalCases, civilCases),
+        ),
+      ),
     };
   } catch (error) {
-    console.error("Error fetching monthly statistics:", error);
-    return { success: false, error: "Failed to fetch monthly statistics" };
-  }
-}
-
-// ─── Create ─────────────────────────────────────────────────────────────────
-
-export async function createMonthlyStatistic(
-  data: MonthlyRow,
-): Promise<ActionResult<MonthlyRow>> {
-  try {
-    const sessionValidation = await validateSession([
-      Roles.ADMIN,
-      Roles.STATISTICS,
-    ]);
-    if (!sessionValidation.success) return sessionValidation;
-
-    const validation = MonthlyRowSchema.safeParse(data);
-    if (!validation.success) {
-      return { success: false, error: prettifyError(validation.error) };
-    }
-
-    const record = await prisma.monthlyStatistics.create({
-      data: {
-        month: validation.data.month,
-        category: validation.data.category,
-        branch: validation.data.branch,
-        criminal: validation.data.criminal,
-        civil: validation.data.civil,
-        total: validation.data.total,
-      },
-    });
-
-    await createLog({
-      action: LogAction.CREATE_STATISTICS,
-      details: { id: record.id, type: "monthly" },
-    });
-
-    return { success: true, result: record };
-  } catch (error) {
-    console.error("Error creating monthly statistic:", error);
-    return { success: false, error: "Failed to create monthly statistic" };
-  }
-}
-
-// ─── Update ─────────────────────────────────────────────────────────────────
-
-export async function updateMonthlyStatistic(
-  id: number,
-  data: MonthlyRow,
-): Promise<ActionResult<MonthlyRow>> {
-  try {
-    const sessionValidation = await validateSession([
-      Roles.ADMIN,
-      Roles.STATISTICS,
-    ]);
-    if (!sessionValidation.success) return sessionValidation;
-
-    const validation = MonthlyRowSchema.safeParse(data);
-    if (!validation.success) {
-      return { success: false, error: prettifyError(validation.error) };
-    }
-
-    const existing = await prisma.monthlyStatistics.findUnique({
-      where: { id },
-    });
-
-    const record = await prisma.monthlyStatistics.update({
-      where: { id },
-      data: {
-        month: validation.data.month,
-        category: validation.data.category,
-        branch: validation.data.branch,
-        criminal: validation.data.criminal,
-        civil: validation.data.civil,
-        total: validation.data.total,
-      },
-    });
-
-    await createLog({
-      action: LogAction.UPDATE_STATISTICS,
-      details: { id, type: "monthly", from: existing, to: record },
-    });
-
-    return { success: true, result: record };
-  } catch (error) {
-    console.error("Error updating monthly statistic:", error);
-    return { success: false, error: "Failed to update monthly statistic" };
-  }
-}
-
-// ─── Delete (single row by id) ───────────────────────────────────────────────
-
-export async function deleteMonthlyStatistic(
-  id: number,
-): Promise<ActionResult<void>> {
-  try {
-    const sessionValidation = await validateSession([
-      Roles.ADMIN,
-      Roles.STATISTICS,
-    ]);
-    if (!sessionValidation.success) return sessionValidation;
-
-    await prisma.monthlyStatistics.delete({ where: { id } });
-    await createLog({
-      action: LogAction.DELETE_STATISTICS,
-      details: { id, type: "monthly" },
-    });
-    return { success: true, result: undefined };
-  } catch (error) {
-    console.error("Error deleting monthly statistic:", error);
-    return { success: false, error: "Failed to delete monthly statistic" };
-  }
-}
-
-// ─── Upsert (bulk, used by import / AddReportPage) ──────────────────────────
-
-export async function upsertMonthlyStatistics(
-  rows: MonthlyRow[],
-): Promise<ActionResult<{ upserted: number }>> {
-  try {
-    const sessionValidation = await validateSession([
-      Roles.ADMIN,
-      Roles.STATISTICS,
-    ]);
-    if (!sessionValidation.success) return sessionValidation;
-
-    const validation = z.array(MonthlyRowSchema).safeParse(rows);
-    if (!validation.success) {
-      return { success: false, error: prettifyError(validation.error) };
-    }
-
-    const results: MonthlyRow[] = [];
-
-    // Run upserts sequentially so new records keep the same order as the
-    // submitted rows from AddReport preview/import.
-    for (const r of validation.data) {
-      const saved = await prisma.monthlyStatistics.upsert({
-        where: {
-          month_category_branch: {
-            month: r.month,
-            category: r.category,
-            branch: r.branch,
-          },
-        },
-        update: { criminal: r.criminal, civil: r.civil, total: r.total },
-        create: {
-          month: r.month,
-          category: r.category,
-          branch: r.branch,
-          criminal: r.criminal,
-          civil: r.civil,
-          total: r.total,
-        },
-      });
-
-      results.push({
-        id: saved.id,
-        month: saved.month,
-        category: saved.category,
-        branch: saved.branch,
-        criminal: saved.criminal,
-        civil: saved.civil,
-        total: saved.total,
-      });
-    }
-
-    await createLog({
-      action: LogAction.IMPORT_STATISTICS,
-      details: { type: "monthly", count: results.length },
-    });
-
-    return { success: true, result: { upserted: results.length } };
-  } catch (error) {
-    console.error("Error upserting monthly statistics:", error);
-    return { success: false, error: "Failed to save monthly statistics" };
-  }
-}
-
-// ─── Clear (delete by month or all) ─────────────────────────────────────────
-
-export async function clearMonthlyStatistics(
-  month?: string,
-): Promise<ActionResult<{ deleted: number }>> {
-  try {
-    const sessionValidation = await validateSession([
-      Roles.ADMIN,
-      Roles.STATISTICS,
-    ]);
-    if (!sessionValidation.success) return sessionValidation;
-
-    const { count } = await prisma.monthlyStatistics.deleteMany({
-      where: month ? { month } : undefined,
-    });
-
-    await createLog({
-      action: LogAction.CLEAR_STATISTICS,
-      details: { type: "monthly", month: month ?? null, count },
-    });
-
-    return { success: true, result: { deleted: count } };
-  } catch (error) {
-    console.error("Error clearing monthly statistics:", error);
-    return { success: false, error: "Failed to clear monthly statistics" };
+    console.error("Error calculating monthly statistics:", error);
+    return {
+      success: false,
+      error: "Failed to calculate monthly statistics",
+    };
   }
 }

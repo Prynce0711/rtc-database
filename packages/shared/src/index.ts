@@ -7,6 +7,8 @@ export { default as DefaultLoading } from "./DefaultLoading";
 export * from "./Case/Archives";
 export * from "./Case/BaseCaseAdapter";
 export * from "./Case/BaseCaseSchema";
+export * from "./Case/CaseBranchHistory";
+export { default as CaseBranchHistoryTimeline } from "./Case/CaseBranchHistoryTimeline";
 export * from "./Case/CaseDetailsShared";
 export * from "./Case/importPreview";
 export { default as CaseEntryToolbar } from "./Case/CaseEntryToolbar";

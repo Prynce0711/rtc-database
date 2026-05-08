@@ -156,6 +156,7 @@ model Case {
   unloadedCase      UnloadedCase[]
   consolidatedCase  ConsolidatedCase[]
   reraffledCase     ReraffledCase[]
+  branchHistory     CaseBranchHistory[]
 
   @@unique([caseType, year, area, number])
 }
@@ -183,6 +184,7 @@ model CriminalCase {
   consolidation  String?
   eqcNumber      String?
   bond           String?
+  previousRaffleDate DateTime?
   raffleDate     DateTime?
   committee1     String?
   committee2     String?
@@ -220,6 +222,7 @@ model CivilCase {
   notes               String?
   nature              String?
   originCaseNumber    String?
+  previousRaffleDate  DateTime?
   reRaffleDate        DateTime?
   reRaffleBranch      String?
   consolitationDate   DateTime?
@@ -400,6 +403,27 @@ model ReraffledCase{
 
   case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
   @@unique([updatedAt, id])
+}
+
+model CaseBranchHistory {
+  id           Int       @id @default(autoincrement())
+  baseCaseID   Int
+  eventType    String    @default("BRANCH_UPDATE")
+  fromBranch   String?
+  toBranch     String?
+  raffleDate   DateTime?
+  notes        String?
+  source       String?
+  fingerprint  String    @unique
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  case Case @relation(fields: [baseCaseID], references: [id], onDelete: Cascade)
+
+  @@index([baseCaseID])
+  @@index([eventType])
+  @@index([raffleDate])
 }
 
 

@@ -51,6 +51,17 @@ const CivilCaseObjectSchema = z.object({
         "MTC-Case Number",
       ]),
     ),
+  previousRaffleDate: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Previous Raffle Date",
+        "Previous Raffled Date",
+        "Prior Raffle Date",
+      ]),
+    ),
   reRaffleDate: z.coerce
     .date()
     .nullable()
@@ -119,6 +130,7 @@ export const initialCaseFormData: Omit<CivilCaseSchema, "id" | "createdAt"> = {
   notes: null,
   nature: null,
   originCaseNumber: null,
+  previousRaffleDate: null,
   reRaffleDate: null,
   reRaffleBranch: null,
   consolitationDate: null,

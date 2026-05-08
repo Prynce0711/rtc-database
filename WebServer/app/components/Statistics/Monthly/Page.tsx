@@ -1,19 +1,12 @@
 "use client";
 
 import { useSession } from "@/app/lib/authClient";
-import Roles from "@/app/lib/Roles";
-import { RadioButton, RedirectingUI, usePopup } from "@rtc-database/shared";
+import { RadioButton, RedirectingUI } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
-import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
+import { FiCalendar, FiDownload, FiFileText } from "react-icons/fi";
 import * as XLSX from "xlsx";
-import {
-  deleteMonthlyStatistic,
-  getMonthlyStatistics,
-  upsertMonthlyStatistics,
-} from "./MonthlyActions";
+import { getLiveMonthlyCaseStatistics } from "./MonthlyActions";
 import type { MonthlyRow } from "./Schema";
-
-import AddReportPage from "./AddReportPage";
 
 import MonthlyTable from "./MonthlyTable";
 // import MonthlyToolbar from "./MonthlyToolbar";
@@ -55,11 +48,6 @@ const categoryViews: {
 
 export default function MonthlyPage() {
   const session = useSession();
-  const statusPopup = usePopup();
-
-  const canManageStats =
-    session?.data?.user?.role === Roles.ADMIN ||
-    session?.data?.user?.role === Roles.STATISTICS;
 
   // const [selectedMonth, setSelectedMonth] = useState(
   //   new Date().toISOString().slice(0, 7),
@@ -72,85 +60,43 @@ export default function MonthlyPage() {
 
   const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
   const selectedDate = `${selectedYear}-${selectedMonth}`;
+  const isSelectedDateValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(selectedDate);
 
-  const [search, setSearch] = useState("");
+  const [search] = useState("");
   const [activeCategoryView, setActiveCategoryView] =
     useState<MonthlyCategoryView>("New Cases Filed");
-  const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
-  const [showAddPage, setShowAddPage] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
-    null,
-  );
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const toggleSelect = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    const allIds = filteredData.filter((r) => r.id != null).map((r) => r.id!);
-    setSelectedIds((prev) => {
-      const allSelected = allIds.every((id) => prev.has(id));
-      return allSelected ? new Set() : new Set(allIds);
-    });
-  };
-
-  const cancelSelection = () => {
-    setSelectionMode(null);
-    setSelectedIds(new Set());
-  };
-
-  const confirmSelection = async () => {
-    if (!canManageStats) return;
-    if (selectedIds.size === 0) return;
-
-    if (selectionMode === "delete") {
-      const confirmed = window.confirm(
-        `Delete ${selectedIds.size} selected row(s)?`,
-      );
-      if (!confirmed) return;
-      await Promise.all(
-        Array.from(selectedIds).map((id) => deleteMonthlyStatistic(id)),
-      );
-      const fresh = await getMonthlyStatistics(selectedDate);
-      if (fresh.success) setImportedData(fresh.result);
-    } else if (selectionMode === "edit") {
-      const selected = filteredData.filter(
-        (r) => r.id != null && selectedIds.has(r.id),
-      );
-      setEditMode(true);
-      setShowAddPage(true);
-      // Store selected data for AddReportPage — done via editMode + initialData filtering
-      setImportedData(() => {
-        // Keep only selected rows for edit context
-        return selected;
-      });
-    }
-
-    cancelSelection();
-  };
-
-  /* ---- Load from DB whenever selectedMonth changes ---- */
+  const [monthlyData, setMonthlyData] = useState<MonthlyRow[]>([]);
+  /* ---- Calculate from live cases whenever selectedMonth changes ---- */
 
   useEffect(() => {
-    getMonthlyStatistics(selectedDate).then((res) => {
-      if (res.success) setImportedData(res.result);
-    });
-  }, [selectedDate]);
+    if (!isSelectedDateValid) {
+      return;
+    }
 
-  const monthlyData = useMemo(() => {
-    const all = importedData ?? [];
-    return all.filter((r) => r.month === selectedDate);
-  }, [importedData, selectedDate]);
+    let cancelled = false;
+
+    getLiveMonthlyCaseStatistics(selectedDate).then((res) => {
+      if (!cancelled) {
+        setMonthlyData(res.success ? res.result : []);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSelectedDateValid, selectedDate]);
+
+  const selectedMonthData = useMemo(
+    () =>
+      isSelectedDateValid
+        ? monthlyData.filter((r) => r.month === selectedDate)
+        : [],
+    [isSelectedDateValid, monthlyData, selectedDate],
+  );
 
   /* ---------- derived ---------- */
 
-  const byCategory = monthlyData.filter(
+  const byCategory = selectedMonthData.filter(
     (r) => r.category === activeCategoryView,
   );
   const filteredData = !search.trim()
@@ -166,10 +112,12 @@ export default function MonthlyPage() {
         );
       });
 
-  const monthLabel = new Date(selectedDate + "-01").toLocaleDateString(
-    "en-US",
-    { month: "long", year: "numeric" },
-  );
+  const monthLabel = isSelectedDateValid
+    ? new Date(selectedDate + "-01").toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "Select a valid year";
 
   /* ---------- helpers ---------- */
 
@@ -204,48 +152,10 @@ export default function MonthlyPage() {
     return <RedirectingUI titleText="Loading monthly statistics..." />;
   }
 
-  if (showAddPage) {
-    return (
-      <AddReportPage
-        month={selectedDate}
-        initialCategory={activeCategoryView}
-        initialData={editMode ? monthlyData : undefined}
-        onBack={() => {
-          setShowAddPage(false);
-          setEditMode(false);
-        }}
-        onSave={async (newRows) => {
-          statusPopup.showLoading("Saving monthly report...");
-          try {
-            const res = await upsertMonthlyStatistics(newRows);
-            if (res.success) {
-              const savedMonth = newRows[0]?.month ?? selectedDate;
-              const fresh = await getMonthlyStatistics(savedMonth);
-              if (fresh.success) {
-                setImportedData(fresh.result);
-                setSelectedMonth(savedMonth);
-              }
-              statusPopup.showSuccess("Monthly report saved successfully.");
-            } else {
-              statusPopup.showError(res.error ?? "Save failed.");
-            }
-          } catch (error) {
-            statusPopup.showError(
-              error instanceof Error ? error.message : "Save failed.",
-            );
-          }
-          setShowAddPage(false);
-          setEditMode(false);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* ── HEADER ── */}
-      {!showAddPage && (
-        <header className="card bg-base-100 shadow-xl">
+      <header className="card bg-base-100 shadow-xl">
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
@@ -308,25 +218,16 @@ export default function MonthlyPage() {
                   <button
                     className="btn btn-outline btn-info btn-md gap-2"
                     onClick={handleExport}
+                    disabled={!isSelectedDateValid || filteredData.length === 0}
                   >
                     <FiDownload className="h-5 w-5" />
                     Export
                   </button>
-                  {canManageStats && (
-                    <button
-                      className="btn btn-success btn-md gap-2"
-                      onClick={() => setShowAddPage(true)}
-                    >
-                      <FiPlus className="h-5 w-5" />
-                      Add Report
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
           </div>
-        </header>
-      )}
+      </header>
 
       {/* ── CATEGORY VIEW SELECTOR ── */}
       <div className="flex justify-start overflow-x-auto pb-1">
@@ -349,13 +250,7 @@ export default function MonthlyPage() {
       /> */}
 
       {/* ── TABLE ── */}
-      <MonthlyTable
-        data={filteredData}
-        selectionMode={selectionMode}
-        selectedIds={selectedIds}
-        onToggleSelect={toggleSelect}
-        onToggleAll={toggleAll}
-      />
+      <MonthlyTable data={filteredData} />
 
       {/* ── FOOTER ── */}
       <p className="text-xs text-base-content/40 text-right">

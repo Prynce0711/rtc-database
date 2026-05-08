@@ -85,12 +85,6 @@ const CASE_VIEW_OPTIONS = [
 
 type CaseView = (typeof CASE_VIEW_OPTIONS)[number]["key"];
 
-const getInitialCaseView = (): CaseView => {
-  if (typeof window === "undefined") return "criminal";
-  const view = new URLSearchParams(window.location.search).get("view");
-  return view === "appealed" ? "appealed" : "criminal";
-};
-
 const formatAppealedValue = (
   record: CriminalAppealedCaseData,
   field: (typeof CRIMINAL_APPEALED_CASE_FIELDS)[number],
@@ -434,7 +428,7 @@ const CriminalCasePage: React.FC<{
     null,
   );
   const isSelecting = selectionMode !== null;
-  const [caseView, setCaseView] = useState<CaseView>(getInitialCaseView);
+  const [caseView, setCaseView] = useState<CaseView>("criminal");
 
   const urlFilterState = useMemo(
     () => getFilterStateFromSearchParams(searchParams),
@@ -519,12 +513,14 @@ const CriminalCasePage: React.FC<{
   // const initialPage = Number(params.get("page")) || 1;
 
   // const [currentPage, setCurrentPage] = useState(initialPage);
-  const [currentPage, setCurrentPage] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return Number(params.get("page")) || 1;
-  });
+  const [currentPage, setCurrentPage] = useState(1);
 
   const pageSize = 10;
+
+  useEffect(() => {
+    const nextPage = Number(searchParams.get("page")) || 1;
+    setCurrentPage((prev) => (prev === nextPage ? prev : nextPage));
+  }, [searchParams]);
 
   // useEffect(() => {
   //   setCurrentPage(currentPage);

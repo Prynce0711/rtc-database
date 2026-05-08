@@ -39,7 +39,8 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
         />
       </div>
 
-      {isSelecting ? (
+      {/* Actions (now in the position where All Categories used to be) */}
+      {isSelecting && (
         <div className="flex items-center gap-2 ml-3">
           <span className="text-xs text-base-content/40 tabular-nums">
             {selectedCount} selected
@@ -61,8 +62,6 @@ const MonthlyToolbar: React.FC<MonthlyToolbarProps> = ({
             <FiX className="h-4 w-4" />
           </button>
         </div>
-      ) : (
-        <div className="ml-3" />
       )}
 
       <span className="ml-auto text-sm text-base-content/50 tabular-nums font-medium">

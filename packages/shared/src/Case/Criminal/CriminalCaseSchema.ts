@@ -56,6 +56,17 @@ const CriminalCaseObjectSchema = z.object({
     .nullable()
     .optional()
     .describe(excelHeaders(["Bond", "BOND"])),
+  previousRaffleDate: z.coerce
+    .date()
+    .nullable()
+    .optional()
+    .describe(
+      excelHeaders([
+        "Previous Raffle Date",
+        "Previous Raffled Date",
+        "Prior Raffle Date",
+      ]),
+    ),
   raffleDate: z.coerce
     .date()
     .nullable()
@@ -206,6 +217,7 @@ export const initialCaseFormData: Omit<CriminalCaseSchema, "id" | "createdAt"> =
     consolidation: null,
     eqcNumber: null,
     bond: null,
+    previousRaffleDate: null,
     raffleDate: null,
     committee1: null,
     committee2: null,
