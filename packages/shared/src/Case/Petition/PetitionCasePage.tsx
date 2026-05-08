@@ -355,7 +355,11 @@ const PetitionCasePage: React.FC<{
       try {
         statusPopup.showLoading("Uploading Excel directly...");
 
-        const result = await adapter.uploadPetitionExcel(file, false, "create");
+        const result = await adapter.uploadPetitionExcel(
+          file,
+          false,
+          "update-existing",
+        );
         const failedExcel = result.success
           ? result.result?.failedExcel
           : result.errorResult?.failedExcel;
@@ -388,7 +392,7 @@ const PetitionCasePage: React.FC<{
 
     if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
       const shouldUploadDirectly = await statusPopup.showConfirm(
-        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Create duplicate" mode instead?`,
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Update existing" mode instead?`,
       );
 
       if (shouldUploadDirectly) {
@@ -427,7 +431,7 @@ const PetitionCasePage: React.FC<{
         shouldPreferDirectCaseImportByRowCount(result.rows.length)
       ) {
         const shouldUploadDirectly = await statusPopup.showConfirm(
-          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Create duplicate" mode instead?`,
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Update existing" mode instead?`,
         );
 
         if (shouldUploadDirectly) {
@@ -439,7 +443,7 @@ const PetitionCasePage: React.FC<{
       if (!saveCaseImportDraft(CASE_IMPORT_DRAFT_KEYS.petition, result.rows)) {
         if (supportsDirectExcelUpload) {
           const shouldUploadDirectly = await statusPopup.showConfirm(
-            'This import is too large to stage in the browser. Upload it directly to the database in "Create duplicate" mode instead?',
+            'This import is too large to stage in the browser. Upload it directly to the database in "Update existing" mode instead?',
           );
 
           if (shouldUploadDirectly) {

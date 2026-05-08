@@ -113,6 +113,33 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     disableSignUp: process.env.NODE_ENV === "production", // Disable sign-up in production
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      await sendEmail(
+        user.email,
+        "Reset your RTC Database password",
+        [
+          `Hello ${user.name || "there"},`,
+          "",
+          "We received a request to reset your RTC Database password.",
+          "",
+          "Open this link to choose a new password:",
+          url,
+          "",
+          "This link expires in 1 hour. If you did not request this, you can ignore this email.",
+        ].join("\n"),
+      );
+    },
+    onPasswordReset: async ({ user }) => {
+      await prisma.log.create({
+        data: {
+          action: LogAction.RESET_PASSWORD,
+          userId: user.id,
+          details: { id: user.id, email: user.email },
+        },
+      });
+    },
   },
   plugins: [
     admin(),
@@ -184,7 +211,10 @@ export const auth = betterAuth({
   },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      if (ctx.path.startsWith("/") && ctx.method === "POST") {
+      if (
+        ctx.method === "POST" &&
+        (ctx.path.startsWith("/sign-in") || ctx.path.includes("sign-in"))
+      ) {
         const email = ctx.body?.email;
         const success = ctx.context.newSession?.user ? true : false;
 
@@ -215,14 +245,14 @@ export const auth = betterAuth({
           const email =
             typeof ctx.body?.email === "string" ? ctx.body.email : undefined;
 
-          let createdUserId =
-            typeof (ctx.context.newSession?.user as any)?.id === "string"
-              ? (ctx.context.newSession?.user as any).id
-              : undefined;
-          let createdUserRole =
-            typeof (ctx.context.newSession?.user as any)?.role === "string"
-              ? (ctx.context.newSession?.user as any).role
-              : undefined;
+          let createdUserId = getStringProperty(
+            ctx.context.newSession?.user,
+            "id",
+          );
+          let createdUserRole = getStringProperty(
+            ctx.context.newSession?.user,
+            "role",
+          );
 
           if ((!createdUserId || !createdUserRole) && email) {
             const createdUser = await prisma.user.findUnique({
@@ -249,20 +279,22 @@ export const auth = betterAuth({
 
       // Defensive: ensure any session user ids are safe to JSON.stringify
       try {
-        if (ctx.context.newSession && ctx.context.newSession.user) {
-          const uid = (ctx.context.newSession.user as any).id;
+        const newSessionUser = asMutableRecord(ctx.context.newSession?.user);
+        if (newSessionUser) {
+          const uid = newSessionUser.id;
           if (typeof uid === "bigint") {
-            (ctx.context.newSession.user as any).id = String(uid);
+            newSessionUser.id = String(uid);
           }
         }
-        if (ctx.context.session && ctx.context.session.user) {
-          const sid = (ctx.context.session.user as any).id;
+        const sessionUser = asMutableRecord(ctx.context.session?.user);
+        if (sessionUser) {
+          const sid = sessionUser.id;
           if (typeof sid === "bigint") {
-            (ctx.context.session.user as any).id = String(sid);
+            sessionUser.id = String(sid);
           }
         }
-      } catch (e) {
-        // ignore failures here — non-critical
+      } catch {
+        // Ignore failures here; this is non-critical cleanup.
       }
     }),
     before: createAuthMiddleware(async (ctx) => {

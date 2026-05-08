@@ -373,7 +373,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         const result = await adapter.uploadSpecialProceedingExcel(
           file,
           false,
-          "create",
+          "update-existing",
         );
         const failedExcel = result.success
           ? result.result?.failedExcel
@@ -407,7 +407,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
 
     if (supportsDirectExcelUpload && shouldPreferDirectCaseImport(file)) {
       const shouldUploadDirectly = await popup.showConfirm(
-        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Create duplicate" mode instead?`,
+        `This file is ${formatImportFileSize(file.size)}. Loading it into the browser may be slow. Upload it directly to the database in "Update existing" mode instead?`,
       );
 
       if (shouldUploadDirectly) {
@@ -444,7 +444,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
         shouldPreferDirectCaseImportByRowCount(result.rows.length)
       ) {
         const shouldUploadDirectly = await popup.showConfirm(
-          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Create duplicate" mode instead?`,
+          `${result.rows.length.toLocaleString()} rows were loaded. Opening that many rows in the browser may still be slow. Upload them directly to the database in "Update existing" mode instead?`,
         );
 
         if (shouldUploadDirectly) {
@@ -461,7 +461,7 @@ const Proceedings: React.FC<{ adapter: SpecialProceedingAdapter }> = ({
       ) {
         if (supportsDirectExcelUpload) {
           const shouldUploadDirectly = await popup.showConfirm(
-            'This import is too large to stage in the browser. Upload it directly to the database in "Create duplicate" mode instead?',
+            'This import is too large to stage in the browser. Upload it directly to the database in "Update existing" mode instead?',
           );
 
           if (shouldUploadDirectly) {

@@ -8,6 +8,7 @@ import {
   useAnimation,
 } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
@@ -480,22 +481,30 @@ shadow-xl
             </motion.div>
 
             <motion.div
-              className="flex items-center gap-2 justify-start w-full"
+              className="flex items-center justify-between gap-3 w-full"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}
             >
-              <input
-                id="remember"
-                type="checkbox"
-                className="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isBusy}
-              />
-              <label htmlFor="remember" className="text-sm cursor-pointer">
-                Remember me
-              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="remember"
+                  type="checkbox"
+                  className="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isBusy}
+                />
+                <label htmlFor="remember" className="text-sm cursor-pointer">
+                  Remember me
+                </label>
+              </div>
+              <Link
+                href="/forgotpassword"
+                className="text-sm font-semibold text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
             </motion.div>
 
             <motion.button

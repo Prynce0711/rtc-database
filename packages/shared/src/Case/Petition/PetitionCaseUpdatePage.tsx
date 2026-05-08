@@ -502,7 +502,7 @@ const PetitionCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const [importConflictMode, setImportConflictMode] =
-    useState<ImportConflictMode>("create");
+    useState<ImportConflictMode>("update-existing");
   const supportsDirectExcelUpload =
     !isEdit && adapter.supportsDirectExcelUpload === true;
   const tableRef = useRef<HTMLDivElement>(null);

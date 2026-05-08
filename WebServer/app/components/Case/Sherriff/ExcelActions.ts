@@ -26,7 +26,7 @@ import { createLog } from "../../ActivityLogs/LogActions";
 export async function uploadSheriffExcel(
   file: File,
   overrideTemplateValidation = false,
-  conflictMode: CaseImportConflictMode = "create",
+  conflictMode: CaseImportConflictMode = "update-existing",
 ): Promise<ActionResult<UploadExcelResult, UploadExcelResult>> {
   try {
     const sessionResult = await validateSession([Roles.CRIMINAL, Roles.ADMIN]);

@@ -96,9 +96,8 @@ type ColDef = {
   mono?: boolean;
 };
 
-const REQUIRED_FIELDS: Array<"caseNumber" | "branch" | "petitioners"> = [
+const REQUIRED_FIELDS: Array<"caseNumber" | "petitioners"> = [
   "caseNumber",
-  "branch",
   "petitioners",
 ];
 
@@ -118,7 +117,6 @@ const FROZEN_COLS: ColDef[] = [
     placeholder: "18",
     type: "text",
     width: 160,
-    required: true,
   },
 ];
 
@@ -641,7 +639,7 @@ export const CivilCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const [importConflictMode, setImportConflictMode] =
-    useState<ImportConflictMode>("create");
+    useState<ImportConflictMode>("update-existing");
   const [uploading, setUploading] = useState(false);
   const supportsDirectExcelUpload =
     !isEdit && adapter.supportsDirectExcelUpload === true;

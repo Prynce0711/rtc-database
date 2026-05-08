@@ -5,7 +5,7 @@ import Roles from "@/app/lib/Roles";
 import { usePopup } from "@rtc-database/shared";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { FiEye, FiEyeOff, FiRefreshCcw } from "react-icons/fi";
+import { FiEye, FiEyeOff, FiKey, FiRefreshCcw } from "react-icons/fi";
 import { getSystemSettings, updateSystemSettings } from "../SettingsActions";
 import {
   InputField,
@@ -15,6 +15,7 @@ import {
   SettingsRow,
   Toggle,
 } from "../SettingsPrimitives";
+import ChangePasswordPopup from "./Security/ChangePasswordPopup";
 import Disable2FAPopup from "./Security/Disable2FAPopup";
 import Enable2FAPopup from "./Security/Enable2FAPopup";
 import RegenerateBackupCodesPopup from "./Security/RegenerateBackupCodesPopup";
@@ -22,20 +23,22 @@ import RegenerateBackupCodesPopup from "./Security/RegenerateBackupCodesPopup";
 const SecurityTab = ({ role }: { role: string }) => {
   const popup = usePopup();
   const session = useSession();
-  const [loadingPolicy, setLoadingPolicy] = useState(true);
+  const isAdmin = role === Roles.ADMIN;
+  const [loadingPolicy, setLoadingPolicy] = useState(isAdmin);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [twoFA, setTwoFA] = useState(
     session?.data?.user?.twoFactorEnabled || false,
   );
   const [showEnable2FAPopup, setShowEnable2FAPopup] = useState(false);
   const [showDisable2FAPopup, setShowDisable2FAPopup] = useState(false);
+  const [showChangePasswordPopup, setShowChangePasswordPopup] =
+    useState(false);
   const [showRegenerateBackupCodesPopup, setShowRegenerateBackupCodesPopup] =
     useState(false);
   const [sessionTimeout, setSessionTimeout] = useState("THIRTY_MINUTES");
   const [showPassword, setShowPassword] = useState(false);
   const [passwordExpiry, setPasswordExpiry] = useState("NEVER");
   const [lockoutThreshold, setLockoutThreshold] = useState("NONE");
-  const isAdmin = role === Roles.ADMIN;
 
   const handleTwoFAToggle = (value: boolean) => {
     if (value) {
@@ -64,7 +67,6 @@ const SecurityTab = ({ role }: { role: string }) => {
 
   useEffect(() => {
     if (!isAdmin) {
-      setLoadingPolicy(false);
       return;
     }
 
@@ -113,6 +115,21 @@ const SecurityTab = ({ role }: { role: string }) => {
         title="Password"
         description="Manage your account password and authentication."
       >
+        <SettingsRow
+          label="Account Password"
+          description="Change your password without leaving settings."
+        >
+          <button
+            type="button"
+            onClick={() => setShowChangePasswordPopup(true)}
+            className="btn btn-primary btn-sm rounded-lg gap-2"
+          >
+            <FiKey size={14} />
+            Change Password
+          </button>
+        </SettingsRow>
+        {false && (
+          <>
         <SettingsRow label="Current Password">
           <div className="relative">
             <InputField
@@ -145,6 +162,8 @@ const SecurityTab = ({ role }: { role: string }) => {
             placeholder="Confirm new password"
           />
         </SettingsRow>
+          </>
+        )}
       </SettingsCard>
 
       <SettingsCard
@@ -203,6 +222,12 @@ const SecurityTab = ({ role }: { role: string }) => {
         open={showRegenerateBackupCodesPopup}
         onClose={() => setShowRegenerateBackupCodesPopup(false)}
         onRegenerated={handleBackupCodesRegenerated}
+      />
+
+      <ChangePasswordPopup
+        open={showChangePasswordPopup}
+        onClose={() => setShowChangePasswordPopup(false)}
+        onChanged={() => popup.showSuccess("Password changed successfully.")}
       />
 
       {isAdmin && (

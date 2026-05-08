@@ -878,7 +878,7 @@ const CriminalCaseUpdatePage = ({
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
   const [importConflictMode, setImportConflictMode] =
-    useState<ImportConflictMode>("create");
+    useState<ImportConflictMode>("update-existing");
   const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);

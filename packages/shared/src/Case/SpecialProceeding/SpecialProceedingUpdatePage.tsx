@@ -481,7 +481,7 @@ const SpecialProceedingUpdatePage = ({
   >({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [importConflictMode, setImportConflictMode] =
-    useState<ImportConflictMode>("create");
+    useState<ImportConflictMode>("update-existing");
   const supportsDirectExcelUpload =
     !isEdit && adapter.supportsDirectExcelUpload === true;
   const [defaultArea, setDefaultArea] = useState(AUTO_DEFAULT_AREA);
