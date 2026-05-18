@@ -1,6 +1,6 @@
 "use server";
 
-import { ChatType } from "@rtc-database/shared/prisma/browser";
+import { ChatType, Roles as UserRole } from "@rtc-database/shared/prisma/browser";
 import { ActionResult, ChatData, Message } from "@rtc-database/shared";
 
 import { validateSession } from "@/app/lib/authActions";
@@ -14,6 +14,115 @@ import { createLog } from "../ActivityLogs/LogActions";
 
 // only returns latest message for each chat
 // useMessaging will fetch all messages for the selected chat
+
+export type ChatUser = {
+  id: string;
+  name: string;
+  image: string | null;
+  role: UserRole;
+};
+
+async function findDirectChatBetween(userId: string, otherUserId: string) {
+  const chats = await prisma.chat.findMany({
+    where: {
+      type: ChatType.DIRECT,
+      AND: [
+        { members: { some: { userId } } },
+        { members: { some: { userId: otherUserId } } },
+      ],
+    },
+    select: {
+      id: true,
+      members: { select: { userId: true } },
+    },
+  });
+
+  return (
+    chats.find(
+      (chat) =>
+        chat.members.length === 2 &&
+        chat.members.every((member) =>
+          [userId, otherUserId].includes(member.userId),
+        ),
+    ) ?? null
+  );
+}
+
+export async function getChatUsers(): Promise<ActionResult<ChatUser[]>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const users = await prisma.user.findMany({
+      where: { id: { not: sessionResult.result.id } },
+      select: { id: true, name: true, image: true, role: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { success: true, result: users };
+  } catch (err) {
+    console.error("Error in getChatUsers:", err);
+    return { success: false, error: "Error fetching users" };
+  }
+}
+
+export async function createChatWithUser(
+  userId: string,
+): Promise<ActionResult<number>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    if (!userId || typeof userId !== "string") {
+      return { success: false, error: "Invalid user ID" };
+    }
+    if (userId === sessionResult.result.id) {
+      return { success: false, error: "Cannot create a chat with yourself" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    const existingChat = await findDirectChatBetween(
+      sessionResult.result.id,
+      userId,
+    );
+    if (existingChat) {
+      return {
+        success: false,
+        error: "A direct chat with this user already exists",
+      };
+    }
+
+    const chat = await prisma.chat.create({
+      data: {
+        type: ChatType.DIRECT,
+        members: {
+          create: [{ userId: sessionResult.result.id }, { userId }],
+        },
+      },
+    });
+
+    await createLog({
+      action: LogAction.CREATE_CHAT,
+      details: { id: chat.id, type: ChatType.DIRECT, memberCount: 2 },
+    });
+
+    return { success: true, result: chat.id };
+  } catch (err) {
+    console.error("Error in createChatWithUser:", err);
+    return { success: false, error: "Error creating direct chat" };
+  }
+}
 
 // TODO: make it so you must add people to chat directly
 export async function getChats(): Promise<ActionResult<ChatData[]>> {
@@ -132,16 +241,10 @@ export async function getDirectChatId(
       throw new Error("Invalid user ID");
     }
 
-    const existingChat = await prisma.chat.findFirst({
-      where: {
-        type: ChatType.DIRECT,
-        members: {
-          every: {
-            userId: { in: [sessionResult.result.id, userId] },
-          },
-        },
-      },
-    });
+    const existingChat = await findDirectChatBetween(
+      sessionResult.result.id,
+      userId,
+    );
 
     if (!existingChat) {
       return { success: false, error: "Direct chat not found" };
@@ -285,6 +388,13 @@ export async function createGroupChat(
       return { success: false, error: "Invalid chat name" };
     }
 
+    const uniqueMemberIds = Array.from(
+      new Set(memberIds.filter((id) => id && id !== sessionResult.result.id)),
+    );
+    if (uniqueMemberIds.length < 2) {
+      return { success: false, error: "Select at least 2 members" };
+    }
+
     const chat = await prisma.chat.create({
       data: {
         name,
@@ -292,7 +402,7 @@ export async function createGroupChat(
         members: {
           create: [
             { userId: sessionResult.result.id },
-            ...memberIds.map((id) => ({ userId: id })),
+            ...uniqueMemberIds.map((id) => ({ userId: id })),
           ],
         },
       },
@@ -300,13 +410,89 @@ export async function createGroupChat(
 
     await createLog({
       action: LogAction.CREATE_CHAT,
-      details: { id: chat.id, type: ChatType.GROUP, memberCount: memberIds.length + 1 },
+      details: {
+        id: chat.id,
+        type: ChatType.GROUP,
+        memberCount: uniqueMemberIds.length + 1,
+      },
     });
 
     return { success: true, result: chat.id };
   } catch (err) {
     console.error("Error in createGroupChat:", err);
     return { success: false, error: "Error creating group chat" };
+  }
+}
+
+export async function addUsersToGroupChat(
+  chatId: number,
+  userIds: string[],
+): Promise<ActionResult<undefined>> {
+  try {
+    const sessionResult = await validateSession();
+    if (!sessionResult.success) {
+      return sessionResult;
+    }
+
+    const uniqueUserIds = Array.from(
+      new Set(userIds.filter((id) => id && id !== sessionResult.result.id)),
+    );
+    if (!chatId || typeof chatId !== "number") {
+      return { success: false, error: "Invalid chat ID" };
+    }
+    if (uniqueUserIds.length === 0) {
+      return { success: false, error: "Select at least 1 user" };
+    }
+
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId },
+      include: {
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!chat) {
+      return { success: false, error: "Chat not found" };
+    }
+    if (chat.type !== ChatType.GROUP) {
+      return { success: false, error: "Can only add users to group chats" };
+    }
+    if (!chat.members.some((member) => member.userId === sessionResult.result.id)) {
+      return { success: false, error: "You are not a member of this chat" };
+    }
+
+    const existingMemberIds = new Set(chat.members.map((member) => member.userId));
+    const newMemberIds = uniqueUserIds.filter((id) => !existingMemberIds.has(id));
+    if (newMemberIds.length === 0) {
+      return { success: true, result: undefined };
+    }
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: newMemberIds } },
+      select: { id: true },
+    });
+    const validUserIds = users.map((user) => user.id);
+    if (validUserIds.length === 0) {
+      return { success: false, error: "No valid users selected" };
+    }
+
+    await prisma.chatMember.createMany({
+      data: validUserIds.map((userId) => ({ chatId, userId })),
+    });
+
+    await createLog({
+      action: LogAction.CREATE_CHAT,
+      details: {
+        id: chatId,
+        type: ChatType.GROUP,
+        addedMemberCount: validUserIds.length,
+      },
+    });
+
+    return { success: true, result: undefined };
+  } catch (err) {
+    console.error("Error in addUsersToGroupChat:", err);
+    return { success: false, error: "Error adding users to group chat" };
   }
 }
 

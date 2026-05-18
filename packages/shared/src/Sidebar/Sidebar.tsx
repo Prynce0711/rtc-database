@@ -399,8 +399,7 @@ const caseNavItems: NavItem[] = [
     dropdowns: [
       { label: "Criminal Cases", href: "criminal" },
       { label: "Civil Cases", href: "civil" },
-      { label: "CFI Transmittal Record", href: "civil/cif" },
-      { label: "Civil Transmittal Record", href: "civil/transmittal" },
+   
       { label: "Petition", href: "petition" },
       { label: "Special Proceedings", href: "proceedings" },
       { label: "Receiving Logs", href: "receiving" },

@@ -21,6 +21,7 @@ import {
   FiUsers,
   FiX,
 } from "react-icons/fi";
+import * as XLSX from "xlsx";
 import {
   calculateCriminalCaseStats,
   CriminalCaseAdapter,
@@ -35,6 +36,7 @@ import {
   Pagination,
   Roles,
   Table,
+  TipCell,
   usePopup,
   useToast,
   CRIMINAL_APPEALED_CASE_FIELDS,
@@ -106,6 +108,51 @@ const formatAppealedValue = (
   return String(value);
 };
 
+const normalizeAppealedSearchValue = (value: unknown): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .trim();
+
+const matchesAppealedSearch = (
+  record: CriminalAppealedCaseData,
+  query: string,
+): boolean => {
+  const normalizedQuery = normalizeAppealedSearchValue(query);
+  if (!normalizedQuery) return true;
+
+  const values = [
+    record.id,
+    ...CRIMINAL_APPEALED_CASE_FIELDS.map((field) =>
+      formatAppealedValue(record, field),
+    ),
+  ];
+
+  return values.some((value) =>
+    normalizeAppealedSearchValue(value).includes(normalizedQuery),
+  );
+};
+
+const downloadAppealedRecordsExcel = (
+  records: CriminalAppealedCaseData[],
+): void => {
+  const rows = records.map((record) => ({
+    ID: record.id,
+    ...Object.fromEntries(
+      CRIMINAL_APPEALED_CASE_FIELDS.map((field) => [
+        field.label,
+        formatAppealedValue(record, field),
+      ]),
+    ),
+  }));
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Appealed Cases");
+  XLSX.writeFile(
+    workbook,
+    `criminal-appealed-cases-export-${Date.now()}.xlsx`,
+  );
+};
+
 const CriminalAppealedCasesSection = ({
   adapter,
   canManageCases,
@@ -118,6 +165,8 @@ const CriminalAppealedCasesSection = ({
   const [records, setRecords] = useState<CriminalAppealedCaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const fetchAppealedCases = useCallback(async () => {
     if (!adapter.getCriminalAppealedCases) {
@@ -164,6 +213,25 @@ const CriminalAppealedCasesSection = ({
     await fetchAppealedCases();
   };
 
+  const filteredRecords = useMemo(
+    () => records.filter((record) => matchesAppealedSearch(record, searchQuery)),
+    [records, searchQuery],
+  );
+
+  const handleExportAppealedCases = () => {
+    if (filteredRecords.length === 0) {
+      popup.showError("No appealed records to export.");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      downloadAppealedRecordsExcel(filteredRecords);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return <PageListSkeleton statCards={2} tableColumns={8} tableRows={8} />;
   }
@@ -178,6 +246,31 @@ const CriminalAppealedCasesSection = ({
 
   return (
     <>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+          <input
+            type="text"
+            placeholder="Search appealed records..."
+            className="input input-bordered w-full pl-11"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          className={`${ButtonStyles.info} ${exporting ? "loading" : ""}`}
+          onClick={handleExportAppealedCases}
+          disabled={exporting}
+        >
+          <FiDownload className="h-5 w-5" />
+          {exporting ? "Exporting..." : "Export Excel"}
+        </button>
+        <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
+          {filteredRecords.length} record{filteredRecords.length !== 1 && "s"}
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-base-200 bg-base-100 p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/40">
@@ -207,7 +300,7 @@ const CriminalAppealedCasesSection = ({
             })),
             ...(canManageCases ? [{ key: "actions", label: "Actions" }] : []),
           ]}
-          data={records as unknown as Record<string, unknown>[]}
+          data={filteredRecords as unknown as Record<string, unknown>[]}
           rowsPerPage={10}
           resizableColumns
           disableCellTooltips={false}
@@ -217,16 +310,21 @@ const CriminalAppealedCasesSection = ({
 
             return (
               <tr key={record.id} className="hover">
-                <td className="px-4 py-3 text-sm font-semibold text-base-content">
-                  {record.id}
-                </td>
+                <TipCell
+                  label="ID"
+                  value={record.id}
+                  className="font-semibold text-base-content"
+                  clickHint={false}
+                />
                 {CRIMINAL_APPEALED_CASE_FIELDS.map((field) => (
-                  <td
+                  <TipCell
                     key={field.key}
-                    className="px-4 py-3 text-sm text-base-content/75 align-top"
-                  >
-                    {formatAppealedValue(record, field)}
-                  </td>
+                    label={field.label}
+                    value={formatAppealedValue(record, field)}
+                    className="text-base-content/75"
+                    truncate
+                    clickHint={false}
+                  />
                 ))}
                 {canManageCases && (
                   <td className="px-4 py-3">
@@ -960,126 +1058,113 @@ const CriminalCasePage: React.FC<{
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+        {CASE_VIEW_OPTIONS.map((view) => {
+          const isActive = caseView === view.key;
+          return (
+            <button
+              key={view.key}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => handleCaseViewChange(view.key)}
+              className={[
+                "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
+                isActive
+                  ? "border-primary bg-primary/10 text-primary shadow-sm"
+                  : "border-base-200 bg-base-100 text-base-content/65 hover:border-base-300 hover:bg-base-200/40",
+              ].join(" ")}
+            >
+              <div className="text-sm font-bold">{view.label}</div>
+              <div className="mt-1 text-xs leading-4 opacity-75">
+                {view.description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Search and Filter Toolbar */}
-      <div className="relative">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {caseView === "criminal" && (
-            <>
-              <div className="relative flex-1 max-w-md">
-                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
-                <input
-                  type="text"
-                  placeholder="Search by case number..."
-                  className="input input-bordered w-full pl-11"
-                  value={appliedFilters?.caseNumber || ""}
-                  disabled={isSelecting}
-                  onChange={(e) =>
-                    setAppliedFilters((prev) => ({
-                      ...prev,
-                      caseNumber: e.target.value,
-                    }))
-                  }
-                />
-              </div>
+      {caseView === "criminal" && (
+        <div className="relative">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-base-content/40 text-xl z-10" />
+              <input
+                type="text"
+                placeholder="Search by case number..."
+                className="input input-bordered w-full pl-11"
+                value={appliedFilters?.caseNumber || ""}
+                disabled={isSelecting}
+                onChange={(e) =>
+                  setAppliedFilters((prev) => ({
+                    ...prev,
+                    caseNumber: e.target.value,
+                  }))
+                }
+              />
+            </div>
 
-              <button
-                type="button"
-                className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
-                onClick={() => setFilterModalOpen((prev) => !prev)}
+            <button
+              type="button"
+              className={`${ButtonStyles.secondary} ${activeFilterCount > 0 ? "btn-primary" : ""}`}
+              onClick={() => setFilterModalOpen((prev) => !prev)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Filter
-                {activeFilterCount > 0 && (
-                  <span className="badge badge-sm badge-primary ml-1">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </>
-          )}
-
-          <div
-            className={
-              caseView === "appealed"
-                ? "flex flex-wrap gap-2 sm:ml-auto"
-                : "flex flex-wrap gap-2"
-            }
-          >
-            {CASE_VIEW_OPTIONS.map((view) => {
-              const isActive = caseView === view.key;
-              return (
-                <button
-                  key={view.key}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => handleCaseViewChange(view.key)}
-                  className={[
-                    "min-w-[12rem] rounded-2xl border px-4 py-2 text-left transition-all",
-                    isActive
-                      ? "border-primary bg-primary/10 text-primary shadow-sm"
-                      : "border-base-200 bg-base-100 text-base-content/65 hover:border-base-300 hover:bg-base-200/40",
-                  ].join(" ")}
-                >
-                  <div className="text-sm font-bold">{view.label}</div>
-                  <div className="mt-1 text-xs leading-4 opacity-75">
-                    {view.description}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {canManageCases &&
-            caseView === "criminal" &&
-            (isSelecting ? (
-              <div className="flex items-center gap-2 sm:ml-3">
-                <span className="text-sm text-base-content/60 whitespace-nowrap">
-                  {selectedCaseIds.length} selected
+                <path
+                  fillRule="evenodd"
+                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Filter
+              {activeFilterCount > 0 && (
+                <span className="badge badge-sm badge-primary ml-1">
+                  {activeFilterCount}
                 </span>
-                <button
-                  className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
-                  onClick={() => void handleApplySelectionMode()}
-                  disabled={
-                    selectedCaseIds.length === 0 ||
-                    (selectionMode === "delete" && deletingSelected)
-                  }
-                >
-                  <FiCheck className="h-4 w-4" />
-                  <span>
-                    {selectionMode === "edit"
-                      ? "Edit Selected"
-                      : "Delete Selected"}
-                  </span>
-                </button>
-                <button
-                  className="btn btn-md btn-ghost text-base-content/50"
-                  onClick={cancelSelectionMode}
-                  title="Cancel selection"
-                >
-                  <FiX className="h-4 w-4" />
-                </button>
-              </div>
-            ) : null)}
+              )}
+            </button>
 
-          {caseView === "criminal" && (
+            {canManageCases &&
+              (isSelecting ? (
+                <div className="flex items-center gap-2 sm:ml-3">
+                  <span className="text-sm text-base-content/60 whitespace-nowrap">
+                    {selectedCaseIds.length} selected
+                  </span>
+                  <button
+                    className={`btn btn-md gap-2 ${selectionMode === "delete" ? "btn-error" : "btn-primary"} ${deletingSelected ? "loading" : ""}`}
+                    onClick={() => void handleApplySelectionMode()}
+                    disabled={
+                      selectedCaseIds.length === 0 ||
+                      (selectionMode === "delete" && deletingSelected)
+                    }
+                  >
+                    <FiCheck className="h-4 w-4" />
+                    <span>
+                      {selectionMode === "edit"
+                        ? "Edit Selected"
+                        : "Delete Selected"}
+                    </span>
+                  </button>
+                  <button
+                    className="btn btn-md btn-ghost text-base-content/50"
+                    onClick={cancelSelectionMode}
+                    title="Cancel selection"
+                  >
+                    <FiX className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null)}
+
             <span className="sm:ml-auto text-sm text-base-content/50 tabular-nums font-medium">
               {totalCount} case{totalCount !== 1 && "s"}
             </span>
-          )}
-        </div>
+          </div>
 
-        {caseView === "criminal" && (
           <FilterDropdown
             isOpen={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
@@ -1088,8 +1173,8 @@ const CriminalCasePage: React.FC<{
             searchValue={appliedFilters}
             getSuggestions={getCaseSuggestions}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {caseView === "appealed" ? (
         <CriminalAppealedCasesSection
