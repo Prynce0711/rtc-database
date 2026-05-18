@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  addUsersToGroupChat,
+  createChatWithUser,
   createGroupChat as createGroupChatAction,
   getChatById,
+  getChatUsers,
   getChats,
 } from "@/app/components/Messages/MessagesActions";
 import { useSession } from "@/app/lib/authClient";
@@ -43,6 +46,7 @@ import {
   FiSmile,
   FiSquare,
   FiTrash2,
+  FiUserPlus,
   FiUsers,
   FiVideo,
   FiX,
@@ -59,6 +63,7 @@ interface DisplayUser {
 }
 
 type GroupedMessages = { date: string; messages: Message[] };
+type ComposeMode = "direct" | "group" | "addMembers";
 
 const INLINE_MEDIA_AUTOPLAY_LIMIT = 1;
 const ATTACHMENT_PLACEHOLDER_TEXT = "Sent an attachment";
@@ -282,9 +287,10 @@ const Messages: React.FC = () => {
     images: string[];
     index: number;
   } | null>(null);
-  const [showGroupCompose, setShowGroupCompose] = useState(false);
+  const [composeMode, setComposeMode] = useState<ComposeMode | null>(null);
   const [groupMembers, setGroupMembers] = useState<DisplayUser[]>([]);
   const [groupName, setGroupName] = useState("");
+  const [allUsers, setAllUsers] = useState<DisplayUser[]>([]);
   const [onlineScrollOffset, setOnlineScrollOffset] = useState(0);
   const [hoveredConvo, setHoveredConvo] = useState<number | null>(null);
   const [pinnedConvoIds, setPinnedConvoIds] = useState<Set<number>>(new Set());
@@ -329,8 +335,29 @@ const Messages: React.FC = () => {
   }, [statusPopup]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadChats();
   }, [loadChats]);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      const result = await getChatUsers();
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to load users");
+        return;
+      }
+      setAllUsers(
+        result.result.map((user) => ({
+          id: user.id,
+          name: user.name,
+          image: user.image ?? undefined,
+          role: user.role,
+        })),
+      );
+    };
+
+    void loadUsers();
+  }, [statusPopup]);
 
   const activeConvo = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
@@ -588,22 +615,31 @@ const Messages: React.FC = () => {
   }, []);
 
   const availableUsers = useMemo(() => {
-    const unique = new Map<string, DisplayUser>();
-    conversations.forEach((conversation) => {
-      const entries = conversation.members ?? [];
-      entries.forEach((entry) => {
-        if (!entry || entry.id === viewerId) return;
-        unique.set(entry.id, {
-          id: entry.id,
-          name: entry.name,
-          image: entry.image ?? undefined,
-        });
-      });
-    });
-    return Array.from(unique.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
+    const existingDirectUserIds = new Set(
+      conversations
+        .filter((conversation) => conversation.type === ChatType.DIRECT)
+        .flatMap(
+          (conversation) =>
+            conversation.members
+              ?.filter((member) => member.id !== viewerId)
+              .map((member) => member.id) ?? [],
+        ),
     );
-  }, [conversations, viewerId]);
+    const activeMemberIds = new Set(
+      composeMode === "addMembers"
+        ? activeConvo?.members?.map((member) => member.id) ?? []
+        : [],
+    );
+
+    return allUsers
+      .filter((user) => {
+        if (composeMode === "direct") {
+          return !existingDirectUserIds.has(user.id);
+        }
+        return !activeMemberIds.has(user.id);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeConvo?.members, allUsers, composeMode, conversations, viewerId]);
 
   // ── Group chat creation ─────────────────────────────────────────────────
   const toggleGroupMember = useCallback((user: DisplayUser) => {
@@ -613,7 +649,64 @@ const Messages: React.FC = () => {
         : [...prev, user],
     );
   }, []);
-  const createGroupChat = useCallback(async () => {
+
+  const closeCompose = useCallback(() => {
+    setComposeMode(null);
+    setGroupMembers([]);
+    setGroupName("");
+    setComposeSearch("");
+  }, []);
+
+  const switchCreateTab = useCallback((mode: "direct" | "group") => {
+    setComposeMode(mode);
+    setGroupMembers((prev) => (mode === "direct" ? prev.slice(0, 1) : prev));
+    setComposeSearch("");
+  }, []);
+
+  const handleCreateDirectChat = useCallback(
+    async (user: DisplayUser) => {
+      const result = await createChatWithUser(user.id);
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to create chat");
+        return;
+      }
+      closeCompose();
+      await loadChats();
+      setActiveId(result.result);
+      setShowMobileChat(true);
+    },
+    [closeCompose, loadChats, statusPopup],
+  );
+
+  const handleComposeSubmit = useCallback(async () => {
+    if (composeMode === "direct") {
+      if (!groupMembers[0]) {
+        statusPopup.showWarning("Select a user.");
+        return;
+      }
+      await handleCreateDirectChat(groupMembers[0]);
+      return;
+    }
+
+    if (composeMode === "addMembers") {
+      if (!activeConvo) return;
+      if (groupMembers.length < 1) {
+        statusPopup.showWarning("Select at least 1 user.");
+        return;
+      }
+      const result = await addUsersToGroupChat(
+        activeConvo.id,
+        groupMembers.map((member) => member.id),
+      );
+      if (!result.success) {
+        statusPopup.showError(result.error || "Failed to add members");
+        return;
+      }
+      closeCompose();
+      await loadChats();
+      return;
+    }
+
     if (groupMembers.length < 2) {
       statusPopup.showWarning("Select at least 2 members.");
       return;
@@ -627,13 +720,20 @@ const Messages: React.FC = () => {
       statusPopup.showError(result.error || "Failed to create group chat");
       return;
     }
-    setShowGroupCompose(false);
-    setGroupMembers([]);
-    setGroupName("");
-    setComposeSearch("");
+    closeCompose();
     await loadChats();
     setActiveId(result.result);
-  }, [groupMembers, groupName, loadChats, statusPopup]);
+    setShowMobileChat(true);
+  }, [
+    activeConvo,
+    closeCompose,
+    composeMode,
+    groupMembers,
+    groupName,
+    handleCreateDirectChat,
+    loadChats,
+    statusPopup,
+  ]);
 
   // ── Online users scroll ─────────────────────────────────────────────────
   const onlineUsers: DisplayUser[] = [];
@@ -812,10 +912,10 @@ const Messages: React.FC = () => {
               </div>
               <button
                 className="btn btn-primary btn-sm btn-square rounded-lg"
-                title="Create group"
-                onClick={() => setShowGroupCompose(true)}
+                title="Create chat"
+                onClick={() => setComposeMode("direct")}
               >
-                <FiUsers className="w-4 h-4" />
+                <FiUserPlus className="w-4 h-4" />
               </button>
             </div>
 
@@ -1137,6 +1237,15 @@ const Messages: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1">
+                  {activeConvo.type === ChatType.GROUP && (
+                    <button
+                      className="btn btn-ghost btn-sm btn-square rounded-lg text-base-content/50 hover:text-primary"
+                      title="Add members"
+                      onClick={() => setComposeMode("addMembers")}
+                    >
+                      <FiUserPlus className="w-4 h-4" />
+                    </button>
+                  )}
                   <button className="btn btn-ghost btn-sm btn-square rounded-lg text-base-content/50 hover:text-primary">
                     <FiPhone className="w-4 h-4" />
                   </button>
@@ -1897,17 +2006,13 @@ const Messages: React.FC = () => {
 
       {/* ── Create Group Chat Modal ────────────────────────────────────── */}
       <AnimatePresence>
-        {showGroupCompose && (
+        {composeMode && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => {
-              setShowGroupCompose(false);
-              setGroupMembers([]);
-              setGroupName("");
-            }}
+            onClick={closeCompose}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -1922,31 +2027,59 @@ const Messages: React.FC = () => {
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
                 <h3 className="text-lg font-bold text-base-content flex items-center gap-2">
-                  <FiUsers className="w-5 h-5 text-primary" />
-                  Create Group Chat
+                  {composeMode === "addMembers" ? (
+                    <>
+                      <FiUsers className="w-5 h-5 text-primary" />
+                      Add Members
+                    </>
+                  ) : (
+                    <>
+                      <FiUserPlus className="w-5 h-5 text-primary" />
+                      Create Chat
+                    </>
+                  )}
                 </h3>
                 <button
-                  onClick={() => {
-                    setShowGroupCompose(false);
-                    setGroupMembers([]);
-                    setGroupName("");
-                  }}
+                  onClick={closeCompose}
                   className="btn btn-ghost btn-sm btn-square rounded-lg"
                 >
                   <FiX className="w-4 h-4" />
                 </button>
               </div>
 
+              {composeMode !== "addMembers" && (
+                <div className="px-5 py-3 border-b border-base-200">
+                  <div className="flex gap-1 bg-base-200/60 rounded-lg p-0.5">
+                    {(["direct", "group"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => switchCreateTab(mode)}
+                        className={[
+                          "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all duration-150",
+                          composeMode === mode
+                            ? "bg-base-100 text-base-content shadow-sm"
+                            : "text-base-content/50 hover:text-base-content/70",
+                        ].join(" ")}
+                      >
+                        {mode === "direct" ? "Direct" : "Group"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Group name */}
-              <div className="px-5 py-3 border-b border-base-200">
-                <input
-                  type="text"
-                  placeholder="Group name (optional)"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="input input-bordered input-sm w-full rounded-lg"
-                />
-              </div>
+              {composeMode === "group" && (
+                <div className="px-5 py-3 border-b border-base-200">
+                  <input
+                    type="text"
+                    placeholder="Group name (optional)"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="input input-bordered input-sm w-full rounded-lg"
+                  />
+                </div>
+              )}
 
               {/* Selected members chips */}
               {groupMembers.length > 0 && (
@@ -1974,7 +2107,11 @@ const Messages: React.FC = () => {
                   <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 w-4 h-4" />
                   <input
                     type="text"
-                    placeholder="Add members..."
+                    placeholder={
+                      composeMode === "direct"
+                        ? "Search users..."
+                        : "Add members..."
+                    }
                     value={composeSearch}
                     onChange={(e) => setComposeSearch(e.target.value)}
                     className="input input-bordered input-sm w-full pl-9 rounded-lg"
@@ -1984,15 +2121,24 @@ const Messages: React.FC = () => {
               </div>
 
               <div className="max-h-56 overflow-y-auto">
-                {availableUsers
-                  .filter(
+                {(() => {
+                  const filteredUsers = availableUsers.filter(
                     (u) =>
                       !composeSearch.trim() ||
                       u.name
                         .toLowerCase()
                         .includes(composeSearch.toLowerCase()),
-                  )
-                  .map((user) => {
+                  );
+
+                  if (filteredUsers.length === 0) {
+                    return (
+                      <div className="px-5 py-8 text-center text-sm text-base-content/45">
+                        No users available
+                      </div>
+                    );
+                  }
+
+                  return filteredUsers.map((user) => {
                     const isSelected = groupMembers.some(
                       (m) => m.id === user.id,
                     );
@@ -2000,7 +2146,13 @@ const Messages: React.FC = () => {
                     return (
                       <button
                         key={user.id}
-                        onClick={() => toggleGroupMember(user)}
+                        onClick={() => {
+                          if (composeMode === "direct") {
+                            setGroupMembers([user]);
+                            return;
+                          }
+                          toggleGroupMember(user);
+                        }}
                         className={`w-full flex items-center gap-3 px-5 py-3 transition-colors text-left ${isSelected ? "bg-primary/5" : "hover:bg-base-200/50"}`}
                       >
                         <UserAvatar user={user} size="md" />
@@ -2035,25 +2187,40 @@ const Messages: React.FC = () => {
                         </div>
                       </button>
                     );
-                  })}
+                  });
+                })()}
               </div>
 
               {/* Create button */}
               <div className="px-5 py-4 border-t border-base-200">
                 <button
-                  onClick={createGroupChat}
-                  disabled={groupMembers.length < 2}
+                  onClick={handleComposeSubmit}
+                  disabled={
+                    composeMode === "group"
+                      ? groupMembers.length < 2
+                      : groupMembers.length < 1
+                  }
                   className="btn btn-primary btn-sm w-full rounded-lg gap-2"
                 >
-                  <FiUsers className="w-4 h-4" />
-                  Create Group
+                  {composeMode === "direct" ? (
+                    <FiUserPlus className="w-4 h-4" />
+                  ) : (
+                    <FiUsers className="w-4 h-4" />
+                  )}
+                  {composeMode === "direct"
+                    ? "Create Chat"
+                    : composeMode === "addMembers"
+                      ? "Add Members"
+                      : "Create Group"}
                   {groupMembers.length > 0 && (
                     <span className="badge badge-sm badge-primary-content/20">
-                      {groupMembers.length} members
+                      {groupMembers.length} selected
                     </span>
                   )}
                 </button>
-                {groupMembers.length < 2 && groupMembers.length > 0 && (
+                {composeMode === "group" &&
+                  groupMembers.length < 2 &&
+                  groupMembers.length > 0 && (
                   <p className="text-[10px] text-error text-center mt-1.5">
                     Select at least 2 members
                   </p>
