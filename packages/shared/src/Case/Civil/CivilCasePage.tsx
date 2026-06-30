@@ -529,7 +529,7 @@ const CivilCasePage: React.FC<{ role: Roles; adapter: CivilCaseAdapter }> = ({
   return (
     <div className="space-y-6 sm:space-y-8">
       <header className="card bg-base-100 shadow-xl">
-        <div className="card-body p-4 sm:p-6">
+        <div className="card p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">

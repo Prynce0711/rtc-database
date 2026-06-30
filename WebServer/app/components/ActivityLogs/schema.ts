@@ -121,6 +121,9 @@ export const CreateLogData = z
       action: z.literal(LogAction.LOGIN_FAILED),
       details: z.object({
         email: z.email(),
+        reason: z
+          .enum(["WRONG_PASSWORD", "WRONG_EMAIL"])
+          .optional(),
       }),
     }),
   )

@@ -161,7 +161,10 @@ const LogsPopup = ({
             <p className="text-[15px] text-base-content/45 font-medium">
               Logged {formatLongDate(selectedLog.timestamp)}
             </p>
-            <LogBadges logAction={selectedLog.action as LogAction} />
+            <LogBadges
+              logAction={selectedLog.action as LogAction}
+              details={selectedLog.details}
+            />
           </div>
         </div>
 
@@ -230,7 +233,10 @@ const LogsPopup = ({
                     Badge
                   </span>
                   <div className="mt-2">
-                    <LogBadges logAction={selectedLog.action as LogAction} />
+                    <LogBadges
+                      logAction={selectedLog.action as LogAction}
+                      details={selectedLog.details}
+                    />
                   </div>
                 </div>
                 <div>
@@ -354,8 +360,11 @@ function createDetailText(
       const user = users.find((u) => u.id === detailsObj.id);
       return `User logged in successfully: ${user?.email || detailsObj.id}`;
     }
-    case LogAction.LOGIN_FAILED:
-      return `Login failed: Email: ${detailsObj.email}`;
+    case LogAction.LOGIN_FAILED: {
+      const failureReason = (detailsObj as { reason?: string }).reason;
+      const reasonText = failureReason ? `${failureReason.replace(/_/g, " ")} - ` : "";
+      return `Login failed: ${reasonText}Email: ${detailsObj.email}`;
+    }
     case LogAction.UPDATE_ROLE: {
       const user = users.find((u) => u.id === detailsObj.id);
       return `Role updated for ${user?.email || "user"}: ${detailsObj.from} → ${detailsObj.to}`;

@@ -23,3 +23,4 @@ dev.db
 .env
 certificates/
 WebServer/dev - Copy.db
+RTC-DATA/

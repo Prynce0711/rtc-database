@@ -181,54 +181,14 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
     });
   }, [searchValue]);
 
-  const toggleFilter = (key: string) => {
-    const next = new Set(enabledFilters);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-      // Default text filters to partial match when first enabled
-      const filterOption = options.find((opt) => opt.key === key);
-      if (filterOption?.type === "text" && exactMatchMap[key] === undefined) {
-        setExactMatchMap((prev) => ({ ...prev, [key]: false }));
-      }
-    }
-    setEnabledFilters(next);
-  };
-
-  const handleFilterChange = (key: string, value: any) =>
-    setFilters((prev) => ({ ...prev, [key]: value }));
-
-  const handleSuggestionClick = (key: string, suggestion: string) => {
-    handleFilterChange(key, suggestion);
-    setFocusedFilter(null);
-    setSuggestions([]);
-  };
-
-  useEffect(() => {
-    if (!focusedFilter || !getSuggestions) return;
-
-    const value = (filters[focusedFilter] as string) ?? "";
-
-    const id = setTimeout(() => {
-      Promise.resolve(getSuggestions(focusedFilter, value))
-        .then((sugs) => setSuggestions((sugs || []).slice(0, 8)))
-        .catch(() => setSuggestions([]));
-    }, 200); // debounce
-
-    return () => clearTimeout(id);
-  }, [focusedFilter, filters, getSuggestions]);
-
-  const resetFilters = () => {
-    setEnabledFilters(new Set());
-    setFilters({});
-    setExactMatchMap({});
-  };
-
-  const applyFilters = () => {
+  const getActiveFilterState = (
+    candidateFilters: FilterValues,
+    candidateEnabledFilters: Set<string>,
+    candidateExactMatchMap: ExactMatchMap,
+  ) => {
     const active: FilterValues = {};
-    enabledFilters.forEach((key) => {
-      const value = filters[key];
+    candidateEnabledFilters.forEach((key) => {
+      const value = candidateFilters[key];
       if (value === undefined || value === null) return;
       if (typeof value === "string" && value.trim() === "") return;
       if (typeof value === "object") {
@@ -238,14 +198,28 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
       active[key] = value;
     });
 
-    const activeExactMatchMap = Object.entries(
-      exactMatchMap,
-    ).reduce<ExactMatchMap>((acc, [key, value]) => {
+    const activeExactMatchMap = Object.entries(candidateExactMatchMap).reduce<
+      ExactMatchMap
+    >((acc, [key, value]) => {
       if (active[key] !== undefined) {
         acc[key] = value;
       }
       return acc;
     }, {});
+
+    return { active, activeExactMatchMap };
+  };
+
+  const commitFilters = (
+    candidateFilters: FilterValues,
+    candidateEnabledFilters: Set<string>,
+    candidateExactMatchMap: ExactMatchMap,
+  ) => {
+    const { active, activeExactMatchMap } = getActiveFilterState(
+      candidateFilters,
+      candidateEnabledFilters,
+      candidateExactMatchMap,
+    );
 
     const params = getCurrentSearchParams();
     if (Object.keys(active).length > 0) {
@@ -272,6 +246,66 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
     }
 
     onApply(active, activeExactMatchMap);
+  };
+
+  const toggleFilter = (key: string) => {
+    const next = new Set(enabledFilters);
+    let nextExactMatchMap = exactMatchMap;
+
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+      // Default text filters to partial match when first enabled
+      const filterOption = options.find((opt) => opt.key === key);
+      if (filterOption?.type === "text" && exactMatchMap[key] === undefined) {
+        nextExactMatchMap = { ...exactMatchMap, [key]: false };
+        setExactMatchMap(nextExactMatchMap);
+      }
+    }
+
+    setEnabledFilters(next);
+    commitFilters(filters, next, nextExactMatchMap);
+  };
+
+  const handleFilterChange = (key: string, value: any) => {
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    commitFilters(nextFilters, enabledFilters, exactMatchMap);
+  };
+
+  const handleSuggestionClick = (key: string, suggestion: string) => {
+    const nextFilters = { ...filters, [key]: suggestion };
+    setFilters(nextFilters);
+    commitFilters(nextFilters, enabledFilters, exactMatchMap);
+    setFocusedFilter(null);
+    setSuggestions([]);
+  };
+
+  useEffect(() => {
+    if (!focusedFilter || !getSuggestions) return;
+
+    const value = (filters[focusedFilter] as string) ?? "";
+
+    const id = setTimeout(() => {
+      Promise.resolve(getSuggestions(focusedFilter, value))
+        .then((sugs) => setSuggestions((sugs || []).slice(0, 8)))
+        .catch(() => setSuggestions([]));
+    }, 200); // debounce
+
+    return () => clearTimeout(id);
+  }, [focusedFilter, filters, getSuggestions]);
+
+  const resetFilters = () => {
+    setEnabledFilters(new Set());
+    setFilters({});
+    setExactMatchMap({});
+    commitFilters({}, new Set(), {});
+    onClose();
+  };
+
+  const applyFilters = () => {
+    commitFilters(filters, enabledFilters, exactMatchMap);
     onClose();
   };
 
@@ -299,7 +333,6 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
                 </span>
               )}
             </div>
-
             <div className="flex items-center gap-2">
               {activeCount > 0 && (
                 <button
@@ -332,7 +365,6 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
             </div>
           </div>
 
-          {/* Content */}
           <div
             ref={contentRef}
             className="p-5 max-h-[65vh] overflow-y-auto"
@@ -359,9 +391,11 @@ const FilterDropdown: React.FC<FilterModalProps> = ({
                   suggestions={focusedFilter === option.key ? suggestions : []}
                   onSuggestionClick={handleSuggestionClick}
                   exactMatch={exactMatchMap[option.key] ?? false}
-                  onExactMatchChange={(key, exact) =>
-                    setExactMatchMap((prev) => ({ ...prev, [key]: exact }))
-                  }
+                  onExactMatchChange={(key, exact) => {
+                    const nextExactMatchMap = { ...exactMatchMap, [key]: exact };
+                    setExactMatchMap(nextExactMatchMap);
+                    commitFilters(filters, enabledFilters, nextExactMatchMap);
+                  }}
                 />
               ))}
             </div>

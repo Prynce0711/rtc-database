@@ -215,7 +215,7 @@ export const auth = betterAuth({
         ctx.method === "POST" &&
         (ctx.path.startsWith("/sign-in") || ctx.path.includes("sign-in"))
       ) {
-        const email = ctx.body?.email;
+        const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
         const success = ctx.context.newSession?.user ? true : false;
 
         console.log(`Login attempt for email: ${email}, success: ${success}`);
@@ -228,10 +228,19 @@ export const auth = betterAuth({
             },
           });
         } else {
+          const existingUser = email
+            ? await prisma.user.findUnique({
+                where: { email },
+                select: { id: true },
+              })
+            : null;
+          const reason = existingUser ? "WRONG_PASSWORD" : "WRONG_EMAIL";
+
           await createLog({
             action: LogAction.LOGIN_FAILED,
             details: {
-              email: email,
+              email,
+              reason,
             },
           });
         }

@@ -129,6 +129,7 @@ const LogsDashboard: React.FC = () => {
   const [userFilter, setUserFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [activeUsersView, setActiveUsersView] = useState(false);
   const [selectedLog, setSelectedLog] = useState<CompleteLogData | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfigType>({
     key: "timestamp",
@@ -172,6 +173,30 @@ const LogsDashboard: React.FC = () => {
 
   // ─── Stats ─────────────────────────────────────────────────────────────────
 
+  const activeUserLoginRows = useMemo(() => {
+    const authActions = [LogAction.LOGIN_SUCCESS, LogAction.LOGOUT] as const;
+    const authLogs = [...logs].filter((log) =>
+      authActions.includes(log.action as typeof authActions[number]),
+    );
+    authLogs.sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+
+    const activeMap = new Map<string, CompleteLogData>();
+    authLogs.forEach((log) => {
+      if (!log.userId) return;
+      if (log.action === LogAction.LOGIN_SUCCESS) {
+        activeMap.set(log.userId, log);
+      } else if (log.action === LogAction.LOGOUT) {
+        activeMap.delete(log.userId);
+      }
+    });
+
+    return Array.from(activeMap.values()).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+  }, [logs]);
+
   const stats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -192,11 +217,12 @@ const LogsDashboard: React.FC = () => {
       total: logs.length,
       today: todayLogs.length,
       uniqueUsers: uniqueUsers.size,
+      activeUsers: activeUserLoginRows.length,
       topAction: topAction
         ? topAction[0].replace(/_/g, " ").toLowerCase()
         : "—",
     };
-  }, [logs]);
+  }, [logs, activeUserLoginRows.length]);
 
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -272,15 +298,17 @@ const LogsDashboard: React.FC = () => {
     return copy;
   }, [filteredLogs, sortConfig]);
 
-  const pageCount = Math.max(1, Math.ceil(sortedLogs.length / pageSize));
+  const totalRows = activeUsersView ? activeUserLoginRows.length : sortedLogs.length;
+  const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
   const effectivePage = Math.min(currentPage, pageCount);
   const handlePageChange = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(pageCount, page)));
   };
   const paginatedLogs = useMemo(() => {
     const start = (effectivePage - 1) * pageSize;
-    return sortedLogs.slice(start, start + pageSize);
-  }, [sortedLogs, effectivePage]);
+    const sourceRows = activeUsersView ? activeUserLoginRows : sortedLogs;
+    return sourceRows.slice(start, start + pageSize);
+  }, [sortedLogs, activeUserLoginRows, effectivePage, activeUsersView]);
 
   const tableSortConfig = useMemo(() => {
     if (!sortConfig) return undefined;
@@ -320,7 +348,8 @@ const LogsDashboard: React.FC = () => {
     userFilter !== "all" ||
     dateFrom !== "" ||
     dateTo !== "" ||
-    query.trim() !== "";
+    query.trim() !== "" ||
+    activeUsersView;
 
   const clearAllFilters = () => {
     setCategoryFilter("all");
@@ -399,10 +428,12 @@ const LogsDashboard: React.FC = () => {
           },
           {
             label: "Active Users",
-            value: stats.uniqueUsers.toLocaleString(),
-            subtitle: "Unique users with logs",
+            value: stats.activeUsers.toLocaleString(),
+            subtitle: "Currently logged in users",
             icon: Users,
             delay: 200,
+            isAction: true,
+            active: activeUsersView,
           },
           {
             label: "Top Action",
@@ -414,15 +445,24 @@ const LogsDashboard: React.FC = () => {
         ].map((card, idx) => (
           <div
             key={idx}
-            className="transform hover:scale-105 card surface-card-hover group"
+            className={`transform hover:scale-105 card surface-card-hover group ${
+              card.isAction ? "cursor-pointer" : ""
+            } ${card.active ? "ring-1 ring-primary/30 shadow-lg" : ""}`}
             style={{
               transitionDelay: `${card.delay}ms`,
               transition: "all 700ms cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
-            <div
-              className="card-body relative overflow-hidden"
+            <button
+              type="button"
+              className="card-body relative overflow-hidden text-left w-full"
               style={{ padding: "var(--space-card-padding)" }}
+              onClick={() => {
+                if (card.label === "Active Users") {
+                  setActiveUsersView((prev) => !prev);
+                  setCurrentPage(1);
+                }
+              }}
             >
               <div className="absolute right-0 top-0 h-32 w-32 -translate-y-8 translate-x-8 opacity-5 transition-all duration-500 group-hover:opacity-10 group-hover:scale-110">
                 <card.icon className="h-full w-full" />
@@ -446,7 +486,7 @@ const LogsDashboard: React.FC = () => {
                   {card.subtitle}
                 </p>
               </div>
-            </div>
+            </button>
           </div>
         ))}
       </section>
@@ -590,6 +630,14 @@ const LogsDashboard: React.FC = () => {
                 &quot;{query}&quot; <FiX className="w-2.5 h-2.5" />
               </button>
             )}
+            {activeUsersView && (
+              <button
+                className="badge badge-sm badge-primary gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setActiveUsersView(false)}
+              >
+                Logged in users <FiX className="w-2.5 h-2.5" />
+              </button>
+            )}
             <button
               className="text-xs text-error hover:underline ml-1 font-medium"
               onClick={clearAllFilters}
@@ -647,10 +695,12 @@ const LogsDashboard: React.FC = () => {
             <td className="py-3.5 align-middle text-center">
               <div className="flex items-center justify-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                  {getUserInitials(log.user?.name)}
+                  {getUserInitials(log.user?.name || (log.details as any)?.email)}
                 </div>
                 <span className="font-medium text-sm">
-                  {log.user?.name || "Unknown"}
+                  {log.user?.name || (log.action === LogAction.LOGIN_FAILED
+                    ? (log.details as any)?.email
+                    : "Unknown")}
                 </span>
               </div>
             </td>
@@ -661,7 +711,10 @@ const LogsDashboard: React.FC = () => {
             </td>
             <td className="py-3.5 align-middle text-center">
               <div className="flex justify-center">
-                <LogBadges logAction={log.action as LogAction} />
+                <LogBadges
+                  logAction={log.action as LogAction}
+                  details={log.details}
+                />
               </div>
             </td>
             <td className="py-3.5 align-middle text-center">

@@ -2,6 +2,8 @@ import { Sidebar } from "@rtc-database/shared";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import React from "react";
+
+export const dynamic = "force-dynamic";
 import { hasPassword } from "../components/AccountManagement/AccountActions";
 import { updateDarkMode } from "../components/Sidebar/DarkModeActions";
 import AppTutorial from "../components/Tutorial/AppTutorial";

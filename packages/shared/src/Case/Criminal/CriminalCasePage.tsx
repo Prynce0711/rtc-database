@@ -488,31 +488,6 @@ const CriminalCasePage: React.FC<{
     { key: "charge", label: "Charge", type: "text" },
     { key: "infoSheet", label: "Info Sheet", type: "text" },
     { key: "court", label: "Court", type: "text" },
-    { key: "consolidation", label: "Consolidation", type: "text" },
-    { key: "eqcNumber", label: "EQC Number", type: "number" },
-    { key: "detained", label: "Detained", type: "text" },
-    { key: "dateFiled", label: "Date Filed", type: "daterange" },
-    { key: "raffleDate", label: "Raffle Date", type: "daterange" },
-    { key: "committee1", label: "Committee 1", type: "text" },
-    { key: "committee2", label: "Committee 2", type: "text" },
-    { key: "judge", label: "Judge", type: "text" },
-    { key: "ao", label: "AO", type: "text" },
-    { key: "complainant", label: "Complainant", type: "text" },
-    { key: "houseNo", label: "House No", type: "text" },
-    { key: "street", label: "Street", type: "text" },
-    { key: "barangay", label: "Barangay", type: "text" },
-    { key: "municipality", label: "Municipality", type: "text" },
-    { key: "province", label: "Province", type: "text" },
-    { key: "counts", label: "Counts", type: "number" },
-    { key: "jdf", label: "JDF", type: "number" },
-    { key: "sajj", label: "SAJJ", type: "number" },
-    { key: "sajj2", label: "SAJJ2", type: "number" },
-    { key: "mf", label: "MF", type: "number" },
-    { key: "stf", label: "STF", type: "number" },
-    { key: "lrf", label: "LRF", type: "number" },
-    { key: "vcf", label: "VCF", type: "number" },
-    { key: "total", label: "Total", type: "number" },
-    { key: "amountInvolved", label: "Amount Involved", type: "number" },
   ];
 
   // const params = new URLSearchParams(window.location.search);
@@ -1007,7 +982,7 @@ const CriminalCasePage: React.FC<{
   return (
     <div className="space-y-6 sm:space-y-8">
       <header className="card bg-base-100 shadow-xl">
-        <div className="card-body p-4 sm:p-6">
+        <div className="card p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 text-base font-bold text-base-content mb-1">

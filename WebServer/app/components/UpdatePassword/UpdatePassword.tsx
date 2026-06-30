@@ -53,7 +53,9 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
   const matchCheck = password !== "" && password === confirm;
 
   const checks = { ...strengthChecks, match: matchCheck };
-  const isValid = Object.values(checks).every(Boolean);
+  const isValid =
+    Object.values(checks).every(Boolean) &&
+    (type !== UpdatePasswordType.CHANGE_PASSWORD || current.trim() !== "");
   useEffect(() => {
     const handleThemeChange = () => {
       setDarkMode(isDarkMode());
@@ -101,9 +103,14 @@ const UpdatePassword: React.FC<{ type: UpdatePasswordType }> = ({ type }) => {
     }
 
     if (type === UpdatePasswordType.CHANGE_PASSWORD) {
+      if (!current.trim()) {
+        statusPopup.showError("Enter your current password to change it.");
+        return;
+      }
+
       const { error } = await authClient.changePassword({
-        newPassword: password, // required
-        currentPassword: UpdatePasswordType.CHANGE_PASSWORD ? current : "", // required
+        newPassword: password,
+        currentPassword: current,
         revokeOtherSessions: true,
       });
 

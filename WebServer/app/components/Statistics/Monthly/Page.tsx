@@ -2,13 +2,15 @@
 
 import { useSession } from "@/app/lib/authClient";
 import Roles from "@/app/lib/Roles";
-import { RadioButton, RedirectingUI, usePopup } from "@rtc-database/shared";
+import { RedirectingUI, usePopup } from "@rtc-database/shared";
 import { useEffect, useMemo, useState } from "react";
-import { FiCalendar, FiDownload, FiFileText, FiPlus } from "react-icons/fi";
+import { FiCalendar, FiDownload, FiPlus } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import {
   deleteMonthlyStatistic,
   getMonthlyStatistics,
+  getMonthlyYears,
+  importLocalMonthlyReports,
   upsertMonthlyStatistics,
 } from "./MonthlyActions";
 import type { MonthlyRow } from "./Schema";
@@ -18,36 +20,7 @@ import AddReportPage from "./AddReportPage";
 import MonthlyTable from "./MonthlyTable";
 // import MonthlyToolbar from "./MonthlyToolbar";
 
-type MonthlyCategoryView =
-  | "Cases Disposed"
-  | "New Cases Filed"
-  | "Pending Cases";
-
-const categoryViews: {
-  label: string;
-  value: MonthlyCategoryView;
-  description: string;
-  icon: React.ElementType;
-}[] = [
-  {
-    label: "New Cases Filed",
-    value: "New Cases Filed",
-    description: "Newly filed case statistics",
-    icon: FiFileText,
-  },
-  {
-    label: "Cases Disposed",
-    value: "Cases Disposed",
-    description: "Disposed case statistics",
-    icon: FiFileText,
-  },
-  {
-    label: "Pending Cases",
-    value: "Pending Cases",
-    description: "Pending case statistics",
-    icon: FiFileText,
-  },
-];
+type MonthlyCategoryView = "Pending Cases";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -66,17 +39,28 @@ export default function MonthlyPage() {
   // );
 
   const today = new Date();
+  const currentYear = String(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(
     String(today.getMonth() + 1).padStart(2, "0"),
   );
 
-  const [selectedYear, setSelectedYear] = useState(String(today.getFullYear()));
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const selectedDate = `${selectedYear}-${selectedMonth}`;
 
   const [search, setSearch] = useState("");
-  const [activeCategoryView, setActiveCategoryView] =
-    useState<MonthlyCategoryView>("New Cases Filed");
+  const [activeCategoryView] = useState<MonthlyCategoryView>(
+    "Pending Cases",
+  );
+  const [availableYears, setAvailableYears] = useState<string[] | null>(null);
   const [importedData, setImportedData] = useState<MonthlyRow[] | null>(null);
+  const selectableYears = useMemo(() => {
+    const years = new Set<string>([currentYear]);
+    (availableYears ?? []).forEach((year) => years.add(year));
+    for (let offset = 1; offset <= 3; offset += 1) {
+      years.add(String(Number(currentYear) - offset));
+    }
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [availableYears, currentYear]);
   const [showAddPage, setShowAddPage] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(
@@ -143,6 +127,38 @@ export default function MonthlyPage() {
     });
   }, [selectedDate]);
 
+  useEffect(() => {
+    const initializeData = async () => {
+      if (canManageStats) {
+        try {
+          const importRes = await importLocalMonthlyReports();
+          if (importRes.success) {
+            const fresh = await getMonthlyStatistics(selectedDate);
+            if (fresh.success) setImportedData(fresh.result);
+          }
+        } catch {
+          // Ignore import failures and fall back to existing database rows.
+        }
+      }
+
+      const yearsRes = await getMonthlyYears();
+      if (yearsRes.success && yearsRes.result.length > 0) {
+        setAvailableYears(yearsRes.result);
+      } else {
+        setAvailableYears([currentYear]);
+      }
+    };
+
+    void initializeData();
+  }, [canManageStats, currentYear]);
+
+  useEffect(() => {
+    if (selectableYears.length === 0) return;
+    if (!selectableYears.includes(selectedYear)) {
+      setSelectedYear(selectableYears[0] ?? currentYear);
+    }
+  }, [selectableYears, selectedYear, currentYear]);
+
   const monthlyData = useMemo(() => {
     const all = importedData ?? [];
     return all.filter((r) => r.month === selectedDate);
@@ -150,9 +166,7 @@ export default function MonthlyPage() {
 
   /* ---------- derived ---------- */
 
-  const byCategory = monthlyData.filter(
-    (r) => r.category === activeCategoryView,
-  );
+  const byCategory = monthlyData.filter((r) => r.category === "Pending Cases");
   const filteredData = !search.trim()
     ? byCategory
     : byCategory.filter((r) => {
@@ -290,18 +304,17 @@ export default function MonthlyPage() {
                   </select>
 
                   {/* YEAR */}
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    className="input input-bordered join-item w-28"
+                  <select
+                    className="select select-bordered join-item w-28"
                     value={selectedYear}
-                    onChange={(e) =>
-                      setSelectedYear(
-                        e.target.value.replace(/\D/g, "").slice(0, 4),
-                      )
-                    }
-                  />
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                  >
+                    {selectableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex items-center gap-2 flex-nowrap">
@@ -312,6 +325,31 @@ export default function MonthlyPage() {
                     <FiDownload className="h-5 w-5" />
                     Export
                   </button>
+                  {canManageStats && (
+                    <button
+                      className="btn btn-ghost btn-sm gap-2"
+                      onClick={async () => {
+                        statusPopup.showLoading("Importing local monthly files...");
+                        try {
+                          const mod = await import("./MonthlyActions");
+                          const res = await mod.importLocalMonthlyReports();
+                          if (res.success) {
+                            statusPopup.showSuccess(
+                              `Imported ${res.result.imported} rows from local files.`,
+                            );
+                            const fresh = await getMonthlyStatistics(selectedDate);
+                            if (fresh.success) setImportedData(fresh.result);
+                          } else {
+                            statusPopup.showError(res.error ?? "Import failed");
+                          }
+                        } catch (e) {
+                          statusPopup.showError("Import failed");
+                        }
+                      }}
+                    >
+                      Import Local Files
+                    </button>
+                  )}
                   {canManageStats && (
                     <button
                       className="btn btn-success btn-md gap-2"
@@ -328,14 +366,7 @@ export default function MonthlyPage() {
         </header>
       )}
 
-      {/* ── CATEGORY VIEW SELECTOR ── */}
-      <div className="flex justify-start overflow-x-auto pb-1">
-        <RadioButton
-          options={categoryViews}
-          value={activeCategoryView}
-          onChange={setActiveCategoryView}
-        />
-      </div>
+      {/* ── CATEGORY VIEW: Pending Cases only ── */}
 
       {/* ── TOOLBAR ── */}
       {/* <MonthlyToolbar

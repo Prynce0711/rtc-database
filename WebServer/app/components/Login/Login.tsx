@@ -1,6 +1,5 @@
 "use client";
 
-import { isDarkMode } from "@rtc-database/shared";
 import {
   AnimatePresence,
   easeInOut,
@@ -63,7 +62,6 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  const [darkMode, setDarkMode] = useState(isDarkMode());
   const cardVariants = {
     hidden: { opacity: 0, y: 30, scale: 0.95 },
     visible: {
@@ -84,16 +82,6 @@ const Login: React.FC = () => {
       transition: { duration: 0.7 },
     },
   };
-
-  useEffect(() => {
-    const handleThemeChange = () => {
-      setDarkMode(isDarkMode());
-    };
-    window.addEventListener("themeChange", handleThemeChange);
-    return () => {
-      window.removeEventListener("themeChange", handleThemeChange);
-    };
-  }, []);
 
   const cardControls = useAnimation();
   const overlayControls = useAnimation();
@@ -240,362 +228,343 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative  bg-black/90">
-      {/* <Image
-        src="/cardo.jpg"
-        alt="Background"
-        fill
-        className={`bg-repeat ${darkMode ? "opacity-20" : "opacity-90"} pointer-events-none`}
-        priority
-      /> */}
-      {/* <Image
-        src="/jere.jpg"
-        alt="Brand"
-        width={300}
-        height={300}
-        className="absolute bottom-4 right-4 opacity-70 pointer-events-none select-none"
-      /> */}
+    <div className="h-screen w-screen overflow-hidden flex">
+      <div className="basis-2/3 min-w-0 h-full bg-slate-900 relative">
+        <Image
+          src="/ha.jpg"
+          alt="RTC brand image"
+          fill
+          className="object-cover"
+          priority
+        />
+      </div>
 
-      <Image
-        src="/ha.jpg"
-        alt="Background"
-        fill
-        className={`object-cover ${darkMode ? "opacity-20" : "opacity-30"} pointer-events-none`}
-        priority
-      />
-      <div className="max-w-md w-full relative z-10">
-        {/* full-screen overlay used during transition */}
+      <div className="basis-1/3 min-w-0 h-full bg-white text-slate-950 shadow-[0_0_28px_-12px_rgba(0,0,0,0.22)]">
+        <div className="flex h-full flex-col items-center justify-center px-4">
+          <div className="w-full max-w-105 space-y-6">
+            <motion.div
+              className="text-center"
+              initial={{ opacity: 0, y: -15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.7,
+                ease: [0.25, 0.46, 0.45, 0.94],
+              }}
+            >
+              <div className="flex items-center justify-center mb-4">
+                <motion.div
+                  className="relative group"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 20,
+                    delay: 0.1,
+                  }}
+                >
+                  <motion.div
+                    className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"
+                    animate={{
+                      scale: [1, 1.1, 1],
+                      opacity: [0.2, 0.3, 0.2],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+                  <Image
+                    src="/SupremeCourtLogo.webp"
+                    alt="Supreme Court of the Philippines"
+                    width={96}
+                    height={96}
+                    className="object-contain relative z-10 drop-shadow-lg"
+                  />
+                </motion.div>
+              </div>
+
+              <motion.h1
+                className="text-4xl font-bold text-slate-950 mb-2 tracking-tight"
+                style={{
+                  textShadow:
+                    "2px 2px 8px rgba(0,0,0,0.08), 0 0 20px rgba(0,0,0,0.05)",
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                Regional Trial Court
+              </motion.h1>
+
+              <motion.p
+                className="text-lg text-slate-700 font-semibold"
+                style={{
+                  textShadow:
+                    "2px 2px 6px rgba(0,0,0,0.08), 0 0 15px rgba(0,0,0,0.04)",
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                Republic of the Philippines
+              </motion.p>
+
+              <motion.p
+                className="text-sm text-slate-600 italic mt-2 font-medium"
+                style={{
+                  textShadow:
+                    "1px 1px 5px rgba(0,0,0,0.08), 0 0 10px rgba(0,0,0,0.03)",
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+                transition={{ delay: 0.5 }}
+              >
+                &quot;Batas at Bayan&quot;
+              </motion.p>
+            </motion.div>
+
+            <motion.div
+              className="relative z-10 p-0 bg-transparent border-0 shadow-none"
+              variants={cardVariants}
+              initial="hidden"
+              animate={cardControls}
+              style={{ WebkitTapHighlightColor: "transparent" }}
+            >
+              <motion.div
+                className="mb-8"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <h2 className="text-3xl font-bold text-slate-950 text-center">
+                  Sign In
+                </h2>
+                <p className="text-sm text-slate-700 text-center mt-2">
+                  Enter your credentials to access your account
+                </p>
+              </motion.div>
+
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    key={error}
+                    className="alert alert-error mb-6 shadow-lg"
+                    initial={{ x: -30, opacity: 0, scale: 0.9 }}
+                    animate={{
+                      x: [-30, 10, -8, 6, -4, 2, 0],
+                      opacity: 1,
+                      scale: 1,
+                    }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{
+                      duration: 0.7,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <span className="text-sm">{error}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleLogin} className="space-y-5">
+                <motion.div
+                  className="form-control"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <label htmlFor="email" className="label">
+                    <span className="label-text font-semibold text-base text-slate-900">
+                      Email Address
+                    </span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-slate-100 focus:scale-[1.02]"
+                    placeholder="admin@rtc.gov.ph"
+                    required
+                    disabled={isBusy}
+                  />
+                </motion.div>
+
+                <motion.div
+                  className="form-control"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 }}
+                >
+                  <label htmlFor="password" className="label">
+                    <span className="label-text font-semibold text-base text-slate-900">
+                      Password
+                    </span>
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-slate-100 pr-12 focus:scale-[1.02]"
+                      placeholder="••••••••"
+                      required
+                      disabled={isBusy}
+                    />
+
+                    <motion.button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition"
+                      disabled={isBusy}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  className="flex items-center justify-between gap-3 w-full"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="remember"
+                      type="checkbox"
+                      className="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      disabled={isBusy}
+                    />
+                    <label htmlFor="remember" className="text-sm cursor-pointer text-slate-700">
+                      Remember me
+                    </label>
+                  </div>
+                  <Link
+                    href="/forgotpassword"
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </motion.div>
+
+                <motion.button
+                  type="submit"
+                  disabled={isBusy}
+                  className="btn btn-primary w-full text-base font-semibold mt-6 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      <span>Signing In...</span>
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
+                </motion.button>
+              </form>
+
+              <div className="divider text-xs text-slate-500 mt-8 mb-6">
+                Or Use Magic Code
+              </div>
+
+              <motion.div
+                className="space-y-4"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.85 }}
+              >
+                <p className="text-sm text-slate-600">
+                  If your admin sent you a magic code because email links do not
+                  open on this local network, paste it here.
+                </p>
+
+                <div className="form-control">
+                  <label htmlFor="magicCode" className="label">
+                    <span className="label-text font-semibold text-base text-slate-900">
+                      Magic Code
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    id="magicCode"
+                    value={magicCode}
+                    onChange={(e) => setMagicCode(formatMagicCode(e.target.value))}
+                    className="input input-bordered w-full bg-slate-100 tracking-[0.2em] uppercase transition-all duration-200 focus:input-secondary"
+                    placeholder="ABCDE-FGHIJ"
+                    disabled={isBusy}
+                    inputMode="text"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <span className="label-text-alt mt-2 text-slate-500">
+                    Paste the code from your email, then continue.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
+                  onClick={() => void handleMagicCodeLogin()}
+                  disabled={isBusy}
+                >
+                  {isVerifyingMagicCode ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      <span>Checking Magic Code...</span>
+                    </>
+                  ) : (
+                    "Sign In With Magic Code"
+                  )}
+                </button>
+              </motion.div>
+
+              <div className="divider text-xs text-slate-500 mt-8">
+                Authorized Access Only
+              </div>
+
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mt-3">
+                  Regional Trial Court © 2026
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
         <motion.div
-          className="fixed inset-0 z-20 bg-base-100"
+          className="fixed inset-0 z-20 bg-slate-950"
           initial={{ opacity: 0 }}
           animate={overlayControls}
           style={{ pointerEvents: "none" }}
         />
-
-        {/* Logo and Header */}
-        <motion.div
-          className="text-center mb-10"
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.8,
-            ease: [0.25, 0.46, 0.45, 0.94],
-          }}
-        >
-          <div className="flex justify-center mb-6">
-            <motion.div
-              className="relative group"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{
-                type: "spring",
-                stiffness: 200,
-                damping: 20,
-                delay: 0.1,
-              }}
-            >
-              <motion.div
-                className="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-all duration-300"
-                animate={{
-                  scale: [1, 1.1, 1],
-                  opacity: [0.2, 0.3, 0.2],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <img
-                src="/SupremeCourtLogo.webp"
-                alt="Supreme Court of the Philippines"
-                className="w-32 h-32 object-contain relative z-10 drop-shadow-lg"
-              />
-            </motion.div>
-          </div>
-
-          <motion.h1
-            className="text-4xl font-bold text-white mb-2 tracking-tight"
-            style={{
-              textShadow:
-                "2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.5)",
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            Regional Trial Court
-          </motion.h1>
-
-          <motion.p
-            className="text-lg text-white/90 font-semibold"
-            style={{
-              textShadow:
-                "2px 2px 6px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5)",
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
-            Republic of the Philippines
-          </motion.p>
-
-          <motion.p
-            className="text-sm text-white/90 italic mt-2 font-medium"
-            style={{
-              textShadow:
-                "1px 1px 5px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.4)",
-            }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.8 }}
-            transition={{ delay: 0.5 }}
-          >
-            &quot;Batas at Bayan&quot;
-          </motion.p>
-        </motion.div>
-
-        {/* Login Form */}
-        <motion.div
-          className="
-relative z-10
-rounded-2xl
-p-8
-bg-linear-to-b from-white/90 to-white/60
-border border-white/20
-shadow-xl
-"
-          variants={cardVariants}
-          initial="hidden"
-          animate={cardControls}
-          style={{ WebkitTapHighlightColor: "transparent" }}
-        >
-          <motion.div
-            className="mb-8"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <h2 className="text-3xl font-bold text-base-content text-center">
-              Sign In
-            </h2>
-            <p className="text-sm text-base-content/90 text-center mt-2">
-              Enter your credentials to access your account
-            </p>
-          </motion.div>
-
-          {/* Error Alert */}
-          <AnimatePresence mode="wait">
-            {error && (
-              <motion.div
-                key={error}
-                className="alert alert-error mb-6 shadow-lg"
-                initial={{ x: -30, opacity: 0, scale: 0.9 }}
-                animate={{
-                  x: [-30, 10, -8, 6, -4, 2, 0],
-                  opacity: 1,
-                  scale: 1,
-                }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{
-                  duration: 0.7,
-                  ease: "easeInOut",
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="stroke-current shrink-0 h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-sm">{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            <motion.div
-              className="form-control"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <label htmlFor="email" className="label">
-                <span className="label-text font-semibold text-base">
-                  Email Address
-                </span>
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 focus:scale-[1.02]"
-                placeholder="admin@rtc.gov.ph"
-                required
-                disabled={isBusy}
-              />
-            </motion.div>
-
-            <motion.div
-              className="form-control"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <label htmlFor="password" className="label">
-                <span className="label-text font-semibold text-base">
-                  Password
-                </span>
-              </label>
-
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input input-bordered w-full focus:input-primary transition-all duration-200 bg-base-200 pr-12 focus:scale-[1.02]"
-                  placeholder="••••••••"
-                  required
-                  disabled={isBusy}
-                />
-
-                <motion.button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content transition"
-                  disabled={isBusy}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
-                </motion.button>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="flex items-center justify-between gap-3 w-full"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  id="remember"
-                  type="checkbox"
-                  className="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  disabled={isBusy}
-                />
-                <label htmlFor="remember" className="text-sm cursor-pointer">
-                  Remember me
-                </label>
-              </div>
-              <Link
-                href="/forgotpassword"
-                className="text-sm font-semibold text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </motion.div>
-
-            <motion.button
-              type="submit"
-              disabled={isBusy}
-              className="btn btn-primary w-full text-base font-semibold mt-6 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              {isLoading ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  <span>Signing In...</span>
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </motion.button>
-          </form>
-
-          <div className="divider text-xs text-base-content/70 mt-8 mb-6">
-            Or Use Magic Code
-          </div>
-
-          <motion.div
-            className="space-y-4"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.85 }}
-          >
-            <p className="text-sm text-base-content/85">
-              If your admin sent you a magic code because email links do not
-              open on this local network, paste it here.
-            </p>
-
-            <div className="form-control">
-              <label htmlFor="magicCode" className="label">
-                <span className="label-text font-semibold text-base">
-                  Magic Code
-                </span>
-              </label>
-              <input
-                type="text"
-                id="magicCode"
-                value={magicCode}
-                onChange={(e) => setMagicCode(formatMagicCode(e.target.value))}
-                className="input input-bordered w-full bg-base-200 tracking-[0.2em] uppercase transition-all duration-200 focus:input-secondary"
-                placeholder="ABCDE-FGHIJ"
-                disabled={isBusy}
-                inputMode="text"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              <span className="label-text-alt mt-2 text-base-content/70">
-                Paste the code from your email, then continue.
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-secondary w-full text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
-              onClick={() => void handleMagicCodeLogin()}
-              disabled={isBusy}
-            >
-              {isVerifyingMagicCode ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  <span>Checking Magic Code...</span>
-                </>
-              ) : (
-                "Sign In With Magic Code"
-              )}
-            </button>
-          </motion.div>
-
-          <div className="divider text-xs text-base-content/70 mt-8">
-            Authorized Access Only
-          </div>
-
-          <div className="text-center">
-            <p className="text-xs text-base-content/80 mt-3">
-              Regional Trial Court © 2026
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Footer */}
       </div>
     </div>
   );

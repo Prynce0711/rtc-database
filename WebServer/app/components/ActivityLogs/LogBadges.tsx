@@ -21,10 +21,22 @@ import {
 } from "react-icons/fi";
 import BaseBadge from "./BaseBadge";
 
-const LogBadges = ({ logAction }: { logAction: LogAction }) => {
+const LogBadges = ({
+  logAction,
+  details,
+}: {
+  logAction: LogAction;
+  details?: Record<string, unknown> | null;
+}) => {
   const getBadgeConfig = (
     action: LogAction,
+    details?: Record<string, unknown> | null,
   ): { color: string; text: string; icon: React.ReactNode } => {
+    const failureReason = (details as { reason?: string } | undefined)?.reason;
+    const failedText = failureReason
+      ? String(failureReason).replace(/_/g, " ")
+      : "Login Failed";
+
     const config: Record<
       LogAction,
       { color: string; text: string; icon: React.ReactNode }
@@ -36,7 +48,7 @@ const LogBadges = ({ logAction }: { logAction: LogAction }) => {
       },
       [LogAction.LOGIN_FAILED]: {
         color: "badge-error",
-        text: "Login Failed",
+        text: failedText,
         icon: <FiXCircle className="w-3 h-3" />,
       },
       [LogAction.LOGOUT]: {
@@ -329,7 +341,7 @@ const LogBadges = ({ logAction }: { logAction: LogAction }) => {
     return config[action];
   };
 
-  const { color, text, icon } = getBadgeConfig(logAction);
+  const { color, text, icon } = getBadgeConfig(logAction, details);
 
   return <BaseBadge color={color} text={text} icon={icon} />;
 };

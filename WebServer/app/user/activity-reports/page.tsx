@@ -1,4 +1,4 @@
-import LogsDashboard from "@/app/components/ActivityLogs/LogsDashboard";
+ import LogsDashboard from "@/app/components/ActivityLogs/LogsDashboard";
 import { auth } from "@/app/lib/auth";
 import { headers } from "next/headers";
 import Link from "next/link";

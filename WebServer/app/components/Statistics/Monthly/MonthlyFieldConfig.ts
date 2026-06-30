@@ -1,6 +1,4 @@
 export const CATEGORY_OPTIONS = [
-  "New Cases Filed",
-  "Cases Disposed",
   "Pending Cases",
 ];
 

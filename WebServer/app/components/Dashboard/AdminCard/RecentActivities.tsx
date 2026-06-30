@@ -110,10 +110,12 @@ const RecentActivities: React.FC = () => {
                                         <td className="py-3.5 align-middle text-center">
                                             <div className="flex items-center justify-center gap-2.5">
                                                 <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                                                    {getUserInitials(log.user?.name)}
+                                                    {getUserInitials(log.user?.name || (log.details as any)?.email)}
                                                 </div>
                                                 <span className="font-medium text-sm">
-                                                    {log.user?.name || "Unknown"}
+                                                    {log.user?.name || (log.action === LogAction.LOGIN_FAILED
+                                                      ? (log.details as any)?.email
+                                                      : "Unknown")}
                                                 </span>
                                             </div>
                                         </td>
@@ -124,7 +126,10 @@ const RecentActivities: React.FC = () => {
                                         </td>
                                         <td className="py-3.5 align-middle text-center">
                                             <div className="flex justify-center">
-                                                <LogBadges logAction={log.action as LogAction} />
+                                                <LogBadges
+                                                  logAction={log.action as LogAction}
+                                                  details={log.details}
+                                                />
                                             </div>
                                         </td>
                                         <td className="py-3.5 align-middle text-center">

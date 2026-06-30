@@ -59,6 +59,15 @@ export const authClient = createAuthClient({
         },
       },
     }),
+    {
+      id: "magic-link-session-refresh",
+      atomListeners: [
+        {
+          signal: "$sessionSignal",
+          matcher: (path: string) => path === "/magic-link/verify",
+        },
+      ],
+    },
   ],
 });
 export const { signIn, signUp, useSession, signOut } = authClient;

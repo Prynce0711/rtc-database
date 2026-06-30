@@ -8,19 +8,18 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { CATEGORY_BADGE } from "./MonthlyUtils";
+ 
 import type { MonthlyRow } from "./Schema";
 
 const PAGE_SIZE = 10;
 
-const COL_KEYS = ["category", "branch", "criminal", "civil", "total"] as const;
+const COL_KEYS = ["branch", "criminal", "civil", "total"] as const;
 
 const DEFAULT_WIDTHS: Record<string, number> = {
-  category: 160,
-  branch: 140,
-  criminal: 120,
-  civil: 120,
-  total: 120,
+  branch: 240,
+  criminal: 140,
+  civil: 140,
+  total: 140,
 };
 
 export type SelectionMode = "edit" | "delete" | null;
@@ -242,23 +241,7 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
                 </th>
               )}
               <th
-                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
-                ref={(node) => {
-                  thRefs.current["category"] = node;
-                }}
-                style={{ width: colWidths["category"] }}
-              >
-                <span className="block truncate">Category</span>
-                <div
-                  className="absolute right-0 top-0 h-full w-5 cursor-col-resize hover:bg-primary/10"
-                  onMouseDown={(e) => startResize(e, "category")}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="absolute left-1/2 top-1/2 h-4 -translate-x-1/2 -translate-y-1/2 border-r border-base-content/20" />
-                </div>
-              </th>
-              <th
-                className="py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
+                className="py-4 px-4 text-left text-sm font-bold uppercase tracking-wider text-base-content/50 overflow-hidden relative"
                 ref={(node) => {
                   thRefs.current["branch"] = node;
                 }}
@@ -327,21 +310,18 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
           <tbody>
             {paginatedData.length === 0 ? (
               <tr>
-                <td
-                  colSpan={isSelecting ? 6 : 5}
-                  className="py-16 text-center text-base-content/40 text-sm"
-                >
-                  No rows match your search.
-                </td>
-              </tr>
+                  <td
+                    colSpan={isSelecting ? 5 : 4}
+                    className="py-16 text-center text-base-content/40 text-sm"
+                  >
+                    No rows match your search.
+                  </td>
+                </tr>
             ) : (
               paginatedData.map((row) => {
                 const currentFlatIdx = flatRowIdx++;
-                const rowKey = `${row.category}-${row.branch}-${row.id ?? currentFlatIdx}`;
+                const rowKey = `${row.branch}-${row.id ?? currentFlatIdx}`;
                 const above = currentFlatIdx > 0;
-                const badge = CATEGORY_BADGE[row.category] ?? {
-                  bg: "bg-base-300/70 text-base-content/70",
-                };
                 return (
                   <tr
                     key={rowKey}
@@ -370,13 +350,10 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
                         />
                       </td>
                     )}
-                    <td className="px-4 py-3.5 align-middle text-center">
-                      <span
-                        className={`inline-flex items-center justify-center rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wide ${badge.bg}`}
-                      >
-                        {row.category}
-                      </span>
+                    <td className="px-4 py-3.5 align-middle text-left text-sm font-medium uppercase text-base-content relative">
+                      {row.branch}
                     </td>
+                    
                     <td
                       className="px-4 py-3.5 text-center text-sm font-medium uppercase text-base-content relative"
                       onMouseEnter={() =>
@@ -385,7 +362,6 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
                       }
                       onMouseLeave={() => setHoveredCell(null)}
                     >
-                      {row.branch}
                       {renderTooltip(
                         "Branch",
                         row.branch,
@@ -451,7 +427,7 @@ const MonthlyTable: React.FC<MonthlyTableProps> = ({
             {data.length > 0 && (
               <tr className="bg-primary/80 text-primary-content">
                 <td
-                  colSpan={isSelecting ? 3 : 2}
+                  colSpan={isSelecting ? 2 : 1}
                   className="px-6 py-3.5 text-left font-black text-[15px] uppercase tracking-widest"
                 >
                   Grand Total :
